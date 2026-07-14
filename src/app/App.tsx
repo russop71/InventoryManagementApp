@@ -4,6 +4,7 @@ import { InventoryProvider } from './contexts/InventoryContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { Toaster } from './components/ui/sonner';
 import { useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   useEffect(() => {
@@ -15,6 +16,7 @@ function App() {
       <InventoryProvider>
         <RouterProvider router={router} />
         <Toaster />
+        <Analytics />
       </InventoryProvider>
     </ToastProvider>
   );
