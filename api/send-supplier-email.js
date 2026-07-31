@@ -1,13 +1,27 @@
 export default async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Allow', 'POST, OPTIONS');
+    return res.status(204).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.WELCOME_FROM_EMAIL || 'Zest IQ <hello@zestiq.ca>';
+  const apiKey =
+    process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_TOKEN ||
+    process.env.RESEND_KEY ||
+    '';
+  const fromEmail =
+    process.env.WELCOME_FROM_EMAIL ||
+    process.env.RESEND_FROM_EMAIL ||
+    'Zest IQ <onboarding@resend.dev>';
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'Email service is not configured' });
+    return res.status(500).json({
+      error: 'Email service is not configured. Set RESEND_API_KEY (or RESEND_API_TOKEN / RESEND_KEY).',
+    });
   }
 
   const to = String(req.body?.to || '').trim();
