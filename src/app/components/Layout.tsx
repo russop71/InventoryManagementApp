@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router';
 import {
   LayoutDashboard, Package, ChefHat,
@@ -34,6 +35,8 @@ export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, accountName, locations, activeLocationId, switchLocation } = useAuth();
+  const [openTopMenu, setOpenTopMenu] = useState<string | null>(null);
+  const closeTopMenuTimer = useRef<number | null>(null);
 
   const navItems = [
     { path: '/app', label: 'Dashboard', icon: LayoutDashboard },
@@ -76,6 +79,34 @@ export function Layout() {
     toast.success('Logged out successfully');
     navigate('/login');
   };
+
+  const clearTopMenuCloseTimer = () => {
+    if (closeTopMenuTimer.current !== null) {
+      window.clearTimeout(closeTopMenuTimer.current);
+      closeTopMenuTimer.current = null;
+    }
+  };
+
+  const openMenu = (label: string) => {
+    clearTopMenuCloseTimer();
+    setOpenTopMenu(label);
+  };
+
+  const scheduleMenuClose = () => {
+    clearTopMenuCloseTimer();
+    closeTopMenuTimer.current = window.setTimeout(() => {
+      setOpenTopMenu(null);
+      closeTopMenuTimer.current = null;
+    }, 140);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTopMenuTimer.current !== null) {
+        window.clearTimeout(closeTopMenuTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] pb-20">
@@ -163,12 +194,29 @@ export function Layout() {
         <div className="px-4 pb-3 flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1.5">
             {topMenuGroups.map(group => (
-              <div key={group.label} className="group relative">
-                <button className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600 transition hover:bg-white hover:text-[#0F172A]">
+              <div
+                key={group.label}
+                className="relative"
+                onMouseEnter={() => openMenu(group.label)}
+                onMouseLeave={scheduleMenuClose}
+                onFocusCapture={() => openMenu(group.label)}
+                onBlurCapture={event => {
+                  const next = event.relatedTarget as Node | null;
+                  if (!next || !event.currentTarget.contains(next)) {
+                    scheduleMenuClose();
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  aria-expanded={openTopMenu === group.label}
+                  onClick={() => setOpenTopMenu(current => (current === group.label ? null : group.label))}
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600 transition hover:bg-white hover:text-[#0F172A]"
+                >
                   <span>{group.label}</span>
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-                <div className="absolute left-0 top-full z-20 hidden pt-2 group-hover:block group-focus-within:block">
+                <div className={`absolute left-0 top-full z-20 pt-2 ${openTopMenu === group.label ? 'block' : 'hidden'}`}>
                   <div className="min-w-[180px] rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
                     {group.items.map(item => {
                       const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
@@ -176,7 +224,10 @@ export function Layout() {
                         <button
                           key={item.path}
                           type="button"
-                          onClick={() => navigate(item.path)}
+                          onClick={() => {
+                            setOpenTopMenu(null);
+                            navigate(item.path);
+                          }}
                           className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition ${active ? 'bg-[#FEF3C7] text-[#0F172A]' : 'text-gray-700 hover:bg-gray-50'}`}
                         >
                           {item.label}
