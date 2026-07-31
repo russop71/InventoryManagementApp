@@ -97,7 +97,7 @@ export function Layout() {
     closeTopMenuTimer.current = window.setTimeout(() => {
       setOpenTopMenu(null);
       closeTopMenuTimer.current = null;
-    }, 140);
+    }, 320);
   };
 
   useEffect(() => {
