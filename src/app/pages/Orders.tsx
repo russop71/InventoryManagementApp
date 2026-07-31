@@ -96,6 +96,9 @@ export function Orders() {
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
   const [draftEmails, setDraftEmails] = useState<Array<{ supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }>>([]);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showManualOrderDialog, setShowManualOrderDialog] = useState(false);
+  const [manualSupplier, setManualSupplier] = useState<string>('');
+  const [manualQuantities, setManualQuantities] = useState<Record<string, number>>({});
 
   const open      = orders.filter(o => o.status === 'pending');
   const inTransit = orders.filter(o => o.status === 'ordered');
@@ -216,6 +219,20 @@ export function Orders() {
 
   const totalOrderCost = displayedSuggestions.filter(s => selectedSuggestions.has(s.itemId)).reduce((sum, s) => sum + s.totalCost, 0);
   const selectedCount = selectedSuggestions.size;
+  const manualSupplierOptions = useMemo(
+    () => Array.from(new Set(inventory.map(item => item.supplier).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [inventory],
+  );
+  const manualSupplierItems = useMemo(() => {
+    if (!manualSupplier) return [];
+    const normalizedSupplier = manualSupplier.trim().toLowerCase();
+    return inventory.filter(item => item.supplier.trim().toLowerCase() === normalizedSupplier);
+  }, [inventory, manualSupplier]);
+  const manualOrderLineCount = manualSupplierItems.filter(item => (manualQuantities[item.id] || 0) > 0).length;
+  const manualOrderTotal = manualSupplierItems.reduce((sum, item) => {
+    const quantity = manualQuantities[item.id] || 0;
+    return sum + quantity * item.unitCost;
+  }, 0);
 
   const toggleSelection = (itemId: string) => {
     const next = new Set(selectedSuggestions);
@@ -225,6 +242,79 @@ export function Orders() {
 
   const selectAll = () => setSelectedSuggestions(new Set(displayedSuggestions.map(s => s.itemId)));
   const deselectAll = () => setSelectedSuggestions(new Set());
+
+  const updateManualQuantity = (itemId: string, value: string) => {
+    const parsed = Number(value);
+    const safeValue = Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
+    setManualQuantities(prev => ({ ...prev, [itemId]: safeValue }));
+  };
+
+  const openManualOrderDialog = () => {
+    setManualSupplier('');
+    setManualQuantities({});
+    setShowManualOrderDialog(true);
+  };
+
+  const handleCreateManualOrderFromDialog = () => {
+    if (!manualSupplier) {
+      toast.error('Select a supplier first');
+      return;
+    }
+
+    const itemsForOrder = manualSupplierItems
+      .map(item => {
+        const quantity = manualQuantities[item.id] || 0;
+        if (quantity <= 0) return null;
+        return {
+          itemId: item.id,
+          itemName: item.name,
+          currentStock: item.currentStock,
+          parLevel: item.parLevel,
+          suggestedQuantity: quantity,
+          unitCost: item.unitCost,
+          totalCost: quantity * item.unitCost,
+          supplier: item.supplier,
+          unit: item.unit,
+          priority: item.currentStock < item.parLevel ? 'high' : 'low',
+          reasoning: item.currentStock < item.parLevel
+            ? `On hand is below par (${item.currentStock} / ${item.parLevel} ${item.unit})`
+            : 'Manual order line',
+          daysUntilStockout: 0,
+          confidence: 1,
+        } as OrderSuggestion;
+      })
+      .filter((entry): entry is OrderSuggestion => Boolean(entry));
+
+    if (itemsForOrder.length === 0) {
+      toast.error('Add at least one item quantity');
+      return;
+    }
+
+    const orderItems = itemsForOrder.map(item => ({
+      itemId: item.itemId,
+      quantity: item.suggestedQuantity,
+      cost: item.totalCost,
+    }));
+
+    placeOrder({
+      date: getDefaultOrderDate(),
+      items: orderItems,
+      supplier: manualSupplier,
+      totalCost: orderItems.reduce((sum, item) => sum + item.cost, 0),
+      status: 'pending',
+    });
+
+    const drafts = buildSupplierEmailDrafts({
+      restaurantName,
+      suggestions: itemsForOrder,
+      suppliers,
+    });
+
+    setDraftEmails(drafts);
+    setShowManualOrderDialog(false);
+    setShowEmailDialog(true);
+    toast.success(`Created order for ${manualSupplier}: ${itemsForOrder.length} item${itemsForOrder.length === 1 ? '' : 's'}`);
+  };
 
   const openEmailClient = async (email: { supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }) => {
     if (!email.supplierEmail || email.supplierEmail === 'orders@supplier.com') {
@@ -429,7 +519,7 @@ export function Orders() {
               AI Orders
             </button>
             <button
-              onClick={() => navigate('/app/ai-orders')}
+              onClick={openManualOrderDialog}
               className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-bold shrink-0"
               style={{ background: Y, color: D }}
             >
@@ -660,6 +750,92 @@ export function Orders() {
           })}
         </div>
       )}
+
+      <Dialog open={showManualOrderDialog} onOpenChange={setShowManualOrderDialog}>
+        <DialogContent className="max-w-[760px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Supplier</label>
+              <select
+                value={manualSupplier}
+                onChange={(event) => {
+                  setManualSupplier(event.target.value);
+                  setManualQuantities({});
+                }}
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Select supplier...</option>
+                {manualSupplierOptions.map(supplier => (
+                  <option key={supplier} value={supplier}>{supplier}</option>
+                ))}
+              </select>
+            </div>
+
+            {!manualSupplier && (
+              <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                Choose a supplier to load all available items.
+              </p>
+            )}
+
+            {manualSupplier && manualSupplierItems.length === 0 && (
+              <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                No inventory items are currently linked to this supplier.
+              </p>
+            )}
+
+            {manualSupplierItems.length > 0 && (
+              <div className="space-y-3">
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                        <th className="px-3 py-2">Item</th>
+                        <th className="px-3 py-2">On hand</th>
+                        <th className="px-3 py-2">Unit cost</th>
+                        <th className="px-3 py-2">Order qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {manualSupplierItems.map(item => (
+                        <tr key={item.id} className="border-t border-gray-100">
+                          <td className="px-3 py-2 font-medium text-gray-900">{item.name}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.currentStock} {item.unit}</td>
+                          <td className="px-3 py-2 text-gray-700">{fmtMoney(item.unitCost)}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              step="1"
+                              value={manualQuantities[item.id] ?? 0}
+                              onChange={(event) => updateManualQuantity(item.id, event.target.value)}
+                              className="w-24 rounded-md border border-gray-300 px-2 py-1"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                  <p className="text-gray-700">{manualOrderLineCount} line items selected</p>
+                  <p className="font-semibold text-gray-900">Order total: {fmtMoney(manualOrderTotal)}</p>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowManualOrderDialog(false)}>Cancel</Button>
+                  <Button className="bg-[#0F172A] hover:bg-[#1E293B] text-white" onClick={handleCreateManualOrderFromDialog}>
+                    Create Order & Generate Email
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Email draft dialog */}
       <Dialog open={showEmailDialog} onOpenChange={open => !open && setShowEmailDialog(false)}>
