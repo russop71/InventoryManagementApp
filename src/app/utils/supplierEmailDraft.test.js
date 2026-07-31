@@ -21,3 +21,13 @@ test('getSupplierEmailAddress falls back to testing email address', () => {
   const email = getSupplierEmailAddress('Woodward', [{ name: 'Woodward', email: '' }]);
   assert.equal(email, 'russop71@gmail.com');
 });
+
+test('getSupplierEmailAddress preserves custom manually entered supplier emails', () => {
+  const email = getSupplierEmailAddress('Woodward', [{ name: 'Woodward', email: 'buyer@woodward-custom.com' }]);
+  assert.equal(email, 'buyer@woodward-custom.com');
+});
+
+test('getSupplierEmailAddress rewrites legacy seeded supplier emails to testing inbox', () => {
+  const email = getSupplierEmailAddress('Woodward', [{ name: 'Woodward', email: 'orderdesk@woodwardmeats.com' }]);
+  assert.equal(email, 'russop71@gmail.com');
+});
