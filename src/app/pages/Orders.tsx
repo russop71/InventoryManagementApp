@@ -104,6 +104,7 @@ export function Orders() {
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false);
   const [manualSupplier, setManualSupplier] = useState<string>('');
   const [manualQuantities, setManualQuantities] = useState<Record<string, number>>({});
+  const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
 
   const open      = orders.filter(o => o.status === 'pending');
   const inTransit = orders.filter(o => o.status === 'ordered');
@@ -131,6 +132,24 @@ export function Orders() {
     }
     return accountName?.trim() || 'Restaurant';
   }, [accountId, accountName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/send-supplier-email')
+      .then(response => response.json())
+      .then(payload => {
+        if (cancelled) return;
+        setEmailServiceConfigured(Boolean(payload?.configured));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setEmailServiceConfigured(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const orderSuggestions = useMemo(() => {
     const suggestions: OrderSuggestion[] = [];
@@ -324,6 +343,12 @@ export function Orders() {
   const openEmailClient = async (email: { supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }) => {
     if (!email.supplierEmail) {
       toast.error('No supplier email address is configured');
+      return;
+    }
+
+    if (emailServiceConfigured === false) {
+      openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+      toast.info('Email service is not configured. Opened your mail app with a draft instead.');
       return;
     }
 

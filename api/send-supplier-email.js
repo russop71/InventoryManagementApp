@@ -1,4 +1,14 @@
 export default async function handler(req, res) {
+  const apiKey =
+    process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_TOKEN ||
+    process.env.RESEND_KEY ||
+    '';
+
+  if (req.method === 'GET') {
+    return res.status(200).json({ configured: Boolean(apiKey) });
+  }
+
   if (req.method === 'OPTIONS') {
     res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(204).end();
@@ -8,11 +18,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey =
-    process.env.RESEND_API_KEY ||
-    process.env.RESEND_API_TOKEN ||
-    process.env.RESEND_KEY ||
-    '';
   const fromEmail =
     process.env.WELCOME_FROM_EMAIL ||
     process.env.RESEND_FROM_EMAIL ||

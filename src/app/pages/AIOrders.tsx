@@ -125,6 +125,7 @@ export function AIOrders() {
   const [emailSendStatus, setEmailSendStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'failed'>>({});
   const [wsConnected, setWsConnected] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<OrderSuggestion[] | null>(null);
+  const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
   const restaurantName = useMemo(() => {
     if (accountId) {
       const profileStorageKey = `zestiq:account:${accountId}:profile`;
@@ -142,6 +143,24 @@ export function AIOrders() {
 
     return accountName?.trim() || 'Restaurant';
   }, [accountId, accountName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/send-supplier-email')
+      .then(response => response.json())
+      .then(payload => {
+        if (cancelled) return;
+        setEmailServiceConfigured(Boolean(payload?.configured));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setEmailServiceConfigured(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // WebSocket connection for live AI suggestions
   useEffect(() => {
@@ -505,6 +524,13 @@ export function AIOrders() {
       return;
     }
 
+    if (emailServiceConfigured === false) {
+      setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
+      openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+      toast.info('Email service is not configured. Opened your mail app with a draft instead.');
+      return;
+    }
+
     setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sending' }));
     try {
       await sendSupplierEmail({
@@ -531,6 +557,11 @@ export function AIOrders() {
   const sendAllDraftEmails = async () => {
     if (draftEmails.length === 0) {
       toast.error('No draft emails to send');
+      return;
+    }
+
+    if (emailServiceConfigured === false) {
+      toast.info('Email service is not configured. Use each Send button to open drafts in your mail app.');
       return;
     }
 
