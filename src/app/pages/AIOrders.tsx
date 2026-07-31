@@ -104,6 +104,11 @@ function getDefaultOrderDate() {
   return date.toISOString();
 }
 
+function openMailtoDraft(to: string, subject: string, body: string) {
+  const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailtoLink;
+}
+
 export function AIOrders() {
   const { inventory, suppliers, placeOrder } = useInventory();
   const { salesData } = useToast();
@@ -510,6 +515,12 @@ export function AIOrders() {
       setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
       toast.success(`Sent supplier email to ${email.supplier}`);
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
+        setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
+        openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+        toast.info('Email service not configured. Opened your mail app with a draft instead.');
+        return;
+      }
       setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'failed' }));
       toast.error(error instanceof Error ? error.message : 'Failed to send email');
     }

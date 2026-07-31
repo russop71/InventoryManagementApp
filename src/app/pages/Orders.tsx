@@ -64,6 +64,11 @@ function fmtMoney(v: number) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function openMailtoDraft(to: string, subject: string, body: string) {
+  const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailtoLink;
+}
+
 interface OrderSuggestion {
   itemId: string;
   itemName: string;
@@ -330,6 +335,11 @@ export function Orders() {
       });
       toast.success(`Sent supplier email to ${email.supplier}`);
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
+        openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+        toast.info('Email service not configured. Opened your mail app with a draft instead.');
+        return;
+      }
       toast.error(error instanceof Error ? error.message : 'Failed to send email');
     }
   };
