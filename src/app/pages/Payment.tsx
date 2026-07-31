@@ -140,7 +140,7 @@ export function Payment() {
             Complete Your Subscription
           </h1>
           <p className="text-sm text-gray-600">
-            Get full access to 86'D inventory management
+            Get full access to zestIQ inventory management
           </p>
         </div>
 

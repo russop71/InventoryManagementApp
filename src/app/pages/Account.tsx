@@ -1,23 +1,48 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { User, Mail, Building, Phone, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
+import { clearLocationScopedData } from '../utils/storageScope';
 
 export function Account() {
+  const { user, accountId, accountName, locations, addLocation, logout, deleteCurrentAccount, updateLocalAccountProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [newLocationName, setNewLocationName] = useState('');
   const [formData, setFormData] = useState({
-    name: 'John Smith',
-    email: 'john@86d.com',
+    name: user?.name || 'Team Member',
+    email: user?.email || '',
     phone: '(555) 123-4567',
-    restaurant: "86'D Restaurant",
+    restaurant: accountName || 'Restaurant Group',
     address: '123 Main Street, New York, NY 10001'
   });
 
+  const profileStorageKey = accountId ? `zestiq:account:${accountId}:profile` : null;
+
+  useEffect(() => {
+    if (!profileStorageKey) return;
+    const raw = localStorage.getItem(profileStorageKey);
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as Partial<typeof formData>;
+      setFormData(prev => ({ ...prev, ...saved }));
+    } catch {
+      // Ignore malformed profile payloads.
+    }
+  }, [profileStorageKey]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (profileStorageKey) {
+      localStorage.setItem(profileStorageKey, JSON.stringify(formData));
+    }
+    updateLocalAccountProfile({
+      name: formData.name,
+      accountName: formData.restaurant,
+    });
     setIsEditing(false);
     toast.success('Account updated successfully');
   };
@@ -27,6 +52,16 @@ export function Account() {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleAddLocation = () => {
+    if (!newLocationName.trim()) {
+      toast.error('Enter a location name first');
+      return;
+    }
+    addLocation(newLocationName);
+    setNewLocationName('');
+    toast.success('Location added');
   };
 
   return (
@@ -183,15 +218,65 @@ export function Account() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Locations</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            {locations.map(location => (
+              <div key={location.id} className="rounded-lg border border-gray-100 px-3 py-2">
+                <p className="text-sm font-medium text-gray-800">{location.name}</p>
+                <p className="text-xs text-gray-400">ID: {location.id}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={newLocationName}
+              onChange={(event) => setNewLocationName(event.target.value)}
+              placeholder="Add location (example: Downtown)"
+            />
+            <Button onClick={handleAddLocation} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+              Add
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-red-600">Danger Zone</CardTitle>
         </CardHeader>
         <CardContent>
           <Button
             variant="outline"
-            className="w-full text-red-600 border-red-300 hover:bg-red-50"
+            className="w-full text-red-600 border-red-300 mb-3 hover:bg-red-50"
             onClick={() => {
-              if (confirm('Are you sure you want to delete your account? This cannot be undone.')) {
-                toast.error('Account deletion feature coming soon');
+              if (!accountId) return;
+              if (confirm('Are you sure you want to reset all location data for this account? This clears inventory, recipes, orders, integrations, and alarms for every location in this account.')) {
+                locations.forEach(location => clearLocationScopedData(accountId, location.id));
+                toast.success('App data reset. Redirecting to login...');
+                setTimeout(() => {
+                  logout();
+                }, 800);
+              }
+            }}
+          >
+            Reset App Data
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full text-red-600 border-red-300 hover:bg-red-50"
+            onClick={async () => {
+              if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) {
+                return;
+              }
+
+              try {
+                await deleteCurrentAccount();
+                toast.success('Account deleted');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to delete account';
+                toast.error(message);
               }
             }}
           >

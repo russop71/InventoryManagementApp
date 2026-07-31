@@ -49,54 +49,48 @@ export function InvoiceScanner() {
 
     setIsProcessing(true);
 
-    // Simulate AI processing with a delay
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const dataUrl = reader.result as string;
+        try {
+          const res = await fetch('http://localhost:4001/api/scan-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageData: dataUrl })
+          });
+          if (!res.ok) throw new Error('Scan failed');
+          const json = await res.json();
+          // Normalize response
+          const parsed: ExtractedInvoice = {
+            vendor: json.vendor || 'Unknown',
+            invoiceNumber: json.invoiceNumber || `INV-${Math.floor(Math.random() * 100000)}`,
+            date: json.date || new Date().toISOString().split('T')[0],
+            items: (json.items || []).map((it: any) => ({
+              name: it.name || it.item || 'Item',
+              quantity: Number(it.quantity) || 1,
+              unit: it.unit || it.unit || 'ea',
+              unitCost: Number(it.unitCost) || Number(it.price) || 0,
+              totalCost: Number(it.totalCost) || (Number(it.quantity) || 1) * (Number(it.unitCost) || 0),
+              category: it.category || 'Uncategorized'
+            })),
+            total: Number(json.total) || 0
+          };
 
-    // Mock extracted data from AI vision model
-    const mockData: ExtractedInvoice = {
-      vendor: "Sysco Food Services",
-      invoiceNumber: `INV-${Math.floor(Math.random() * 100000)}`,
-      date: new Date().toISOString().split('T')[0],
-      items: [
-        {
-          name: "Chicken Breast",
-          quantity: 50,
-          unit: "lbs",
-          unitCost: 3.99,
-          totalCost: 199.50,
-          category: "Protein"
-        },
-        {
-          name: "Roma Tomatoes",
-          quantity: 25,
-          unit: "lbs",
-          unitCost: 2.49,
-          totalCost: 62.25,
-          category: "Produce"
-        },
-        {
-          name: "Extra Virgin Olive Oil",
-          quantity: 4,
-          unit: "gallons",
-          unitCost: 24.99,
-          totalCost: 99.96,
-          category: "Dry Goods"
-        },
-        {
-          name: "Fresh Basil",
-          quantity: 2,
-          unit: "lbs",
-          unitCost: 12.99,
-          totalCost: 25.98,
-          category: "Produce"
+          setExtractedData(parsed);
+          setEditedItems(parsed.items);
+        } catch (err) {
+          console.error('Invoice scan error', err);
+          alert('Invoice scan failed. See console for details.');
+        } finally {
+          setIsProcessing(false);
         }
-      ],
-      total: 387.69
-    };
-
-    setExtractedData(mockData);
-    setEditedItems(mockData.items);
-    setIsProcessing(false);
+      };
+      reader.readAsDataURL(selectedFile);
+    } catch (err) {
+      console.error(err);
+      setIsProcessing(false);
+    }
   };
 
   const handleItemEdit = (index: number, field: keyof InvoiceItem, value: string | number) => {

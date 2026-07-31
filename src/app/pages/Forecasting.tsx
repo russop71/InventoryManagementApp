@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { useState } from 'react';
+import { apiRequest } from '../utils/api';
 import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -25,6 +26,80 @@ interface SupplierEmail {
   emailSubject: string;
 }
 
+async function resolveWeatherContext(targetDate: string) {
+  const fallbackWeather = {
+    summary: 'Typical local conditions',
+    tempC: 20,
+    precipitationChance: 0.2,
+  };
+
+  try {
+    const latitude = 43.6532;
+    const longitude = -79.3832;
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_mean&timezone=auto&forecast_days=7`;
+    const response = await fetch(weatherUrl);
+    if (!response.ok) throw new Error('Weather lookup failed');
+
+    const data = await response.json();
+    const dailyTimes = data.daily?.time || [];
+    const dailyTempsMax = data.daily?.temperature_2m_max || [];
+    const dailyTempsMin = data.daily?.temperature_2m_min || [];
+    const dailyPrecip = data.daily?.precipitation_probability_mean || [];
+    const targetIndex = dailyTimes.findIndex((date: string) => date === targetDate);
+    const lookupIndex = targetIndex >= 0 ? targetIndex : Math.max(dailyTimes.length - 1, 0);
+
+    const tempMax = Number(dailyTempsMax[lookupIndex] ?? 20);
+    const tempMin = Number(dailyTempsMin[lookupIndex] ?? 20);
+    const temperature = Number.isFinite(tempMax) && Number.isFinite(tempMin) ? (tempMax + tempMin) / 2 : 20;
+    const precipitationChance = Number(dailyPrecip[lookupIndex] ?? 0.2) / 100;
+
+    return {
+      summary: precipitationChance > 0.6 ? 'Rain expected' : 'Dry weather expected',
+      tempC: Math.round(temperature),
+      precipitationChance,
+    };
+  } catch {
+    return fallbackWeather;
+  }
+}
+
+async function resolveEventContext(targetDate: string) {
+  try {
+    const [year] = targetDate.split('-');
+    const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/CA`);
+    if (!response.ok) throw new Error('Holiday lookup failed');
+
+    const data = await response.json();
+    const matchingEvents = Array.isArray(data)
+      ? data.filter((event: { date?: string }) => event.date === targetDate)
+      : [];
+    const holidayNames = matchingEvents
+      .map((event: { localName?: string; name?: string }) => event.localName || event.name)
+      .filter(Boolean) as string[];
+
+    return {
+      localEvents: holidayNames.length > 0 ? holidayNames : ['No major local events detected'],
+      holidayNames,
+      eventCount: holidayNames.length,
+    };
+  } catch {
+    const month = Number((targetDate || '').slice(5, 7));
+    const day = Number((targetDate || '').slice(8, 10));
+    const fallbackEvents = [] as string[];
+
+    if ((month === 12 && day >= 20) || (month === 1 && day <= 3)) fallbackEvents.push('Holiday season');
+    if (month === 7 && day === 1) fallbackEvents.push('Canada Day');
+    if (month === 10 && day === 31) fallbackEvents.push('Halloween');
+    if (month === 12 && day === 25) fallbackEvents.push('Christmas');
+
+    return {
+      localEvents: fallbackEvents.length > 0 ? fallbackEvents : ['No major local events detected'],
+      holidayNames: fallbackEvents,
+      eventCount: fallbackEvents.length,
+    };
+  }
+}
+
 export function Forecasting() {
   const { inventory, forecasts, addForecast, generateDailyOrder } = useInventory();
   const { isConnected, salesData, menuItems } = useToast();
@@ -37,62 +112,94 @@ export function Forecasting() {
   const [draftEmails, setDraftEmails] = useState<SupplierEmail[]>([]);
 
   // Calculate predicted item usage based on Toast sales data
-  const handleAutoPredict = () => {
-    if (!isConnected || salesData.length === 0 || !expectedRevenue) {
-      toast.error('Please enter expected revenue and connect to Toast POS');
+  const handleAutoPredict = async () => {
+    if (!selectedDate || !expectedRevenue) {
+      toast.error('Please enter a date and expected revenue');
       return;
     }
 
-    // Calculate average revenue per day from historical data
-    const avgRevenue = salesData.reduce((sum, day) => sum + day.revenue, 0) / salesData.length;
-    const revenueMultiplier = expectedRevenue / avgRevenue;
+    if (!isConnected || salesData.length === 0) {
+      toast.error('Connect to Toast POS first so AI can learn from historical sales');
+      return;
+    }
 
-    // Calculate average items sold per menu item
-    const itemPredictions = menuItems.map(menuItem => {
-      const totalSold = salesData.reduce((sum, day) => {
-        const itemSales = day.topItems.find(item => item.itemName === menuItem.name);
-        return sum + (itemSales?.quantity || 0);
-      }, 0);
-      
-      const avgSold = totalSold / salesData.length;
-      const predictedSold = Math.round(avgSold * revenueMultiplier);
+    try {
+      const forecastDate = new Date(selectedDate);
+      const dayOfWeek = forecastDate.getDay();
+      const month = forecastDate.getMonth() + 1;
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-      return {
-        menuItem,
-        predictedSold,
+      const weatherContext = await resolveWeatherContext(selectedDate);
+      const eventContext = await resolveEventContext(selectedDate);
+
+      const eventSummary = {
+        localEvents: eventContext.localEvents,
+        season: month >= 6 && month <= 8 ? 'summer' : month >= 9 && month <= 11 ? 'fall' : month >= 12 || month <= 2 ? 'winter' : 'spring',
+        isWeekend,
       };
-    });
 
-    // Store for display
-    setPredictedMenuItems(itemPredictions.map(p => ({
-      name: p.menuItem.name,
-      quantity: p.predictedSold
-    })));
+      const payload = {
+        date: selectedDate,
+        expectedRevenue,
+        history: salesData,
+        menuItems,
+        inventory,
+        weather: weatherContext,
+        events: eventSummary,
+      };
 
-    // Calculate ingredient usage based on predicted menu item sales
-    const ingredientUsage = new Map<string, number>();
+      const result = await apiRequest<{ predictedMenuItems: Array<{ name: string; quantity: number }>; ingredientUsage: Array<{ itemId: string; expectedUsage: number }>; summary: string; confidence: number }>(
+        '/api/forecast/sales',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+      );
 
-    itemPredictions.forEach(({ menuItem, predictedSold }) => {
-      menuItem.ingredients.forEach(ingredient => {
-        const currentUsage = ingredientUsage.get(ingredient.inventoryItemId) || 0;
-        ingredientUsage.set(
-          ingredient.inventoryItemId,
-          currentUsage + (predictedSold * ingredient.quantity)
-        );
+      const predicted = (result.ingredientUsage || []).filter(item => inventory.some(i => i.id === item.itemId));
+      const menuForecast = (result.predictedMenuItems || []).length > 0
+        ? (result.predictedMenuItems || [])
+        : menuItems.map(menuItem => ({
+            name: menuItem.name,
+            quantity: Math.max(1, Math.round((salesData[salesData.length - 1]?.revenue || expectedRevenue) / Math.max(menuItem.price, 1) / 10)),
+          }));
+      setPredictedMenuItems(menuForecast);
+      setSelectedItems(predicted);
+      toast.success(result.summary || `Forecast ready with ${predicted.length} ingredient predictions`);
+    } catch (error) {
+      console.error('AI forecast failed', error);
+      const avgRevenue = salesData.reduce((sum, day) => sum + day.revenue, 0) / salesData.length;
+      const revenueMultiplier = expectedRevenue / Math.max(avgRevenue, 1);
+      const itemPredictions = menuItems.map(menuItem => {
+        const totalSold = salesData.reduce((sum, day) => {
+          const itemSales = day.topItems.find(item => item.itemName === menuItem.name);
+          return sum + (itemSales?.quantity || 0);
+        }, 0);
+        const avgSold = salesData.length > 0 ? totalSold / salesData.length : 0;
+        const predictedSold = Math.max(1, Math.round(avgSold * revenueMultiplier));
+        return {
+          menuItem,
+          predictedSold,
+        };
       });
-    });
 
-    // Convert to selected items format
-    const predicted = Array.from(ingredientUsage.entries()).map(([itemId, usage]) => ({
-      itemId,
-      expectedUsage: Math.round(usage * 100) / 100, // Round to 2 decimals
-    })).filter(item => {
-      const inventoryItem = inventory.find(i => i.id === item.itemId);
-      return inventoryItem !== undefined;
-    });
+      const ingredientUsage = new Map<string, number>();
+      itemPredictions.forEach(({ menuItem, predictedSold }) => {
+        menuItem.ingredients.forEach(ingredient => {
+          const currentUsage = ingredientUsage.get(ingredient.inventoryItemId) || 0;
+          ingredientUsage.set(ingredient.inventoryItemId, currentUsage + (predictedSold * ingredient.quantity));
+        });
+      });
 
-    setSelectedItems(predicted);
-    toast.success(`Predicted usage for ${predicted.length} ingredients based on Toast sales data`);
+      const fallbackPredicted = Array.from(ingredientUsage.entries()).map(([itemId, usage]) => ({
+        itemId,
+        expectedUsage: Math.round(usage * 100) / 100,
+      })).filter(item => inventory.some(i => i.id === item.itemId));
+
+      setPredictedMenuItems(itemPredictions.map(p => ({ name: p.menuItem.name, quantity: p.predictedSold })));
+      setSelectedItems(fallbackPredicted);
+      toast.success('Forecast generated with fallback rules');
+    }
   };
 
   const handleAddForecast = (e: React.FormEvent<HTMLFormElement>) => {

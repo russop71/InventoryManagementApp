@@ -40,7 +40,7 @@ export function Help() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-semibold text-gray-900">Help Center</h2>
-        <p className="text-sm text-gray-600 mt-1">Find answers and learn how to use 86'D Solutions</p>
+        <p className="text-sm text-gray-600 mt-1">Find answers and learn how to use zestIQ Solutions</p>
       </div>
 
       {/* Search */}
@@ -56,7 +56,7 @@ export function Help() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => navigate('/contact')}>
+        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => navigate('/app/contact')}>
           <CardContent className="pt-4 text-center">
             <MessageCircle className="w-8 h-8 mx-auto text-[#0F172A] mb-2" />
             <p className="text-sm font-medium">Contact Support</p>

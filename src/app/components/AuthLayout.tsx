@@ -1,14 +1,8 @@
-import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router';
+import { useAuth } from '../contexts/AuthContext';
 
 export function AuthLayout() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    // Check authentication status
-    const authStatus = localStorage.getItem('isAuthenticated');
-    setIsAuthenticated(authStatus === 'true');
-  }, []);
+  const { isAuthenticated } = useAuth();
 
   // Loading state
   if (isAuthenticated === null) {

@@ -1,12 +1,23 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
+import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { CalendarDays } from 'lucide-react';
 import {
   Plus, ChevronRight, ShoppingCart, Truck, CheckCircle2,
-  Clock, Package, SlidersHorizontal,
+  Clock, Package, SlidersHorizontal, Sparkles, Mail,
+  Check, AlertCircle, TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
+import { buildSupplierEmailDrafts } from '../utils/supplierEmailDraft.js';
+import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 
 const Y = '#F5C10E';
 const D = '#0F172A';
@@ -42,14 +53,49 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function getDefaultOrderDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(0, 0, 0, 0);
+  return date.toISOString();
+}
+
 function fmtMoney(v: number) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+interface OrderSuggestion {
+  itemId: string;
+  itemName: string;
+  currentStock: number;
+  parLevel: number;
+  suggestedQuantity: number;
+  unitCost: number;
+  totalCost: number;
+  supplier: string;
+  unit: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  reasoning: string;
+  daysUntilStockout: number;
+  confidence: number;
+}
+
 export function Orders() {
-  const { orders, inventory, updateOrderStatus } = useInventory();
+  const { orders, inventory, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
+  const { salesData } = useToast();
+  const { accountId, accountName } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
   const [detailId, setDetailId]   = useState<string | null>(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<OrderSuggestion[] | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [editableItems, setEditableItems] = useState<Record<string, { quantity: number; cost: number }>>({});
+  const [supplierDateOverrides, setSupplierDateOverrides] = useState<Record<string, string>>({});
+  const [selectedSupplier, setSelectedSupplier] = useState<string>('');
+  const [draftEmails, setDraftEmails] = useState<Array<{ supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }>>([]);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
 
   const open      = orders.filter(o => o.status === 'pending');
   const inTransit = orders.filter(o => o.status === 'ordered');
@@ -61,9 +107,310 @@ export function Orders() {
 
   const detailOrder = orders.find(o => o.id === detailId);
 
+  const restaurantName = useMemo(() => {
+    if (accountId) {
+      const profileStorageKey = `zestiq:account:${accountId}:profile`;
+      const raw = localStorage.getItem(profileStorageKey);
+      if (raw) {
+        try {
+          const profile = JSON.parse(raw) as { restaurant?: string };
+          const profileRestaurantName = profile.restaurant?.trim();
+          if (profileRestaurantName) return profileRestaurantName;
+        } catch {
+          // ignore malformed data
+        }
+      }
+    }
+    return accountName?.trim() || 'Restaurant';
+  }, [accountId, accountName]);
+
+  const orderSuggestions = useMemo(() => {
+    const suggestions: OrderSuggestion[] = [];
+    const salesTrend = salesData.length >= 2
+      ? (salesData[salesData.length - 1].revenue - salesData[0].revenue) / salesData[0].revenue
+      : 0;
+
+    inventory.forEach(item => {
+      const stockPercentage = (item.currentStock / item.parLevel) * 100;
+      let estimatedDailyUsage = item.category === 'Produce'
+        ? item.parLevel * 0.2
+        : item.category === 'Proteins'
+          ? item.parLevel * 0.15
+          : item.category === 'Dairy'
+            ? item.parLevel * 0.12
+            : item.parLevel * 0.1;
+
+      if (salesTrend > 0.1) estimatedDailyUsage *= 1.2;
+      else if (salesTrend < -0.1) estimatedDailyUsage *= 0.85;
+
+      const suggestedQuantity = calculateForecastOrderQuantity({
+        currentStock: item.currentStock,
+        expectedUsage: estimatedDailyUsage,
+        parLevel: item.parLevel,
+        safetyBuffer: Math.max(item.parLevel * 0.1, 2),
+        minimumOrderQty: item.minimumOrderQty || 0,
+      });
+
+      const daysUntilStockout = estimatedDailyUsage > 0 ? Math.floor(item.currentStock / estimatedDailyUsage) : 999;
+      let priority: OrderSuggestion['priority'] = 'low';
+      let shouldOrder = false;
+      let reasoning = '';
+      let confidence = 0;
+
+      if (daysUntilStockout <= 2) {
+        shouldOrder = true; priority = 'critical'; reasoning = `Critical: only ${daysUntilStockout} days of stock left`; confidence = 0.95;
+      } else if (daysUntilStockout <= 4) {
+        shouldOrder = true; priority = 'high'; reasoning = `High priority: ${daysUntilStockout} days until stockout`; confidence = 0.88;
+      } else if (stockPercentage < 40) {
+        shouldOrder = true; priority = 'medium'; reasoning = `Below 40% par level (${stockPercentage.toFixed(0)}%)`; confidence = 0.75;
+      } else if (stockPercentage < 70) {
+        shouldOrder = true; priority = 'low'; reasoning = `Stock at ${stockPercentage.toFixed(0)}% - consider ordering soon`; confidence = 0.6;
+      }
+
+      if (shouldOrder) {
+        suggestions.push({
+          itemId: item.id,
+          itemName: item.name,
+          currentStock: item.currentStock,
+          parLevel: item.parLevel,
+          suggestedQuantity,
+          unitCost: item.unitCost,
+          totalCost: suggestedQuantity * item.unitCost,
+          supplier: item.supplier,
+          unit: item.unit,
+          priority,
+          reasoning,
+          daysUntilStockout,
+          confidence,
+        });
+      }
+    });
+
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    return suggestions.sort((a, b) => priorityOrder[a.priority] === priorityOrder[b.priority] ? b.confidence - a.confidence : priorityOrder[a.priority] - priorityOrder[b.priority]);
+  }, [inventory, salesData]);
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:4001');
+    ws.addEventListener('open', () => {
+      setWsConnected(true);
+      ws.send(JSON.stringify({ type: 'requestAiOrder', payload: { inventory, salesData } }));
+    });
+    ws.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'aiOrder') {
+          setAiSuggestions(payload.data || []);
+        }
+      } catch {
+        // ignore malformed websocket data
+      }
+    });
+    ws.addEventListener('close', () => setWsConnected(false));
+    return () => ws.close();
+  }, [inventory, salesData]);
+
+  const displayedSuggestions = showAllSuggestions
+    ? (aiSuggestions || orderSuggestions)
+    : (aiSuggestions || orderSuggestions).filter(s => s.priority === 'critical' || s.priority === 'high');
+
+  const totalOrderCost = displayedSuggestions.filter(s => selectedSuggestions.has(s.itemId)).reduce((sum, s) => sum + s.totalCost, 0);
+  const selectedCount = selectedSuggestions.size;
+
+  const toggleSelection = (itemId: string) => {
+    const next = new Set(selectedSuggestions);
+    next.has(itemId) ? next.delete(itemId) : next.add(itemId);
+    setSelectedSuggestions(next);
+  };
+
+  const selectAll = () => setSelectedSuggestions(new Set(displayedSuggestions.map(s => s.itemId)));
+  const deselectAll = () => setSelectedSuggestions(new Set());
+
+  const openEmailClient = async (email: { supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }) => {
+    if (!email.supplierEmail || email.supplierEmail === 'orders@supplier.com') {
+      toast.error('No supplier email address is configured');
+      return;
+    }
+
+    try {
+      await sendSupplierEmail({
+        to: email.supplierEmail,
+        subject: email.emailSubject,
+        text: email.emailBody,
+      });
+      toast.success(`Sent supplier email to ${email.supplier}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to send email');
+    }
+  };
+
+  const updateDraftEmailField = (supplier: string, field: 'emailSubject' | 'emailBody', value: string) => {
+    setDraftEmails(prev => prev.map(email => {
+      if (email.supplier !== supplier) return email;
+      return { ...email, [field]: value };
+    }));
+  };
+
+  const updateDraftItemQuantity = (supplier: string, itemId: string, value: string) => {
+    const parsed = Number(value);
+    const safeValue = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+
+    setDraftEmails(prev => prev.map(email => {
+      if (email.supplier !== supplier) return email;
+
+      const updatedItems = email.items.map(item => {
+        if (item.itemId !== itemId) return item;
+        const nextQuantity = Math.max(0, Math.round(safeValue));
+        return {
+          ...item,
+          suggestedQuantity: nextQuantity,
+          totalCost: nextQuantity * item.unitCost,
+        };
+      });
+
+      const totalCost = updatedItems.reduce((sum, item) => sum + item.totalCost, 0);
+      return {
+        ...email,
+        items: updatedItems,
+        totalCost,
+        emailBody: `${email.emailBody.split('\n').slice(0, 3).join('\n')}\n\n${updatedItems.map(item => `${item.itemName} - ${item.suggestedQuantity} ${item.unit}`).join('\n')}`,
+      };
+    }));
+  };
+
+  const copyDraftToClipboard = async (email: { supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }) => {
+    try {
+      await navigator.clipboard.writeText(`${email.emailSubject}\n\n${email.emailBody}`);
+      toast.success(`Copied ${email.supplier} draft`);
+    } catch {
+      toast.error('Clipboard access is unavailable');
+    }
+  };
+
+  const handleApproveOrders = () => {
+    const sourceList = aiSuggestions || orderSuggestions;
+    const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
+    if (ordersToPlace.length === 0) {
+      toast.error('Select at least one item to place an order');
+      return;
+    }
+
+    const supplierMap: Record<string, OrderSuggestion[]> = {};
+    ordersToPlace.forEach(suggestion => {
+      if (!supplierMap[suggestion.supplier]) supplierMap[suggestion.supplier] = [];
+      supplierMap[suggestion.supplier].push(suggestion);
+    });
+
+    const drafts = buildSupplierEmailDrafts({ restaurantName, suggestions: ordersToPlace, suppliers });
+
+    Object.entries(supplierMap).forEach(([supplier, suggestions]) => {
+      const items = suggestions.map(suggestion => ({
+        itemId: suggestion.itemId,
+        quantity: suggestion.suggestedQuantity,
+        cost: suggestion.totalCost,
+      }));
+      placeOrder({
+        date: getDefaultOrderDate(),
+        items,
+        supplier,
+        totalCost: items.reduce((sum, item) => sum + item.cost, 0),
+        status: 'pending',
+      });
+    });
+
+    setDraftEmails(drafts);
+    setShowEmailDialog(true);
+    toast.success(`✓ ${ordersToPlace.length} items approved and added to orders/invoices`);
+    setSelectedSuggestions(new Set());
+  };
+
+  const handleCreateManualOrder = () => {
+    const fallbackItems = inventory.slice(0, 3).map(item => ({
+      itemId: item.id,
+      quantity: Math.max(item.parLevel / 2, 1),
+      cost: item.unitCost * Math.max(item.parLevel / 2, 1),
+    }));
+
+    placeOrder({
+      date: getDefaultOrderDate(),
+      items: fallbackItems,
+      supplier: inventory[0]?.supplier || 'Supplier',
+      totalCost: fallbackItems.reduce((sum, item) => sum + item.cost, 0),
+      status: 'pending',
+    });
+
+    toast.success('Manual order created and linked to an invoice');
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-500';
+      case 'high': return 'bg-orange-500';
+      case 'medium': return 'bg-yellow-500';
+      default: return 'bg-green-500';
+    }
+  };
+
+  const getPriorityBadgeColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-100 text-red-800 border-red-300';
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
+      default: return 'bg-green-100 text-green-800 border-green-300';
+    }
+  };
+
   const handleStatus = (id: string, status: OrderStatus) => {
     updateOrderStatus(id, status as any);
     toast.success(`Order marked as ${STATUS_CFG[status].label}`);
+  };
+
+  const handleSaveLineEdits = (orderId: string) => {
+    const order = orders.find(entry => entry.id === orderId);
+    if (!order) return;
+
+    const nextItems = order.items.map(item => ({
+      ...item,
+      quantity: editableItems[item.itemId]?.quantity ?? item.quantity,
+      cost: editableItems[item.itemId]?.cost ?? item.cost,
+    }));
+
+    const updatedTotal = nextItems.reduce((sum, item) => sum + item.cost, 0);
+    const updatedOrder = { ...order, items: nextItems, totalCost: updatedTotal };
+
+    const existingInvoice = invoices.find(invoice => invoice.orderId === orderId);
+    if (existingInvoice) {
+      updateInvoice(existingInvoice.id, { items: nextItems, totalAmount: updatedTotal, supplier: order.supplier });
+    }
+
+    toast.success('Order lines updated');
+  };
+
+  const updateEditableItem = (itemId: string, field: 'quantity' | 'cost', value: number) => {
+    setEditableItems(prev => ({
+      ...prev,
+      [itemId]: {
+        quantity: prev[itemId]?.quantity ?? 0,
+        cost: prev[itemId]?.cost ?? 0,
+        ...prev[itemId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const resetEditableItems = (orderId: string) => {
+    const order = orders.find(entry => entry.id === orderId);
+    if (!order) return;
+
+    const nextState: Record<string, { quantity: number; cost: number }> = {};
+    order.items.forEach(item => {
+      nextState[item.itemId] = { quantity: item.quantity, cost: item.cost };
+    });
+    setEditableItems(nextState);
+
+    const nextDates = Object.fromEntries(
+      Object.entries(order.supplierDates || {}).filter(([, value]) => Boolean(value))
+    );
+    setSupplierDateOverrides(nextDates);
   };
 
   const TABS = [
@@ -84,13 +431,30 @@ export function Orders() {
             <h1 className="text-[26px] font-extrabold tracking-tight" style={{ color: D }}>Orders</h1>
             <p className="text-sm text-gray-400 mt-0.5">Manage purchase orders and track deliveries.</p>
           </div>
-          <button
-            className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-bold shrink-0 mt-1"
-            style={{ background: Y, color: D }}
-          >
-            <Plus className="w-4 h-4" />
-            New Order
-          </button>
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              onClick={() => navigate('/app/forecasting')}
+              className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Forecasting
+            </button>
+            <button
+              onClick={() => navigate('/app/ai-orders')}
+              className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI Orders
+            </button>
+            <button
+              onClick={handleCreateManualOrder}
+              className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-bold shrink-0"
+              style={{ background: Y, color: D }}
+            >
+              <Plus className="w-4 h-4" />
+              New Order
+            </button>
+          </div>
         </div>
 
         {/* Stat strip */}
@@ -160,6 +524,87 @@ export function Orders() {
         </button>
       </div>
 
+      <div className="px-4 mt-4 space-y-3">
+        <Card className="border-gray-200">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-black text-gray-900">AI order suggestions</p>
+                <p className="text-xs text-gray-500">Smart recommendations based on inventory risk and recent sales.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-[#0F172A] text-white">{wsConnected ? 'Live' : 'Offline'}</Badge>
+                <Button size="sm" variant="outline" onClick={() => setShowAllSuggestions(!showAllSuggestions)}>
+                  {showAllSuggestions ? 'Priority only' : 'Show all'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+              <p className="text-xs text-gray-600">{selectedCount} selected · Est. ${totalOrderCost.toFixed(2)}</p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={selectAll}>Select all</Button>
+                <Button size="sm" variant="outline" onClick={deselectAll}>Clear</Button>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="text-xs font-semibold text-gray-600">Supplier</label>
+              <select
+                value={selectedSupplier}
+                onChange={(event) => setSelectedSupplier(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+              >
+                <option value="">Choose a supplier</option>
+                {Array.from(new Set(displayedSuggestions.map(item => item.supplier))).sort((a, b) => a.localeCompare(b)).map(supplier => (
+                  <option key={supplier} value={supplier}>{supplier}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {displayedSuggestions.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 p-4 text-sm text-gray-500">
+                  No urgent reorder suggestions right now.
+                </div>
+              ) : (
+                displayedSuggestions
+                  .filter(suggestion => !selectedSupplier || suggestion.supplier === selectedSupplier)
+                  .map(suggestion => (
+                    <button
+                      key={suggestion.itemId}
+                      onClick={() => toggleSelection(suggestion.itemId)}
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${selectedSuggestions.has(suggestion.itemId) ? 'border-[#0F172A] bg-[#FEFCE8]' : 'border-gray-200 bg-white'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${getPriorityColor(suggestion.priority)}`} />
+                            <p className="text-sm font-semibold text-gray-900">{suggestion.itemName}</p>
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">{suggestion.reasoning}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">{suggestion.suggestedQuantity} {suggestion.unit}</p>
+                          <p className="text-xs text-gray-500">${suggestion.totalCost.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+              )}
+            </div>
+
+            {selectedCount > 0 && (
+              <div className="mt-3 flex gap-2">
+                <Button className="flex-1 bg-[#0F172A] hover:bg-[#1E293B] text-white" onClick={handleApproveOrders}>
+                  <Check className="mr-2 h-4 w-4" /> Approve {selectedCount} orders
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Order rows */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-3 text-center px-4">
@@ -167,7 +612,7 @@ export function Orders() {
             <ShoppingCart className="w-7 h-7 text-gray-300" />
           </div>
           <p className="font-bold text-gray-500 text-sm">No orders yet</p>
-          <p className="text-xs text-gray-400">Create a forecast to generate your first order list</p>
+          <p className="text-xs text-gray-400">Place an order to generate your first order list</p>
         </div>
       ) : (
         <div className="divide-y divide-gray-50">
@@ -188,7 +633,10 @@ export function Orders() {
             return (
               <button
                 key={order.id}
-                onClick={() => setDetailId(order.id)}
+                onClick={() => {
+                  setDetailId(order.id);
+                  resetEditableItems(order.id);
+                }}
                 className="w-full flex items-center gap-3 px-4 py-4 bg-white active:bg-gray-50 transition-colors text-left"
               >
                 {/* Supplier avatar */}
@@ -231,6 +679,75 @@ export function Orders() {
         </div>
       )}
 
+      {/* Email draft dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={open => !open && setShowEmailDialog(false)}>
+        <DialogContent className="max-w-[760px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Supplier email drafts</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {draftEmails.length === 0 ? (
+              <p className="text-sm text-gray-500">No supplier drafts available yet.</p>
+            ) : draftEmails.map(email => (
+              <div key={`${email.supplier}-${email.supplierEmail}`} className="rounded-2xl border border-gray-200 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{email.supplier}</p>
+                    <p className="text-xs text-gray-500">{email.supplierEmail}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => copyDraftToClipboard(email)}>
+                      <Mail className="mr-1.5 h-3.5 w-3.5" /> Copy
+                    </Button>
+                    <Button size="sm" onClick={() => void openEmailClient(email)}>
+                      <Mail className="mr-1.5 h-3.5 w-3.5" /> Send
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Subject</label>
+                  <input
+                    value={email.emailSubject}
+                    onChange={(event) => updateDraftEmailField(email.supplier, 'emailSubject', event.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Body</label>
+                  <textarea
+                    value={email.emailBody}
+                    onChange={(event) => updateDraftEmailField(email.supplier, 'emailBody', event.target.value)}
+                    rows={8}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Item quantities</label>
+                  <div className="space-y-2">
+                    {email.items.map(item => (
+                      <div key={item.itemId} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{item.itemName}</p>
+                          <p className="text-xs text-gray-500">{item.unit}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={item.suggestedQuantity}
+                          onChange={(event) => updateDraftItemQuantity(email.supplier, item.itemId, event.target.value)}
+                          className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Detail dialog */}
       <Dialog open={!!detailId} onOpenChange={open => !open && setDetailId(null)}>
         <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col">
@@ -265,31 +782,73 @@ export function Orders() {
                 </div>
 
                 {Object.entries(groups).map(([sup, items]) => {
-                  const av  = avatarColor(sup);
-                  const tot = items.reduce((s, oi) => s + oi.cost, 0);
+                  const av = avatarColor(sup);
+                  const tot = items.reduce((sum, oi) => sum + (editableItems[oi.itemId]?.cost ?? oi.cost), 0);
+                  const receiptDate = supplierDateOverrides[sup] || detailOrder.supplierDates?.[sup] || '';
                   return (
                     <div key={sup}>
-                      <div className="flex items-center gap-2 mb-2 px-1">
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black" style={{ background: av.bg, color: av.text }}>
+                      <div className="mb-2 flex items-center gap-2 px-1">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-black" style={{ background: av.bg, color: av.text }}>
                           {initials(sup)}
                         </div>
-                        <p className="text-xs font-bold text-gray-700 flex-1">{sup}</p>
-                        <p className="text-xs font-bold" style={{ color: D }}>{fmtMoney(tot)}</p>
+                        <p className="flex-1 text-xs font-bold text-gray-700">{sup}</p>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1 text-[11px] font-semibold text-gray-600">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            <input
+                              type="date"
+                              value={receiptDate}
+                              onChange={(event) => setSupplierDateOverrides(prev => ({ ...prev, [sup]: event.target.value }))}
+                              className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px]"
+                            />
+                          </label>
+                          <p className="text-xs font-bold" style={{ color: D }}>{fmtMoney(tot)}</p>
+                        </div>
                       </div>
-                      <div className="space-y-1.5">
-                        {items.map(oi => {
-                          const item = inventory.find(i => i.id === oi.itemId);
-                          if (!item) return null;
-                          return (
-                            <div key={oi.itemId} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5">
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
-                                <p className="text-[10px] text-gray-400">{oi.quantity} {item.unit} · ${item.unitCost.toFixed(2)}/{item.unit}</p>
-                              </div>
-                              <p className="text-sm font-bold ml-3 shrink-0" style={{ color: D }}>{fmtMoney(oi.cost)}</p>
-                            </div>
-                          );
-                        })}
+                      <div className="overflow-hidden rounded-xl border border-gray-200">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Item</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Qty</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Cost</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 bg-white">
+                            {items.map(oi => {
+                              const item = inventory.find(i => i.id === oi.itemId);
+                              if (!item) return null;
+                              const current = editableItems[oi.itemId] ?? { quantity: oi.quantity, cost: oi.cost };
+                              return (
+                                <tr key={oi.itemId}>
+                                  <td className="px-3 py-2">
+                                    <p className="text-sm font-bold text-gray-900">{item.name}</p>
+                                    <p className="text-[10px] text-gray-400">{item.unit}</p>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={current.quantity}
+                                      onChange={(event) => updateEditableItem(oi.itemId, 'quantity', Number(event.target.value) || 0)}
+                                      className="w-24"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={current.cost}
+                                      onChange={(event) => updateEditableItem(oi.itemId, 'cost', Number(event.target.value) || 0)}
+                                      className="w-28"
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   );

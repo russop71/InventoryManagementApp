@@ -125,7 +125,7 @@ export function Privacy() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">12. Contact Us</h3>
             <p className="text-sm text-gray-600">
-              If you have any questions about this Privacy Policy, please contact us at privacy@86d.com or call (555) 123-4567.
+              If you have any questions about this Privacy Policy, please contact us at privacy@zestiq.com or call (555) 123-4567.
             </p>
           </section>
         </CardContent>

@@ -7,6 +7,8 @@ import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Plus, Trash2, AlarmClock, Bell, BellOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
+import { locationScopedStorageKey, readScopedJson } from '../utils/storageScope';
 
 interface OrderAlarm {
   id: string;
@@ -46,16 +48,20 @@ const DEFAULT_ALARMS: OrderAlarm[] = [
   },
 ];
 
-function loadAlarms(): OrderAlarm[] {
-  try {
-    const stored = localStorage.getItem('orderAlarms');
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return DEFAULT_ALARMS;
+function loadAlarms(accountId?: string | null, locationId?: string | null): OrderAlarm[] {
+  if (!accountId || !locationId) return [];
+  const scopedKey = locationScopedStorageKey(accountId, locationId, 'orderAlarms');
+  if (localStorage.getItem(scopedKey) === null) {
+    const legacy = localStorage.getItem('orderAlarms');
+    if (legacy !== null) {
+      localStorage.setItem(scopedKey, legacy);
+    }
+  }
+  return readScopedJson<OrderAlarm[]>(scopedKey, DEFAULT_ALARMS);
 }
 
-function saveAlarms(alarms: OrderAlarm[]) {
-  localStorage.setItem('orderAlarms', JSON.stringify(alarms));
+function saveAlarms(accountId: string, locationId: string, alarms: OrderAlarm[]) {
+  localStorage.setItem(locationScopedStorageKey(accountId, locationId, 'orderAlarms'), JSON.stringify(alarms));
 }
 
 function formatTime12h(time24: string): string {
@@ -73,7 +79,8 @@ function dayLabel(days: string[]): string {
 }
 
 export function OrderAlarms() {
-  const [alarms, setAlarms] = useState<OrderAlarm[]>(loadAlarms);
+  const { accountId, activeLocationId } = useAuth();
+  const [alarms, setAlarms] = useState<OrderAlarm[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAlarm, setEditingAlarm] = useState<OrderAlarm | null>(null);
 
@@ -82,10 +89,15 @@ export function OrderAlarms() {
   const [formTime, setFormTime] = useState('09:00');
   const [formDays, setFormDays] = useState<string[]>(WEEKDAYS);
 
+  useEffect(() => {
+    setAlarms(loadAlarms(accountId, activeLocationId));
+  }, [accountId, activeLocationId]);
+
   const persist = useCallback((updated: OrderAlarm[]) => {
+    if (!accountId || !activeLocationId) return;
     setAlarms(updated);
-    saveAlarms(updated);
-  }, []);
+    saveAlarms(accountId, activeLocationId, updated);
+  }, [accountId, activeLocationId]);
 
   // Check alarms every 30 seconds
   useEffect(() => {
@@ -113,7 +125,7 @@ export function OrderAlarms() {
           }
           return alarm;
         });
-        if (changed) saveAlarms(updated);
+        if (changed && accountId && activeLocationId) saveAlarms(accountId, activeLocationId, updated);
         return updated;
       });
     };
@@ -121,7 +133,7 @@ export function OrderAlarms() {
     check();
     const interval = setInterval(check, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [accountId, activeLocationId]);
 
   const openAdd = () => {
     setEditingAlarm(null);

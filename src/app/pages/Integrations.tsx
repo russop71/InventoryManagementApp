@@ -1,34 +1,30 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useToast } from '../contexts/ToastContext';
+import { useInventory } from '../contexts/InventoryContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Switch } from '../components/ui/switch';
-import { CheckCircle, XCircle, RefreshCw, ExternalLink, Wifi, LogOut, Mail, Phone, MapPin, Building2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import { CheckCircle, XCircle, RefreshCw, ExternalLink, Wifi, LogOut, Mail, Phone, MapPin, ChevronDown } from 'lucide-react';
 import { toast as showToast } from 'sonner';
-
-interface Supplier {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  category: string;
-  contactPerson: string;
-  address?: string;
-}
 
 export function Integrations() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const { 
     isConnected, 
     apiKey, 
     restaurantId, 
     connectToast, 
     disconnectToast, 
-    syncData, 
+    syncData,
+    importSalesData,
     lastSync,
     salesData,
     menuItems
@@ -37,64 +33,21 @@ export function Integrations() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [tempApiKey, setTempApiKey] = useState('');
   const [tempRestaurantId, setTempRestaurantId] = useState('');
+  const [importPayload, setImportPayload] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
-
-  // Supplier contacts
-  const [suppliers] = useState<Supplier[]>([
-    {
-      id: '1',
-      name: 'US Foods',
-      email: 'orders@usfoods.com',
-      phone: '(555) 123-4567',
-      category: 'Proteins, Produce, Dairy',
-      contactPerson: 'Mike Johnson',
-      address: '123 Distribution Way, Toronto, ON'
-    },
-    {
-      id: '2',
-      name: 'Sysco',
-      email: 'orders@sysco.com',
-      phone: '(555) 234-5678',
-      category: 'Dry Goods, Proteins',
-      contactPerson: 'Sarah Williams',
-      address: '456 Supplier Blvd, Toronto, ON'
-    },
-    {
-      id: '3',
-      name: 'Gordon Food Service',
-      email: 'sales@gfs.com',
-      phone: '(555) 345-6789',
-      category: 'Produce, Beverages',
-      contactPerson: 'James Chen',
-      address: '789 Food Plaza, Mississauga, ON'
-    },
-    {
-      id: '4',
-      name: 'Ontario Seafood',
-      email: 'fresh@ontarioseafood.ca',
-      phone: '(555) 456-7890',
-      category: 'Seafood',
-      contactPerson: 'Maria Rodriguez',
-      address: '321 Harbor St, Toronto, ON'
-    },
-    {
-      id: '5',
-      name: 'Fresh Valley Farms',
-      email: 'orders@freshvalley.ca',
-      phone: '(555) 567-8901',
-      category: 'Produce, Dairy',
-      contactPerson: 'David Kim',
-      address: '555 Farm Road, Markham, ON'
-    }
-  ]);
+  const [isImporting, setIsImporting] = useState(false);
+  const { suppliers } = useInventory();
 
   const handleConnect = () => {
-    if (!tempApiKey || !tempRestaurantId) {
-      showToast.error('Please enter both API Key and Restaurant ID');
-      return;
-    }
-    connectToast(tempApiKey, tempRestaurantId);
-    showToast.success('Successfully connected to Toast POS');
+    const normalizedApiKey = tempApiKey.trim() || 'demo-toast-api-key';
+    const normalizedRestaurantId = tempRestaurantId.trim() || 'demo-restaurant';
+
+    connectToast(normalizedApiKey, normalizedRestaurantId);
+    showToast.success(
+      normalizedApiKey === 'demo-toast-api-key' && normalizedRestaurantId === 'demo-restaurant'
+        ? 'Connected to demo POS data. Forecasting is ready to use.'
+        : 'Successfully connected to Toast POS'
+    );
     setTempApiKey('');
     setTempRestaurantId('');
   };
@@ -105,8 +58,7 @@ export function Integrations() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
+    logout();
     showToast.success('Logged out successfully');
     navigate('/login');
   };
@@ -120,6 +72,26 @@ export function Integrations() {
       showToast.error('Failed to sync data');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importPayload.trim()) {
+      showToast.error('Paste a POS export payload first');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const parsed = JSON.parse(importPayload);
+      await importSalesData(parsed);
+      setImportPayload('');
+      showToast.success('POS import completed');
+    } catch (error) {
+      console.error(error);
+      showToast.error('That payload could not be imported');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -140,27 +112,6 @@ export function Integrations() {
         <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Settings & Integrations</h2>
         <p className="text-sm text-gray-600 mt-1">Connect Toast POS to sync sales data</p>
       </div>
-
-      {/* About 86'D Card */}
-      <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
-        <CardHeader>
-          <div className="flex items-center space-x-3">
-            <div className="bg-white rounded-lg p-2 shadow-md">
-              <span className="text-3xl font-black text-red-600">86</span>
-            </div>
-            <div>
-              <CardTitle className="text-red-900">86'D Inventory Management</CardTitle>
-              <CardDescription className="text-red-700">Kitchen slang for "out of stock" - we help you never run out</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-red-800">
-            Built for restaurants by people who understand BOH operations. Track inventory, 
-            forecast demand, automate ordering, and integrate with your POS—all from your phone.
-          </p>
-        </CardContent>
-      </Card>
 
       {/* Toast POS Integration Card */}
       <Card>
@@ -229,8 +180,12 @@ export function Integrations() {
                   />
                 </div>
 
+                <p className="text-xs text-gray-500">
+                  Leave the fields blank to connect with demo POS data and start forecasting immediately.
+                </p>
+
                 <Button onClick={handleConnect} className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white">
-                  Connect to Toast
+                  Connect POS
                 </Button>
 
                 <a
@@ -280,6 +235,22 @@ export function Integrations() {
 
               {/* Actions */}
               <div className="space-y-2">
+                <div className="rounded-lg border border-dashed border-slate-300 p-3 space-y-2">
+                  <Label htmlFor="posImport">Import Marketman profitability rows</Label>
+                  <Textarea
+                    id="posImport"
+                    value={importPayload}
+                    onChange={(e) => setImportPayload(e.target.value)}
+                    placeholder='{"marketmanReport":[{"Menu item name":"Chicken Sandwich","Qty sold":3,"Total sales":45}],"menuItems":[...]}'
+                    className="min-h-[90px] font-mono text-xs"
+                  />
+                  <Button onClick={handleImport} variant="outline" className="w-full" disabled={isImporting}>
+                    {isImporting ? 'Importing...' : 'Import sales data'}
+                  </Button>
+                  <p className="text-[11px] text-gray-500">
+                    Paste a JSON payload with Marketman profitability rows (only Qty sold {'>'} 0 will be imported) plus optional menuItems to power forecasting.
+                  </p>
+                </div>
                 <Button 
                   onClick={handleSync} 
                   variant="outline" 
@@ -382,63 +353,52 @@ export function Integrations() {
         </Card>
       )}
 
-      {/* Supplier Contacts */}
+      {/* Supplier dropdown */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Building2 className="w-5 h-5 text-[#0F172A]" />
+        <CardHeader className="flex items-center justify-between gap-3">
+          <div>
             <CardTitle className="text-base">Supplier Contacts</CardTitle>
+            <CardDescription>Quick access to supplier emails and phone numbers</CardDescription>
           </div>
-          <CardDescription>
-            Contact information for your suppliers
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {suppliers.map((supplier) => (
-              <Card key={supplier.id} className="bg-gray-50">
-                <CardContent className="pt-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{supplier.name}</h3>
-                        <p className="text-xs text-gray-600 mt-1">{supplier.category}</p>
-                      </div>
-                      <Badge className="bg-[#FEF9C3] text-[#1E3A5F] text-xs">
-                        {supplier.contactPerson}
-                      </Badge>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <a 
-                        href={`mailto:${supplier.email}`}
-                        className="flex items-center space-x-2 text-sm text-gray-700 hover:text-[#0F172A]"
-                      >
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span>{supplier.email}</span>
-                      </a>
-                      
-                      <a 
-                        href={`tel:${supplier.phone}`}
-                        className="flex items-center space-x-2 text-sm text-gray-700 hover:text-[#0F172A]"
-                      >
-                        <Phone className="w-4 h-4 text-gray-400" />
-                        <span>{supplier.phone}</span>
-                      </a>
-                      
-                      {supplier.address && (
-                        <div className="flex items-start space-x-2 text-sm text-gray-700">
-                          <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          <span>{supplier.address}</span>
-                        </div>
-                      )}
-                    </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="inline-flex items-center gap-2">
+                <span>View Suppliers</span>
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-80">
+              <DropdownMenuLabel>Supplier Contacts</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {suppliers.map((supplier, index) => (
+                <div key={supplier.id} className="space-y-2 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-900">{supplier.name}</span>
+                    <span className="text-[11px] text-gray-500">{supplier.category}</span>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
+                  <div className="text-xs text-gray-500">{supplier.contactPerson}</div>
+                  <div className="flex flex-col gap-1 text-xs text-gray-600">
+                    <a href={`mailto:${supplier.email}`} className="inline-flex items-center gap-1 hover:text-[#0F172A]">
+                      <Mail className="w-3.5 h-3.5" />
+                      {supplier.email}
+                    </a>
+                    <a href={`tel:${supplier.phone}`} className="inline-flex items-center gap-1 hover:text-[#0F172A]">
+                      <Phone className="w-3.5 h-3.5" />
+                      {supplier.phone}
+                    </a>
+                    {supplier.address && (
+                      <div className="inline-flex items-start gap-1 text-gray-500">
+                        <MapPin className="w-3.5 h-3.5 mt-0.5" />
+                        {supplier.address}
+                      </div>
+                    )}
+                  </div>
+                  {index < suppliers.length - 1 && <DropdownMenuSeparator />}
+                </div>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardHeader>
       </Card>
 
       {/* Account Section - Always show logout */}

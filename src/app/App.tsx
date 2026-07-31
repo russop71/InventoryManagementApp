@@ -2,21 +2,24 @@ import { RouterProvider } from 'react-router';
 import { router } from './routes';
 import { InventoryProvider } from './contexts/InventoryContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from './components/ui/sonner';
 import { useEffect } from 'react';
 
 function App() {
   useEffect(() => {
-    document.title = "86'D - Restaurant Inventory Management";
+    document.title = 'zestIQ - Restaurant Inventory Management';
   }, []);
 
   return (
-    <ToastProvider>
+    <AuthProvider>
       <InventoryProvider>
-        <RouterProvider router={router} />
-        <Toaster />
+        <ToastProvider>
+          <RouterProvider router={router} />
+          <Toaster />
+        </ToastProvider>
       </InventoryProvider>
-    </ToastProvider>
+    </AuthProvider>
   );
 }
 

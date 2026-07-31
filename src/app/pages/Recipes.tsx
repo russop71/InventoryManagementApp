@@ -1,575 +1,1112 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
+import { useLocation, useNavigate } from 'react-router';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
-import { Plus, ChefHat, DollarSign, Trash2, Edit, RefreshCw, Camera } from 'lucide-react';
+import { Plus, ChefHat, Trash2, Edit, RefreshCw, Camera } from 'lucide-react';
 import { toast as showToast } from 'sonner';
 import { RecipeScan } from '../components/RecipeScan';
+import { convertQuantity, formatUnitLabel, getCompatibleUnits, normalizeUnit } from '../utils/unitConversion';
+
+type IngredientSelection = { inventoryItemId: string; quantity: number; unit: string };
+
+function IngredientAutocomplete({
+  inventory,
+  onAddIngredient,
+}: {
+  inventory: { id: string; name: string; unit: string; supplier: string; unitCost: number }[];
+  onAddIngredient: (itemId: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const matches = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return inventory.slice(0, 8);
+
+    return inventory
+      .map(item => {
+        const name = item.name.toLowerCase();
+        const supplier = item.supplier.toLowerCase();
+        const nameIndex = name.indexOf(normalized);
+        const supplierIndex = supplier.indexOf(normalized);
+        const score = name.startsWith(normalized)
+          ? 0
+          : nameIndex >= 0
+            ? nameIndex + 1
+            : supplier.startsWith(normalized)
+              ? 50
+              : supplierIndex >= 0
+                ? supplierIndex + 51
+                : 999;
+        return { item, score };
+      })
+      .filter(entry => entry.score < 999)
+      .sort((left, right) => left.score - right.score || left.item.name.localeCompare(right.item.name))
+      .slice(0, 8)
+      .map(entry => entry.item);
+  }, [inventory, query]);
+
+  const addItem = (itemId: string) => {
+    onAddIngredient(itemId);
+    setQuery('');
+    setOpen(false);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Input
+        value={query}
+        onChange={event => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && matches[0]) {
+            event.preventDefault();
+            addItem(matches[0].id);
+          }
+        }}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 150);
+        }}
+        placeholder="Start typing an inventory item..."
+        className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+      />
+
+      {open && matches.length > 0 && (
+        <div className="max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+            Closest matches
+          </div>
+          <div className="divide-y divide-slate-100">
+            {matches.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => addItem(item.id)}
+                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{item.name}</p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {item.unit} unit • {item.supplier}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right text-[11px] text-slate-500">
+                  ${item.unitCost.toFixed(2)}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {open && query.trim() && matches.length === 0 && (
+        <p className="text-xs text-slate-500">No inventory items match “{query.trim()}”.</p>
+      )}
+    </div>
+  );
+}
 
 export function Recipes() {
-  const { inventory, recipes, addRecipe, updateRecipe, deleteRecipe, syncToastMenuItems } = useInventory();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    inventory,
+    recipes,
+    preppedRecipes,
+    addRecipe,
+    updateRecipe,
+    deleteRecipe,
+    syncToastMenuItems,
+    addPreppedRecipe,
+    updatePreppedRecipe,
+    deletePreppedRecipe,
+  } = useInventory();
   const { isConnected, menuItems } = useToast();
+  const toastMenuItemOptions = useMemo(() => menuItems.slice().sort((left, right) => left.name.localeCompare(right.name)), [menuItems]);
+
+  const topSellerName = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('menuItem') || '';
+  }, [location.search]);
+  const normalizedTopSellerName = topSellerName.trim().toLowerCase();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isScanOpen, setIsScanOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<string | null>(null);
-  const [selectedIngredients, setSelectedIngredients] = useState<{
-    inventoryItemId: string;
-    quantity: number;
-    unit: string;
-  }[]>([]);
-  const [modifiers, setModifiers] = useState<{
-    name: string;
-    ingredientChanges: { inventoryItemId: string; quantity: number }[];
-  }[]>([]);
-  const [scannedRecipeData, setScannedRecipeData] = useState<{
-    menuItemName: string;
-    category: string;
-    price: number;
-    ingredients: string[];
-  } | null>(null);
+  const [recipeMenuItemName, setRecipeMenuItemName] = useState('');
+  const [recipeCategory, setRecipeCategory] = useState('');
+  const [recipePrice, setRecipePrice] = useState('');
+  const [selectedIngredients, setSelectedIngredients] = useState<IngredientSelection[]>([]);
+  const [recipeExternalId, setRecipeExternalId] = useState('');
+  const [activeTab, setActiveTab] = useState<'menuItems' | 'preppedRecipes'>('menuItems');
+  const [isPrepDialogOpen, setIsPrepDialogOpen] = useState(false);
+  const [editingPrepId, setEditingPrepId] = useState<string | null>(null);
+  const [prepMenuItemName, setPrepMenuItemName] = useState('');
+  const [prepCategory, setPrepCategory] = useState('');
+  const [prepYieldQuantity, setPrepYieldQuantity] = useState('1');
+  const [prepYieldUnit, setPrepYieldUnit] = useState('batch');
+  const [selectedPrepIngredients, setSelectedPrepIngredients] = useState<IngredientSelection[]>([]);
+  const [scannedRecipeData, setScannedRecipeData] = useState<{ menuItemName: string; category: string; price: number; ingredients: string[] } | null>(null);
 
-  // Sync Toast menu items on mount if connected
-  useEffect(() => {
-    if (isConnected && menuItems.length > 0) {
-      const hasToastRecipes = recipes.some(r => r.source === 'toast');
-      if (!hasToastRecipes) {
-        handleSyncToastItems();
+  const tokenizeIngredientLine = (line: string) =>
+    line
+      .toLowerCase()
+      .replace(/[^a-z\s-]/g, ' ')
+      .split(/\s+/)
+      .map(token => token.trim())
+      .filter(token => token.length > 2)
+      .filter(token => !['cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'kg', 'gr', 'g', 'ml', 'l', 'ea', 'pcs', 'pinch', 'dash'].includes(token));
+
+  const findInventoryMatchForIngredientLine = (line: string) => {
+    const tokens = tokenizeIngredientLine(line);
+    if (tokens.length === 0) return null;
+
+    let bestMatch: { id: string; unit: string; score: number } | null = null;
+    for (const item of inventory) {
+      const haystack = `${item.name} ${item.supplier}`.toLowerCase();
+      const score = tokens.reduce((sum, token) => (haystack.includes(token) ? sum + 1 : sum), 0);
+      if (score <= 0) continue;
+      if (!bestMatch || score > bestMatch.score) {
+        bestMatch = { id: item.id, unit: item.unit, score };
       }
     }
-  }, [isConnected, menuItems]);
+
+    return bestMatch && bestMatch.score >= 2 ? bestMatch : null;
+  };
+
+  const resetRecipeForm = () => {
+    setEditingRecipe(null);
+    setRecipeMenuItemName('');
+    setRecipeCategory('');
+    setRecipePrice('');
+    setSelectedIngredients([]);
+    setRecipeExternalId('');
+    setScannedRecipeData(null);
+  };
+
+  const resetPrepForm = () => {
+    setEditingPrepId(null);
+    setPrepMenuItemName('');
+    setPrepCategory('Prepped Items');
+    setPrepYieldQuantity('1');
+    setPrepYieldUnit('batch');
+    setSelectedPrepIngredients([]);
+  };
+
+  const calculateIngredientLineCost = (ingredient: IngredientSelection) => {
+    const item = inventory.find((inventoryItem) => inventoryItem.id === ingredient.inventoryItemId);
+    if (!item) return 0;
+
+    const sourceUnit = ingredient.unit || item.unit;
+    const quantityInInventoryUnit = convertQuantity(ingredient.quantity, sourceUnit, item.unit);
+    const quantityForCost = quantityInInventoryUnit ?? ingredient.quantity;
+
+    return quantityForCost * item.unitCost;
+  };
+
+  const calculateRecipeCost = (recipeId: string) => {
+    const recipe = recipes.find((recipe) => recipe.id === recipeId);
+    if (!recipe) return 0;
+    return recipe.ingredients.reduce((total, ingredient) => total + calculateIngredientLineCost(ingredient), 0);
+  };
+
+  const calculateIngredientCost = (ingredients: IngredientSelection[]) => {
+    return ingredients.reduce((total, ingredient) => total + calculateIngredientLineCost(ingredient), 0);
+  };
+
+  const currentMenuItemCost = calculateIngredientCost(selectedIngredients);
+  const currentMenuItemPrice = Number(recipePrice || 0);
+  const currentFoodCostPercent = currentMenuItemPrice > 0 ? (currentMenuItemCost / currentMenuItemPrice) * 100 : 0;
+  const currentMenuItemMargin = currentMenuItemPrice - currentMenuItemCost;
+  const currentMenuItemMarginPercent = currentMenuItemPrice > 0 ? (currentMenuItemMargin / currentMenuItemPrice) * 100 : 0;
+  const getMarginColor = (marginPercent: number) => {
+    if (marginPercent < 60) return '#b91c1c';
+    if (marginPercent < 70) return '#c2410c';
+    return '#15803d';
+  };
+  const unlinkedMenuItemCount = recipes.filter((recipe) => !recipe.externalId).length;
+  const uncostedMenuItemCount = recipes.filter((recipe) => recipe.ingredients.length === 0).length;
+  const averageMarginPercent = recipes.length > 0
+    ? recipes.reduce((sum, recipe) => {
+        const cost = calculateRecipeCost(recipe.id);
+        const marginPercent = recipe.price > 0 ? ((recipe.price - cost) / recipe.price) * 100 : 0;
+        return sum + marginPercent;
+      }, 0) / recipes.length
+    : 0;
+
+  const handleAddIngredient = (
+    itemId: string,
+    setIngredients: React.Dispatch<React.SetStateAction<IngredientSelection[]>>,
+  ) => {
+    if (!itemId) return;
+    const item = inventory.find((inventoryItem) => inventoryItem.id === itemId);
+    if (!item) return;
+    setIngredients((current) => {
+      if (current.find((ingredient) => ingredient.inventoryItemId === itemId)) {
+        showToast.error('Ingredient already added');
+        return current;
+      }
+      return [...current, { inventoryItemId: item.id, quantity: 0, unit: item.unit }];
+    });
+  };
+
+  const handleUpdateIngredientQuantity = (
+    itemId: string,
+    quantity: number,
+    setIngredients: React.Dispatch<React.SetStateAction<IngredientSelection[]>>,
+  ) => {
+    setIngredients((current) => current.map((ingredient) => ingredient.inventoryItemId === itemId ? { ...ingredient, quantity } : ingredient));
+  };
+
+  const handleUpdateIngredientUnit = (
+    itemId: string,
+    unit: string,
+    setIngredients: React.Dispatch<React.SetStateAction<IngredientSelection[]>>,
+  ) => {
+    setIngredients((current) => current.map((ingredient) => {
+      if (ingredient.inventoryItemId !== itemId) return ingredient;
+
+      const currentUnit = ingredient.unit;
+      const convertedQuantity = convertQuantity(ingredient.quantity, currentUnit, unit);
+      return {
+        ...ingredient,
+        unit,
+        quantity: convertedQuantity ?? ingredient.quantity,
+      };
+    }));
+  };
+
+  const handleRemoveIngredient = (
+    itemId: string,
+    setIngredients: React.Dispatch<React.SetStateAction<IngredientSelection[]>>,
+  ) => {
+    setIngredients((current) => current.filter((ingredient) => ingredient.inventoryItemId !== itemId));
+  };
+
+  const handleAddMenuIngredient = (itemId: string) => {
+    handleAddIngredient(itemId, setSelectedIngredients);
+  };
+
+  const handleAddPrepIngredient = (itemId: string) => {
+    handleAddIngredient(itemId, setSelectedPrepIngredients);
+  };
+
+  const handleUpdateMenuIngredientQuantity = (itemId: string, quantity: number) => {
+    handleUpdateIngredientQuantity(itemId, quantity, setSelectedIngredients);
+  };
+
+  const handleUpdatePrepIngredientQuantity = (itemId: string, quantity: number) => {
+    handleUpdateIngredientQuantity(itemId, quantity, setSelectedPrepIngredients);
+  };
+
+  const handleUpdateMenuIngredientUnit = (itemId: string, unit: string) => {
+    handleUpdateIngredientUnit(itemId, unit, setSelectedIngredients);
+  };
+
+  const handleUpdatePrepIngredientUnit = (itemId: string, unit: string) => {
+    handleUpdateIngredientUnit(itemId, unit, setSelectedPrepIngredients);
+  };
+
+  const handleRemoveMenuIngredient = (itemId: string) => {
+    handleRemoveIngredient(itemId, setSelectedIngredients);
+  };
+
+  const handleRemovePrepIngredient = (itemId: string) => {
+    handleRemoveIngredient(itemId, setSelectedPrepIngredients);
+  };
+
+  const renderIngredientEditor = (
+    ingredients: IngredientSelection[],
+    onAddIngredient: (itemId: string) => void,
+    onUpdateIngredientQuantity: (itemId: string, quantity: number) => void,
+    onUpdateIngredientUnit: (itemId: string, unit: string) => void,
+    onRemoveIngredient: (itemId: string) => void,
+    emptyMessage: string,
+    yieldContext?: { quantity: number; unit: string },
+  ) => (
+    <div className="space-y-3">
+      <div>
+        <Label>Ingredients</Label>
+        <IngredientAutocomplete inventory={inventory} onAddIngredient={onAddIngredient} />
+      </div>
+
+      {ingredients.length > 0 ? (
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
+          {ingredients.map((ingredient) => {
+            const item = inventory.find((inventoryItem) => inventoryItem.id === ingredient.inventoryItemId);
+            if (!item) return null;
+            const compatibleUnits = getCompatibleUnits(item.unit);
+            const normalizedIngredientUnit = normalizeUnit(ingredient.unit || item.unit);
+            const availableUnits = compatibleUnits.some((unitOption) => unitOption.value === normalizedIngredientUnit)
+              ? compatibleUnits
+              : [...compatibleUnits, { value: normalizedIngredientUnit, label: formatUnitLabel(normalizedIngredientUnit) }];
+            const lineCost = calculateIngredientLineCost(ingredient);
+            return (
+              <div key={ingredient.inventoryItemId} className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3 sm:grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr_auto] sm:items-end">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900 truncate">{item.name}</p>
+                  <p className="mt-1 text-[11px] text-slate-500 truncate">
+                    Base: {formatUnitLabel(item.unit)} • {item.supplier} • ${item.unitCost.toFixed(2)}/{formatUnitLabel(item.unit)}
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor={`qty-${ingredient.inventoryItemId}`}>Quantity</Label>
+                  <Input
+                    id={`qty-${ingredient.inventoryItemId}`}
+                    type="number"
+                    step="0.01"
+                    value={ingredient.quantity}
+                    onChange={(e) => onUpdateIngredientQuantity(ingredient.inventoryItemId, Number(e.target.value))}
+                    className="min-w-0"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">Used in {formatUnitLabel(ingredient.unit || item.unit)}</p>
+                </div>
+                <div>
+                  <Label htmlFor={`unit-${ingredient.inventoryItemId}`}>Unit</Label>
+                  <select
+                    id={`unit-${ingredient.inventoryItemId}`}
+                    value={normalizedIngredientUnit}
+                    onChange={(e) => onUpdateIngredientUnit(ingredient.inventoryItemId, e.target.value)}
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    {availableUnits.map((unitOption) => (
+                      <option key={unitOption.value} value={unitOption.value}>
+                        {unitOption.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Line Cost</p>
+                  <span className="text-sm font-semibold text-slate-900">${lineCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" variant="outline" type="button" onClick={() => onRemoveIngredient(ingredient.inventoryItemId)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="grid gap-3 rounded-lg bg-slate-100 px-4 py-3 text-sm sm:grid-cols-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Ingredient Lines</p>
+              <p className="mt-1 font-semibold text-slate-900">{ingredients.length}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Total Cost</p>
+              <p className="mt-1 font-semibold text-slate-900">${calculateIngredientCost(ingredients).toFixed(2)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Per Yield</p>
+              <p className="mt-1 font-semibold text-slate-900">
+                {yieldContext && yieldContext.quantity > 0
+                  ? `$${(calculateIngredientCost(ingredients) / yieldContext.quantity).toFixed(2)} / ${yieldContext.unit}`
+                  : 'Set yield to calculate'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-slate-500">{emptyMessage}</p>
+      )}
+    </div>
+  );
 
   const handleSyncToastItems = () => {
     if (!isConnected) {
-      showToast.error('Please connect to Toast POS first');
+      showToast.error('Connect to Toast POS first');
       return;
     }
-
-    // Remove old Toast recipes
-    const manualRecipes = recipes.filter(r => r.source !== 'toast');
-    
-    // Map Toast menu items to recipes
-    const toastRecipes = menuItems.map(item => {
-      const recipeId = `toast-${item.id}-${Date.now()}`;
-      return {
-        id: recipeId,
-        menuItemName: item.name,
-        category: item.category,
-        price: item.price,
-        ingredients: item.ingredients.map(ing => {
-          const invItem = inventory.find(i => i.id === ing.inventoryItemId);
-          return {
-            inventoryItemId: ing.inventoryItemId,
-            quantity: ing.quantity,
-            unit: invItem?.unit || 'lbs'
-          };
-        }),
-        source: 'toast' as const,
-        externalId: item.id,
-      };
-    });
-
-    // Combine manual and Toast recipes
-    const allRecipes = [...manualRecipes, ...toastRecipes];
-    
-    // Update recipes in context
-    allRecipes.forEach((recipe, index) => {
-      if (recipe.source === 'toast' && !recipes.find(r => r.id === recipe.id)) {
-        addRecipe(recipe);
-      }
-    });
-
-    showToast.success(`Synced ${toastRecipes.length} menu items from Toast`);
-  };
-
-  const handleAddIngredient = (itemId: string) => {
-    const item = inventory.find(i => i.id === itemId);
-    if (!item) return;
-
-    if (selectedIngredients.find(ing => ing.inventoryItemId === itemId)) {
-      showToast.error('Ingredient already added');
+    if (menuItems.length === 0) {
+      showToast.error('No menu items available to sync');
       return;
     }
-
-    setSelectedIngredients([
-      ...selectedIngredients,
-      { inventoryItemId: itemId, quantity: 0, unit: item.unit }
-    ]);
+    syncToastMenuItems(menuItems);
+    showToast.success(`Synced ${menuItems.length} menu items from Toast`);
   };
 
-  const handleUpdateIngredientQuantity = (itemId: string, quantity: number) => {
-    setSelectedIngredients(
-      selectedIngredients.map(ing =>
-        ing.inventoryItemId === itemId ? { ...ing, quantity } : ing
-      )
-    );
+  useEffect(() => {
+    if (isConnected && recipes.every((recipe) => recipe.source !== 'toast')) {
+      handleSyncToastItems();
+    }
+  }, [isConnected]);
+
+  useEffect(() => {
+    if (topSellerName) {
+      setActiveTab('menuItems');
+    }
+  }, [topSellerName]);
+
+  const topSellerMatch = useMemo(() => {
+    if (!normalizedTopSellerName) return null;
+    return recipes.find((recipe) => recipe.menuItemName.trim().toLowerCase() === normalizedTopSellerName) || null;
+  }, [normalizedTopSellerName, recipes]);
+
+  const visibleRecipes = useMemo(() => {
+    if (!normalizedTopSellerName) return recipes;
+
+    const matching = recipes.filter((recipe) => recipe.menuItemName.trim().toLowerCase() === normalizedTopSellerName);
+    const remaining = recipes.filter((recipe) => recipe.menuItemName.trim().toLowerCase() !== normalizedTopSellerName);
+    return [...matching, ...remaining];
+  }, [normalizedTopSellerName, recipes]);
+
+  const totalMenuItemRevenue = recipes.reduce((sum, recipe) => sum + recipe.price, 0);
+  const totalMenuItemCost = recipes.reduce((sum, recipe) => sum + calculateRecipeCost(recipe.id), 0);
+  const linkedMenuItemCount = recipes.filter((recipe) => Boolean(recipe.externalId)).length;
+
+  const handleEditRecipe = (recipeId: string) => {
+    const recipe = recipes.find((item) => item.id === recipeId);
+    if (!recipe) return;
+    setEditingRecipe(recipeId);
+    setRecipeMenuItemName(recipe.menuItemName);
+    setRecipeCategory(recipe.category);
+    setRecipePrice(String(recipe.price));
+    setSelectedIngredients(recipe.ingredients);
+    setRecipeExternalId(recipe.externalId || '');
+    setScannedRecipeData(null);
+    setIsDialogOpen(true);
   };
 
-  const handleRemoveIngredient = (itemId: string) => {
-    setSelectedIngredients(selectedIngredients.filter(ing => ing.inventoryItemId !== itemId));
+  const handleRecipeExternalIdChange = (externalId: string) => {
+    setRecipeExternalId(externalId);
+    const linkedItem = toastMenuItemOptions.find((item) => item.id === externalId);
+    if (!linkedItem) return;
+    setRecipeMenuItemName(linkedItem.name);
+    setRecipeCategory(linkedItem.category);
+    setRecipePrice(String(linkedItem.price));
   };
 
-  const handleAddModifier = () => {
-    setModifiers([...modifiers, { name: '', ingredientChanges: [] }]);
+  const handleTopSellerSelect = (recipeId: string) => {
+    navigate(`/app/recipes?menuItem=${encodeURIComponent(recipes.find((recipe) => recipe.id === recipeId)?.menuItemName || '')}`);
+    setActiveTab('menuItems');
+  };
+
+  const handleDeleteRecipe = (recipeId: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    deleteRecipe(recipeId);
+    showToast.success('Recipe deleted');
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-
-    const recipe = {
-      menuItemName: formData.get('menuItemName') as string,
-      category: formData.get('category') as string,
-      price: Number(formData.get('price')),
+    const recipePayload = {
+      menuItemName: recipeMenuItemName.trim(),
+      category: recipeCategory.trim(),
+      price: Number(recipePrice || 0),
       ingredients: selectedIngredients,
-      modifiers: modifiers.filter(m => m.name && m.ingredientChanges.length > 0),
+      externalId: recipeExternalId.trim() || undefined,
+      deletable: true,
     };
 
     if (editingRecipe) {
-      updateRecipe(editingRecipe, recipe);
-      showToast.success('Recipe updated successfully');
+      updateRecipe(editingRecipe, recipePayload);
+      showToast.success('Recipe updated');
     } else {
-      addRecipe(recipe);
-      showToast.success('Recipe added successfully');
+      addRecipe(recipePayload);
+      showToast.success('Recipe created');
     }
 
     setIsDialogOpen(false);
-    setSelectedIngredients([]);
-    setModifiers([]);
-    setEditingRecipe(null);
-    e.currentTarget.reset();
+    resetRecipeForm();
   };
 
-  const handleEditRecipe = (recipeId: string) => {
-    const recipe = recipes.find(r => r.id === recipeId);
-    if (!recipe) return;
+  const handleRecipeScanned = (scannedData: { menuItemName: string; category: string; price: number; ingredients: string[] }) => {
+    setScannedRecipeData(scannedData);
 
-    setEditingRecipe(recipeId);
-    setSelectedIngredients(recipe.ingredients);
-    setModifiers(recipe.modifiers || []);
-    setIsDialogOpen(true);
-  };
+    const autoMappedIngredients: IngredientSelection[] = [];
+    const seen = new Set<string>();
+    scannedData.ingredients.forEach((line) => {
+      const match = findInventoryMatchForIngredientLine(line);
+      if (!match || seen.has(match.id)) return;
+      seen.add(match.id);
+      autoMappedIngredients.push({
+        inventoryItemId: match.id,
+        quantity: 0,
+        unit: match.unit,
+      });
+    });
 
-  const handleDeleteRecipe = (recipeId: string, name: string) => {
-    if (confirm(`Delete "${name}"? This cannot be undone.`)) {
-      deleteRecipe(recipeId);
-      showToast.success('Recipe deleted');
+    const normalizedName = scannedData.menuItemName?.trim() || 'Scanned Recipe';
+    const normalizedCategory = scannedData.category?.trim() || 'Prepped Items';
+    const nextIngredients = autoMappedIngredients;
+    const nextCost = calculateIngredientCost(nextIngredients);
+
+    addPreppedRecipe({
+      menuItemName: normalizedName,
+      category: normalizedCategory,
+      ingredients: nextIngredients,
+      yieldQuantity: 1,
+      yieldUnit: 'batch',
+      cost: nextCost,
+      deletable: true,
+    });
+
+    setEditingPrepId(null);
+    setPrepMenuItemName('');
+    setPrepCategory('Prepped Items');
+    setPrepYieldQuantity('1');
+    setPrepYieldUnit('batch');
+    setSelectedPrepIngredients([]);
+
+    setIsDialogOpen(false);
+    setIsScanOpen(false);
+    setActiveTab('preppedRecipes');
+    setIsPrepDialogOpen(false);
+
+    if (autoMappedIngredients.length > 0) {
+      showToast.success(`Recipe scanned and added to Recipes with ${autoMappedIngredients.length} mapped ingredients.`);
+    } else {
+      showToast.success('Recipe scanned and added to Recipes. Add ingredient mappings when ready.');
     }
   };
 
-  const calculateRecipeCost = (recipeId: string) => {
-    const recipe = recipes.find(r => r.id === recipeId);
-    if (!recipe) return 0;
-
-    return recipe.ingredients.reduce((total, ingredient) => {
-      const item = inventory.find(i => i.id === ingredient.inventoryItemId);
-      if (!item) return total;
-      return total + (ingredient.quantity * item.unitCost);
-    }, 0);
+  const openPrepDialog = (prepId?: string) => {
+    if (prepId) {
+      const prepItem = preppedRecipes.find((item) => item.id === prepId);
+      if (!prepItem) return;
+      setEditingPrepId(prepId);
+      setPrepMenuItemName(prepItem.menuItemName);
+      setPrepCategory(prepItem.category);
+      setPrepYieldQuantity(String(prepItem.yieldQuantity));
+      setPrepYieldUnit(prepItem.yieldUnit);
+      setSelectedPrepIngredients(prepItem.ingredients);
+    } else {
+      resetPrepForm();
+    }
+    setIsPrepDialogOpen(true);
   };
 
-  const handleRecipeScanned = (scannedData: {
-    menuItemName: string;
-    category: string;
-    price: number;
-    ingredients: string[];
-  }) => {
-    // Save scanned data and open regular dialog to map ingredients
-    setScannedRecipeData(scannedData);
-    setIsScanOpen(false);
-    setIsDialogOpen(true);
-    showToast.success('Recipe scanned! Now map ingredients to inventory items.');
+  const handleCreatePreppedRecipe = () => {
+    if (!prepMenuItemName.trim()) {
+      showToast.error('Enter a recipe name');
+      return;
+    }
+    if (selectedPrepIngredients.length === 0) {
+      showToast.error('Add at least one ingredient');
+      return;
+    }
+
+    const parsedYieldQuantity = Number(prepYieldQuantity);
+    if (!parsedYieldQuantity || parsedYieldQuantity <= 0) {
+      showToast.error('Enter a valid yield quantity');
+      return;
+    }
+
+    const payload = {
+      menuItemName: prepMenuItemName.trim(),
+      category: prepCategory.trim() || 'Prepped Items',
+      ingredients: selectedPrepIngredients,
+      yieldQuantity: parsedYieldQuantity,
+      yieldUnit: prepYieldUnit.trim() || 'batch',
+      cost: calculateIngredientCost(selectedPrepIngredients),
+      deletable: true,
+    };
+
+    if (editingPrepId) {
+      updatePreppedRecipe(editingPrepId, payload);
+      showToast.success(`Updated recipe ${payload.menuItemName}`);
+    } else {
+      addPreppedRecipe(payload);
+      showToast.success(`Created recipe ${payload.menuItemName}`);
+    }
+
+    setIsPrepDialogOpen(false);
+    resetPrepForm();
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Recipe Builder</h2>
-          <p className="text-sm text-gray-600 mt-1">Define menu items & costs</p>
+          <h1 className="text-3xl font-extrabold text-slate-900">Menu Item Builder</h1>
+          <p className="text-sm text-slate-500">Build menu items from inventory ingredients and create reusable prep components.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) {
-            setEditingRecipe(null);
-            setSelectedIngredients([]);
-            setModifiers([]);
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
-              <Plus className="w-4 h-4 mr-1" />
-              New
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingRecipe ? 'Edit Recipe' : 'Create Recipe'}
-              </DialogTitle>
-              <DialogDescription>
-                {editingRecipe ? 'Edit the recipe details below.' : 'Add a new recipe to your menu.'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetRecipeForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-700">
+                <Plus className="w-4 h-4 mr-2" />New Menu Item
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingRecipe ? 'Edit Menu Item' : 'Create Menu Item'}</DialogTitle>
+                <DialogDescription>
+                  {editingRecipe ? 'Update menu item details and ingredient cost mapping.' : 'Build a new menu item and attach inventory ingredients.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="externalId">POS Number</Label>
+                    <select
+                      id="externalId"
+                      name="externalId"
+                      value={recipeExternalId}
+                      onChange={(e) => handleRecipeExternalIdChange(e.target.value)}
+                      className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    >
+                      <option value="">Not linked to POS</option>
+                      {toastMenuItemOptions.map((item) => (
+                        <option key={item.id} value={item.id}>{item.name} · {item.id}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">Link this menu item to a POS item so sync matches by POS number.</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="menuItemName">Menu Item Name</Label>
+                    <Input
+                      id="menuItemName"
+                      name="menuItemName"
+                      value={recipeMenuItemName}
+                      onChange={(e) => setRecipeMenuItemName(e.target.value)}
+                      placeholder="Chicken Sandwich"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Input
+                      id="category"
+                      name="category"
+                      value={recipeCategory}
+                      onChange={(e) => setRecipeCategory(e.target.value)}
+                      placeholder="Entrees"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="price">Price</Label>
+                    <Input
+                      id="price"
+                      name="price"
+                      type="number"
+                      step="0.01"
+                      value={recipePrice}
+                      onChange={(e) => setRecipePrice(e.target.value)}
+                      placeholder="15.99"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <Card className="border-slate-200 bg-slate-50">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Linked POS</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900 truncate">{recipeExternalId || 'Manual item'}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-slate-200 bg-slate-50">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Ingredients</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{selectedIngredients.length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-slate-200 bg-slate-50">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Food Cost</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">${currentMenuItemCost.toFixed(2)}</p>
+                      <p className="text-[11px] text-slate-500">{currentFoodCostPercent.toFixed(0)}%</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-slate-200 bg-slate-50">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Margin</p>
+                      <p className="mt-2 text-sm font-semibold" style={{ color: getMarginColor(currentMenuItemMarginPercent) }}>
+                        ${currentMenuItemMargin.toFixed(2)} · {currentMenuItemMarginPercent.toFixed(0)}%
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {scannedRecipeData && (
+                  <Card className="border-slate-200 bg-slate-50">
+                    <CardContent>
+                      <p className="text-sm font-medium text-slate-900">Scanned Ingredients</p>
+                      <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                        {scannedRecipeData.ingredients.map((ingredient, index) => (
+                          <li key={index}>• {ingredient}</li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {renderIngredientEditor(
+                  selectedIngredients,
+                  handleAddMenuIngredient,
+                  handleUpdateMenuIngredientQuantity,
+                  handleUpdateMenuIngredientUnit,
+                  handleRemoveMenuIngredient,
+                  'Add ingredients from inventory to compute food cost.',
+                  undefined,
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-slate-900 text-white hover:bg-slate-700">
+                    {editingRecipe ? 'Update Menu Item' : 'Save Menu Item'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Button size="sm" className="bg-violet-600 text-white hover:bg-violet-700" onClick={() => setIsScanOpen(true)}>
+            <Camera className="w-4 h-4 mr-2" /> Scan Recipe
+          </Button>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'menuItems' | 'preppedRecipes')}>
+        <TabsList>
+          <TabsTrigger value="menuItems">Menu Items</TabsTrigger>
+          <TabsTrigger value="preppedRecipes">Recipes</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="menuItems" className="space-y-4">
+          {topSellerName && (
+            <Card className={topSellerMatch ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}>
+              <CardContent>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Top Seller Selection</p>
+                    <p className="text-xs mt-1" style={{ color: topSellerMatch ? '#92400E' : '#475569' }}>
+                      {topSellerMatch
+                        ? `Showing recipe for ${topSellerName}.`
+                        : `${topSellerName} was clicked from Top Sellers, but no matching recipe exists yet.`}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => navigate('/app/recipes')}>
+                    Clear
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardContent>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Recipe Intake</p>
+                    <p className="text-xs text-slate-500 mt-1">Create manually, scan a recipe card, or connect an item to POS before costing it.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setIsScanOpen(true)}>
+                    <Camera className="w-4 h-4 mr-2" /> Scan
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardContent>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">POS Sync</p>
+                    <p className="text-xs text-slate-500 mt-1">Keep menu items aligned with connected POS records and prices.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={handleSyncToastItems}>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Sync
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Menu Items</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{recipes.length}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Not Linked To POS</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{unlinkedMenuItemCount}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Missing Costing</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{uncostedMenuItemCount}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Average Margin</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{averageMarginPercent.toFixed(0)}%</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {recipes.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <ChefHat className="w-12 h-12 text-slate-400 mb-4" />
+                <p className="text-sm text-slate-500">No menu items yet. Create one or scan one from your menu.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+              <div className="grid items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[10px] uppercase tracking-[0.2em] text-slate-500" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr' }}>
+                <span>Menu Item</span>
+                <span className="text-right">POS #</span>
+                <span className="text-right">Category</span>
+                <span className="text-right">Food Cost</span>
+                <span className="text-right">Price</span>
+                <span className="text-right">Margin</span>
+                <span className="text-right">Actions</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {visibleRecipes.map((recipe) => {
+                  const recipeCost = calculateRecipeCost(recipe.id);
+                  const foodCostPercent = recipe.price > 0 ? (recipeCost / recipe.price) * 100 : 0;
+                  const margin = recipe.price - recipeCost;
+                  const marginPercent = recipe.price > 0 ? (margin / recipe.price) * 100 : 0;
+                  const isTopSellerMatch = recipe.menuItemName.trim().toLowerCase() === normalizedTopSellerName;
+                  return (
+                    <div
+                      key={recipe.id}
+                      className={`grid items-center gap-3 px-4 py-4 text-sm text-slate-700 ${isTopSellerMatch ? 'bg-amber-50' : ''}`}
+                      style={{ gridTemplateColumns: '1.3fr 0.9fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr' }}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditRecipe(recipe.id)}
+                            className="truncate text-left font-semibold text-slate-900 hover:text-slate-700 hover:underline"
+                          >
+                            {recipe.menuItemName}
+                          </button>
+                          {isTopSellerMatch && (
+                            <Badge className="bg-amber-100 text-amber-800 text-[10px]">Top Seller</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1 truncate">{recipe.ingredients.length} ingredients</p>
+                      </div>
+                      <p className="text-right text-slate-500 truncate">{recipe.externalId || 'Not linked'}</p>
+                      <p className="text-right text-slate-500 truncate">{recipe.category}</p>
+                      <div className="text-right">
+                        <p className="font-semibold text-slate-900 tabular-nums">${recipeCost.toFixed(2)}</p>
+                        <p className="text-[11px] text-slate-500">{foodCostPercent.toFixed(0)}%</p>
+                      </div>
+                      <p className="text-right font-semibold text-slate-900 tabular-nums">${recipe.price.toFixed(2)}</p>
+                      <div className="text-right">
+                        <p className="font-semibold" style={{ color: getMarginColor(marginPercent) }}>${margin.toFixed(2)}</p>
+                        <p className="text-[11px]" style={{ color: getMarginColor(marginPercent) }}>{marginPercent.toFixed(0)}%</p>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}>
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="preppedRecipes" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
+            <Card className="bg-slate-50 border-slate-200">
+              <CardContent>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Recipes</p>
+                    <p className="text-xs text-slate-500 mt-1">Build reusable component recipes for sauces, dressings, batters, and other menu-item building blocks.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => openPrepDialog()}>
+                    New Recipe
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-emerald-50 border-emerald-200">
+              <CardContent>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">Recipes</p>
+                    <p className="text-xs text-emerald-700 mt-1">{preppedRecipes.length} recipes created</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-emerald-900">{preppedRecipes.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {preppedRecipes.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center text-slate-500">
+                <p>No recipes yet. Build one like a reusable component recipe and add your yield.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+              <div
+                className="grid items-center px-4 py-3 text-[10px] uppercase tracking-[0.2em] text-slate-500 bg-slate-50 border-b border-slate-100"
+                style={{ gridTemplateColumns: '1.6fr 1fr 1fr 1fr 0.9fr' }}
+              >
+                <span className="font-black">Recipe</span>
+                <span className="font-black text-right">Category</span>
+                <span className="font-black text-right">Yield</span>
+                <span className="font-black text-right">Cost</span>
+                <span className="font-black text-right">Actions</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {preppedRecipes.map((component) => (
+                  <div
+                    key={component.id}
+                    className="grid items-center gap-3 px-4 py-4 text-sm text-slate-700"
+                    style={{ gridTemplateColumns: '1.6fr 1fr 1fr 1fr 0.9fr' }}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{component.menuItemName}</p>
+                      <p className="text-[11px] text-slate-500 truncate mt-1">{component.ingredients.length} ingredients</p>
+                    </div>
+                    <p className="text-right text-slate-500 truncate">{component.category}</p>
+                    <p className="text-right font-semibold text-slate-900 tabular-nums">{component.yieldQuantity} {component.yieldUnit}</p>
+                    <p className="text-right font-semibold text-slate-900 tabular-nums">${component.cost.toFixed(2)}</p>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => openPrepDialog(component.id)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => deletePreppedRecipe(component.id)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={isPrepDialogOpen} onOpenChange={(open: boolean) => {
+        setIsPrepDialogOpen(open);
+        if (!open) {
+          resetPrepForm();
+        }
+      }}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingPrepId ? 'Edit Recipe' : 'Create Recipe'}</DialogTitle>
+            <DialogDescription>Build a reusable component recipe with ingredients and yield for menu items.</DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreatePreppedRecipe();
+            }}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="menuItemName">Menu Item Name</Label>
+                <Label htmlFor="prepMenuItemName">Recipe Name</Label>
                 <Input
-                  id="menuItemName"
-                  name="menuItemName"
+                  id="prepMenuItemName"
+                  value={prepMenuItemName}
+                  onChange={(e) => setPrepMenuItemName(e.target.value)}
+                  placeholder="Classic Ranch"
                   required
-                  placeholder="e.g., Chicken Sandwich"
-                  defaultValue={
-                    editingRecipe 
-                      ? recipes.find(r => r.id === editingRecipe)?.menuItemName 
-                      : scannedRecipeData?.menuItemName || ''
-                  }
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Input
-                    id="category"
-                    name="category"
-                    required
-                    placeholder="e.g., Entrees"
-                    defaultValue={
-                      editingRecipe 
-                        ? recipes.find(r => r.id === editingRecipe)?.category 
-                        : scannedRecipeData?.category || ''
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="price">Price ($)</Label>
-                  <Input
-                    id="price"
-                    name="price"
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="15.99"
-                    defaultValue={
-                      editingRecipe 
-                        ? recipes.find(r => r.id === editingRecipe)?.price 
-                        : scannedRecipeData?.price || ''
-                    }
-                  />
-                </div>
-              </div>
-
-              {scannedRecipeData && (
-                <Card className="bg-purple-50 border-purple-200">
-                  <CardContent className="py-3">
-                    <p className="text-sm font-medium text-purple-900 mb-2">
-                      📸 Scanned Ingredients
-                    </p>
-                    <div className="space-y-1">
-                      {scannedRecipeData.ingredients.map((ing, idx) => (
-                        <p key={idx} className="text-xs text-purple-700">• {ing}</p>
-                      ))}
-                    </div>
-                    <p className="text-xs text-purple-600 mt-2">
-                      Match these to your inventory items below
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
               <div>
-                <Label>🧾 Ingredients</Label>
-                <div className="mt-2 space-y-2">
-                  <select
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                    onChange={(e) => {
-                      handleAddIngredient(e.target.value);
-                      e.target.value = '';
-                    }}
-                    value=""
-                  >
-                    <option value="">➕ Add ingredient...</option>
-                    {inventory.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.unit}) - ${item.unitCost.toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
-
-                  {selectedIngredients.length > 0 && (
-                    <div className="border border-gray-200 rounded-md divide-y">
-                      {selectedIngredients.map(ingredient => {
-                        const item = inventory.find(i => i.id === ingredient.inventoryItemId);
-                        if (!item) return null;
-
-                        const cost = ingredient.quantity * item.unitCost;
-
-                        return (
-                          <div key={ingredient.inventoryItemId} className="p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <p className="font-medium text-sm">{item.name}</p>
-                                <p className="text-xs text-gray-500">
-                                  ${item.unitCost.toFixed(2)} per {item.unit}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRemoveIngredient(ingredient.inventoryItemId)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Qty"
-                                value={ingredient.quantity || ''}
-                                onChange={(e) =>
-                                  handleUpdateIngredientQuantity(
-                                    ingredient.inventoryItemId,
-                                    Number(e.target.value)
-                                  )
-                                }
-                                className="flex-1"
-                              />
-                              <span className="text-sm text-gray-500 w-16">{item.unit}</span>
-                              <span className="text-sm font-semibold text-gray-700 w-20 text-right">
-                                ${cost.toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {selectedIngredients.length > 0 && (
-                    <div className="bg-[#FEFCE8] border border-[#F5C10E]/30 rounded p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-[#0F172A]">Total Cost</span>
-                        <span className="text-lg font-bold text-[#0F172A]">
-                          ${selectedIngredients.reduce((sum, ing) => {
-                            const item = inventory.find(i => i.id === ing.inventoryItemId);
-                            return sum + (item ? ing.quantity * item.unitCost : 0);
-                          }, 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    setEditingRecipe(null);
-                    setSelectedIngredients([]);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={selectedIngredients.length === 0} className="bg-[#0F172A] hover:bg-[#1E293B] text-white disabled:bg-gray-400 disabled:hover:bg-gray-400">
-                  {editingRecipe ? 'Update Recipe' : 'Create Recipe'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Recipe Scan Banner */}
-      <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                <Camera className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-purple-900">Scan Recipe Card</p>
-                <p className="text-xs text-purple-700 mt-0.5">
-                  Take a photo to extract ingredients automatically
-                </p>
+                <Label htmlFor="prepCategory">Category</Label>
+                <Input
+                  id="prepCategory"
+                  value={prepCategory}
+                  onChange={(e) => setPrepCategory(e.target.value)}
+                  placeholder="Prepped Items"
+                  required
+                />
               </div>
             </div>
-            <Button
-              size="sm"
-              className="bg-purple-600 hover:bg-purple-700 text-white"
-              onClick={() => setIsScanOpen(true)}
-            >
-              <Camera className="w-4 h-4 mr-1" />
-              Scan
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
-      <RecipeScan
-        isOpen={isScanOpen}
-        onClose={() => setIsScanOpen(false)}
-        onRecipeExtracted={handleRecipeScanned}
-      />
-
-      {/* Toast Sync Banner */}
-      {isConnected && (
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardContent className="py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">T</span>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-orange-900">Toast POS Connected</p>
-                  <p className="text-xs text-orange-700">{menuItems.length} menu items available</p>
-                </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="prepYieldQuantity">Yield Qty</Label>
+                <Input
+                  id="prepYieldQuantity"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={prepYieldQuantity}
+                  onChange={(e) => setPrepYieldQuantity(e.target.value)}
+                  required
+                />
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-white border-orange-300 text-orange-700 hover:bg-orange-50"
-                onClick={handleSyncToastItems}
-              >
-                <RefreshCw className="w-4 h-4 mr-1" />
-                Sync
+              <div>
+                <Label htmlFor="prepYieldUnit">Yield Unit</Label>
+                <Input
+                  id="prepYieldUnit"
+                  value={prepYieldUnit}
+                  onChange={(e) => setPrepYieldUnit(e.target.value)}
+                  placeholder="quart"
+                  required
+                />
+              </div>
+            </div>
+
+            {renderIngredientEditor(
+              selectedPrepIngredients,
+              handleAddPrepIngredient,
+              handleUpdatePrepIngredientQuantity,
+              handleUpdatePrepIngredientUnit,
+              handleRemovePrepIngredient,
+              'Add ingredients from inventory to build this recipe.',
+              { quantity: Number(prepYieldQuantity) || 0, unit: prepYieldUnit || 'yield' },
+            )}
+
+            <div className="flex items-center justify-between rounded-md bg-slate-50 px-4 py-3 text-sm">
+              <span>Recipe cost</span>
+              <span className="font-semibold text-slate-900">${calculateIngredientCost(selectedPrepIngredients).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsPrepDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-slate-900 text-white hover:bg-slate-700">
+                {editingPrepId ? 'Update Recipe' : 'Save Recipe'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <div className="space-y-3">
-        {recipes.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <ChefHat className="w-12 h-12 text-gray-400 mb-4" />
-              <p className="text-gray-500 text-center text-sm">
-                No recipes yet. Create your first recipe to start tracking costs.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          recipes.map(recipe => {
-            const recipeCost = calculateRecipeCost(recipe.id);
-            const profitMargin = recipe.price - recipeCost;
-            const profitPercentage = (profitMargin / recipe.price) * 100;
-
-            return (
-              <Card key={recipe.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <CardTitle className="text-base">{recipe.menuItemName}</CardTitle>
-                        {recipe.source === 'toast' && (
-                          <Badge className="bg-orange-500 text-white text-xs">
-                            Toast
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500">{recipe.category}</p>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800">
-                      ${recipe.price.toFixed(2)}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Cost Breakdown */}
-                  <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Food Cost</span>
-                      <span className="font-semibold text-gray-900">${recipeCost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Menu Price</span>
-                      <span className="font-semibold text-gray-900">${recipe.price.toFixed(2)}</span>
-                    </div>
-                    <div className="pt-2 border-t border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">Profit Margin</span>
-                        <div className="text-right">
-                          <p className="font-bold text-green-600">${profitMargin.toFixed(2)}</p>
-                          <p className="text-xs text-gray-500">{profitPercentage.toFixed(1)}%</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Ingredients */}
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Ingredients</p>
-                    <div className="space-y-1">
-                      {recipe.ingredients.map(ingredient => {
-                        const item = inventory.find(i => i.id === ingredient.inventoryItemId);
-                        if (!item) return null;
-
-                        return (
-                          <div
-                            key={ingredient.inventoryItemId}
-                            className="flex items-center justify-between text-sm py-1"
-                          >
-                            <span className="text-gray-700">{item.name}</span>
-                            <span className="text-gray-500">
-                              {ingredient.quantity} {ingredient.unit}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Modifiers */}
-                  {recipe.modifiers && recipe.modifiers.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Modifiers</p>
-                      <div className="space-y-1">
-                        {recipe.modifiers.map((modifier, index) => (
-                          <div key={index} className="text-sm text-gray-600">
-                            • {modifier.name}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex space-x-2 pt-2 border-t">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleEditRecipe(recipe.id)}
-                    >
-                      <Edit className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+      <RecipeScan isOpen={isScanOpen} onClose={() => setIsScanOpen(false)} onRecipeExtracted={handleRecipeScanned} />
     </div>
   );
 }

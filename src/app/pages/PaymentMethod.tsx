@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/badge';
 import { CreditCard, Plus, Trash2, Check, Crown } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 interface PaymentCard {
   id: string;
@@ -27,28 +28,22 @@ interface PlanOption {
 }
 
 export function PaymentMethod() {
-  const [cards, setCards] = useState<PaymentCard[]>([
-    {
-      id: '1',
-      type: 'visa',
-      last4: '4242',
-      expiry: '12/25',
-      isDefault: true,
-      holderName: 'John Smith'
-    },
-    {
-      id: '2',
-      type: 'mastercard',
-      last4: '5555',
-      expiry: '08/26',
-      isDefault: false,
-      holderName: 'John Smith'
-    }
-  ]);
+  const { accountId } = useAuth();
+  const [cards, setCards] = useState<PaymentCard[]>([]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<BillingPeriod>('monthly');
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+
+  const trialStorageKey = useMemo(() => {
+    return accountId ? `zestiq:account:${accountId}:trial-ends-at` : 'zestiq:trial-ends-at';
+  }, [accountId]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(trialStorageKey);
+    setTrialEndsAt(stored);
+  }, [trialStorageKey]);
 
   const planOptions: PlanOption[] = [
     {
@@ -124,6 +119,18 @@ export function PaymentMethod() {
     setIsPlanDialogOpen(false);
     toast.success(`Plan changed to ${period} billing`);
   };
+
+  const handleStartFreeTrial = () => {
+    const now = new Date();
+    const end = new Date(now);
+    end.setDate(end.getDate() + 14);
+    const endIso = end.toISOString();
+    localStorage.setItem(trialStorageKey, endIso);
+    setTrialEndsAt(endIso);
+    toast.success('Your 14-day free trial is now active');
+  };
+
+  const isTrialActive = Boolean(trialEndsAt) && new Date(trialEndsAt as string).getTime() > Date.now();
 
   return (
     <div className="space-y-4">
@@ -208,6 +215,33 @@ export function PaymentMethod() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Card className="border-[#F5C10E]/40 bg-gradient-to-br from-[#FEFCE8] to-[#FEF9C3]">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span>Free Trial</span>
+            {isTrialActive && (
+              <Badge className="bg-green-100 text-green-800 border-green-300">
+                Active
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-700">
+            Start with a 14-day free trial to explore AI ordering, forecasting, and inventory workflows before choosing a paid plan.
+          </p>
+          {isTrialActive && trialEndsAt ? (
+            <p className="text-sm font-semibold text-[#0F172A]">
+              Trial ends on {new Date(trialEndsAt).toLocaleDateString()}.
+            </p>
+          ) : (
+            <Button onClick={handleStartFreeTrial} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+              Start Free Trial
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Current Plan */}
       <Card>

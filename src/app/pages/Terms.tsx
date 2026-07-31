@@ -20,7 +20,7 @@ export function Terms() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">1. Acceptance of Terms</h3>
             <p className="text-sm text-gray-600">
-              By accessing and using 86'D Solutions ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+              By accessing and using zestIQ Solutions ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
             </p>
           </section>
 
@@ -76,7 +76,7 @@ export function Terms() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">8. Limitation of Liability</h3>
             <p className="text-sm text-gray-600">
-              In no event shall 86'D Solutions or its suppliers be liable for any damages arising out of the use or inability to use the Service, even if 86'D Solutions has been notified of the possibility of such damages.
+              In no event shall zestIQ Solutions or its suppliers be liable for any damages arising out of the use or inability to use the Service, even if zestIQ Solutions has been notified of the possibility of such damages.
             </p>
           </section>
 
@@ -97,7 +97,7 @@ export function Terms() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">11. Contact Information</h3>
             <p className="text-sm text-gray-600">
-              If you have any questions about these Terms, please contact us at legal@86d.com or call (555) 123-4567.
+              If you have any questions about these Terms, please contact us at legal@zestiq.com or call (555) 123-4567.
             </p>
           </section>
         </CardContent>
@@ -106,7 +106,7 @@ export function Terms() {
       <Card>
         <CardContent className="py-4">
           <p className="text-xs text-gray-500 text-center">
-            By using 86'D Solutions, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+            By using zestIQ Solutions, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
           </p>
         </CardContent>
       </Card>

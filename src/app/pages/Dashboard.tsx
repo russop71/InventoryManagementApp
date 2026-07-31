@@ -4,18 +4,26 @@ import { Link, useNavigate } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Flame, Wine, Beer, GlassWater, Coffee, DollarSign } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useState } from 'react';
+
+type SalesRangePreset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'last-month' | 'custom';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { inventory, orders, recipes } = useInventory();
-  const { isConnected, salesData, salesCategories, menuItems } = useToast();
+  const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [breakdownType, setBreakdownType] = useState<'items' | 'cost' | 'lowStock' | 'orders'>('items');
+  const [newCogsCategoryName, setNewCogsCategoryName] = useState('');
+  const [salesRangePreset, setSalesRangePreset] = useState<SalesRangePreset>('this-week');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
 
   const lowStockItems = inventory.filter(
     item => item.currentStock < item.parLevel * 0.3
@@ -26,10 +34,87 @@ export function Dashboard() {
     0
   );
 
+  const toLocalDateKey = (value: string | Date) => {
+    const date = value instanceof Date ? value : new Date(value);
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getPresetDateBounds = (preset: SalesRangePreset) => {
+    const referenceDate = new Date();
+    const start = new Date(referenceDate);
+    const end = new Date(referenceDate);
+
+    switch (preset) {
+      case 'today': {
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: toLocalDateKey(start), endDate: toLocalDateKey(end) };
+      }
+      case 'this-week': {
+        const day = referenceDate.getDay();
+        const offset = (day + 6) % 7;
+        start.setDate(referenceDate.getDate() - offset);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: toLocalDateKey(start), endDate: toLocalDateKey(end) };
+      }
+      case 'last-week': {
+        const day = referenceDate.getDay();
+        const offset = (day + 6) % 7;
+        start.setDate(referenceDate.getDate() - offset - 7);
+        end.setDate(start.getDate() + 6);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: toLocalDateKey(start), endDate: toLocalDateKey(end) };
+      }
+      case 'this-month': {
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        end.setMonth(referenceDate.getMonth() + 1, 0);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: toLocalDateKey(start), endDate: toLocalDateKey(end) };
+      }
+      case 'last-month': {
+        start.setMonth(referenceDate.getMonth() - 1, 1);
+        start.setHours(0, 0, 0, 0);
+        end.setMonth(referenceDate.getMonth(), 0);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: toLocalDateKey(start), endDate: toLocalDateKey(end) };
+      }
+      case 'custom': {
+        return { startDate: customStartDate, endDate: customEndDate || customStartDate };
+      }
+    }
+  };
+
+  const filteredSalesData = (() => {
+    if (salesRangePreset === 'custom') {
+      const startDate = customStartDate;
+      const endDate = customEndDate || customStartDate;
+      if (!startDate || !endDate) return [];
+      return salesData.filter(day => day.date >= startDate && day.date <= endDate);
+    }
+
+    const { startDate, endDate } = getPresetDateBounds(salesRangePreset);
+    return salesData.filter(day => day.date >= startDate && day.date <= endDate);
+  })();
+
   // Calculate Toast data stats
-  const totalRevenue = salesData.reduce((sum, day) => sum + day.revenue, 0);
-  const totalCovers = salesData.reduce((sum, day) => sum + day.covers, 0);
+  const totalRevenue = filteredSalesData.reduce((sum, day) => sum + day.revenue, 0);
+  const totalCovers = filteredSalesData.reduce((sum, day) => sum + day.covers, 0);
   const averageCheck = totalCovers > 0 ? totalRevenue / totalCovers : 0;
+  const chronologicalSales = [...filteredSalesData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const latestSalesDay = chronologicalSales[chronologicalSales.length - 1];
+  const previousSalesDay = chronologicalSales[chronologicalSales.length - 2];
+  const todaysRevenue = latestSalesDay?.revenue ?? 0;
+  const todaysCovers = latestSalesDay?.covers ?? 0;
+  const todaysAvgCheck = todaysCovers > 0 ? todaysRevenue / todaysCovers : 0;
+  const revenueDeltaPercent = previousSalesDay && previousSalesDay.revenue > 0
+    ? ((todaysRevenue - previousSalesDay.revenue) / previousSalesDay.revenue) * 100
+    : 0;
 
   // Calculate food cost percentage (COGS / Revenue)
   const totalFoodCost = totalInventoryValue;
@@ -43,7 +128,7 @@ export function Dashboard() {
 
   // Calculate COGS from menu item ingredient costs × units sold
   const cogsUnitsSold: Record<string, number> = {};
-  salesData.forEach(day => day.topItems.forEach(item => {
+  filteredSalesData.forEach(day => day.topItems.forEach(item => {
     cogsUnitsSold[item.itemName] = (cogsUnitsSold[item.itemName] || 0) + item.quantity;
   }));
   const totalCOGS = menuItems.reduce((sum, mi) => {
@@ -55,14 +140,88 @@ export function Dashboard() {
   }, 0);
   const cogsPercent = totalRevenue > 0 ? (totalCOGS / totalRevenue) * 100 : 0;
 
-  // Aggregate top-selling items across all POS days
+  const menuItemCogs = menuItems.map(mi => {
+    const ingredientCost = mi.ingredients.reduce((sum, ing) => {
+      const inv = inventory.find(i => i.id === ing.inventoryItemId);
+      return sum + (inv ? ing.quantity * inv.unitCost : 0);
+    }, 0);
+    const sold = cogsUnitsSold[mi.name] ?? 0;
+    return {
+      ...mi,
+      costPerItem: ingredientCost,
+      sold,
+      totalCOGS: ingredientCost * sold,
+    };
+  });
+
+  const cogsCategoryTotals = cogsCategories.map(cat => {
+    const totalCOGS = menuItemCogs.filter(mi => mi.cogsCategoryId === cat.id).reduce((sum, mi) => sum + mi.totalCOGS, 0);
+    const itemCount = menuItemCogs.filter(mi => mi.cogsCategoryId === cat.id).length;
+    return {
+      categoryId: cat.id,
+      name: cat.name,
+      color: cat.color,
+      totalCOGS,
+      itemCount,
+    };
+  });
+
+  const totalCogsCategoryCOGS = cogsCategoryTotals.reduce((sum, category) => sum + category.totalCOGS, 0);
+  const cogsCategoryTotalsWithPercent = cogsCategoryTotals.map(category => ({
+    ...category,
+    percent: totalCogsCategoryCOGS > 0 ? (category.totalCOGS / totalCogsCategoryCOGS) * 100 : 0,
+  }));
+
+  const uncategorizedCogs = menuItemCogs.filter(mi => !mi.cogsCategoryId);
+
+  const handleAddCogsCategory = () => {
+    const name = newCogsCategoryName.trim();
+    if (!name) return;
+    addCogsCategory(name);
+    setNewCogsCategoryName('');
+  };
+
+  const handleCategoryClick = (_: any, index: number) => {
+    const categoryId = cogsCategoryTotals[index]?.categoryId;
+    if (categoryId) {
+      navigate(`/cogs?category=${encodeURIComponent(categoryId)}`);
+    }
+  };
+
+  const handleCategoryCardClick = (categoryId: string) => {
+    if (categoryId) {
+      navigate(`/cogs?category=${encodeURIComponent(categoryId)}`);
+    }
+  };
+
+  const handleTopSellerClick = (itemName: string) => {
+    navigate(`/app/recipes?menuItem=${encodeURIComponent(itemName)}`);
+  };
+
+  const renderCogsTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0].payload as { totalCOGS: number; percent: number };
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-lg">
+        <p className="font-semibold text-slate-900">{label}</p>
+        <p className="text-slate-600">COGS: ${data.totalCOGS.toFixed(2)}</p>
+        <p className="text-slate-500">{data.percent.toFixed(1)}%</p>
+      </div>
+    );
+  };
+
+  // Aggregate top-selling items directly from raw POS sales rows
   const topSellingItems = Object.values(
-    salesData.flatMap(day => day.topItems).reduce((acc, item) => {
-      if (!acc[item.itemName]) {
-        acc[item.itemName] = { itemName: item.itemName, quantity: 0, revenue: 0 };
+    filteredSalesData.flatMap(day => day.topItems).reduce((acc, item) => {
+      const normalizedName = item.itemName.trim().toLowerCase();
+      if (!normalizedName) {
+        return acc;
       }
-      acc[item.itemName].quantity += item.quantity;
-      acc[item.itemName].revenue  += item.revenue;
+      if (!acc[normalizedName]) {
+        acc[normalizedName] = { itemName: item.itemName, quantity: 0, revenue: 0 };
+      }
+      acc[normalizedName].quantity += item.quantity;
+      acc[normalizedName].revenue += item.revenue;
       return acc;
     }, {} as Record<string, { itemName: string; quantity: number; revenue: number }>)
   ).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
@@ -85,90 +244,134 @@ export function Dashboard() {
   }, [] as { id: string; category: string; value: number; items: number }[]);
 
   // Format sales data for chart
-  const salesChartData = [...salesData].reverse().map((day, index) => ({
+  const salesChartData = [...filteredSalesData].reverse().map((day, index) => ({
     id: `${day.date}-${index}`,
     date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     revenue: day.revenue,
     covers: day.covers,
   }));
 
-  // Usage Summary - Hypothetical vs Actual
-  const usageSummary = [
-    { 
-      id: 'proteins',
-      category: 'Proteins', 
-      hypothetical: 850, 
-      actual: 782,
-      unit: 'lbs',
-      items: [
-        { name: 'Chicken Breast', hypothetical: 280, actual: 265, unit: 'lbs' },
-        { name: 'Ground Beef', hypothetical: 220, actual: 198, unit: 'lbs' },
-        { name: 'Salmon Fillets', hypothetical: 150, actual: 142, unit: 'lbs' },
-        { name: 'Pork Tenderloin', hypothetical: 120, actual: 105, unit: 'lbs' },
-        { name: 'Shrimp', hypothetical: 80, actual: 72, unit: 'lbs' }
-      ]
-    },
-    { 
-      id: 'produce',
-      category: 'Produce', 
-      hypothetical: 320, 
-      actual: 298,
-      unit: 'lbs',
-      items: [
-        { name: 'Romaine Lettuce', hypothetical: 85, actual: 78, unit: 'lbs' },
-        { name: 'Tomatoes', hypothetical: 95, actual: 88, unit: 'lbs' },
-        { name: 'Onions', hypothetical: 55, actual: 52, unit: 'lbs' },
-        { name: 'Bell Peppers', hypothetical: 45, actual: 42, unit: 'lbs' },
-        { name: 'Potatoes', hypothetical: 40, actual: 38, unit: 'lbs' }
-      ]
-    },
-    { 
-      id: 'dairy',
-      category: 'Dairy', 
-      hypothetical: 180, 
-      actual: 195,
-      unit: 'lbs',
-      items: [
-        { name: 'Whole Milk', hypothetical: 65, actual: 72, unit: 'lbs' },
-        { name: 'Cheddar Cheese', hypothetical: 48, actual: 52, unit: 'lbs' },
-        { name: 'Butter', hypothetical: 35, actual: 38, unit: 'lbs' },
-        { name: 'Heavy Cream', hypothetical: 22, actual: 23, unit: 'lbs' },
-        { name: 'Sour Cream', hypothetical: 10, actual: 10, unit: 'lbs' }
-      ]
-    },
-    { 
-      id: 'dry-goods',
-      category: 'Dry Goods', 
-      hypothetical: 240, 
-      actual: 215,
-      unit: 'lbs',
-      items: [
-        { name: 'All-Purpose Flour', hypothetical: 85, actual: 75, unit: 'lbs' },
-        { name: 'Rice', hypothetical: 65, actual: 58, unit: 'lbs' },
-        { name: 'Pasta', hypothetical: 50, actual: 45, unit: 'lbs' },
-        { name: 'Sugar', hypothetical: 25, actual: 22, unit: 'lbs' },
-        { name: 'Salt', hypothetical: 15, actual: 15, unit: 'lbs' }
-      ]
-    },
-    { 
-      id: 'beverages',
-      category: 'Beverages', 
-      hypothetical: 450, 
-      actual: 468,
-      unit: 'units',
-      items: [
-        { name: 'Coca-Cola', hypothetical: 180, actual: 188, unit: 'units' },
-        { name: 'Iced Tea', hypothetical: 120, actual: 125, unit: 'units' },
-        { name: 'Orange Juice', hypothetical: 85, actual: 90, unit: 'units' },
-        { name: 'Coffee', hypothetical: 45, actual: 45, unit: 'units' },
-        { name: 'Bottled Water', hypothetical: 20, actual: 20, unit: 'units' }
-      ]
-    }
-  ];
+  // Usage Summary - real raw usage from POS top items x recipe ingredient quantities
+  const recipeByName = new Map(recipes.map(recipe => [recipe.menuItemName.trim().toLowerCase(), recipe]));
+
+  const usageRows = filteredSalesData
+    .map(day => {
+      const dayTs = new Date(day.date).getTime();
+      const categoryTotals = new Map<string, number>();
+      const itemTotals = new Map<string, { category: string; name: string; unit: string; qty: number }>();
+
+      day.topItems.forEach(soldItem => {
+        const recipe = recipeByName.get(soldItem.itemName.trim().toLowerCase());
+        if (!recipe) return;
+
+        recipe.ingredients.forEach(ingredient => {
+          const inv = inventory.find(i => i.id === ingredient.inventoryItemId);
+          if (!inv) return;
+
+          const usedQty = ingredient.quantity * soldItem.quantity;
+          if (!Number.isFinite(usedQty)) return;
+
+          const category = inv.category || 'Uncategorized';
+          categoryTotals.set(category, (categoryTotals.get(category) || 0) + usedQty);
+
+          const existingItem = itemTotals.get(inv.id);
+          itemTotals.set(inv.id, {
+            category,
+            name: inv.name,
+            unit: ingredient.unit || inv.unit || 'units',
+            qty: (existingItem?.qty || 0) + usedQty,
+          });
+        });
+      });
+
+      return { dayTs, categoryTotals, itemTotals };
+    })
+    .filter(row => Number.isFinite(row.dayTs))
+    .sort((left, right) => left.dayTs - right.dayTs);
+
+  const currentWindow = usageRows.slice(-7);
+  const previousWindow = usageRows.slice(Math.max(0, usageRows.length - 14), Math.max(0, usageRows.length - 7));
+
+  const aggregateWindow = (rows: typeof usageRows) => {
+    const byCategory = new Map<string, { total: number; items: Map<string, { name: string; unit: string; qty: number }> }>();
+
+    rows.forEach(row => {
+      row.categoryTotals.forEach((qty, category) => {
+        const existing = byCategory.get(category);
+        byCategory.set(category, {
+          total: (existing?.total || 0) + qty,
+          items: existing?.items || new Map<string, { name: string; unit: string; qty: number }>(),
+        });
+      });
+
+      row.itemTotals.forEach((itemUsage, itemId) => {
+        const categoryBucket = byCategory.get(itemUsage.category) || {
+          total: 0,
+          items: new Map<string, { name: string; unit: string; qty: number }>(),
+        };
+        const existingItem = categoryBucket.items.get(itemId);
+        categoryBucket.items.set(itemId, {
+          name: itemUsage.name,
+          unit: itemUsage.unit,
+          qty: (existingItem?.qty || 0) + itemUsage.qty,
+        });
+        byCategory.set(itemUsage.category, categoryBucket);
+      });
+    });
+
+    return byCategory;
+  };
+
+  const currentAgg = aggregateWindow(currentWindow);
+  const previousAgg = aggregateWindow(previousWindow);
+
+  const categoryKeys = Array.from(new Set([...Array.from(currentAgg.keys()), ...Array.from(previousAgg.keys())]));
+
+  const usageSummary = categoryKeys
+    .map(category => {
+      const currentCategory = currentAgg.get(category);
+      const previousCategory = previousAgg.get(category);
+
+      const actual = Number((currentCategory?.total || 0).toFixed(2));
+      const rawHypothetical = Number((previousCategory?.total || 0).toFixed(2));
+      const hypothetical = rawHypothetical > 0 ? rawHypothetical : actual;
+
+      const itemKeys = Array.from(new Set([
+        ...Array.from(currentCategory?.items.keys() || []),
+        ...Array.from(previousCategory?.items.keys() || []),
+      ]));
+
+      const itemUsage = itemKeys
+        .map(itemId => {
+          const currentItem = currentCategory?.items.get(itemId);
+          const previousItem = previousCategory?.items.get(itemId);
+          const itemActual = Number((currentItem?.qty || 0).toFixed(2));
+          const itemRawHyp = Number((previousItem?.qty || 0).toFixed(2));
+          return {
+            name: currentItem?.name || previousItem?.name || 'Unknown item',
+            hypothetical: itemRawHyp > 0 ? itemRawHyp : itemActual,
+            actual: itemActual,
+            unit: currentItem?.unit || previousItem?.unit || 'units',
+          };
+        })
+        .sort((left, right) => right.actual - left.actual)
+        .slice(0, 5);
+
+      return {
+        id: `usage-${category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        category,
+        hypothetical,
+        actual,
+        unit: itemUsage[0]?.unit || 'units',
+        items: itemUsage,
+      };
+    })
+    .filter(category => category.actual > 0 || category.hypothetical > 0)
+    .sort((left, right) => right.actual - left.actual);
 
   const totalHypothetical = usageSummary.reduce((sum, item) => sum + item.hypothetical, 0);
   const totalActual = usageSummary.reduce((sum, item) => sum + item.actual, 0);
-  const variancePercent = ((totalActual - totalHypothetical) / totalHypothetical * 100);
+  const variancePercent = totalHypothetical > 0 ? ((totalActual - totalHypothetical) / totalHypothetical * 100) : 0;
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
@@ -193,6 +396,29 @@ export function Dashboard() {
   }).sort((a, b) => b.totalValue - a.totalValue);
 
   const pendingOrders = orders.filter(order => order.status === 'pending');
+
+  const salesBreakdownItems = Object.values(
+    filteredSalesData.flatMap(day => day.topItems).reduce((acc, item) => {
+      if (!acc[item.itemName]) {
+        acc[item.itemName] = { itemName: item.itemName, quantity: 0, revenue: 0 };
+      }
+      acc[item.itemName].quantity += item.quantity;
+      acc[item.itemName].revenue += item.revenue;
+      return acc;
+    }, {} as Record<string, { itemName: string; quantity: number; revenue: number }>)
+  ).sort((left, right) => right.quantity - left.quantity || right.revenue - left.revenue);
+
+  const salesRangeLabel = salesRangePreset === 'custom'
+    ? (customStartDate && customEndDate ? `${customStartDate} → ${customEndDate}` : 'Custom range')
+    : salesRangePreset === 'today'
+      ? 'Today'
+      : salesRangePreset === 'this-week'
+        ? 'This week'
+        : salesRangePreset === 'last-week'
+          ? 'Last week'
+          : salesRangePreset === 'this-month'
+            ? 'This month'
+            : 'Last month';
 
   return (
     <div className="space-y-4">
@@ -267,60 +493,230 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* ── COGS card ────────────────────────────────── */}
-      <button
-        onClick={() => navigate('/cogs')}
-        className="w-full text-left rounded-2xl p-4 shadow-md active:scale-[0.98] transition-all"
-        style={{ background: '#0F172A' }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,193,14,0.15)' }}>
-              <DollarSign className="w-4 h-4" style={{ color: '#F5C10E' }} />
+      <Card className="border-0 shadow-sm overflow-hidden bg-white">
+        <div className="h-[3px] bg-[#2563EB]" />
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-[#2563EB]/15 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-[#2563EB]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[#0F172A]">Sales</p>
+                  <p className="text-[10px] text-gray-400 font-medium">Sales window • pick a range to review revenue</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSalesBreakdownOpen(true)}
+                  className="rounded-full border border-gray-200 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600 hover:bg-slate-50"
+                >
+                  Breakdown
+                </button>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  {filteredSalesData.length}d data
+                </span>
+              </div>
             </div>
+
+            <div className="flex flex-wrap gap-2">
+              {([
+                ['today', 'Today'],
+                ['this-week', 'This week'],
+                ['last-week', 'Last week'],
+                ['this-month', 'This month'],
+                ['last-month', 'Last month'],
+                ['custom', 'Custom'],
+              ] as Array<[SalesRangePreset, string]>).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setSalesRangePreset(value);
+                    if (value !== 'custom') {
+                      setCustomStartDate('');
+                      setCustomEndDate('');
+                    }
+                  }}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest transition ${salesRangePreset === value ? 'bg-[#2563EB] text-white' : 'bg-slate100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {salesRangePreset === 'custom' && (
+              <div className="flex flex-wrap gap-2">
+                <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2 text-[11px] font-medium text-gray-600">
+                  <span>From</span>
+                  <Input type="date" value={customStartDate} onChange={(event) => setCustomStartDate(event.target.value)} className="h-8 w-auto min-w-[130px] border-0 bg-transparent p-0 text-[11px]" />
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2 text-[11px] font-medium text-gray-600">
+                  <span>To</span>
+                  <Input type="date" value={customEndDate} onChange={(event) => setCustomEndDate(event.target.value)} className="h-8 w-auto min-w-[130px] border-0 bg-transparent p-0 text-[11px]" />
+                </label>
+              </div>
+            )}
+          </div>
+
+          {filteredSalesData.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+              <span className="mb-2 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-blue-700">
+                Sales
+              </span>
+              <p className="text-sm font-semibold text-gray-500">No sales data for this range</p>
+              <p className="text-xs text-gray-400 mt-1">Choose another period or import POS data to populate this view.</p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-700">Sales</p>
+                    <p className="text-[11px] font-semibold text-slate-700">{salesRangeLabel}</p>
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-600">{filteredSalesData.length} days</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="rounded-xl border border-gray-100 p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Revenue</p>
+                  <p className="mt-1 text-lg font-black text-[#0F172A] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                    ${todaysRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </p>
+                  <p className={`text-[10px] mt-1 font-semibold ${revenueDeltaPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {revenueDeltaPercent >= 0 ? '+' : ''}{revenueDeltaPercent.toFixed(1)}% vs prev day
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-100 p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Covers</p>
+                  <p className="mt-1 text-lg font-black text-[#0F172A] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {todaysCovers.toLocaleString('en-US')}
+                  </p>
+                  <p className="text-[10px] mt-1 text-gray-500 font-semibold">guest count</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Avg Check</p>
+                  <p className="mt-1 text-lg font-black text-[#0F172A] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                    ${todaysAvgCheck.toFixed(0)}
+                  </p>
+                  <p className="text-[10px] mt-1 text-gray-500 font-semibold">per cover</p>
+                </div>
+              </div>
+
+              <div className="h-[180px] rounded-xl border border-gray-100 p-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={salesChartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(value) => `$${Math.round(value)}`} tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      formatter={(value: number) => [`$${value.toLocaleString('en-US')}`, 'Revenue']}
+                      labelFormatter={(label) => `Date: ${label}`}
+                    />
+                    <Line type="monotone" dataKey="revenue" stroke="#2563EB" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={salesBreakdownOpen} onOpenChange={setSalesBreakdownOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Sales breakdown for {salesRangeLabel}</DialogTitle>
+            <DialogDescription>Every menu item sold within the selected sales window.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-2 rounded-2xl border border-gray-100 p-3">
+            {salesBreakdownItems.length === 0 ? (
+              <p className="text-sm text-gray-500">No items sold in this date range.</p>
+            ) : (
+              salesBreakdownItems.map(item => (
+                <div key={item.itemName} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-3 py-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{item.itemName}</p>
+                    <p className="text-[11px] text-gray-500">{item.quantity} sold</p>
+                  </div>
+                  <p className="text-sm font-black text-slate-700">${item.revenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── COGS categories bar graph ────────────────────────────────── */}
+      <div className="rounded-3xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+        <div className="px-4 py-4 border-b border-gray-100">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-[13px] font-bold text-white leading-tight">Cost of Goods Sold</p>
-              <p className="text-[10px] text-slate-500 font-medium">Tap to see full breakdown</p>
+              <p className="text-sm font-semibold text-slate-900">Cost of Goods Sold by Category</p>
+              <p className="text-xs text-slate-500">Click a category to view a full breakdown.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="text-[10px] uppercase font-semibold tracking-widest text-slate-400">{salesData.length}d period</span>
+              <span className="text-[10px] uppercase font-semibold tracking-widest text-slate-400">{menuItems.length} menu items</span>
             </div>
           </div>
-          <div className="text-right">
-            <span
-              className="text-[10px] font-black px-2 py-1 rounded-full"
-              style={{
-                background: cogsPercent > 35 ? 'rgba(220,38,38,0.2)' : 'rgba(22,163,74,0.2)',
-                color: cogsPercent > 35 ? '#FCA5A5' : '#86EFAC',
-              }}
-            >
-              {totalRevenue > 0 ? `${cogsPercent.toFixed(1)}% of rev` : 'No POS data'}
-            </span>
+        </div>
+
+        <div className="px-4 py-6">
+          <div className="h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={cogsCategoryTotalsWithPercent} margin={{ top: 10, right: 16, left: -12, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(value) => `$${Math.round(value)}`} tick={{ fontSize: 11, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <Tooltip content={renderCogsTooltip} />
+                <Bar dataKey="totalCOGS" radius={[8, 8, 0, 0]} onClick={handleCategoryClick}>
+                  {cogsCategoryTotals.map((entry) => (
+                    <Cell key={`cell-${entry.categoryId}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
-        <div className="flex items-end justify-between">
-          <p
-            className="text-3xl font-black text-white tabular-nums"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            {totalCOGS > 0
-              ? `$${totalCOGS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              : '—'}
-          </p>
-          <p className="text-[10px] text-slate-500 font-semibold pb-1">
-            {salesData.length}d period · {menuItems.length} menu items
-          </p>
-        </div>
-        {/* Mini progress bar */}
-        {totalRevenue > 0 && (
-          <div className="mt-3 w-full h-1 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${Math.min(cogsPercent, 100)}%`,
-                background: cogsPercent > 35 ? '#EF4444' : '#F5C10E',
-              }}
-            />
+
+        <div className="px-4 pb-4">
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {cogsCategoryTotalsWithPercent.map(category => (
+              <button
+                key={category.categoryId}
+                type="button"
+                onClick={() => handleCategoryCardClick(category.categoryId)}
+                className="rounded-2xl border border-gray-100 p-3 flex items-center gap-3 text-left transition hover:bg-slate-50 cursor-pointer"
+              >
+                <span className="w-3 h-3 rounded-full" style={{ background: category.color }} />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 truncate">{category.name}</p>
+                  <p className="text-xs text-slate-500">${category.totalCOGS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                </div>
+              </button>
+            ))}
           </div>
-        )}
-      </button>
+
+          <div className="rounded-2xl border border-gray-100 p-4">
+            <p className="text-sm font-semibold text-slate-900">Create COGS category</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Input
+                placeholder="New category name"
+                value={newCogsCategoryName}
+                onChange={(e) => setNewCogsCategoryName(e.target.value)}
+                className="min-w-0"
+              />
+              <Button type="button" onClick={handleAddCogsCategory} className="w-full sm:w-auto">
+                Add Category
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── Top Sellers from POS ─────────────────────── */}
       <Card className="border-0 shadow-sm bg-white overflow-hidden">
@@ -333,7 +729,7 @@ export function Dashboard() {
               </div>
               <div>
                 <p className="text-sm font-bold text-[#0F172A]">Top Sellers</p>
-                <p className="text-[10px] text-gray-400 font-medium">From Toast POS</p>
+                <p className="text-[10px] text-gray-400 font-medium">Uses the raw item rows from the selected sales window</p>
               </div>
             </div>
             {salesData.length > 0 && (
@@ -347,7 +743,7 @@ export function Dashboard() {
             <div className="flex flex-col items-center py-6 gap-2 text-center">
               <TrendingUp className="w-8 h-8 text-gray-200" />
               <p className="text-sm font-semibold text-gray-400">No POS data yet</p>
-              <p className="text-xs text-gray-400">Connect Toast POS to see your top sellers</p>
+              <p className="text-xs text-gray-400">Sales rows will appear here once there is transaction data in the selected range</p>
             </div>
           ) : (
             <div className="space-y-0">
@@ -356,7 +752,12 @@ export function Dashboard() {
                 const pct = Math.round((item.quantity / maxQty) * 100);
                 const rankColors = ['#F5C10E', '#F5C10E', '#9CA3AF', '#9CA3AF', '#9CA3AF'];
                 return (
-                  <div key={item.itemName} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
+                  <button
+                    key={item.itemName}
+                    type="button"
+                    onClick={() => handleTopSellerClick(item.itemName)}
+                    className="w-full text-left flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0 transition hover:bg-slate-50"
+                  >
                     {/* Rank */}
                     <span
                       className="text-[11px] font-black w-5 text-center shrink-0"
@@ -383,7 +784,7 @@ export function Dashboard() {
                     <span className="text-[12px] font-black text-[#0F172A] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                       ${item.revenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -609,13 +1010,13 @@ export function Dashboard() {
                 <AlertTriangle className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-bold text-white text-sm">Don't Get 86'd!</p>
+                <p className="font-bold text-white text-sm">Low Stock</p>
                 <p className="text-red-100 text-xs mt-0.5">
                   {lowStockItems.length} {lowStockItems.length === 1 ? 'item' : 'items'} running low
                 </p>
               </div>
             </div>
-            <Link to="/inventory">
+            <Link to="/app/inventory">
               <Button size="sm" className="bg-white text-red-600 hover:bg-red-50 font-bold shadow-none">
                 Review
               </Button>
@@ -666,7 +1067,7 @@ export function Dashboard() {
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-gray-900 text-sm">AI Order Assistant</h3>
               <p className="text-xs text-gray-500 mt-0.5 mb-3">Smart ordering based on sales trends & forecasting</p>
-              <Link to="/ai-orders">
+              <Link to="/app/orders">
                 <Button className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white h-9 text-sm">
                   <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                   View AI Suggestions
@@ -689,7 +1090,7 @@ export function Dashboard() {
               <p className="text-xs text-gray-500 mt-0.5 mb-3">
                 {recipes.length} recipes configured • Track ingredient costs
               </p>
-              <Link to="/recipes">
+              <Link to="/app/recipes">
                 <Button className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white h-9 text-sm">
                   Manage Recipes
                 </Button>
@@ -709,7 +1110,7 @@ export function Dashboard() {
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-gray-900 text-sm">Invoice Scanner</h3>
               <p className="text-xs text-gray-500 mt-0.5 mb-3">Scan invoices with AI • Automatically update inventory</p>
-              <Link to="/invoice-scanner">
+              <Link to="/app/invoice-scanner">
                 <Button className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white h-9 text-sm">
                   <Camera className="w-3.5 h-3.5 mr-1.5" />
                   Scan Invoice
@@ -737,6 +1138,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+
               {/* Summary Stats */}
               <div className="grid grid-cols-2 gap-3 pb-4 border-b border-gray-200">
                 <div className="text-center">
@@ -755,7 +1157,8 @@ export function Dashboard() {
               <div className="space-y-3">
                 {usageSummary.map((item) => {
                   const variance = item.actual - item.hypothetical;
-                  const variancePercent = (variance / item.hypothetical * 100);
+                  const safeHypothetical = item.hypothetical > 0 ? item.hypothetical : 1;
+                  const variancePercent = (variance / safeHypothetical * 100);
                   const isOver = variance > 0;
                   const isExpanded = expandedCategory === item.id;
 
@@ -791,7 +1194,7 @@ export function Dashboard() {
                               className={`absolute h-2 rounded-full ${
                                 isOver ? 'bg-yellow-500' : 'bg-green-500'
                               }`}
-                              style={{ width: `${(item.actual / item.hypothetical * 100)}%` }}
+                              style={{ width: `${(item.actual / safeHypothetical * 100)}%` }}
                             />
                           </div>
                         </div>
@@ -810,7 +1213,8 @@ export function Dashboard() {
                         <div className="ml-6 space-y-2 pl-4 border-l-2 border-gray-200">
                           {item.items.map((subItem) => {
                             const subVariance = subItem.actual - subItem.hypothetical;
-                            const subVariancePercent = (subVariance / subItem.hypothetical * 100);
+                            const safeSubHypothetical = subItem.hypothetical > 0 ? subItem.hypothetical : 1;
+                            const subVariancePercent = (subVariance / safeSubHypothetical * 100);
                             const isSubOver = subVariance > 0;
 
                             return (
@@ -834,7 +1238,7 @@ export function Dashboard() {
                                         className={`absolute h-1.5 rounded-full ${
                                           isSubOver ? 'bg-yellow-500' : 'bg-green-500'
                                         }`}
-                                        style={{ width: `${(subItem.actual / subItem.hypothetical * 100)}%` }}
+                                        style={{ width: `${(subItem.actual / safeSubHypothetical * 100)}%` }}
                                       />
                                     </div>
                                   </div>

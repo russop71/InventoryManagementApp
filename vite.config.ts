@@ -32,13 +32,22 @@ export default defineConfig({
     },
     // Deduplicate shared packages so only one copy ends up in the bundle.
     // Prevents "multiple renderers" / "invalid hook call" errors.
-    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react-router', 'jotai', 'scheduler'],
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react-router'],
   },
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react/jsx-runtime', 'react-router', 'jotai', 'scheduler'],
+    include: ['react', 'react-dom', 'react/jsx-runtime', 'react-router'],
+  },
+
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4001',
+        changeOrigin: true,
+      },
+    },
   },
 })

@@ -1,49 +1,77 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Input } from '../components/ui/input';
-import { Lock, User } from 'lucide-react';
+import { Lock, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
+import { apiRequest } from '../utils/api';
 
 // Lemon/speech-bubble logo — circle outline + 3 ascending bars + green leaf.
 // Dark variant (charcoal) used on yellow background so it stays visible.
 function ZestIQLogo({ size = 64 }: { size?: number }) {
-  const h = Math.round(size * 1.2);
+  const h = Math.round(size * 1.16);
   return (
-    <svg width={size} height={h} viewBox="0 0 100 120" fill="none">
-      {/* Lemon circle with speech-bubble tail bottom-left */}
+    <svg width={size} height={h} viewBox="0 0 100 116" fill="none">
       <path
-        d="M 50 16 C 73 16, 91 32, 91 52 C 91 72, 73 88, 50 88 L 28 102 L 18 88 C 9 81, 9 66, 9 52 C 9 32, 27 16, 50 16 Z"
-        stroke="#0F172A" strokeWidth="7" fill="none"
+        d="M 12 52 C 22 28, 36 16, 50 16 C 64 16, 78 28, 88 52 C 78 76, 64 88, 50 88 C 36 88, 22 76, 12 52 Z"
+        stroke="#0F172A" strokeWidth="6" fill="none"
         strokeLinejoin="round" strokeLinecap="round"
       />
-      {/* 3 ascending bars — short / medium / tall, same baseline */}
-      <rect x="23" y="58" width="13" height="20" rx="3" fill="#0F172A" />
-      <rect x="40" y="45" width="13" height="33" rx="3" fill="#0F172A" />
-      <rect x="57" y="33" width="13" height="45" rx="3" fill="#0F172A" />
-      {/* Green leaf top-right */}
-      <path d="M 56 20 C 62 4, 88 2, 90 18 C 78 26, 60 24, 56 20 Z" fill="#4CAF50" />
-      <path d="M 56 20 C 68 14, 82 10, 90 18" stroke="#3D8B40" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <rect x="34" y="62" width="6" height="14" rx="2" fill="#0F172A" />
+      <rect x="43" y="55" width="6" height="21" rx="2" fill="#0F172A" />
+      <rect x="52" y="47" width="6" height="29" rx="2" fill="#0F172A" />
+      <path d="M 58 16 C 64 3, 84 3, 88 16 C 80 23, 64 23, 58 16 Z" fill="#5FAF4B" />
+      <path d="M 60 16 C 69 12, 79 11, 86 16" stroke="#3F8D3A" strokeWidth="1.5" strokeLinecap="round" fill="none" />
     </svg>
   );
 }
 
 export function Login() {
   const navigate = useNavigate();
+  const [name, setName]           = useState('');
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignup, setIsSignup]   = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const { login, register } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     await new Promise(r => setTimeout(r, 900));
-    if (email && password) {
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', email);
-      toast.success('Welcome back!');
-      navigate('/');
-    } else {
+    if (!email || !password) {
       toast.error('Please enter your email and password');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      if (isSignup) {
+        if (!name.trim()) {
+          toast.error('Please enter your name');
+          setIsLoading(false);
+          return;
+        }
+        await register(name, email, password);
+        try {
+          await apiRequest<{ sent: boolean }>('/api/send-welcome-email', {
+            method: 'POST',
+            body: JSON.stringify({ name, email }),
+          });
+        } catch (emailError) {
+          console.error('Failed to send welcome email', emailError);
+        }
+        toast.success('Account created successfully');
+        navigate('/app/payment-method');
+      } else {
+        await login(email, password);
+        toast.success('Welcome back!');
+        navigate('/app');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : isSignup ? 'Unable to create account' : 'Unable to sign in');
     }
     setIsLoading(false);
   };
@@ -51,39 +79,98 @@ export function Login() {
   const handleDemoLogin = async () => {
     setIsLoading(true);
     await new Promise(r => setTimeout(r, 700));
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('userEmail', 'demo@zestiq.com');
-    toast.success('Logged in as Demo User');
-    navigate('/');
+    try {
+      await login('demo@zestiq.com', 'demo');
+      toast.success('Logged in as Demo User');
+      navigate('/app');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Demo login failed');
+    }
     setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#F5C10E' }}>
 
+      <div className="flex items-center justify-end px-5 pt-5">
+        <button
+          type="button"
+          onClick={() => setMenuOpen(value => !value)}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/70 shadow-sm backdrop-blur transition-transform active:scale-95"
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? <X className="h-5 w-5 text-[#0F172A]" /> : <Menu className="h-5 w-5 text-[#0F172A]" />}
+        </button>
+      </div>
+
       {/* ── Yellow hero ───────────────────────────────── */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
         <ZestIQLogo size={72} />
         <div className="flex items-baseline mt-5">
           <span className="font-black text-[40px] leading-none tracking-tight" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)' }}>zest</span>
-          <span className="font-black text-[40px] leading-none tracking-tight" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)', opacity: 0.45 }}>IQ</span>
+          <span className="ml-1 font-black text-[40px] leading-none tracking-tight" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)' }}>IQ</span>
         </div>
         <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
           Smarter Kitchens. Better Business.
         </p>
       </div>
 
+      {menuOpen && (
+        <div className="px-5 pb-4">
+          <div className="rounded-3xl bg-white/95 p-4 shadow-xl ring-1 ring-black/5">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Menu</p>
+            <div className="mt-3 grid gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleDemoLogin();
+                }}
+                className="h-11 rounded-2xl border border-[#F5C10E]/30 bg-[#F5C10E]/10 text-sm font-bold text-[#0F172A] transition-colors active:scale-[0.99]"
+              >
+                Try Demo Account
+              </button>
+              <a
+                href="mailto:sales@zestiq.ca?subject=zestIQ%20Sales%20Inquiry"
+                className="flex h-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm font-bold text-[#0F172A] transition-colors"
+                onClick={() => setMenuOpen(false)}
+              >
+                Contact Sales
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── White card ────────────────────────────────── */}
       <div className="flex-1 bg-white rounded-t-[32px] px-6 pt-8 pb-10 shadow-2xl">
 
         <h2 className="text-2xl font-black mb-1" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)' }}>
-          Welcome back
+          {isSignup ? 'Create your account' : 'Welcome back'}
         </h2>
         <p className="text-sm text-gray-400 font-medium mb-8">
-          Sign in to manage your restaurant inventory
+          {isSignup ? 'Set up your login to save data under your account' : 'Sign in to manage your restaurant inventory'}
         </p>
 
         <form onSubmit={handleLogin} className="space-y-4">
+          {isSignup && (
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full name</label>
+              <div className="relative">
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Jane Smith"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  required={isSignup}
+                  className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#0F172A] placeholder:text-gray-400"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
             <div className="relative">
@@ -124,7 +211,7 @@ export function Login() {
             className="w-full h-12 rounded-xl text-sm font-black tracking-wide transition-all active:scale-[0.98] disabled:opacity-60"
             style={{ background: '#0F172A', color: '#F5C10E' }}
           >
-            {isLoading ? 'Signing in…' : 'Sign In'}
+            {isLoading ? (isSignup ? 'Creating account…' : 'Signing in…') : (isSignup ? 'Create Account' : 'Sign In')}
           </button>
         </form>
 
@@ -148,8 +235,15 @@ export function Login() {
         </button>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          {"Don't have an account? "}
-          <a href="#" className="font-bold" style={{ color: '#0F172A' }}>Contact Sales</a>
+          {isSignup ? 'Already have an account? ' : "Don't have an account? "}
+          <button
+            type="button"
+            onClick={() => setIsSignup(value => !value)}
+            className="font-bold"
+            style={{ color: '#0F172A' }}
+          >
+            {isSignup ? 'Sign In' : 'Create one'}
+          </button>
         </p>
       </div>
 

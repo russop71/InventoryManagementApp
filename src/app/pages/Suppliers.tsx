@@ -6,11 +6,11 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Truck, Plus, Pencil, Trash2, Mail, Phone, MapPin, Package, DollarSign, ChevronDown, ChevronRight } from 'lucide-react';
+import { Truck, Plus, Pencil, Trash2, Mail, Phone, MapPin, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Suppliers() {
-  const { inventory, suppliers, addSupplier, updateSupplier, deleteSupplier } = useInventory();
+  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useInventory();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<string | null>(null);
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
@@ -59,22 +59,10 @@ export function Suppliers() {
     setExpandedSupplier(expandedSupplier === supplierId ? null : supplierId);
   };
 
-  // Get items supplied by each supplier
-  const getSupplierItems = (supplierName: string) => {
-    return inventory.filter(item => item.supplier === supplierName);
-  };
-
-  // Calculate total value for each supplier
-  const getSupplierValue = (supplierName: string) => {
-    return getSupplierItems(supplierName).reduce(
-      (sum, item) => sum + (item.currentStock * item.unitCost),
-      0
-    );
-  };
-
   const editingSupplierData = editingSupplier 
     ? suppliers.find(s => s.id === editingSupplier)
     : null;
+  const contactableSuppliers = suppliers.filter(supplier => supplier.contactPerson || supplier.email || supplier.phone).length;
 
   return (
     <div className="space-y-4 pb-20">
@@ -84,7 +72,7 @@ export function Suppliers() {
             <Truck className="w-6 h-6 mr-2 text-[#0F172A]" />
             Suppliers
           </h2>
-          <p className="text-sm text-gray-600 mt-1">Manage supplier relationships</p>
+          <p className="text-sm text-gray-600 mt-1">Manage supplier contact information</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
           setIsAddDialogOpen(open);
@@ -103,99 +91,110 @@ export function Suppliers() {
                 {editingSupplier ? 'Update supplier information' : 'Add a new supplier to your network'}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddSupplier} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Supplier Name *</Label>
-                <Input 
-                  id="name" 
-                  name="name" 
-                  required 
-                  defaultValue={editingSupplierData?.name}
-                  placeholder="US Foods"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="category">Category *</Label>
-                <select
-                  id="category"
-                  name="category"
-                  required
-                  defaultValue={editingSupplierData?.category || ''}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                >
-                  <option value="">Select category...</option>
-                  <option value="Proteins">Proteins</option>
-                  <option value="Produce">Produce</option>
-                  <option value="Dairy">Dairy</option>
-                  <option value="Dry Goods">Dry Goods</option>
-                  <option value="Beverages">Beverages</option>
-                  <option value="Pantry">Pantry</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <Label htmlFor="contactPerson">Contact Person</Label>
-                <Input 
-                  id="contactPerson" 
-                  name="contactPerson" 
-                  defaultValue={editingSupplierData?.contactPerson}
-                  placeholder="John Smith"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input 
-                    id="email" 
-                    name="email" 
-                    type="email"
-                    defaultValue={editingSupplierData?.email}
-                    placeholder="orders@supplier.com"
-                  />
+            <form key={editingSupplierData?.id || 'new-supplier'} onSubmit={handleAddSupplier} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-4 rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+                    <FileText className="h-3.5 w-3.5" />
+                    Supplier details
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name">Supplier Name *</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      required
+                      defaultValue={editingSupplierData?.name}
+                      placeholder="US Foods"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="category">Category *</Label>
+                    <select
+                      id="category"
+                      name="category"
+                      required
+                      defaultValue={editingSupplierData?.category || ''}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    >
+                      <option value="">Select category...</option>
+                      <option value="Proteins">Proteins</option>
+                      <option value="Produce">Produce</option>
+                      <option value="Dairy">Dairy</option>
+                      <option value="Dry Goods">Dry Goods</option>
+                      <option value="Beverages">Beverages</option>
+                      <option value="Pantry">Pantry</option>
+                      <option value="Seafood">Seafood</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="paymentTerms">Payment Terms</Label>
+                    <Input
+                      id="paymentTerms"
+                      name="paymentTerms"
+                      defaultValue={editingSupplierData?.paymentTerms}
+                      placeholder="Net 30"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input 
-                    id="phone" 
-                    name="phone" 
-                    type="tel"
-                    defaultValue={editingSupplierData?.phone}
-                    placeholder="(555) 123-4567"
-                  />
+
+                <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+                    <Phone className="h-3.5 w-3.5" />
+                    Contact information
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contactPerson">Contact Person</Label>
+                    <Input
+                      id="contactPerson"
+                      name="contactPerson"
+                      defaultValue={editingSupplierData?.contactPerson}
+                      placeholder="John Smith"
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        defaultValue={editingSupplierData?.email}
+                        placeholder="orders@supplier.com"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        defaultValue={editingSupplierData?.phone}
+                        placeholder="(555) 123-4567"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      name="address"
+                      defaultValue={editingSupplierData?.address}
+                      placeholder="123 Main St, City, State ZIP"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="address">Address</Label>
-                <Input 
-                  id="address" 
-                  name="address"
-                  defaultValue={editingSupplierData?.address}
-                  placeholder="123 Main St, City, State ZIP"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="paymentTerms">Payment Terms</Label>
-                <Input 
-                  id="paymentTerms" 
-                  name="paymentTerms"
-                  defaultValue={editingSupplierData?.paymentTerms}
-                  placeholder="Net 30"
-                />
-              </div>
-
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="notes">Notes</Label>
                 <textarea
                   id="notes"
                   name="notes"
                   defaultValue={editingSupplierData?.notes}
-                  rows={3}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  rows={4}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="Additional notes about this supplier..."
                 />
               </div>
@@ -228,24 +227,21 @@ export function Suppliers() {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-2xl font-bold text-[#0F172A]">{suppliers.length}</div>
-            <p className="text-xs text-[#1D4ED8] mt-1">In network</p>
+            <p className="text-xs text-[#1D4ED8] mt-1">Vendor directory</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-purple-900">Total Value</CardTitle>
+            <CardTitle className="text-xs font-medium text-blue-900">Contactable</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-purple-900">
-              ${suppliers.reduce((sum, supplier) => sum + getSupplierValue(supplier.name), 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-            </div>
-            <p className="text-xs text-purple-700 mt-1">Inventory value</p>
+            <div className="text-2xl font-bold text-blue-900">{contactableSuppliers}</div>
+            <p className="text-xs text-blue-700 mt-1">Have contact details</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* AI Scanner Info */}
       <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
         <CardContent className="pt-4">
           <div className="flex items-start space-x-3">
@@ -253,9 +249,9 @@ export function Suppliers() {
               <Truck className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-green-900">Auto-Add from Invoices</h3>
+              <h3 className="font-semibold text-green-900">Contact directory</h3>
               <p className="text-sm text-green-800 mt-1">
-                Suppliers are automatically added when you scan invoices. The AI extracts supplier information and adds them to this list.
+                This view is focused on supplier names and contact details only. Inventory item links are intentionally hidden for now.
               </p>
             </div>
           </div>
@@ -269,14 +265,12 @@ export function Suppliers() {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Truck className="w-12 h-12 text-gray-400 mb-4" />
               <p className="text-gray-500 text-center text-sm">
-                No suppliers yet. Add your first supplier or scan an invoice.
+                No suppliers yet. Add your first supplier contact.
               </p>
             </CardContent>
           </Card>
         ) : (
           suppliers.map(supplier => {
-            const supplierItems = getSupplierItems(supplier.name);
-            const supplierValue = getSupplierValue(supplier.name);
             const isExpanded = expandedSupplier === supplier.id;
 
             return (
@@ -299,9 +293,7 @@ export function Suppliers() {
                             <Badge className="bg-[#FEF9C3] text-[#1E3A5F] text-xs">
                               {supplier.category}
                             </Badge>
-                            <span className="text-xs text-gray-500">
-                              {supplierItems.length} items • ${supplierValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </span>
+                            <span className="text-xs text-gray-500">Contact details</span>
                           </div>
                         </div>
                       </div>
@@ -327,7 +319,6 @@ export function Suppliers() {
 
                 {isExpanded && (
                   <CardContent className="space-y-4 pt-0">
-                    {/* Contact Information */}
                     <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                       {supplier.contactPerson && (
                         <div className="flex items-center space-x-2 text-sm">
@@ -370,50 +361,8 @@ export function Suppliers() {
                         </div>
                       )}
                     </div>
-
-                    {/* Supplied Items */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-gray-900 flex items-center">
-                          <Package className="w-4 h-4 mr-1" />
-                          Supplied Items ({supplierItems.length})
-                        </h4>
-                        <span className="text-sm font-bold text-gray-900">
-                          ${supplierValue.toFixed(2)}
-                        </span>
-                      </div>
-                      {supplierItems.length === 0 ? (
-                        <p className="text-xs text-gray-500 text-center py-4">
-                          No items from this supplier yet
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {supplierItems.map(item => (
-                            <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <p className="font-medium text-sm text-gray-900">{item.name}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {item.category} • {item.currentStock} {item.unit} @ ${item.unitCost.toFixed(2)}/{item.unit}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-semibold text-sm text-gray-900">
-                                    ${(item.currentStock * item.unitCost).toFixed(2)}
-                                  </p>
-                                  <Badge className={`text-xs ${
-                                    item.currentStock < item.parLevel * 0.3 
-                                      ? 'bg-red-100 text-red-800' 
-                                      : 'bg-green-100 text-green-800'
-                                  }`}>
-                                    {((item.currentStock / item.parLevel) * 100).toFixed(0)}% stock
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
+                      Inventory item links are hidden in this view. Add or edit contact details above.
                     </div>
                   </CardContent>
                 )}
