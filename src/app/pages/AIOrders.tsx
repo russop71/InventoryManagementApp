@@ -115,6 +115,8 @@ export function AIOrders() {
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [manualOrderQuantities, setManualOrderQuantities] = useState<Record<string, number>>({});
   const [draftEmails, setDraftEmails] = useState<SupplierEmail[]>([]);
+  const [sendingAllEmails, setSendingAllEmails] = useState(false);
+  const [emailSendStatus, setEmailSendStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'failed'>>({});
   const [wsConnected, setWsConnected] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<OrderSuggestion[] | null>(null);
   const restaurantName = useMemo(() => {
@@ -474,6 +476,8 @@ export function AIOrders() {
     toast.success('Email copied to clipboard!');
   };
 
+  const resetEmailSendStatus = () => setEmailSendStatus({});
+
   const updateDraftEmailField = (supplier: string, field: 'emailSubject' | 'emailBody', value: string) => {
     setDraftEmails(prev => prev.map(email => {
       if (email.supplier !== supplier) return email;
@@ -516,15 +520,58 @@ export function AIOrders() {
       return;
     }
 
+    setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sending' }));
     try {
       await sendSupplierEmail({
         to: email.supplierEmail,
         subject: email.emailSubject,
         text: email.emailBody,
       });
+      setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
       toast.success(`Sent supplier email to ${email.supplier}`);
     } catch (error) {
+      setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'failed' }));
       toast.error(error instanceof Error ? error.message : 'Failed to send email');
+    }
+  };
+
+  const sendAllDraftEmails = async () => {
+    if (draftEmails.length === 0) {
+      toast.error('No draft emails to send');
+      return;
+    }
+
+    setSendingAllEmails(true);
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const email of draftEmails) {
+      if (!email.supplierEmail || email.supplierEmail === 'orders@supplier.com') {
+        setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'failed' }));
+        failedCount += 1;
+        continue;
+      }
+
+      setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sending' }));
+      try {
+        await sendSupplierEmail({
+          to: email.supplierEmail,
+          subject: email.emailSubject,
+          text: email.emailBody,
+        });
+        setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
+        successCount += 1;
+      } catch {
+        setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'failed' }));
+        failedCount += 1;
+      }
+    }
+
+    setSendingAllEmails(false);
+    if (failedCount === 0) {
+      toast.success(`Sent all ${successCount} supplier email${successCount === 1 ? '' : 's'}`);
+    } else {
+      toast.error(`Sent ${successCount} email${successCount === 1 ? '' : 's'}, ${failedCount} failed`);
     }
   };
 
@@ -1005,7 +1052,10 @@ export function AIOrders() {
       </div>
 
       {/* Email Dialog */}
-      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+      <Dialog open={showEmailDialog} onOpenChange={(open) => {
+        setShowEmailDialog(open);
+        if (!open) resetEmailSendStatus();
+      }}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center">
@@ -1016,6 +1066,16 @@ export function AIOrders() {
               Copy and send these emails to your suppliers
             </DialogDescription>
           </DialogHeader>
+          <div className="pt-2">
+            <Button
+              onClick={sendAllDraftEmails}
+              disabled={sendingAllEmails || draftEmails.length === 0}
+              className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]"
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              {sendingAllEmails ? 'Sending all...' : 'Send All Emails'}
+            </Button>
+          </div>
           <div className="space-y-4 pt-4">
             {draftEmails.map((email, idx) => (
               <Card key={email.supplier} className="overflow-hidden">
@@ -1026,6 +1086,15 @@ export function AIOrders() {
                       <p className="text-sm text-gray-600 mt-1">
                         {email.items.length} item(s) • ${email.totalCost.toFixed(2)}
                       </p>
+                      {emailSendStatus[email.supplier] && emailSendStatus[email.supplier] !== 'idle' && (
+                        <p className={`mt-1 text-xs font-semibold ${emailSendStatus[email.supplier] === 'sent' ? 'text-emerald-700' : emailSendStatus[email.supplier] === 'failed' ? 'text-red-700' : 'text-blue-700'}`}>
+                          {emailSendStatus[email.supplier] === 'sent'
+                            ? 'Sent'
+                            : emailSendStatus[email.supplier] === 'failed'
+                              ? 'Failed'
+                              : 'Sending...'}
+                        </p>
+                      )}
                     </div>
                     <div className="flex space-x-2">
                       <Button
@@ -1041,6 +1110,7 @@ export function AIOrders() {
                         size="sm"
                         variant="outline"
                         onClick={() => openEmailClient(email)}
+                        disabled={sendingAllEmails}
                         className="border-[#0F172A] bg-white font-semibold text-[#0F172A] hover:bg-gray-100"
                       >
                         <Mail className="w-4 h-4 mr-2" />
