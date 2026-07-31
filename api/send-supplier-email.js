@@ -27,27 +27,56 @@ export default async function handler(req, res) {
   const to = String(req.body?.to || '').trim();
   const subject = String(req.body?.subject || '').trim() || 'Supplier order request';
   const text = String(req.body?.text || '').trim();
+  const senderEmail = String(req.body?.senderEmail || '').trim();
+  const senderName = String(req.body?.senderName || '').trim();
 
   if (!to || !text) {
     return res.status(400).json({ error: 'to and text are required' });
   }
 
   try {
-    const response = await fetch('https://api.resend.com/emails', {
+    const requestedFrom = senderEmail
+      ? `${senderName || 'Account Holder'} <${senderEmail}>`
+      : fromEmail;
+
+    const buildPayload = (fromValue, includeReplyTo) => ({
+      from: fromValue,
+      to: [to],
+      subject,
+      text,
+      ...(includeReplyTo && senderEmail ? { reply_to: senderEmail } : {}),
+    });
+
+    let response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [to],
-        subject,
-        text,
-      }),
+      body: JSON.stringify(buildPayload(requestedFrom, false)),
     });
 
-    const payload = await response.json();
+    let payload = await response.json();
+    if (!response.ok && senderEmail) {
+      const message = String(payload?.message || payload?.error || '').toLowerCase();
+      const shouldFallback =
+        message.includes('verify') ||
+        message.includes('from address') ||
+        message.includes('domain');
+
+      if (shouldFallback) {
+        response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(buildPayload(fromEmail, true)),
+        });
+        payload = await response.json();
+      }
+    }
+
     if (!response.ok) {
       const message = payload?.message || payload?.error || 'Email provider request failed';
       return res.status(502).json({ error: message });

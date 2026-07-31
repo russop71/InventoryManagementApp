@@ -88,7 +88,7 @@ interface OrderSuggestion {
 export function Orders() {
   const { orders, inventory, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
   const { salesData } = useToast();
-  const { accountId, accountName } = useAuth();
+  const { accountId, accountName, user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
   const [detailId, setDetailId]   = useState<string | null>(null);
@@ -332,6 +332,8 @@ export function Orders() {
         to: email.supplierEmail,
         subject: email.emailSubject,
         text: email.emailBody,
+        senderEmail: user?.email,
+        senderName: user?.name,
       });
       toast.success(`Sent supplier email to ${email.supplier}`);
     } catch (error) {

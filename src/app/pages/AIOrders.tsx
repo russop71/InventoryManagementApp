@@ -112,7 +112,7 @@ function openMailtoDraft(to: string, subject: string, body: string) {
 export function AIOrders() {
   const { inventory, suppliers, placeOrder } = useInventory();
   const { salesData } = useToast();
-  const { accountId, accountName } = useAuth();
+  const { accountId, accountName, user } = useAuth();
   const createOrderRef = useRef<HTMLDivElement | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
   const [editableSuggestionQuantities, setEditableSuggestionQuantities] = useState<Record<string, number>>({});
@@ -511,6 +511,8 @@ export function AIOrders() {
         to: email.supplierEmail,
         subject: email.emailSubject,
         text: email.emailBody,
+        senderEmail: user?.email,
+        senderName: user?.name,
       });
       setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
       toast.success(`Sent supplier email to ${email.supplier}`);
@@ -549,6 +551,8 @@ export function AIOrders() {
           to: email.supplierEmail,
           subject: email.emailSubject,
           text: email.emailBody,
+          senderEmail: user?.email,
+          senderName: user?.name,
         });
         setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
         successCount += 1;
