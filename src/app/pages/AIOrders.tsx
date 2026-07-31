@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { groupBySupplier } from '../utils/invoiceWorkflow';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { resolveSuggestionQuantity } from '../utils/orderSuggestionUtils.js';
+import { getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
 
 interface OrderSuggestion {
   itemId: string;
@@ -393,7 +394,7 @@ export function AIOrders() {
 
       emailsToDraft.push({
         supplier,
-        supplierEmail: getSupplierEmailAddress(supplier),
+        supplierEmail: getSupplierEmailAddress(supplier, suppliers),
         items,
         totalCost,
         emailBody,
@@ -425,27 +426,6 @@ export function AIOrders() {
     }
   };
 
-  const getSupplierEmailAddress = (supplierName: string) => {
-    const matchedSupplier = suppliers.find(
-      supplier => supplier.name.trim().toLowerCase() === supplierName.trim().toLowerCase(),
-    );
-
-    if (matchedSupplier?.email?.trim()) {
-      return matchedSupplier.email.trim();
-    }
-
-    const fallbackEmails: { [key: string]: string } = {
-      'US Foods': 'orders@usfoods.com',
-      'Sysco': 'orders@sysco.com',
-      'Gordon Food Service': 'sales@gfs.com',
-      'Ontario Seafood': 'fresh@ontarioseafood.ca',
-      'Fresh Valley Farms': 'orders@freshvalley.ca',
-      'Restaurant Depot': 'orders@restaurantdepot.com',
-    };
-
-    return fallbackEmails[supplierName] || 'orders@supplier.com';
-  };
-
   const generateEmails = () => {
     const sourceList = aiSuggestions || orderSuggestions;
     const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
@@ -459,7 +439,7 @@ export function AIOrders() {
 
       return {
         supplier,
-        supplierEmail: getSupplierEmailAddress(supplier),
+        supplierEmail: getSupplierEmailAddress(supplier, suppliers),
         items,
         totalCost,
         emailBody,
@@ -515,7 +495,7 @@ export function AIOrders() {
   };
 
   const openEmailClient = async (email: SupplierEmail) => {
-    if (!email.supplierEmail || email.supplierEmail === 'orders@supplier.com') {
+    if (!email.supplierEmail) {
       toast.error('No supplier email address is configured');
       return;
     }
@@ -546,7 +526,7 @@ export function AIOrders() {
     let failedCount = 0;
 
     for (const email of draftEmails) {
-      if (!email.supplierEmail || email.supplierEmail === 'orders@supplier.com') {
+      if (!email.supplierEmail) {
         setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'failed' }));
         failedCount += 1;
         continue;
@@ -645,7 +625,7 @@ export function AIOrders() {
 
     const supplierEmailDraft: SupplierEmail = {
       supplier: selectedSupplier,
-      supplierEmail: getSupplierEmailAddress(selectedSupplier),
+      supplierEmail: getSupplierEmailAddress(selectedSupplier, suppliers),
       items: itemsForEmail,
       totalCost: manualOrderTotal,
       emailBody,

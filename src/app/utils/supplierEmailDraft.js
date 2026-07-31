@@ -1,21 +1,23 @@
+export const TEST_SUPPLIER_EMAIL = 'russop71@gmail.com';
+
 const FALLBACK_EMAILS = {
-  'US Foods': 'orders@usfoods.com',
-  Sysco: 'orders@sysco.com',
-  'Gordon Food Service': 'sales@gfs.com',
-  'Ontario Seafood': 'fresh@ontarioseafood.ca',
-  'Fresh Valley Farms': 'orders@freshvalley.ca',
-  'Restaurant Depot': 'orders@restaurantdepot.com',
-  Woodward: 'orderdesk@woodwardmeats.com',
-  'Daily Seafood': 'order@dailyseafood.ca',
-  Eccolo: 'orderdesk@eccolo.ca',
-  'Bondi Produce': '',
+  'US Foods': TEST_SUPPLIER_EMAIL,
+  Sysco: TEST_SUPPLIER_EMAIL,
+  'Gordon Food Service': TEST_SUPPLIER_EMAIL,
+  'Ontario Seafood': TEST_SUPPLIER_EMAIL,
+  'Fresh Valley Farms': TEST_SUPPLIER_EMAIL,
+  'Restaurant Depot': TEST_SUPPLIER_EMAIL,
+  Woodward: TEST_SUPPLIER_EMAIL,
+  'Daily Seafood': TEST_SUPPLIER_EMAIL,
+  Eccolo: TEST_SUPPLIER_EMAIL,
+  'Bondi Produce': TEST_SUPPLIER_EMAIL,
 };
 
 export function getSupplierEmailAddress(supplierName, suppliers = []) {
   const normalized = String(supplierName || '').trim().toLowerCase();
   const matchedSupplier = suppliers.find(supplier => supplier.name.trim().toLowerCase() === normalized);
   if (matchedSupplier?.email?.trim()) return matchedSupplier.email.trim();
-  return FALLBACK_EMAILS[supplierName] || FALLBACK_EMAILS[supplierName?.trim()] || 'orders@supplier.com';
+  return FALLBACK_EMAILS[supplierName] || FALLBACK_EMAILS[supplierName?.trim()] || TEST_SUPPLIER_EMAIL;
 }
 
 export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [] }) {

@@ -10,6 +10,7 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Calendar, Plus, TrendingUp, Sparkles, ShoppingBag, DollarSign, Mail, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
 
 interface SupplierEmail {
   supplier: string;
@@ -101,7 +102,7 @@ async function resolveEventContext(targetDate: string) {
 }
 
 export function Forecasting() {
-  const { inventory, forecasts, addForecast, generateDailyOrder } = useInventory();
+  const { inventory, forecasts, addForecast, generateDailyOrder, suppliers } = useInventory();
   const { isConnected, salesData, menuItems } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<{ itemId: string; expectedUsage: number }[]>([]);
@@ -286,16 +287,6 @@ export function Forecasting() {
       day: 'numeric' 
     });
 
-    // Supplier email mapping
-    const supplierEmails: { [key: string]: string } = {
-      'US Foods': 'orders@usfoods.com',
-      'Sysco': 'orders@sysco.com',
-      'Gordon Food Service': 'sales@gfs.com',
-      'Ontario Seafood': 'fresh@ontarioseafood.ca',
-      'Fresh Valley Farms': 'orders@freshvalley.ca',
-      'Restaurant Depot': 'orders@restaurantdepot.com',
-    };
-
     const emails: SupplierEmail[] = Object.keys(supplierMap).map(supplier => {
       const items = supplierMap[supplier];
       const totalCost = items.reduce((sum, orderItem) => sum + (orderItem.quantity * orderItem.item.unitCost), 0);
@@ -338,7 +329,7 @@ Kitchen Management Team`;
 
       return {
         supplier,
-        supplierEmail: supplierEmails[supplier] || 'orders@supplier.com',
+        supplierEmail: getSupplierEmailAddress(supplier, suppliers),
         items: emailItems,
         totalCost,
         emailBody,

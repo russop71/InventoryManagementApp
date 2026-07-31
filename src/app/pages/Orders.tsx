@@ -317,7 +317,7 @@ export function Orders() {
   };
 
   const openEmailClient = async (email: { supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }) => {
-    if (!email.supplierEmail || email.supplierEmail === 'orders@supplier.com') {
+    if (!email.supplierEmail) {
       toast.error('No supplier email address is configured');
       return;
     }

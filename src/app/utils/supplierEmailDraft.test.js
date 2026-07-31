@@ -17,7 +17,7 @@ test('buildSupplierEmailDrafts uses supplier emails and creates a mail draft', (
   assert.match(drafts[0].emailBody, /Salmon/);
 });
 
-test('getSupplierEmailAddress falls back to known supplier addresses', () => {
+test('getSupplierEmailAddress falls back to testing email address', () => {
   const email = getSupplierEmailAddress('Woodward', [{ name: 'Woodward', email: '' }]);
-  assert.equal(email, 'orderdesk@woodwardmeats.com');
+  assert.equal(email, 'russop71@gmail.com');
 });

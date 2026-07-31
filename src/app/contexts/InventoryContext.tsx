@@ -223,7 +223,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const MARKETMAN_SUPPLIER_CONTACTS: Record<string, Pick<Supplier, 'contactPerson' | 'email' | 'phone' | 'address' | 'paymentTerms' | 'notes'>> = {
     'daily seafood': {
       contactPerson: '',
-      email: 'order@dailyseafood.ca',
+      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
       phone: '416-4619449',
       address: '',
       paymentTerms: '',
@@ -231,7 +231,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     },
     woodward: {
       contactPerson: '',
-      email: 'orderdesk@woodwardmeats.com',
+      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
       phone: '905-847-7200',
       address: '',
       paymentTerms: '',
@@ -239,7 +239,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     },
     eccolo: {
       contactPerson: '',
-      email: 'orderdesk@eccolo.ca',
+      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
       phone: '416-661-1994',
       address: '',
       paymentTerms: '',
@@ -247,7 +247,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     },
     bondi: {
       contactPerson: '',
-      email: '',
+      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
       phone: '',
       address: '',
       paymentTerms: '',
