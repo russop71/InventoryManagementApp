@@ -324,24 +324,6 @@ export function Orders() {
     setSelectedSuggestions(new Set());
   };
 
-  const handleCreateManualOrder = () => {
-    const fallbackItems = inventory.slice(0, 3).map(item => ({
-      itemId: item.id,
-      quantity: Math.max(item.parLevel / 2, 1),
-      cost: item.unitCost * Math.max(item.parLevel / 2, 1),
-    }));
-
-    placeOrder({
-      date: getDefaultOrderDate(),
-      items: fallbackItems,
-      supplier: inventory[0]?.supplier || 'Supplier',
-      totalCost: fallbackItems.reduce((sum, item) => sum + item.cost, 0),
-      status: 'pending',
-    });
-
-    toast.success('Manual order created and linked to an invoice');
-  };
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'critical': return 'bg-red-500';
@@ -447,7 +429,7 @@ export function Orders() {
               AI Orders
             </button>
             <button
-              onClick={handleCreateManualOrder}
+              onClick={() => navigate('/app/ai-orders')}
               className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-bold shrink-0"
               style={{ background: Y, color: D }}
             >
