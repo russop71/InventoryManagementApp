@@ -29,7 +29,6 @@ export function Invoices() {
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [draftInvoices, setDraftInvoices] = useState<Record<string, { invoiceNumber: string; supplier: string; status: InvoiceRecord['status']; items: OrderItem[] }>>({});
   const [itemSearch, setItemSearch] = useState<string>('');
-  const [itemSearchSupplier, setItemSearchSupplier] = useState<string>('');
   const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'open' | 'received' | 'cancelled'>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'current-month' | 'last-30-days'>('current-month');
@@ -66,7 +65,6 @@ export function Invoices() {
       };
     });
     setItemSearch('');
-    setItemSearchSupplier('');
   };
 
   const startEditing = (invoice: InvoiceRecord) => {
@@ -417,43 +415,42 @@ export function Invoices() {
                                 <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-3">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-sm font-semibold text-gray-900">Add items</p>
-                                    <span className="text-xs text-gray-500">Type to find inventory</span>
+                                    <span className="text-xs text-gray-500">
+                                      {draftInvoices[invoice.id].supplier
+                                        ? `Showing items from ${draftInvoices[invoice.id].supplier}`
+                                        : 'Select a supplier first'}
+                                    </span>
                                   </div>
-                                  <div className="grid gap-2 md:grid-cols-2">
+                                  <div className="grid gap-2">
                                     <Input
                                       placeholder="Search items"
                                       value={itemSearch}
                                       onChange={event => setItemSearch(event.target.value)}
+                                      disabled={!draftInvoices[invoice.id].supplier}
                                     />
-                                    <select
-                                      value={itemSearchSupplier}
-                                      onChange={event => setItemSearchSupplier(event.target.value)}
-                                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-                                    >
-                                      <option value="">All suppliers</option>
-                                      {availableSuppliers.map(supplier => (
-                                        <option key={supplier} value={supplier}>{supplier}</option>
-                                      ))}
-                                    </select>
                                   </div>
                                   <div className="max-h-40 space-y-2 overflow-auto rounded-lg border border-gray-100 p-2">
-                                    {filterInvoiceItems(
-                                      inventory.filter(item => !itemSearchSupplier || item.supplier === itemSearchSupplier),
-                                      itemSearch,
-                                    ).slice(0, 8).map(item => (
-                                      <button
-                                        key={item.id}
-                                        type="button"
-                                        onClick={() => addDraftItem(invoice.id, item)}
-                                        className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-gray-100"
-                                      >
-                                        <span>
-                                          <span className="font-medium text-gray-900">{item.name}</span>
-                                          <span className="ml-2 text-xs text-gray-500">{item.supplier}</span>
-                                        </span>
-                                        <span className="text-xs text-gray-500">{item.unit}</span>
-                                      </button>
-                                    ))}
+                                    {draftInvoices[invoice.id].supplier ? (
+                                      filterInvoiceItems(
+                                        inventory.filter(item => item.supplier === draftInvoices[invoice.id].supplier),
+                                        itemSearch,
+                                      ).slice(0, 8).map(item => (
+                                        <button
+                                          key={item.id}
+                                          type="button"
+                                          onClick={() => addDraftItem(invoice.id, item)}
+                                          className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-gray-100"
+                                        >
+                                          <span>
+                                            <span className="font-medium text-gray-900">{item.name}</span>
+                                            <span className="ml-2 text-xs text-gray-500">{item.supplier}</span>
+                                          </span>
+                                          <span className="text-xs text-gray-500">{item.unit}</span>
+                                        </button>
+                                      ))
+                                    ) : (
+                                      <p className="px-2 py-1 text-xs text-gray-500">Choose a supplier to load invoice items.</p>
+                                    )}
                                   </div>
                                 </div>
 
