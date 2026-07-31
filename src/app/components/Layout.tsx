@@ -168,20 +168,22 @@ export function Layout() {
                   <span>{group.label}</span>
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-                <div className="absolute left-0 top-full z-20 mt-2 hidden min-w-[180px] rounded-2xl border border-gray-200 bg-white p-2 shadow-xl group-hover:block">
-                  {group.items.map(item => {
-                    const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-                    return (
-                      <button
-                        key={item.path}
-                        type="button"
-                        onClick={() => navigate(item.path)}
-                        className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition ${active ? 'bg-[#FEF3C7] text-[#0F172A]' : 'text-gray-700 hover:bg-gray-50'}`}
-                      >
-                        {item.label}
-                      </button>
-                    );
-                  })}
+                <div className="absolute left-0 top-full z-20 hidden pt-2 group-hover:block group-focus-within:block">
+                  <div className="min-w-[180px] rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
+                    {group.items.map(item => {
+                      const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                      return (
+                        <button
+                          key={item.path}
+                          type="button"
+                          onClick={() => navigate(item.path)}
+                          className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition ${active ? 'bg-[#FEF3C7] text-[#0F172A]' : 'text-gray-700 hover:bg-gray-50'}`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             ))}
