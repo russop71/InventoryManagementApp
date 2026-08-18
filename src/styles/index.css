@@ -1,4 +1,52 @@
-@import './fonts.css';
-@import './tailwind.css';
-@import './theme.css';
-@import './animations.css';
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>ZestIQ | Restaurant Inventory & Food Cost Management</title>
+
+    <meta
+      name="description"
+      content="ZestIQ helps restaurant teams control inventory, recipe costs, purchasing, forecasting, and waste from one simple platform."
+    />
+
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#F5C10E" />
+
+    <meta
+      property="og:title"
+      content="ZestIQ | Smarter Restaurant Inventory"
+    />
+
+    <meta
+      property="og:description"
+      content="Control inventory, food costs, purchasing, forecasting, and waste from one restaurant operations platform."
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://zestiq.ca/" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="canonical" href="https://zestiq.ca/" />
+
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      #root {
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
