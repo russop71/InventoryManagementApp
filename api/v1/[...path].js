@@ -3,6 +3,7 @@ import { normalizePosImportPayload } from '../../server/pos-import.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -97,8 +98,14 @@ function mapLocationData(row) {
   };
 }
 
-async function getAccount(accountId) {
-  const rows = await supabase(`accounts?id=eq.${encodeURIComponent(accountId)}&select=*`);
+export function identifierFilter(idColumn, slugColumn, identifier) {
+  const column = UUID_PATTERN.test(identifier) ? idColumn : slugColumn;
+  return `${column}=eq.${encodeURIComponent(identifier)}`;
+}
+
+async function getAccount(accountIdentifier) {
+  const filter = identifierFilter('id', 'slug', accountIdentifier);
+  const rows = await supabase(`accounts?${filter}&select=*`);
   return rows?.[0] || null;
 }
 
@@ -140,8 +147,9 @@ async function ensureAccountForEmail(email) {
   return { account, locations };
 }
 
-async function ensureLocationBelongsToAccount(accountId, locationId) {
-  const rows = await supabase(`locations?id=eq.${encodeURIComponent(locationId)}&account_id=eq.${encodeURIComponent(accountId)}&select=*`);
+async function ensureLocationBelongsToAccount(accountId, locationIdentifier) {
+  const filter = identifierFilter('id', 'slug', locationIdentifier);
+  const rows = await supabase(`locations?${filter}&account_id=eq.${encodeURIComponent(accountId)}&select=*`);
   return rows?.[0] || null;
 }
 
@@ -207,9 +215,10 @@ export default async function handler(req, res) {
     }
 
     if (segments[0] !== 'accounts' || !segments[1]) return json(res, 404, { error: 'not found' });
-    const accountId = segments[1];
-    const account = await getAccount(accountId);
+    const requestedAccountId = segments[1];
+    const account = await getAccount(requestedAccountId);
     if (!account) return json(res, 404, { error: 'account not found' });
+    const accountId = account.id;
 
     if (segments.length === 2 && method === 'DELETE') {
       await supabase(`accounts?id=eq.${accountId}`, { method: 'DELETE', prefer: 'return=minimal' });
@@ -269,10 +278,11 @@ export default async function handler(req, res) {
         return json(res, 201, { locations: all.map(mapLocation) });
       }
 
-      const locationId = segments[3];
-      if (!locationId) return json(res, 404, { error: 'location not found' });
-      const location = await ensureLocationBelongsToAccount(accountId, locationId);
+      const requestedLocationId = segments[3];
+      if (!requestedLocationId) return json(res, 404, { error: 'location not found' });
+      const location = await ensureLocationBelongsToAccount(accountId, requestedLocationId);
       if (!location) return json(res, 404, { error: 'location not found' });
+      const locationId = location.id;
 
       if (segments[4] === 'data') {
         const rows = await supabase(`location_data?location_id=eq.${locationId}&select=*`);
