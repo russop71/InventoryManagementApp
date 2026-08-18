@@ -67,7 +67,7 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 const SALES_INTEGRATION_PAUSED = true;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const { accountId, activeLocationId } = useAuth();
+  const { accountId, activeLocationId, token } = useAuth();
   const { recipes, inventory, syncToastMenuItems } = useInventory();
 
   const buildToastMenuItemsFromRecipes = (sourceRecipes: Recipe[]): ToastMenuItem[] => {
@@ -228,25 +228,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       return fallback;
     };
 
-    const restoreFromServer = async () => {
-      try {
-        const payload = await apiRequest<ToastIntegrationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`);
-        const serverToast = payload.toast || {};
-        const hasServerSales = Array.isArray(serverToast.salesData) && serverToast.salesData.length > 0;
-        const hasServerMenuItems = Array.isArray(serverToast.menuItems) && serverToast.menuItems.length > 0;
-        const fallbackToastState = buildSeededToastState(recipes);
-        const nextMenuItems = hasServerMenuItems ? serverToast.menuItems : fallbackToastState.menuItems;
-        const nextSalesData = hasServerSales ? serverToast.salesData : fallbackToastState.salesData;
-
-        setIsConnected(Boolean(serverToast.connected || hasServerSales || hasServerMenuItems || true));
-        setApiKey(serverToast.apiKey || '');
-        setRestaurantId(serverToast.restaurantId || '');
-        setLastSync(serverToast.lastSync || null);
-        setCogsCategories(serverToast.cogsCategories || []);
-        setSalesData(nextSalesData);
-        setMenuItems(nextMenuItems);
-        setIsHydrated(true);
-      } catch {
+    const restoreFromLocal = () => {
         const restoredConnected = readWithLegacyJson<boolean>('toastConnected', false);
         const restoredApiKey = readWithLegacyString('toastApiKey', '');
         const restoredRestaurantId = readWithLegacyString('toastRestaurantId', '');
@@ -266,15 +248,43 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         setSalesData(nextSalesData);
         setMenuItems(nextMenuItems);
         setIsHydrated(true);
+    };
+
+    const restoreFromServer = async () => {
+      if (!token) {
+        restoreFromLocal();
+        return;
+      }
+
+      try {
+        const payload = await apiRequest<ToastIntegrationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`);
+        const serverToast = payload.toast || {};
+        const hasServerSales = Array.isArray(serverToast.salesData) && serverToast.salesData.length > 0;
+        const hasServerMenuItems = Array.isArray(serverToast.menuItems) && serverToast.menuItems.length > 0;
+        const fallbackToastState = buildSeededToastState(recipes);
+        const nextMenuItems = hasServerMenuItems ? serverToast.menuItems : fallbackToastState.menuItems;
+        const nextSalesData = hasServerSales ? serverToast.salesData : fallbackToastState.salesData;
+
+        setIsConnected(Boolean(serverToast.connected || hasServerSales || hasServerMenuItems || true));
+        setApiKey(serverToast.apiKey || '');
+        setRestaurantId(serverToast.restaurantId || '');
+        setLastSync(serverToast.lastSync || null);
+        setCogsCategories(serverToast.cogsCategories || []);
+        setSalesData(nextSalesData);
+        setMenuItems(nextMenuItems);
+        setIsHydrated(true);
+      } catch {
+        restoreFromLocal();
       }
     };
 
     void restoreFromServer();
-  }, [accountId, activeLocationId]);
+  }, [accountId, activeLocationId, token]);
 
   useEffect(() => {
     if (!accountId || !activeLocationId || !isHydrated) return;
     localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastSalesData'), JSON.stringify(salesData));
+    if (!token) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`, {
       method: 'PUT',
       body: JSON.stringify({
@@ -289,7 +299,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }).catch(error => {
       console.error('Failed to sync Toast integration state', error);
     });
-  }, [salesData, accountId, activeLocationId, isHydrated, isConnected, apiKey, restaurantId, menuItems, cogsCategories, lastSync]);
+  }, [salesData, accountId, activeLocationId, isHydrated, isConnected, apiKey, restaurantId, menuItems, cogsCategories, lastSync, token]);
 
   useEffect(() => {
     if (!accountId || !activeLocationId || !isHydrated) return;
