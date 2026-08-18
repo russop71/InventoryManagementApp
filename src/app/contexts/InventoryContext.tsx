@@ -215,7 +215,7 @@ function normalizePreppedRecipe(recipe: Partial<PreppedRecipe> & Pick<PreppedRec
 }
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
-  const { user, accountId, activeLocationId } = useAuth();
+  const { user, accountId, activeLocationId, token } = useAuth();
   const pollRef = useRef<number | null>(null);
 
   const MARKETMAN_SUPPLIER_TARGET_EMAIL = 'russop71@gmail.com';
@@ -391,6 +391,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       effectiveSuppliers,
       effectivePreppedRecipes,
     );
+    if (!token) return;
     void apiRequest<LocationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/data`, {
       method: 'PUT',
       body: JSON.stringify({
@@ -428,6 +429,23 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const fallbackInventory = demoData.inventory as unknown as InventoryItem[];
     const fallbackRecipes = demoData.recipes as unknown as Recipe[];
     const fallbackStorageAreas = demoData.storageAreas;
+
+    if (!token) {
+      const nextStorageAreas = sortUniqueStorageAreas([
+        ...DEFAULT_STORAGE_AREAS,
+        ...localStorageAreas,
+        ...localInventory.map(item => normalizeStorageArea(item.storageArea)),
+      ]);
+      setInventory(localInventory.length > 0 ? localInventory : fallbackInventory);
+      setRecipes(localRecipes.length > 0 ? localRecipes : fallbackRecipes);
+      setStorageAreas(nextStorageAreas.length > 0 ? nextStorageAreas : fallbackStorageAreas);
+      setOrders(readScopedJson<DailyOrder[]>(localKey('orders'), []));
+      setInvoices(readScopedJson<InvoiceRecord[]>(localKey('invoices'), []));
+      setSuppliers(readScopedJson<Supplier[]>(localKey('suppliers'), []));
+      setPreppedRecipes(readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe)));
+      setIsLocationLoaded(true);
+      return;
+    }
 
     try {
       const payload = await apiRequest<LocationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/data`);
@@ -557,10 +575,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
 
     setPreppedRecipes(readScopedJson<PreppedRecipe[]>(preppedKey, []).map(recipe => normalizePreppedRecipe(recipe)));
-  }, [accountId, activeLocationId, user?.email]);
+  }, [accountId, activeLocationId, user?.email, token]);
 
   useEffect(() => {
-    if (!accountId || !activeLocationId) return;
+    if (!accountId || !activeLocationId || !token) return;
     if (pollRef.current) window.clearInterval(pollRef.current);
 
     pollRef.current = window.setInterval(() => {
@@ -573,7 +591,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         pollRef.current = null;
       }
     };
-  }, [accountId, activeLocationId]);
+  }, [accountId, activeLocationId, token]);
 
   useEffect(() => {
     const key = localKey('forecasts');
