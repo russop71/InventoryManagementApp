@@ -147,7 +147,9 @@ async function ensureLocationBelongsToAccount(accountId, locationId) {
 
 function parseSegments(req) {
   if (Array.isArray(req.query?.path)) return req.query.path;
-  if (typeof req.query?.path === 'string') return [req.query.path];
+if (typeof req.query?.path === 'string') {
+  return req.query.path.split('/').filter(Boolean).map(decodeURIComponent);
+}
   const pathname = new URL(req.url, 'http://localhost').pathname;
   return pathname.replace(/^\/api\/v1\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
 }
