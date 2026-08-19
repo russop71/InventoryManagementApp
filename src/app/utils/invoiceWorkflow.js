@@ -29,3 +29,24 @@ export function filterInvoiceItems(inventory, query) {
     return searchable.includes(normalized);
   });
 }
+
+export function normalizeInvoiceNumber(invoiceNumber) {
+  return String(invoiceNumber || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function hasDuplicateInvoiceNumber(invoices, invoiceNumber) {
+  const normalized = normalizeInvoiceNumber(invoiceNumber);
+  if (!normalized) return false;
+  return invoices.some((invoice) => normalizeInvoiceNumber(invoice.invoiceNumber) === normalized);
+}
+
+export function normalizeInventoryItemName(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(?:case|cs|each|ea|unit|units|kg|lb|lbs|liter|litre|l|ml)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
