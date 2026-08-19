@@ -36,6 +36,16 @@ export function InvoiceScanner() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        alert('Please upload a JPEG, PNG, or WebP image.');
+        event.target.value = '';
+        return;
+      }
+      if (file.size > 4 * 1024 * 1024) {
+        alert('Please upload an invoice image smaller than 4 MB.');
+        event.target.value = '';
+        return;
+      }
       setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
@@ -54,13 +64,13 @@ export function InvoiceScanner() {
       reader.onloadend = async () => {
         const dataUrl = reader.result as string;
         try {
-          const res = await fetch('http://localhost:4001/api/scan-invoice', {
+          const res = await fetch('/api/scan-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ imageData: dataUrl })
           });
-          if (!res.ok) throw new Error('Scan failed');
           const json = await res.json();
+          if (!res.ok) throw new Error(json.error || 'Scan failed');
           // Normalize response
           const parsed: ExtractedInvoice = {
             vendor: json.vendor || 'Unknown',
@@ -81,7 +91,7 @@ export function InvoiceScanner() {
           setEditedItems(parsed.items);
         } catch (err) {
           console.error('Invoice scan error', err);
-          alert('Invoice scan failed. See console for details.');
+          alert(err instanceof Error ? err.message : 'Invoice scan failed.');
         } finally {
           setIsProcessing(false);
         }
@@ -216,7 +226,7 @@ export function InvoiceScanner() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleFileSelect}
               className="hidden"
               id="invoice-upload"
@@ -227,7 +237,7 @@ export function InvoiceScanner() {
                 Click to upload invoice image
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                PNG, JPG, or PDF up to 10MB
+                JPEG, PNG, or WebP up to 4 MB
               </p>
             </label>
           </div>
