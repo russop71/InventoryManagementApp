@@ -130,12 +130,27 @@ async function extractInvoice(imageData, apiKey) {
   if (!response.ok) {
     const error = new Error(payload?.error?.message || `OpenAI request failed (${response.status})`);
     error.status = response.status;
+    error.code = payload?.error?.code;
     throw error;
   }
 
   const outputText = extractResponseText(payload);
   if (!outputText) throw new Error('OpenAI returned no invoice data');
   return normalizeInvoice(JSON.parse(outputText));
+}
+
+export function mapInvoiceExtractionError(error) {
+  const status = Number(error?.status);
+  if ([401, 403].includes(status)) {
+    return { status: 503, error: 'AI invoice scanning is not configured correctly' };
+  }
+  if (status === 429 && error?.code === 'insufficient_quota') {
+    return { status: 503, error: 'OpenAI API quota is exhausted. Add API billing or credits, then try again.' };
+  }
+  if (status === 429) {
+    return { status: 429, error: 'AI invoice scanning is busy. Try again shortly.' };
+  }
+  return { status: 502, error: 'Invoice extraction failed. Try a clearer image or PDF.' };
 }
 
 export default async function handler(req, res) {
@@ -156,12 +171,7 @@ export default async function handler(req, res) {
     return res.status(200).json(await extractInvoice(imageData, apiKey));
   } catch (error) {
     console.error('api/scan-invoice error', error);
-    if ([401, 403].includes(Number(error?.status))) {
-      return res.status(503).json({ error: 'AI invoice scanning is not configured correctly' });
-    }
-    if (Number(error?.status) === 429) {
-      return res.status(429).json({ error: 'AI invoice scanning is busy. Try again shortly.' });
-    }
-    return res.status(502).json({ error: 'Invoice extraction failed. Try a clearer image or PDF.' });
+    const mappedError = mapInvoiceExtractionError(error);
+    return res.status(mappedError.status).json({ error: mappedError.error });
   }
 }
