@@ -103,6 +103,17 @@ export function identifierFilter(idColumn, slugColumn, identifier) {
   return `${column}=eq.${encodeURIComponent(identifier)}`;
 }
 
+export function findDuplicateInvoiceNumber(invoices = []) {
+  const seen = new Map();
+  for (const invoice of invoices) {
+    const normalized = String(invoice?.invoiceNumber || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!normalized) continue;
+    if (seen.has(normalized)) return invoice.invoiceNumber || seen.get(normalized);
+    seen.set(normalized, invoice.invoiceNumber);
+  }
+  return null;
+}
+
 async function getAccount(accountIdentifier) {
   const filter = identifierFilter('id', 'slug', accountIdentifier);
   const rows = await supabase(`accounts?${filter}&select=*`);
@@ -290,13 +301,18 @@ export default async function handler(req, res) {
         if (method === 'GET') return json(res, 200, mapLocationData(current));
         if (method === 'PUT') {
           const body = req.body || {};
+          const nextInvoices = Array.isArray(body.invoices) ? body.invoices : (current.invoices || []);
+          const duplicateInvoiceNumber = findDuplicateInvoiceNumber(nextInvoices);
+          if (duplicateInvoiceNumber) {
+            return json(res, 409, { error: `Invoice ${duplicateInvoiceNumber} already exists` });
+          }
           const next = {
             location_id: locationId,
             inventory: Array.isArray(body.inventory) ? body.inventory : (current.inventory || []),
             recipes: Array.isArray(body.recipes) ? body.recipes : (current.recipes || []),
             storage_areas: Array.isArray(body.storageAreas) ? body.storageAreas : (current.storage_areas || []),
             orders: Array.isArray(body.orders) ? body.orders : (current.orders || []),
-            invoices: Array.isArray(body.invoices) ? body.invoices : (current.invoices || []),
+            invoices: nextInvoices,
             suppliers: Array.isArray(body.suppliers) ? body.suppliers : (current.suppliers || []),
             prepped_recipes: Array.isArray(body.preppedRecipes) ? body.preppedRecipes : (current.prepped_recipes || []),
             forecasts: Array.isArray(body.forecasts) ? body.forecasts : (current.forecasts || []),
