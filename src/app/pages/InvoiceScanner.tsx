@@ -25,7 +25,7 @@ interface ExtractedInvoice {
 }
 
 export function InvoiceScanner() {
-  const { inventory, addInventoryItem, updateInventoryItem, suppliers, addSupplier, updateSupplier } = useInventory();
+  const { importScannedInvoice } = useInventory();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,13 +36,13 @@ export function InvoiceScanner() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-        alert('Please upload a JPEG, PNG, or WebP image.');
+      if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+        alert('Please upload a JPEG, PNG, WebP, or PDF invoice.');
         event.target.value = '';
         return;
       }
       if (file.size > 4 * 1024 * 1024) {
-        alert('Please upload an invoice image smaller than 4 MB.');
+        alert('Please upload an invoice file smaller than 4 MB.');
         event.target.value = '';
         return;
       }
@@ -121,66 +121,16 @@ export function InvoiceScanner() {
   };
 
   const handleSaveToInventory = () => {
-    // First, handle supplier - add if new or update if exists
-    if (extractedData?.vendor) {
-      const existingSupplier = suppliers.find(s => 
-        s.name.toLowerCase() === extractedData.vendor.toLowerCase()
-      );
-
-      if (!existingSupplier) {
-        // Automatically add new supplier from invoice
-        const inferredCategory = editedItems.length > 0 ? editedItems[0].category : 'Other';
-        addSupplier({
-          name: extractedData.vendor,
-          contactPerson: '',
-          email: '',
-          phone: '',
-          address: '',
-          category: inferredCategory,
-          paymentTerms: '',
-          notes: `Auto-added from invoice ${extractedData.invoiceNumber} on ${new Date().toLocaleDateString()}`,
-          source: 'invoice',
-        });
-      }
-    }
-
-    // Then handle inventory items
-    editedItems.forEach(item => {
-      // Check if item already exists in inventory
-      const existingItem = inventory.find(inv => 
-        inv.name.toLowerCase() === item.name.toLowerCase()
-      );
-
-      if (existingItem) {
-        // Update existing item - add to current stock
-        updateInventoryItem(existingItem.id, {
-          currentStock: existingItem.currentStock + item.quantity,
-          unitCost: item.unitCost,
-          supplier: extractedData?.vendor || existingItem.supplier,
-          lastUpdated: new Date().toISOString()
-        });
-      } else {
-        // Create new inventory item
-        addInventoryItem({
-          id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: item.name,
-          category: item.category,
-          currentStock: item.quantity,
-          unit: item.unit,
-          unitCost: item.unitCost,
-          parLevel: item.quantity * 2, // Set default par level to 2x initial quantity
-          supplier: extractedData?.vendor || 'Unknown',
-          reorderPoint: item.quantity * 0.5,
-          lastUpdated: new Date().toISOString(),
-          history: [{
-            date: new Date().toISOString(),
-            change: item.quantity,
-            reason: `Initial stock from invoice ${extractedData?.invoiceNumber}`,
-            newStock: item.quantity
-          }]
-        });
-      }
+    if (!extractedData) return;
+    const result = importScannedInvoice({
+      ...extractedData,
+      items: editedItems,
+      total: totalValue,
     });
+    if (!result.success) {
+      alert(result.error || 'The invoice could not be saved.');
+      return;
+    }
 
     // Reset form
     setSelectedFile(null);
@@ -191,7 +141,7 @@ export function InvoiceScanner() {
       fileInputRef.current.value = '';
     }
 
-    alert(`Successfully added ${editedItems.length} items to inventory!${extractedData?.vendor ? `\n\nSupplier "${extractedData.vendor}" has been added to your supplier list.` : ''}`);
+    alert(`Successfully processed ${editedItems.length} invoice items. Existing products were matched and supplier pricing was saved separately.`);
   };
 
   const handleClearAll = () => {
@@ -226,7 +176,7 @@ export function InvoiceScanner() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
               onChange={handleFileSelect}
               className="hidden"
               id="invoice-upload"
@@ -237,7 +187,7 @@ export function InvoiceScanner() {
                 Click to upload invoice image
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                JPEG, PNG, or WebP up to 4 MB
+                JPEG, PNG, WebP, or PDF up to 4 MB
               </p>
             </label>
           </div>
@@ -264,7 +214,15 @@ export function InvoiceScanner() {
                 </Button>
               </div>
 
-              {previewUrl && (
+              {previewUrl && selectedFile?.type === 'application/pdf' && (
+                <iframe
+                  src={previewUrl}
+                  title="Invoice PDF preview"
+                  className="h-80 w-full rounded-lg border border-gray-200 bg-gray-50"
+                />
+              )}
+
+              {previewUrl && selectedFile?.type !== 'application/pdf' && (
                 <div className="rounded-lg overflow-hidden border border-gray-200">
                   <img 
                     src={previewUrl} 
