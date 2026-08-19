@@ -120,13 +120,17 @@ export function Invoices() {
       cost: Number(item.cost) || 0,
     }));
 
-    updateInvoice(invoice.id, {
+    const result = updateInvoice(invoice.id, {
       invoiceNumber: draft.invoiceNumber.trim() || invoice.invoiceNumber,
       supplier: draft.supplier.trim() || invoice.supplier,
       status: draft.status,
       items: nextItems,
       totalAmount: calculateInvoiceTotal(nextItems),
     });
+    if (!result.success) {
+      window.alert(result.error || 'The invoice could not be saved.');
+      return;
+    }
 
     if (draft.status === 'received' && invoice.orderId) {
       updateOrderStatus(invoice.orderId, 'received');
@@ -145,14 +149,20 @@ export function Invoices() {
   };
 
   const handleCreateInvoice = () => {
-    const newInvoice = addInvoice({
-      date: new Date().toISOString(),
-      invoiceNumber: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
-      supplier: 'Supplier',
-      items: [],
-      totalAmount: 0,
-      status: 'open',
-    });
+    let newInvoice: InvoiceRecord;
+    try {
+      newInvoice = addInvoice({
+        date: new Date().toISOString(),
+        invoiceNumber: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
+        supplier: 'Supplier',
+        items: [],
+        totalAmount: 0,
+        status: 'open',
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'The invoice could not be created.');
+      return;
+    }
 
     setExpandedInvoiceId(newInvoice.id);
     setEditingInvoiceId(newInvoice.id);
