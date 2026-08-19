@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupBySupplier, calculateInvoiceTotal, filterInvoiceItems } from './invoiceWorkflow.js';
+import {
+  groupBySupplier,
+  calculateInvoiceTotal,
+  filterInvoiceItems,
+  hasDuplicateInvoiceNumber,
+  normalizeInventoryItemName,
+} from './invoiceWorkflow.js';
 
 test('groups order suggestions by supplier and totals each supplier group', () => {
   const suggestions = [
@@ -36,4 +42,16 @@ test('filters inventory items by search query', () => {
   const results = filterInvoiceItems(inventory, 'chicken');
 
   assert.deepEqual(results.map(item => item.id), ['1', '3']);
+});
+
+test('detects duplicate invoice numbers despite formatting differences', () => {
+  const invoices = [{ invoiceNumber: 'INV-001 42' }];
+
+  assert.equal(hasDuplicateInvoiceNumber(invoices, 'inv00142'), true);
+  assert.equal(hasDuplicateInvoiceNumber(invoices, 'INV-00143'), false);
+});
+
+test('normalizes equivalent supplier item names to one inventory identity', () => {
+  assert.equal(normalizeInventoryItemName('Atlantic Salmon (Case)'), 'atlantic salmon');
+  assert.equal(normalizeInventoryItemName('Atlantic Salmon - CS'), 'atlantic salmon');
 });
