@@ -5,6 +5,7 @@ import { apiRequest } from '../utils/api';
 import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
 import { buildDemoLocationData } from '../utils/demoData';
 import { mergeLocationData } from '../utils/locationDataMerge.js';
+import { hasDuplicateInvoiceNumber, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
 
 const DEFAULT_STORAGE_AREAS = ['Walk-In Cooler', 'Dry Storage', 'Freezer', 'Bar', 'Wine Cellar', 'Unassigned'] as const;
 
@@ -159,6 +160,28 @@ export interface PreppedRecipe {
   deletable?: boolean;
 }
 
+export interface ScannedInvoiceItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  totalCost: number;
+  category: string;
+}
+
+export interface ScannedInvoiceInput {
+  vendor: string;
+  invoiceNumber: string;
+  date: string;
+  items: ScannedInvoiceItem[];
+  total: number;
+}
+
+interface InvoiceMutationResult {
+  success: boolean;
+  error?: string;
+}
+
 interface InventoryContextType {
   inventory: InventoryItem[];
   storageAreas: string[];
@@ -169,7 +192,7 @@ interface InventoryContextType {
   invoices: InvoiceRecord[];
   suppliers: Supplier[];
   isLocationLoaded: boolean;
-  addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
+  addInventoryItem: (item: Omit<InventoryItem, 'id'>) => InventoryItem;
   addStorageArea: (storageArea: string) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
@@ -183,8 +206,9 @@ interface InventoryContextType {
   placeOrder: (order: { date: string; items: OrderItem[]; supplier: string; totalCost: number; status?: DailyOrder['status']; supplierDates?: Record<string, string>; }) => void;
   updateOrderStatus: (orderId: string, status: DailyOrder['status']) => void;
   addInvoice: (invoice: Omit<InvoiceRecord, 'id'>) => InvoiceRecord;
-  updateInvoice: (invoiceId: string, updates: Partial<InvoiceRecord>) => void;
+  updateInvoice: (invoiceId: string, updates: Partial<InvoiceRecord>) => InvoiceMutationResult;
   deleteInvoice: (invoiceId: string) => void;
+  importScannedInvoice: (invoice: ScannedInvoiceInput) => InvoiceMutationResult;
   addPreppedRecipe: (recipe: Omit<PreppedRecipe, 'id'>) => void;
   updatePreppedRecipe: (id: string, updates: Partial<PreppedRecipe>) => void;
   deletePreppedRecipe: (id: string) => void;
@@ -676,6 +700,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setInventory(nextInventory);
     setStorageAreas(nextStorageAreas);
     saveLocationData(nextInventory, recipes, nextStorageAreas, orders, invoices, suppliers, preppedRecipes);
+    return newItem;
   };
 
   const addStorageArea = (storageArea: string) => {
@@ -943,6 +968,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const addInvoice = (invoiceInput: Omit<InvoiceRecord, 'id'>) => {
+    if (hasDuplicateInvoiceNumber(invoices, invoiceInput.invoiceNumber)) {
+      throw new Error(`Invoice ${invoiceInput.invoiceNumber} already exists.`);
+    }
+
     const newInvoice: InvoiceRecord = {
       ...invoiceInput,
       id: `${Date.now()}-invoice`,
@@ -958,6 +987,16 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const updateInvoice = (invoiceId: string, updates: Partial<InvoiceRecord>) => {
+    if (
+      updates.invoiceNumber &&
+      hasDuplicateInvoiceNumber(invoices.filter(invoice => invoice.id !== invoiceId), updates.invoiceNumber)
+    ) {
+      return {
+        success: false,
+        error: `Invoice ${updates.invoiceNumber} already exists.`,
+      };
+    }
+
     setInvoices(prev => {
       const nextInvoices = prev.map(invoice => {
         if (invoice.id !== invoiceId) return invoice;
@@ -976,6 +1015,186 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       saveLocationData(inventory, recipes, storageAreas, orders, nextInvoices, suppliers, preppedRecipes);
       return nextInvoices;
     });
+    return { success: true };
+  };
+
+  const importScannedInvoice = (invoiceInput: ScannedInvoiceInput): InvoiceMutationResult => {
+    const invoiceNumber = invoiceInput.invoiceNumber.trim();
+    if (!invoiceNumber) {
+      return { success: false, error: 'An invoice number is required before saving.' };
+    }
+    if (hasDuplicateInvoiceNumber(invoices, invoiceNumber)) {
+      return {
+        success: false,
+        error: `Invoice ${invoiceNumber} has already been saved. Inventory was not changed.`,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const supplierName = invoiceInput.vendor.trim() || 'Unknown supplier';
+    const normalizedSupplier = supplierName.toLowerCase();
+    const supplierSlug = normalizedSupplier.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'supplier';
+    const nextInventory = inventory.map(item => ({
+      ...item,
+      history: item.history ? [...item.history] : undefined,
+      priceHistory: item.priceHistory ? [...item.priceHistory] : undefined,
+      purchaseOptions: item.purchaseOptions ? item.purchaseOptions.map(option => ({ ...option })) : undefined,
+    }));
+    const invoiceItems: OrderItem[] = [];
+
+    invoiceInput.items.forEach((scannedItem, index) => {
+      const normalizedName = normalizeInventoryItemName(scannedItem.name);
+      const itemIndex = nextInventory.findIndex(item => (
+        normalizedName.length > 0 && normalizeInventoryItemName(item.name) === normalizedName
+      ));
+      const quantity = Math.max(0, Number(scannedItem.quantity) || 0);
+      const unitCost = Math.max(0, Number(scannedItem.unitCost) || 0);
+      const totalCost = Math.max(0, Number(scannedItem.totalCost) || quantity * unitCost);
+
+      if (itemIndex >= 0) {
+        const existingItem = nextInventory[itemIndex];
+        const shouldBecomePrimary = !existingItem.supplier || existingItem.supplier.toLowerCase() === 'unknown';
+        const existingOptions = existingItem.purchaseOptions?.length
+          ? existingItem.purchaseOptions
+          : [{
+              id: `${existingItem.id}-${existingItem.supplier.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'supplier'}`,
+              productName: existingItem.name,
+              supplier: existingItem.supplier,
+              productCode: existingItem.vendorItemCode || '',
+              packSize: existingItem.packSize || 1,
+              packUnit: existingItem.packUnit || existingItem.unit,
+              unitPrice: existingItem.unitCost,
+              isMain: true,
+              isLocal: true,
+            }];
+        const matchingOption = existingOptions.find(option => option.supplier.trim().toLowerCase() === normalizedSupplier);
+        const isPrimarySupplier = shouldBecomePrimary || matchingOption?.isMain === true || existingItem.supplier.trim().toLowerCase() === normalizedSupplier;
+        const supplierOption = {
+          id: matchingOption?.id || `${existingItem.id}-${supplierSlug}`,
+          productName: scannedItem.name.trim() || existingItem.name,
+          supplier: supplierName,
+          productCode: matchingOption?.productCode || '',
+          packSize: matchingOption?.packSize || 1,
+          packUnit: scannedItem.unit.trim() || matchingOption?.packUnit || existingItem.unit,
+          unitPrice: unitCost,
+          orderingStatus: matchingOption?.orderingStatus,
+          isMain: isPrimarySupplier,
+          isLocal: matchingOption?.isLocal ?? true,
+        };
+        const purchaseOptions = matchingOption
+          ? existingOptions.map(option => option.id === matchingOption.id ? supplierOption : (isPrimarySupplier ? { ...option, isMain: false } : option))
+          : [
+              ...existingOptions.map(option => isPrimarySupplier ? { ...option, isMain: false } : option),
+              supplierOption,
+            ];
+        const newStock = existingItem.currentStock + quantity;
+        const nextPriceHistory = isPrimarySupplier && unitCost !== existingItem.unitCost
+          ? [
+              ...(existingItem.priceHistory || []),
+              {
+                date: now,
+                oldPrice: existingItem.unitCost,
+                newPrice: unitCost,
+                reason: `Invoice ${invoiceNumber} from ${supplierName}`,
+              },
+            ]
+          : existingItem.priceHistory;
+
+        nextInventory[itemIndex] = {
+          ...existingItem,
+          currentStock: newStock,
+          supplier: isPrimarySupplier ? supplierName : existingItem.supplier,
+          unitCost: isPrimarySupplier ? unitCost : existingItem.unitCost,
+          purchaseOptions,
+          priceHistory: nextPriceHistory,
+          lastUpdated: now,
+          history: [
+            ...(existingItem.history || []),
+            {
+              date: now,
+              change: quantity,
+              reason: `Invoice ${invoiceNumber} from ${supplierName}`,
+              newStock,
+            },
+          ],
+        };
+        invoiceItems.push({ itemId: existingItem.id, quantity, cost: totalCost });
+        return;
+      }
+
+      const itemId = `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 9)}`;
+      nextInventory.push({
+        id: itemId,
+        name: scannedItem.name.trim() || 'Unknown item',
+        category: scannedItem.category.trim() || 'Uncategorized',
+        storageArea: 'Unassigned',
+        currentStock: quantity,
+        unit: scannedItem.unit.trim() || 'ea',
+        unitCost,
+        parLevel: quantity * 2,
+        supplier: supplierName,
+        reorderPoint: quantity * 0.5,
+        lastUpdated: now,
+        deletable: true,
+        inactive: false,
+        history: [{
+          date: now,
+          change: quantity,
+          reason: `Initial stock from invoice ${invoiceNumber}`,
+          newStock: quantity,
+        }],
+        purchaseOptions: [{
+          id: `${itemId}-${supplierSlug}`,
+          productName: scannedItem.name.trim() || 'Unknown item',
+          supplier: supplierName,
+          productCode: '',
+          packSize: 1,
+          packUnit: scannedItem.unit.trim() || 'ea',
+          unitPrice: unitCost,
+          isMain: true,
+          isLocal: true,
+        }],
+      });
+      invoiceItems.push({ itemId, quantity, cost: totalCost });
+    });
+
+    const nextSuppliers = suppliers.some(supplier => supplier.name.trim().toLowerCase() === normalizedSupplier)
+      ? suppliers
+      : [...suppliers, {
+          id: `${Date.now()}-${supplierSlug}`,
+          name: supplierName,
+          contactPerson: '',
+          email: '',
+          phone: '',
+          address: '',
+          category: invoiceInput.items[0]?.category || 'Other',
+          paymentTerms: '',
+          notes: `Auto-added from invoice ${invoiceNumber}`,
+          dateAdded: now,
+          source: 'invoice' as const,
+        }];
+    const calculatedTotal = invoiceItems.reduce((sum, item) => sum + item.cost, 0);
+    const newInvoice: InvoiceRecord = {
+      id: `${Date.now()}-invoice-${Math.random().toString(36).slice(2, 9)}`,
+      date: invoiceInput.date || now,
+      invoiceNumber,
+      supplier: supplierName,
+      items: invoiceItems,
+      totalAmount: Number.isFinite(invoiceInput.total) ? Math.max(0, invoiceInput.total) : calculatedTotal,
+      status: 'received',
+    };
+    const nextInvoices = [...invoices, newInvoice];
+    const nextStorageAreas = sortUniqueStorageAreas([
+      ...storageAreas,
+      ...nextInventory.map(item => normalizeStorageArea(item.storageArea)),
+    ]);
+
+    setInventory(nextInventory);
+    setInvoices(nextInvoices);
+    setSuppliers(nextSuppliers);
+    setStorageAreas(nextStorageAreas);
+    saveLocationData(nextInventory, recipes, nextStorageAreas, orders, nextInvoices, nextSuppliers, preppedRecipes);
+    return { success: true };
   };
 
   const deleteInvoice = (invoiceId: string) => {
@@ -1064,6 +1283,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         addInvoice,
         updateInvoice,
         deleteInvoice,
+        importScannedInvoice,
         preppedRecipes,
         addPreppedRecipe,
         updatePreppedRecipe,
