@@ -1,6 +1,6 @@
 const DEFAULT_MODEL = 'gpt-5.6-luna';
-const MAX_IMAGE_DATA_LENGTH = 6_000_000;
-const SUPPORTED_IMAGE_DATA_URL = /^data:image\/(?:jpeg|png|webp);base64,/i;
+const MAX_DOCUMENT_DATA_LENGTH = 6_000_000;
+const SUPPORTED_DOCUMENT_DATA_URL = /^data:(?:image\/(?:jpeg|png|webp)|application\/pdf);base64,/i;
 
 const invoiceSchema = {
   type: 'object',
@@ -87,6 +87,10 @@ export function normalizeInvoice(payload) {
 }
 
 async function extractInvoice(imageData, apiKey) {
+  const documentInput = imageData.startsWith('data:application/pdf')
+    ? { type: 'input_file', filename: 'invoice.pdf', file_data: imageData }
+    : { type: 'input_image', image_url: imageData, detail: 'high' };
+
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
@@ -108,7 +112,7 @@ async function extractInvoice(imageData, apiKey) {
               'Choose a practical restaurant inventory category for each item.',
             ].join('\n'),
           },
-          { type: 'input_image', image_url: imageData, detail: 'high' },
+          documentInput,
         ],
       }],
       text: {
@@ -138,11 +142,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { imageData } = parseJsonBody(req);
-  if (typeof imageData !== 'string' || !SUPPORTED_IMAGE_DATA_URL.test(imageData)) {
-    return res.status(400).json({ error: 'A JPEG, PNG, or WebP invoice image is required' });
+  if (typeof imageData !== 'string' || !SUPPORTED_DOCUMENT_DATA_URL.test(imageData)) {
+    return res.status(400).json({ error: 'A JPEG, PNG, WebP, or PDF invoice is required' });
   }
-  if (imageData.length > MAX_IMAGE_DATA_LENGTH) {
-    return res.status(413).json({ error: 'Invoice image is too large. Use an image under 4 MB.' });
+  if (imageData.length > MAX_DOCUMENT_DATA_LENGTH) {
+    return res.status(413).json({ error: 'Invoice file is too large. Use a file under 4 MB.' });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -158,6 +162,6 @@ export default async function handler(req, res) {
     if (Number(error?.status) === 429) {
       return res.status(429).json({ error: 'AI invoice scanning is busy. Try again shortly.' });
     }
-    return res.status(502).json({ error: 'Invoice extraction failed. Try a clearer image.' });
+    return res.status(502).json({ error: 'Invoice extraction failed. Try a clearer image or PDF.' });
   }
 }
