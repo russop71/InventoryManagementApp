@@ -520,7 +520,12 @@ export function Landing() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
           <Logo />
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold text-black/50"><Link to="/restaurant-inventory-management-software">Inventory software</Link><Link to="/restaurant-food-cost-software">Food cost software</Link><Link to="/restaurant-invoice-scanner">Invoice scanner</Link><Link to="/privacy">Privacy</Link></div>
-          <p className="text-sm text-black/45">Restaurant inventory intelligence, built for operators.</p>
+          <div className="flex flex-col gap-2 text-sm lg:items-end">
+            <p className="text-black/45">Restaurant inventory intelligence, built for operators.</p>
+            <p className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 font-bold text-red-700" aria-label="Proudly Canadian owned and operated">
+              <span aria-hidden="true">🇨🇦</span> Proudly Canadian owned &amp; operated
+            </p>
+          </div>
         </div>
       </footer>
     </div>
