@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Input } from '../components/ui/input';
-import { Lock, Menu, User, X } from 'lucide-react';
+import { Building, Lock, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
@@ -29,6 +29,7 @@ function ZestIQLogo({ size = 64 }: { size?: number }) {
 export function Login() {
   const navigate = useNavigate();
   const [name, setName]           = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -54,7 +55,12 @@ export function Login() {
           setIsLoading(false);
           return;
         }
-        await register(name, email, password);
+        if (!companyName.trim()) {
+          toast.error('Please enter your company name');
+          setIsLoading(false);
+          return;
+        }
+        await register(name, companyName, email, password);
         try {
           await apiRequest<{ sent: boolean }>('/api/send-welcome-email', {
             method: 'POST',
@@ -155,20 +161,36 @@ export function Login() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           {isSignup && (
-            <div>
-              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full name</label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Jane Smith"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  required={isSignup}
-                  className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#0F172A] placeholder:text-gray-400"
-                />
+            <>
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full name</label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Jane Smith"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    required={isSignup}
+                    className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#0F172A] placeholder:text-gray-400"
+                  />
+                </div>
               </div>
-            </div>
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Company name</label>
+                <div className="relative">
+                  <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Restaurant Group"
+                    value={companyName}
+                    onChange={e => setCompanyName(e.target.value)}
+                    required={isSignup}
+                    className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#0F172A] placeholder:text-gray-400"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div>
@@ -201,9 +223,32 @@ export function Login() {
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <a href="#" className="text-xs font-semibold" style={{ color: '#0F172A' }}>Forgot password?</a>
-          </div>
+          {!isSignup && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="text-xs font-semibold"
+                style={{ color: '#0F172A' }}
+                onClick={async () => {
+                  if (!email.trim()) {
+                    toast.error('Enter your email first');
+                    return;
+                  }
+                  try {
+                    await apiRequest('/api/v1/auth/recover', {
+                      method: 'POST',
+                      body: JSON.stringify({ email }),
+                    });
+                    toast.success('If that email is registered, a secure reset link has been sent.');
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Unable to send reset link');
+                  }
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"

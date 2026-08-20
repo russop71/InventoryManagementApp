@@ -62,7 +62,7 @@ export function Terms() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">6. Payment Terms</h3>
             <p className="text-sm text-gray-600">
-              Subscription fees are billed in advance on a monthly or annual basis. All fees are non-refundable except as required by law. We reserve the right to change our pricing with 30 days notice.
+              Subscription fees are billed monthly in advance in Canadian dollars. ZestIQ Premium is CAD $249.99 per month for one location, and each additional location is CAD $100 per month. There is no free trial. All fees are non-refundable except as required by law. We reserve the right to change pricing with 30 days notice.
             </p>
           </section>
 

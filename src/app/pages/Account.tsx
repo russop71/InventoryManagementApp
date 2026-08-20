@@ -3,15 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { User, Mail, Building, Phone, MapPin } from 'lucide-react';
+import { User, Mail, Building, Phone, MapPin, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { clearLocationScopedData } from '../utils/storageScope';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
 export function Account() {
-  const { user, accountId, accountName, locations, addLocation, logout, deleteCurrentAccount, updateLocalAccountProfile } = useAuth();
+  const { user, accountId, accountName, locations, addLocation, logout, changePassword, deleteCurrentAccount, updateLocalAccountProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || 'Team Member',
     email: user?.email || '',
@@ -54,14 +59,42 @@ export function Account() {
     });
   };
 
-  const handleAddLocation = () => {
+  const handleAddLocation = async () => {
     if (!newLocationName.trim()) {
       toast.error('Enter a location name first');
       return;
     }
-    addLocation(newLocationName);
-    setNewLocationName('');
-    toast.success('Location added');
+    try {
+      await addLocation(newLocationName);
+      setNewLocationName('');
+      toast.success('Location added');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to add location');
+    }
+  };
+
+  const handlePasswordChange = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (newPassword.length < 10) {
+      toast.error('Use a password with at least 10 characters.');
+      return;
+    }
+    if (newPassword !== passwordConfirmation) {
+      toast.error('The passwords do not match.');
+      return;
+    }
+    setIsPasswordSaving(true);
+    try {
+      await changePassword(newPassword);
+      setNewPassword('');
+      setPasswordConfirmation('');
+      setIsPasswordDialogOpen(false);
+      toast.success('Password changed securely');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to change password');
+    } finally {
+      setIsPasswordSaving(false);
+    }
   };
 
   return (
@@ -121,9 +154,10 @@ export function Account() {
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
-                  disabled={!isEditing}
+                  disabled
                   className="pl-10"
                 />
+                <p className="mt-1 text-xs text-slate-500">Email changes require a verified account update.</p>
               </div>
             </div>
 
@@ -202,9 +236,9 @@ export function Account() {
           <Button
             variant="outline"
             className="w-full justify-start"
-            onClick={() => toast.info('Password change feature coming soon')}
+            onClick={() => setIsPasswordDialogOpen(true)}
           >
-            Change Password
+            <KeyRound className="mr-2 h-4 w-4" /> Change Password
           </Button>
           <Button
             variant="outline"
@@ -215,6 +249,47 @@ export function Account() {
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change your password</DialogTitle>
+            <DialogDescription>Choose a unique password with at least 10 characters.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div>
+              <Label htmlFor="account-new-password">New password</Label>
+              <Input
+                id="account-new-password"
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={event => setNewPassword(event.target.value)}
+                minLength={10}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="account-confirm-password">Confirm password</Label>
+              <Input
+                id="account-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={passwordConfirmation}
+                onChange={event => setPasswordConfirmation(event.target.value)}
+                minLength={10}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={isPasswordSaving} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">
+                {isPasswordSaving ? 'Saving…' : 'Save password'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
@@ -235,7 +310,7 @@ export function Account() {
               onChange={(event) => setNewLocationName(event.target.value)}
               placeholder="Add location (example: Downtown)"
             />
-            <Button onClick={handleAddLocation} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+            <Button onClick={() => void handleAddLocation()} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
               Add
             </Button>
           </div>

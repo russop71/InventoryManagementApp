@@ -25,6 +25,8 @@ import { Contact } from "./pages/Contact";
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import { Landing } from "./pages/Landing";
+import { ResetPassword } from "./pages/ResetPassword";
+import { PlatformAdmin } from "./pages/PlatformAdmin";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 
@@ -36,6 +38,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+  },
+  {
+    path: "/reset-password",
+    Component: ResetPassword,
   },
   {
     path: "/app",
@@ -60,6 +66,7 @@ export const router = createBrowserRouter([
           { path: "invoice-scanner", Component: InvoiceScanner },
           { path: "suppliers", Component: Suppliers },
           { path: "users", Component: Users },
+          { path: "platform", Component: PlatformAdmin },
           { path: "account", Component: Account },
           { path: "payment-method", Component: PaymentMethod },
           { path: "payment", Component: Payment },

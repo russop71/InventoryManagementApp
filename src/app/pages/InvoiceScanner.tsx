@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Trash2 } from 'lucide-react';
+import { apiRequest } from '../utils/api';
 
 interface InvoiceItem {
   name: string;
@@ -64,13 +65,10 @@ export function InvoiceScanner() {
       reader.onloadend = async () => {
         const dataUrl = reader.result as string;
         try {
-          const res = await fetch('/api/scan-invoice', {
+          const json = await apiRequest<ExtractedInvoice>('/api/scan-invoice', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ imageData: dataUrl })
           });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || 'Scan failed');
           // Normalize response
           const parsed: ExtractedInvoice = {
             vendor: json.vendor || 'Unknown',

@@ -1,434 +1,292 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { useCallback, useEffect, useState } from 'react';
+import { Check, CreditCard, Download, ExternalLink, LockKeyhole, Receipt, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Badge } from '../components/ui/badge';
-import { CreditCard, Plus, Trash2, Check, Crown } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { apiRequest } from '../utils/api';
 
-interface PaymentCard {
-  id: string;
-  type: 'visa' | 'mastercard' | 'amex';
-  last4: string;
-  expiry: string;
-  isDefault: boolean;
-  holderName: string;
+type BillingPlan = 'monthly';
+
+interface BillingDetails {
+  configured: boolean;
+  additionalLocationPriceConfigured: boolean;
+  customerCreated: boolean;
+  customerEmail?: string | null;
+  plan: BillingPlan | null;
+  status: string;
+  additionalLocationQuantity: number;
+  subscriptionStartedAt: string | null;
+  currentPeriodEnd: string | null;
+  billingFrequency: {
+    interval: string;
+    intervalCount: number;
+  } | null;
+  paymentMethods: Array<{
+    id: string;
+    brand: string;
+    last4: string;
+    expMonth: number | null;
+    expYear: number | null;
+    holderName: string | null;
+  }>;
+  payments: Array<{
+    id: string;
+    number: string | null;
+    date: string | null;
+    amount: number;
+    currency: string;
+    status: string;
+    hostedInvoiceUrl: string | null;
+    invoicePdf: string | null;
+  }>;
 }
 
-type BillingPeriod = 'monthly' | 'bi-weekly' | 'yearly';
+const PLANS: Array<{ id: BillingPlan; name: string; price: string; detail: string }> = [
+  { id: 'monthly', name: 'ZestIQ Premium', price: 'CAD $249.99', detail: 'Per month · one location included · no free trial' },
+];
 
-interface PlanOption {
-  period: BillingPeriod;
-  price: number;
-  displayName: string;
-  savingsPercent?: number;
+function formatDate(value: string | null) {
+  if (!value) return 'Not available';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleDateString();
+}
+
+function formatFrequency(frequency: BillingDetails['billingFrequency']) {
+  if (!frequency) return 'Not started';
+  if (frequency.intervalCount === 1) return `Every ${frequency.interval}`;
+  return `Every ${frequency.intervalCount} ${frequency.interval}s`;
+}
+
+function statusClass(status: string) {
+  if (status === 'active') return 'bg-green-100 text-green-800';
+  if (status === 'past_due' || status === 'unpaid') return 'bg-red-100 text-red-800';
+  return 'bg-slate-100 text-slate-700';
 }
 
 export function PaymentMethod() {
-  const { accountId } = useAuth();
-  const [cards, setCards] = useState<PaymentCard[]>([]);
+  const { user, accountId, accountName, locations } = useAuth();
+  const isOwner = user?.role === 'Owner';
+  const [billing, setBilling] = useState<BillingDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [locationCount, setLocationCount] = useState(Math.max(1, locations.length));
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState<BillingPeriod>('monthly');
-  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
-
-  const trialStorageKey = useMemo(() => {
-    return accountId ? `zestiq:account:${accountId}:trial-ends-at` : 'zestiq:trial-ends-at';
-  }, [accountId]);
+  const loadBilling = useCallback(async () => {
+    if (!accountId || !isOwner) return;
+    setIsLoading(true);
+    try {
+      const payload = await apiRequest<{ billing: BillingDetails }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing`);
+      setBilling(payload.billing);
+      setLocationCount(Math.max(1, locations.length, 1 + Number(payload.billing.additionalLocationQuantity || 0)));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load billing');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accountId, isOwner, locations.length]);
 
   useEffect(() => {
-    const stored = localStorage.getItem(trialStorageKey);
-    setTrialEndsAt(stored);
-  }, [trialStorageKey]);
+    void loadBilling();
+    const checkout = new URLSearchParams(window.location.search).get('checkout');
+    if (checkout === 'success') toast.success('Subscription checkout completed. Billing details will update shortly.');
+    if (checkout === 'cancelled') toast.info('Checkout was cancelled. No payment was taken.');
+  }, [loadBilling]);
 
-  const planOptions: PlanOption[] = [
-    {
-      period: 'bi-weekly',
-      price: 49.99,
-      displayName: 'Bi-Weekly',
-    },
-    {
-      period: 'monthly',
-      price: 99.00,
-      displayName: 'Monthly',
-    },
-    {
-      period: 'yearly',
-      price: 999.00,
-      displayName: 'Yearly',
-      savingsPercent: 16,
-    },
-  ];
-
-  const currentPlanOption = planOptions.find(p => p.period === currentPlan);
-
-  const handleAddCard = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    const newCard: PaymentCard = {
-      id: Date.now().toString(),
-      type: 'visa',
-      last4: (formData.get('cardNumber') as string).slice(-4),
-      expiry: formData.get('expiry') as string,
-      isDefault: cards.length === 0,
-      holderName: formData.get('holderName') as string
-    };
-
-    setCards([...cards, newCard]);
-    setIsDialogOpen(false);
-    toast.success('Payment method added successfully');
-    e.currentTarget.reset();
-  };
-
-  const handleSetDefault = (cardId: string) => {
-    setCards(cards.map(card => ({
-      ...card,
-      isDefault: card.id === cardId
-    })));
-    toast.success('Default payment method updated');
-  };
-
-  const handleDeleteCard = (cardId: string) => {
-    if (confirm('Remove this payment method?')) {
-      setCards(cards.filter(card => card.id !== cardId));
-      toast.success('Payment method removed');
+  const openCheckout = async (plan: BillingPlan) => {
+    if (!accountId) return;
+    setIsLoading(true);
+    try {
+      const result = await apiRequest<{ url: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing/checkout`, {
+        method: 'POST',
+        body: JSON.stringify({ plan, locationCount }),
+      });
+      window.location.assign(result.url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to start secure checkout');
+      setIsLoading(false);
     }
   };
 
-  const getCardIcon = (type: string) => {
-    const baseClass = "w-10 h-7 rounded flex items-center justify-center text-white text-xs font-bold";
-    switch (type) {
-      case 'visa':
-        return <div className={`${baseClass} bg-[#F5C10E]`}>VISA</div>;
-      case 'mastercard':
-        return <div className={`${baseClass} bg-red-600`}>MC</div>;
-      case 'amex':
-        return <div className={`${baseClass} bg-[#0F172A]`}>AMEX</div>;
-      default:
-        return <CreditCard className="w-10 h-7" />;
+  const openPortal = async () => {
+    if (!accountId) return;
+    setIsLoading(true);
+    try {
+      const result = await apiRequest<{ url: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing/portal`, {
+        method: 'POST',
+      });
+      window.location.assign(result.url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to open billing portal');
+      setIsLoading(false);
     }
   };
 
-  const handleChangePlan = (period: BillingPeriod) => {
-    setCurrentPlan(period);
-    setIsPlanDialogOpen(false);
-    toast.success(`Plan changed to ${period} billing`);
-  };
-
-  const handleStartFreeTrial = () => {
-    const now = new Date();
-    const end = new Date(now);
-    end.setDate(end.getDate() + 14);
-    const endIso = end.toISOString();
-    localStorage.setItem(trialStorageKey, endIso);
-    setTrialEndsAt(endIso);
-    toast.success('Your 14-day free trial is now active');
-  };
-
-  const isTrialActive = Boolean(trialEndsAt) && new Date(trialEndsAt as string).getTime() > Date.now();
+  if (!isOwner) {
+    return (
+      <Card className="border-amber-200 bg-amber-50">
+        <CardContent className="py-8">
+          <LockKeyhole className="mb-3 h-8 w-8 text-amber-700" />
+          <h2 className="text-xl font-bold text-slate-950">Company owner access required</h2>
+          <p className="mt-2 text-sm text-slate-600">Only the company Owner can see subscriptions, payment history, payment methods, and renewal dates.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Payment Methods</h2>
-          <p className="text-sm text-gray-600 mt-1">Manage your payment cards & billing</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Owner control center</p>
+          <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Subscription & billing</h2>
+          <p className="mt-1 text-sm text-slate-600">{accountName} · Stripe-secured payments</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
-              <Plus className="w-4 h-4 mr-1" />
-              Add Card
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-[calc(100vw-2rem)]">
-            <DialogHeader>
-              <DialogTitle>Add Payment Method</DialogTitle>
-              <DialogDescription>
-                Enter your card details below
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleAddCard} className="space-y-4">
-              <div>
-                <Label htmlFor="holderName">Cardholder Name</Label>
-                <Input
-                  id="holderName"
-                  name="holderName"
-                  required
-                  placeholder="John Smith"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input
-                  id="cardNumber"
-                  name="cardNumber"
-                  required
-                  placeholder="1234 5678 9012 3456"
-                  maxLength={19}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="expiry">Expiry Date</Label>
-                  <Input
-                    id="expiry"
-                    name="expiry"
-                    required
-                    placeholder="MM/YY"
-                    maxLength={5}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cvv">CVV</Label>
-                  <Input
-                    id="cvv"
-                    name="cvv"
-                    required
-                    placeholder="123"
-                    maxLength={4}
-                    type="password"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
-                  Add Card
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card className="border-[#F5C10E]/40 bg-gradient-to-br from-[#FEFCE8] to-[#FEF9C3]">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between gap-2">
-            <span>Free Trial</span>
-            {isTrialActive && (
-              <Badge className="bg-green-100 text-green-800 border-green-300">
-                Active
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-gray-700">
-            Start with a 14-day free trial to explore AI ordering, forecasting, and inventory workflows before choosing a paid plan.
-          </p>
-          {isTrialActive && trialEndsAt ? (
-            <p className="text-sm font-semibold text-[#0F172A]">
-              Trial ends on {new Date(trialEndsAt).toLocaleDateString()}.
-            </p>
-          ) : (
-            <Button onClick={handleStartFreeTrial} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
-              Start Free Trial
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" disabled={isLoading} onClick={() => void loadBilling()}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+          </Button>
+          {billing?.customerCreated && (
+            <Button type="button" disabled={isLoading} onClick={() => void openPortal()} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">
+              Manage in Stripe <ExternalLink className="ml-2 h-4 w-4" />
             </Button>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Current Plan */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Plan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-lg">Professional Plan</h3>
-              <p className="text-sm text-gray-600">
-                ${currentPlanOption?.price.toFixed(2)}/{currentPlan === 'bi-weekly' ? 'bi-weekly' : currentPlan} • Billed {currentPlan}
-              </p>
-            </div>
-            <Badge className="bg-green-100 text-green-800">Active</Badge>
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600">Next billing date: April 1, 2026</p>
-            <Dialog open={isPlanDialogOpen} onOpenChange={setIsPlanDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                >
-                  Change Plan
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[calc(100vw-2rem)]">
-                <DialogHeader>
-                  <DialogTitle>Choose Your Plan</DialogTitle>
-                  <DialogDescription>
-                    Select the billing period that works best for you
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 pt-2 max-h-[60vh] overflow-y-auto">
-                  {planOptions.map((plan) => {
-                    const isCurrentPlan = plan.period === currentPlan;
-                    const monthlyEquivalent = plan.period === 'yearly' 
-                      ? plan.price / 12 
-                      : plan.period === 'bi-weekly'
-                      ? (plan.price * 26) / 12
-                      : plan.price;
-
-                    return (
-                      <button
-                        key={plan.period}
-                        onClick={() => handleChangePlan(plan.period)}
-                        className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                          isCurrentPlan
-                            ? 'border-[#F5C10E] bg-[#FEFCE8]'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-base text-gray-900">
-                              {plan.displayName}
-                            </h3>
-                            {plan.savingsPercent && (
-                              <Badge className="bg-green-100 text-green-800 border-green-300 text-xs">
-                                <Crown className="w-3 h-3 mr-1" />
-                                Save {plan.savingsPercent}%
-                              </Badge>
-                            )}
-                            {isCurrentPlan && (
-                              <Badge className="bg-[#FEF9C3] text-[#1E3A5F] border-[#F5C10E]/50 text-xs">
-                                <Check className="w-3 h-3 mr-1" />
-                                Current
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xl font-bold text-gray-900">
-                              ${plan.price.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {plan.period === 'yearly' && `Just $${monthlyEquivalent.toFixed(2)}/month`}
-                          {plan.period === 'bi-weekly' && `≈ $${monthlyEquivalent.toFixed(2)}/month`}
-                          {plan.period === 'monthly' && 'Standard monthly billing'}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 text-center">
-                    All plans include AI ordering, forecasting & Toast POS integration
-                  </p>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Saved Cards */}
-      <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Saved Cards</h3>
-        {cards.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <CreditCard className="w-12 h-12 text-gray-400 mb-4" />
-              <p className="text-gray-500 text-center text-sm">
-                No payment methods added yet
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          cards.map(card => (
-            <Card key={card.id}>
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    {getCardIcon(card.type)}
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium">•••• {card.last4}</span>
-                        {card.isDefault && (
-                          <Badge className="bg-[#FEF9C3] text-[#1E3A5F] text-xs">
-                            <Check className="w-3 h-3 mr-1" />
-                            Default
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-600">{card.holderName}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-600">Exp {card.expiry}</p>
-                </div>
-
-                <div className="flex space-x-2 pt-3 border-t border-gray-100">
-                  {!card.isDefault && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSetDefault(card.id)}
-                      className="flex-1"
-                    >
-                      Set as Default
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDeleteCard(card.id)}
-                    className={card.isDefault ? 'flex-1' : ''}
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+        </div>
       </div>
 
-      {/* Billing History */}
+      {billing && !billing.configured && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-4 text-sm text-amber-900">
+            Secure billing screens are ready, but Stripe keys and plan price IDs still need to be connected before customers can subscribe.
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs text-slate-400">Status</p>
+            <Badge className={`mt-2 capitalize ${statusClass(billing?.status || 'not configured')}`}>{(billing?.status || 'not configured').replaceAll('_', ' ')}</Badge>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs text-slate-400">Subscription started</p>
+            <p className="mt-2 font-semibold text-slate-900">{formatDate(billing?.subscriptionStartedAt || null)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs text-slate-400">Billing frequency</p>
+            <p className="mt-2 font-semibold capitalize text-slate-900">{formatFrequency(billing?.billingFrequency || null)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs text-slate-400">Next renewal</p>
+            <p className="mt-2 font-semibold text-slate-900">{formatDate(billing?.currentPeriodEnd || null)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Billing History</CardTitle>
+          <CardTitle>Subscription plan</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            { date: 'Mar 1, 2026', amount: '$99.00', status: 'Paid' },
-            { date: 'Feb 1, 2026', amount: '$99.00', status: 'Paid' },
-            { date: 'Jan 1, 2026', amount: '$99.00', status: 'Paid' }
-          ].map((invoice, index) => (
-            <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-              <div>
-                <p className="font-medium text-sm">{invoice.date}</p>
-                <p className="text-xs text-gray-600">{invoice.status}</p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <span className="font-semibold">{invoice.amount}</span>
+        <CardContent className="grid max-w-md gap-3">
+          {PLANS.map(plan => {
+            const current = billing?.plan === plan.id;
+            return (
+              <div key={plan.id} className={`rounded-2xl border-2 p-4 ${current ? 'border-[#F5C10E] bg-[#FEFCE8]' : 'border-slate-200'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-slate-950">{plan.name}</p>
+                  {current && <Badge className="bg-[#F5C10E] text-[#0F172A]"><Check className="mr-1 h-3 w-3" />Current</Badge>}
+                </div>
+                <p className="mt-3 text-2xl font-extrabold text-slate-950">{plan.price}</p>
+                <p className="mt-1 text-sm text-slate-500">{plan.detail}</p>
+                <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                  <Label htmlFor="subscription-location-count">Total locations</Label>
+                  <Input
+                    id="subscription-location-count"
+                    className="mt-2"
+                    type="number"
+                    min={Math.max(1, locations.length)}
+                    max={100}
+                    value={locationCount}
+                    onChange={event => setLocationCount(Math.max(Math.max(1, locations.length), Math.min(100, Number(event.target.value) || 1)))}
+                    disabled={current}
+                  />
+                  <p className="mt-2 text-xs text-slate-500">Each location after the first adds CAD $100/month.</p>
+                  <p className="mt-2 text-lg font-extrabold text-slate-950">
+                    CAD ${(249.99 + Math.max(0, locationCount - 1) * 100).toFixed(2)}/month
+                  </p>
+                </div>
                 <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => toast.info('Invoice download coming soon')}
+                  type="button"
+                  className="mt-4 w-full bg-[#0F172A] text-white hover:bg-[#1E293B]"
+                  disabled={isLoading || current || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured)}
+                  onClick={() => void openCheckout(plan.id)}
                 >
-                  Download
+                  {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${(249.99 + Math.max(0, locationCount - 1) * 100).toFixed(2)}/month`}
                 </Button>
               </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Payment information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(billing?.paymentMethods || []).length > 0 ? billing?.paymentMethods.map(method => (
+            <div key={method.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+              <div>
+                <p className="font-semibold capitalize text-slate-950">{method.brand} •••• {method.last4}</p>
+                <p className="mt-1 text-sm text-slate-500">{method.holderName || billing?.customerEmail || 'Company payment method'}</p>
+              </div>
+              <p className="text-sm text-slate-600">
+                Expires {method.expMonth?.toString().padStart(2, '0')}/{method.expYear}
+              </p>
             </div>
-          ))}
+          )) : (
+            <p className="py-5 text-center text-sm text-slate-500">No Stripe payment method is attached yet.</p>
+          )}
+          <p className="text-xs text-slate-500">Only card brand, last four digits, and expiry are displayed. zestIQ never stores full card numbers or security codes.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" /> Payment history</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(billing?.payments || []).length > 0 ? billing?.payments.map(payment => (
+            <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+              <div>
+                <p className="font-semibold text-slate-950">{payment.number || 'Stripe invoice'}</p>
+                <p className="mt-1 text-sm text-slate-500">{formatDate(payment.date)} · <span className="capitalize">{payment.status}</span></p>
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="font-bold text-slate-950">{payment.currency} {payment.amount.toFixed(2)}</p>
+                {(payment.invoicePdf || payment.hostedInvoiceUrl) && (
+                  <a
+                    href={payment.invoicePdf || payment.hostedInvoiceUrl || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-9 items-center rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <Download className="mr-2 h-4 w-4" /> Invoice
+                  </a>
+                )}
+              </div>
+            </div>
+          )) : (
+            <p className="py-5 text-center text-sm text-slate-500">Payment history will appear here after the first Stripe invoice.</p>
+          )}
         </CardContent>
       </Card>
     </div>

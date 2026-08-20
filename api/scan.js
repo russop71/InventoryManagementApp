@@ -1,3 +1,38 @@
+import { requireActiveUser } from './_authenticated-user.js';
+
+const DEFAULT_MODEL = 'gpt-5.6-luna';
+const MAX_IMAGE_DATA_LENGTH = 6_000_000;
+const SUPPORTED_IMAGE_DATA_URL = /^data:image\/(?:jpeg|png|webp);base64,/i;
+
+const recipeSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['menuItemName', 'category', 'price', 'yieldQuantity', 'yieldUnit', 'ingredients'],
+  properties: {
+    menuItemName: { type: 'string' },
+    category: { type: 'string' },
+    price: { type: 'number' },
+    yieldQuantity: { type: 'number' },
+    yieldUnit: { type: 'string' },
+    ingredients: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['rawText', 'name', 'quantity', 'unit', 'matchedInventoryItemId', 'matchConfidence'],
+        properties: {
+          rawText: { type: 'string' },
+          name: { type: 'string' },
+          quantity: { type: 'number' },
+          unit: { type: 'string' },
+          matchedInventoryItemId: { type: 'string' },
+          matchConfidence: { type: 'number' },
+        },
+      },
+    },
+  },
+};
+
 function parseJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string') {
@@ -10,155 +45,164 @@ function parseJsonBody(req) {
   return {};
 }
 
-function parseJsonFromModelText(text) {
-  if (!text || typeof text !== 'string') return null;
-  const trimmed = text.trim();
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // continue
-  }
-
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced && fenced[1]) {
-    try {
-      return JSON.parse(fenced[1]);
-    } catch {
-      // continue
-    }
-  }
-
-  const firstBrace = trimmed.indexOf('{');
-  const lastBrace = trimmed.lastIndexOf('}');
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    try {
-      return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
+function normalizeInventoryCatalog(inventory) {
+  if (!Array.isArray(inventory)) return [];
+  return inventory
+    .slice(0, 500)
+    .map(item => ({
+      id: String(item?.id || '').trim(),
+      name: String(item?.name || '').trim(),
+      unit: String(item?.unit || 'ea').trim() || 'ea',
+      supplier: String(item?.supplier || '').trim(),
+    }))
+    .filter(item => item.id && item.name);
 }
 
-function normalizeScanPayload(payload) {
-  const recipe = payload?.recipe || payload || {};
-  const name = (recipe.menuItemName || recipe.menu_item_name || recipe.name || 'Scanned Recipe').toString().trim();
-  const category = (recipe.category || 'Uncategorized').toString().trim();
-  const priceSource = recipe.price ?? recipe.price_usd ?? recipe.priceUsd ?? '0.00';
-  const priceNum = Number.parseFloat(String(priceSource).replace(/[^0-9.]/g, ''));
-  const ingredients = Array.isArray(recipe.ingredients)
-    ? recipe.ingredients
-        .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
-        .filter(Boolean)
+export function extractResponseText(payload) {
+  if (typeof payload?.output_text === 'string') return payload.output_text;
+  for (const item of payload?.output || []) {
+    for (const content of item?.content || []) {
+      if (content?.type === 'output_text' && typeof content.text === 'string') return content.text;
+    }
+  }
+  return '';
+}
+
+export function normalizeScannedRecipe(payload, inventoryCatalog = []) {
+  const catalog = normalizeInventoryCatalog(inventoryCatalog);
+  const catalogById = new Map(catalog.map(item => [item.id, item]));
+  const source = payload || {};
+  const ingredients = Array.isArray(source.ingredients)
+    ? source.ingredients.map(item => {
+        const requestedId = String(item?.matchedInventoryItemId || '').trim();
+        const catalogItem = catalogById.get(requestedId);
+        const quantity = Number(item?.quantity);
+        const confidence = Number(item?.matchConfidence);
+        return {
+          rawText: String(item?.rawText || item?.name || '').trim(),
+          name: String(item?.name || 'Unknown ingredient').trim() || 'Unknown ingredient',
+          quantity: Number.isFinite(quantity) && quantity >= 0 ? quantity : 0,
+          unit: String(item?.unit || catalogItem?.unit || 'ea').trim() || 'ea',
+          matchedInventoryItemId: catalogItem?.id || '',
+          matchedInventoryItemName: catalogItem?.name || '',
+          matchConfidence: catalogItem && Number.isFinite(confidence)
+            ? Math.min(1, Math.max(0, confidence))
+            : 0,
+        };
+      })
     : [];
+  const price = Number(source.price);
+  const yieldQuantity = Number(source.yieldQuantity);
 
   return {
-    menuItemName: name || 'Scanned Recipe',
-    category: category || 'Uncategorized',
-    price: Number.isFinite(priceNum) ? priceNum.toFixed(2) : '0.00',
+    menuItemName: String(source.menuItemName || 'Scanned Recipe').trim() || 'Scanned Recipe',
+    category: String(source.category || 'Prepped Items').trim() || 'Prepped Items',
+    price: Number.isFinite(price) && price >= 0 ? price : 0,
+    yieldQuantity: Number.isFinite(yieldQuantity) && yieldQuantity > 0 ? yieldQuantity : 1,
+    yieldUnit: String(source.yieldUnit || 'batch').trim() || 'batch',
     ingredients,
-    aiUsed: Boolean(payload?.aiUsed),
-    method: payload?.method || (payload?.aiUsed ? 'openai' : 'fallback'),
+    aiUsed: true,
+    method: 'openai-vision-inventory-match',
   };
 }
 
-function isOpenAIUnavailableError(error) {
-  const status = Number(error?.openaiStatus || 0);
-  const code = String(error?.openaiCode || '').toLowerCase();
-  const message = String(error?.message || '').toLowerCase();
-
-  if ([401, 402, 403, 429].includes(status)) return true;
-  if (code === 'insufficient_quota') return true;
-  if (message.includes('quota') || message.includes('billing') || message.includes('rate limit')) return true;
-  return false;
-}
-
-async function callOpenAIForRecipeScan(imageData, apiKey) {
-  const prompt = [
-    'Extract recipe fields from this image and return strict JSON only.',
-    'Required JSON keys: menuItemName, category, price, ingredients.',
-    'ingredients must be an array of concise strings (for example: "2 tbsp olive oil").',
-    'If a field is missing, infer best guess. No markdown.',
-  ].join('\n');
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+async function extractRecipe(imageData, inventoryCatalog, apiKey) {
+  const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      temperature: 0.1,
-      messages: [
-        {
-          role: 'system',
-          content: 'You output strict valid JSON only.',
+      model: process.env.OPENAI_RECIPE_MODEL || DEFAULT_MODEL,
+      input: [{
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: [
+              'Read this handwritten or printed restaurant recipe.',
+              'Transcribe the recipe name, category, selling price when present, yield, and every ingredient quantity and unit.',
+              'Match each ingredient to the closest item in the inventory catalog below.',
+              'Use matchedInventoryItemId only when it exactly equals an ID from the catalog. Otherwise return an empty string.',
+              'Set matchConfidence from 0 to 1. Use a conservative score when the handwriting or match is uncertain.',
+              'Do not invent costs or prices. Costs are calculated separately from stored inventory prices.',
+              `Inventory catalog: ${JSON.stringify(inventoryCatalog)}`,
+            ].join('\n'),
+          },
+          { type: 'input_image', image_url: imageData, detail: 'high' },
+        ],
+      }],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'inventory_matched_recipe',
+          strict: true,
+          schema: recipeSchema,
         },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageData } },
-          ],
-        },
-      ],
-      max_tokens: 900,
+      },
+      max_output_tokens: 2500,
     }),
   });
 
-  const json = await response.json();
+  const payload = await response.json();
   if (!response.ok) {
-    const message = json?.error?.message || `OpenAI request failed (${response.status})`;
-    const error = new Error(message);
-    error.openaiStatus = response.status;
-    error.openaiCode = json?.error?.code;
+    const error = new Error(payload?.error?.message || `OpenAI request failed (${response.status})`);
+    error.status = response.status;
+    error.code = payload?.error?.code;
     throw error;
   }
 
-  const text = json?.choices?.[0]?.message?.content || '';
-  const parsed = parseJsonFromModelText(text);
-  if (!parsed) throw new Error('OpenAI returned non-JSON response for scan');
+  const outputText = extractResponseText(payload);
+  if (!outputText) throw new Error('OpenAI returned no recipe data');
+  return normalizeScannedRecipe(JSON.parse(outputText), inventoryCatalog);
+}
 
-  return {
-    ...parsed,
-    aiUsed: true,
-    method: 'openai-vision',
-  };
+export function mapRecipeScanError(error) {
+  const status = Number(error?.status);
+  if ([401, 403].includes(status)) {
+    return { status: 503, error: 'AI recipe scanning is not configured correctly' };
+  }
+  if (status === 429 && error?.code === 'insufficient_quota') {
+    return { status: 503, error: 'OpenAI API quota is exhausted. Add API billing or credits, then try again.' };
+  }
+  if (status === 429) {
+    return { status: 429, error: 'AI recipe scanning is busy. Try again shortly.' };
+  }
+  return { status: 502, error: 'Recipe extraction failed. Try a clearer, well-lit photo.' };
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const body = parseJsonBody(req);
-    const imageData = body?.imageData;
-    if (!imageData || typeof imageData !== 'string') {
-      return res.status(400).json({ error: 'imageData required' });
-    }
+    await requireActiveUser(req);
+  } catch (error) {
+    return res.status(Number(error?.status) || 401).json({ error: error?.message || 'Sign in is required' });
+  }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return res.status(503).json({
-        error: 'OPENAI_API_KEY not configured',
-        aiAvailable: false,
-      });
-    }
+  const body = parseJsonBody(req);
+  const imageData = body?.imageData;
+  if (typeof imageData !== 'string' || !SUPPORTED_IMAGE_DATA_URL.test(imageData)) {
+    return res.status(400).json({ error: 'A JPEG, PNG, or WebP recipe image is required' });
+  }
+  if (imageData.length > MAX_IMAGE_DATA_LENGTH) {
+    return res.status(413).json({ error: 'Recipe image is too large. Use a file under 4 MB.' });
+  }
 
-    const parsed = await callOpenAIForRecipeScan(imageData, apiKey);
-    return res.status(200).json(normalizeScanPayload(parsed));
+  const inventoryCatalog = normalizeInventoryCatalog(body?.inventory);
+  if (inventoryCatalog.length === 0) {
+    return res.status(400).json({ error: 'Add inventory items before scanning a recipe so ingredients can be matched and costed.' });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'AI recipe scanning is not configured' });
+
+  try {
+    return res.status(200).json(await extractRecipe(imageData, inventoryCatalog, apiKey));
   } catch (error) {
     console.error('api/scan error', error);
-    if (isOpenAIUnavailableError(error)) {
-      return res.status(503).json({
-        error: 'AI provider temporarily unavailable',
-        aiAvailable: false,
-      });
-    }
-    return res.status(500).json({ error: 'Recipe scan failed' });
+    const mappedError = mapRecipeScanError(error);
+    return res.status(mappedError.status).json({ error: mappedError.error });
   }
 }

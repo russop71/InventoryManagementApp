@@ -1,360 +1,335 @@
-import { useEffect, useState } from 'react';
-import { Card, CardContent } from '../components/ui/card';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { Activity, CreditCard, Edit, KeyRound, Mail, Plus, Shield, Trash2, UserCheck, Users as UsersIcon } from 'lucide-react';
+import { toast } from 'sonner';
+import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Badge } from '../components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Users as UsersIcon, Plus, Mail, Shield, Trash2, Edit } from 'lucide-react';
-import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
 
-interface User {
+interface UserUsage {
+  eventCount: number;
+  lastActive: string | null;
+  topArea: string | null;
+}
+
+interface CompanyUser {
   id: string;
   name: string;
   email: string;
   role: 'Owner' | 'Admin' | 'Manager' | 'Staff';
   status: 'Active' | 'Inactive';
   lastLogin: string;
+  usage?: UserUsage;
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value || value === 'Never') return 'Never';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+function roleBadgeClass(role: CompanyUser['role']) {
+  if (role === 'Owner') return 'bg-[#0F172A] text-white';
+  if (role === 'Admin') return 'bg-red-100 text-red-800';
+  if (role === 'Manager') return 'bg-[#FEF9C3] text-[#1E3A5F]';
+  return 'bg-slate-100 text-slate-700';
 }
 
 export function Users() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<string | null>(null);
-
+  const navigate = useNavigate();
   const { user: currentUser, accountId, accountName } = useAuth();
   const isOwner = currentUser?.role === 'Owner';
-  const localUsersKey = accountId ? `zestiq:account:${accountId}:users` : null;
+  const [users, setUsers] = useState<CompanyUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
-  const loadUsers = async () => {
-    if (!accountId) {
+  const loadUsers = useCallback(async (quiet = false) => {
+    if (!accountId || !isOwner) {
       setUsers([]);
       return;
     }
-
+    if (!quiet) setIsLoading(true);
     try {
-      setIsLoading(true);
-      const payload = await apiRequest<{ users: User[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/users`);
+      const payload = await apiRequest<{ users: CompanyUser[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/users`);
       setUsers(payload.users || []);
-      if (localUsersKey) {
-        localStorage.setItem(localUsersKey, JSON.stringify(payload.users || []));
-      }
     } catch (error) {
-      const fallback = localUsersKey ? localStorage.getItem(localUsersKey) : null;
-      if (fallback) {
-        try {
-          setUsers(JSON.parse(fallback) as User[]);
-        } catch {
-          setUsers([]);
-        }
-      } else {
-        setUsers([]);
-      }
+      if (!quiet) toast.error(error instanceof Error ? error.message : 'Unable to load company users');
     } finally {
-      setIsLoading(false);
+      if (!quiet) setIsLoading(false);
     }
-  };
+  }, [accountId, isOwner]);
 
   useEffect(() => {
     void loadUsers();
-  }, [accountId]);
-
-  useEffect(() => {
-    if (!accountId) return;
-    const intervalId = window.setInterval(() => {
-      void loadUsers();
-    }, 10000);
+    if (!accountId || !isOwner) return;
+    const intervalId = window.setInterval(() => void loadUsers(true), 30_000);
     return () => window.clearInterval(intervalId);
-  }, [accountId]);
+  }, [accountId, isOwner, loadUsers]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!accountId) return;
+  const selectedUser = users.find(user => user.id === editingUserId);
+  const activeUserCount = users.filter(user => user.status === 'Active').length;
+  const activeThisMonth = users.filter(user => user.usage?.lastActive).length;
+  const totalActivity = users.reduce((total, user) => total + (user.usage?.eventCount || 0), 0);
+  const topArea = useMemo(() => {
+    const counts = new Map<string, number>();
+    users.forEach(user => {
+      if (user.usage?.topArea) counts.set(user.usage.topArea, (counts.get(user.usage.topArea) || 0) + (user.usage.eventCount || 0));
+    });
+    return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || 'No activity';
+  }, [users]);
 
-    const formData = new FormData(e.currentTarget);
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!accountId || !isOwner) return;
+    const formData = new FormData(event.currentTarget);
     const payload = {
       name: String(formData.get('name') || '').trim(),
       email: String(formData.get('email') || '').trim(),
-      role: formData.get('role') as User['role'],
-      status: 'Active' as const,
+      role: String(formData.get('role') || 'Staff') as CompanyUser['role'],
+      status: String(formData.get('status') || 'Active') as CompanyUser['status'],
     };
 
-    if (!isOwner) {
-      toast.error('Only owners can manage users');
-      return;
-    }
-
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      if (editingUser) {
-        const response = await apiRequest<{ users: User[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/users/${encodeURIComponent(editingUser)}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-        if (localUsersKey) {
-          localStorage.setItem(localUsersKey, JSON.stringify(response.users || []));
-        }
-        toast.success('User updated successfully');
-      } else {
-        const response = await apiRequest<{ users: User[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/users`, {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        if (localUsersKey) {
-          localStorage.setItem(localUsersKey, JSON.stringify(response.users || []));
-        }
-        toast.success('User added successfully');
-      }
-
-      await loadUsers();
+      const path = editingUserId
+        ? `/api/v1/accounts/${encodeURIComponent(accountId)}/users/${encodeURIComponent(editingUserId)}`
+        : `/api/v1/accounts/${encodeURIComponent(accountId)}/users`;
+      await apiRequest(path, {
+        method: editingUserId ? 'PUT' : 'POST',
+        body: JSON.stringify(payload),
+      });
+      toast.success(editingUserId ? 'User access updated' : 'Invitation email sent');
       setIsDialogOpen(false);
-      setEditingUser(null);
-      e.currentTarget.reset();
+      setEditingUserId(null);
+      await loadUsers(true);
     } catch (error) {
-      const fallbackUsers = users.slice();
-      if (editingUser) {
-        const next = fallbackUsers.map(u => (u.id === editingUser ? { ...u, ...payload, id: editingUser } : u));
-        setUsers(next);
-        if (localUsersKey) localStorage.setItem(localUsersKey, JSON.stringify(next));
-      } else {
-        const next = [...fallbackUsers, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ...payload, lastLogin: 'Never' } as User];
-        setUsers(next);
-        if (localUsersKey) localStorage.setItem(localUsersKey, JSON.stringify(next));
-      }
-      toast.success(editingUser ? 'User updated locally' : 'User added locally');
+      toast.error(error instanceof Error ? error.message : 'Unable to save user');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEditUser = (userId: string) => {
-    if (!isOwner) return;
-    setEditingUser(userId);
-    setIsDialogOpen(true);
+  const sendPasswordReset = async (user: CompanyUser) => {
+    if (!accountId || !isOwner) return;
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/users/${encodeURIComponent(user.id)}/password-reset`, {
+        method: 'POST',
+      });
+      toast.success(`Secure password-reset link sent to ${user.email}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to send password reset');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteUser = async (userId: string, name: string) => {
-    if (!isOwner || !accountId) return;
-    if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
-
+  const deleteUser = async (user: CompanyUser) => {
+    if (!accountId || !isOwner || !confirm(`Remove ${user.name} from ${accountName}? This revokes their company access.`)) return;
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const response = await apiRequest<{ users: User[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/users/${encodeURIComponent(userId)}`, {
+      await apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/users/${encodeURIComponent(user.id)}`, {
         method: 'DELETE',
       });
-      if (localUsersKey) {
-        localStorage.setItem(localUsersKey, JSON.stringify(response.users || []));
-      }
-      await loadUsers();
-      toast.success('User deleted');
+      toast.success('User access removed');
+      await loadUsers(true);
     } catch (error) {
-      const next = users.filter(u => u.id !== userId);
-      setUsers(next);
-      if (localUsersKey) localStorage.setItem(localUsersKey, JSON.stringify(next));
-      toast.success('User deleted locally');
+      toast.error(error instanceof Error ? error.message : 'Unable to remove user');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'Admin':
-        return 'bg-red-100 text-red-800';
-      case 'Manager':
-        return 'bg-[#FEF9C3] text-[#1E3A5F]';
-      case 'Staff':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  if (!isOwner) {
+    return (
+      <Card className="border-amber-200 bg-amber-50">
+        <CardContent className="py-8">
+          <Shield className="mb-3 h-8 w-8 text-amber-700" />
+          <h2 className="text-xl font-bold text-slate-950">Company owner access required</h2>
+          <p className="mt-2 text-sm text-slate-600">Only a company Owner can view team members, usage, password resets, roles, and billing.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">User Management</h2>
-          <p className="text-sm text-gray-600 mt-1">Manage team access & roles</p>
-          <p className="text-xs text-gray-500 mt-1">Account: {accountName || 'Unassigned Account'}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Owner control center</p>
+          <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Users & app usage</h2>
+          <p className="mt-1 text-sm text-slate-600">{accountName} · isolated company workspace</p>
         </div>
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={open => {
-            setIsDialogOpen(open);
-            if (!open) setEditingUser(null);
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button size="sm" disabled={!isOwner || isLoading} className="bg-[#0F172A] hover:bg-[#1E293B] text-white disabled:bg-slate-300 disabled:text-slate-600">
-              <Plus className="w-4 h-4 mr-1" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-[calc(100vw-2rem)]">
-            <DialogHeader>
-              <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
-              <DialogDescription>{editingUser ? 'Update user information below.' : 'Create a new user account.'}</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  required
-                  placeholder="John Smith"
-                  defaultValue={editingUser ? users.find(u => u.id === editingUser)?.name : ''}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  placeholder="john@zestiq.com"
-                  defaultValue={editingUser ? users.find(u => u.id === editingUser)?.email : ''}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="role">Role</Label>
-                <select
-                  id="role"
-                  name="role"
-                  required
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  defaultValue={editingUser ? users.find(u => u.id === editingUser)?.role : 'Staff'}
-                >
-                  <option value="Staff">Staff</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Owner">Owner</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    setEditingUser(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
-                  {editingUser ? 'Update User' : 'Add User'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={() => navigate('/app/payment-method')}>
+            <CreditCard className="mr-2 h-4 w-4" /> Billing
+          </Button>
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={open => {
+              setIsDialogOpen(open);
+              if (!open) setEditingUserId(null);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                disabled={isLoading}
+                className="bg-[#0F172A] text-white hover:bg-[#1E293B]"
+                onClick={() => setEditingUserId(null)}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Invite user
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingUserId ? 'Edit company access' : 'Invite a company user'}</DialogTitle>
+                <DialogDescription>
+                  {editingUserId ? 'Update this person’s role or access status.' : 'They will receive a secure email link to create their password.'}
+                </DialogDescription>
+              </DialogHeader>
+              <form key={editingUserId || 'new'} onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="team-name">Full name</Label>
+                  <Input id="team-name" name="name" required defaultValue={selectedUser?.name || ''} />
+                </div>
+                <div>
+                  <Label htmlFor="team-email">Email</Label>
+                  <Input id="team-email" name="email" type="email" required defaultValue={selectedUser?.email || ''} />
+                </div>
+                <div>
+                  <Label htmlFor="team-role">Role</Label>
+                  <select id="team-role" name="role" defaultValue={selectedUser?.role || 'Staff'} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
+                    <option value="Staff">Staff</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Owner">Owner</option>
+                  </select>
+                </div>
+                {editingUserId && (
+                  <div>
+                    <Label htmlFor="team-status">Access status</Label>
+                    <select id="team-status" name="status" defaultValue={selectedUser?.status || 'Active'} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={isLoading} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">
+                    {editingUserId ? 'Save access' : 'Send invitation'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{users.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Total Users</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">{users.filter(u => u.status === 'Active').length}</p>
-              <p className="text-xs text-gray-500 mt-1">Active</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-red-600">{users.filter(u => u.role === 'Admin').length}</p>
-              <p className="text-xs text-gray-500 mt-1">Admins</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {!isOwner && (
-        <Card>
-          <CardContent className="bg-yellow-50 border border-yellow-100 text-yellow-700">
-            <p className="text-sm font-semibold">Owner access required</p>
-            <p className="text-sm text-gray-500 mt-1">Only users with the Owner role can add, edit, or delete team members.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="space-y-3">
-        {isLoading && users.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <p className="text-gray-500 text-center text-sm">Loading users...</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: 'Company users', value: users.length, icon: UsersIcon },
+          { label: 'Active access', value: activeUserCount, icon: UserCheck },
+          { label: 'Active in 30 days', value: activeThisMonth, icon: Activity },
+          { label: '30-day app actions', value: totalActivity, icon: Activity },
+        ].map(metric => (
+          <Card key={metric.label}>
+            <CardContent className="flex items-center gap-3 py-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FEF9C3] text-[#0F172A]">
+                <metric.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-950">{metric.value}</p>
+                <p className="text-xs text-slate-500">{metric.label}</p>
+              </div>
             </CardContent>
           </Card>
-        ) : users.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <UsersIcon className="w-12 h-12 text-gray-400 mb-4" />
-              <p className="text-gray-500 text-center text-sm">No users yet. Add your first team member.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          users.map(user => (
-            <Card key={user.id}>
-              <CardContent className="py-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-10 h-10 bg-[#FEF9C3] rounded-full flex items-center justify-center">
-                      <span className="text-[#0F172A] font-bold text-sm">{user.name.split(' ').map(n => n[0]).join('')}</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{user.name}</h3>
-                      <p className="text-sm text-gray-500 flex items-center mt-0.5">
-                        <Mail className="w-3 h-3 mr-1" />
-                        {user.email}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge className={getRoleBadgeColor(user.role)}>
-                    <Shield className="w-3 h-3 mr-1" />
-                    {user.role}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  <div className="flex items-center space-x-4">
-                    <div>
-                      <p className="text-xs text-gray-500">Last Login</p>
-                      <p className="text-sm font-medium text-gray-700">{user.lastLogin}</p>
-                    </div>
-                    <Badge className={user.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>{user.status}</Badge>
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant="outline" disabled={!isOwner || isLoading} onClick={() => handleEditUser(user.id)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={!isOwner || isLoading} onClick={() => handleDeleteUser(user.id, user.name)}>
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+        ))}
       </div>
+
+      <Card className="border-blue-200 bg-blue-50">
+        <CardContent className="py-4">
+          <p className="text-sm font-semibold text-blue-950">Protected company access</p>
+          <p className="mt-1 text-sm text-blue-800">
+            Users can only access {accountName} data. Owners can manage access and send reset links, but cannot view passwords or silently impersonate another user. Most-used area this month: <span className="font-semibold capitalize">{topArea}</span>.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Company team</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading && users.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">Loading protected user records…</p>
+          ) : users.length === 0 ? (
+            <div className="py-10 text-center">
+              <UsersIcon className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+              <p className="text-sm text-slate-500">No company users have been added yet.</p>
+            </div>
+          ) : users.map(user => (
+            <div key={user.id} className="rounded-2xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FEF9C3] font-bold text-[#0F172A]">
+                    {user.name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-950">{user.name}</p>
+                    <p className="flex items-center gap-1 truncate text-sm text-slate-500"><Mail className="h-3.5 w-3.5" /> {user.email}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className={roleBadgeClass(user.role)}><Shield className="mr-1 h-3 w-3" />{user.role}</Badge>
+                  <Badge className={user.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}>{user.status}</Badge>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-slate-400">Last login</p>
+                  <p className="mt-1 font-medium text-slate-700">{formatDate(user.lastLogin)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Last app activity</p>
+                  <p className="mt-1 font-medium text-slate-700">{formatDate(user.usage?.lastActive)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">30-day actions</p>
+                  <p className="mt-1 font-medium text-slate-700">{user.usage?.eventCount || 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Most-used area</p>
+                  <p className="mt-1 font-medium capitalize text-slate-700">{user.usage?.topArea || 'No activity'}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <Button type="button" size="sm" variant="outline" disabled={isLoading} onClick={() => void sendPasswordReset(user)}>
+                  <KeyRound className="mr-1.5 h-4 w-4" /> Send reset
+                </Button>
+                <Button type="button" size="sm" variant="outline" disabled={isLoading} onClick={() => {
+                  setEditingUserId(user.id);
+                  setIsDialogOpen(true);
+                }}>
+                  <Edit className="mr-1.5 h-4 w-4" /> Edit
+                </Button>
+                <Button type="button" size="sm" variant="outline" disabled={isLoading} onClick={() => void deleteUser(user)}>
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }

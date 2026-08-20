@@ -188,27 +188,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }
 
     const key = (name: string) => locationScopedStorageKey(accountId, activeLocationId, name);
-    const readWithLegacyJson = <T,>(name: string, fallback: T): T => {
+    const readScopedValue = <T,>(name: string, fallback: T): T => {
       const scopedKey = key(name);
-      const scopedRaw = localStorage.getItem(scopedKey);
-      if (scopedRaw !== null) {
-        return readScopedJson<T>(scopedKey, fallback);
-      }
-
-      const legacyRaw = localStorage.getItem(name);
-      if (legacyRaw !== null) {
-        localStorage.setItem(scopedKey, legacyRaw);
-        try {
-          return JSON.parse(legacyRaw) as T;
-        } catch {
-          return fallback;
-        }
-      }
-
-      return fallback;
+      return readScopedJson<T>(scopedKey, fallback);
     };
 
-    const readWithLegacyString = (name: string, fallback: string): string => {
+    const readScopedString = (name: string, fallback: string): string => {
       const scopedKey = key(name);
       const scopedRaw = localStorage.getItem(scopedKey);
       if (scopedRaw !== null) {
@@ -219,23 +204,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const legacyRaw = localStorage.getItem(name);
-      if (legacyRaw !== null) {
-        localStorage.setItem(scopedKey, JSON.stringify(legacyRaw));
-        return legacyRaw;
-      }
-
       return fallback;
     };
 
     const restoreFromLocal = () => {
-        const restoredConnected = readWithLegacyJson<boolean>('toastConnected', false);
-        const restoredApiKey = readWithLegacyString('toastApiKey', '');
-        const restoredRestaurantId = readWithLegacyString('toastRestaurantId', '');
-        const restoredLastSync = readWithLegacyJson<string | null>('toastLastSync', null);
-        const restoredCogsCategories = readWithLegacyJson<CogsCategory[]>('toastCogsCategories', []);
-        const restoredSalesData = readWithLegacyJson<ToastSalesData[]>('toastSalesData', []);
-        const restoredMenuItems = readWithLegacyJson<ToastMenuItem[]>('toastMenuItems', []);
+        const restoredConnected = readScopedValue<boolean>('toastConnected', false);
+        const restoredApiKey = readScopedString('toastApiKey', '');
+        const restoredRestaurantId = readScopedString('toastRestaurantId', '');
+        const restoredLastSync = readScopedValue<string | null>('toastLastSync', null);
+        const restoredCogsCategories = readScopedValue<CogsCategory[]>('toastCogsCategories', []);
+        const restoredSalesData = readScopedValue<ToastSalesData[]>('toastSalesData', []);
+        const restoredMenuItems = readScopedValue<ToastMenuItem[]>('toastMenuItems', []);
         const fallbackToastState = buildFallbackToastState(recipes);
         const nextMenuItems = restoredMenuItems.length > 0 ? restoredMenuItems : fallbackToastState.menuItems;
         const nextSalesData = restoredSalesData.length > 0 ? restoredSalesData : fallbackToastState.salesData;

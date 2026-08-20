@@ -51,12 +51,6 @@ const DEFAULT_ALARMS: OrderAlarm[] = [
 function loadAlarms(accountId?: string | null, locationId?: string | null): OrderAlarm[] {
   if (!accountId || !locationId) return [];
   const scopedKey = locationScopedStorageKey(accountId, locationId, 'orderAlarms');
-  if (localStorage.getItem(scopedKey) === null) {
-    const legacy = localStorage.getItem('orderAlarms');
-    if (legacy !== null) {
-      localStorage.setItem(scopedKey, legacy);
-    }
-  }
   return readScopedJson<OrderAlarm[]>(scopedKey, DEFAULT_ALARMS);
 }
 

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Plus, ChefHat, Trash2, Edit, RefreshCw, Camera } from 'lucide-react';
 import { toast as showToast } from 'sonner';
-import { RecipeScan } from '../components/RecipeScan';
+import { RecipeScan, type ScannedRecipeData } from '../components/RecipeScan';
 import { convertQuantity, formatUnitLabel, getCompatibleUnits, normalizeUnit } from '../utils/unitConversion';
 
 type IngredientSelection = { inventoryItemId: string; quantity: number; unit: string };
@@ -157,33 +157,7 @@ export function Recipes() {
   const [prepYieldQuantity, setPrepYieldQuantity] = useState('1');
   const [prepYieldUnit, setPrepYieldUnit] = useState('batch');
   const [selectedPrepIngredients, setSelectedPrepIngredients] = useState<IngredientSelection[]>([]);
-  const [scannedRecipeData, setScannedRecipeData] = useState<{ menuItemName: string; category: string; price: number; ingredients: string[] } | null>(null);
-
-  const tokenizeIngredientLine = (line: string) =>
-    line
-      .toLowerCase()
-      .replace(/[^a-z\s-]/g, ' ')
-      .split(/\s+/)
-      .map(token => token.trim())
-      .filter(token => token.length > 2)
-      .filter(token => !['cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'kg', 'gr', 'g', 'ml', 'l', 'ea', 'pcs', 'pinch', 'dash'].includes(token));
-
-  const findInventoryMatchForIngredientLine = (line: string) => {
-    const tokens = tokenizeIngredientLine(line);
-    if (tokens.length === 0) return null;
-
-    let bestMatch: { id: string; unit: string; score: number } | null = null;
-    for (const item of inventory) {
-      const haystack = `${item.name} ${item.supplier}`.toLowerCase();
-      const score = tokens.reduce((sum, token) => (haystack.includes(token) ? sum + 1 : sum), 0);
-      if (score <= 0) continue;
-      if (!bestMatch || score > bestMatch.score) {
-        bestMatch = { id: item.id, unit: item.unit, score };
-      }
-    }
-
-    return bestMatch && bestMatch.score >= 2 ? bestMatch : null;
-  };
+  const [scannedRecipeData, setScannedRecipeData] = useState<ScannedRecipeData | null>(null);
 
   const resetRecipeForm = () => {
     setEditingRecipe(null);
@@ -202,6 +176,7 @@ export function Recipes() {
     setPrepYieldQuantity('1');
     setPrepYieldUnit('batch');
     setSelectedPrepIngredients([]);
+    setScannedRecipeData(null);
   };
 
   const calculateIngredientLineCost = (ingredient: IngredientSelection) => {
@@ -210,9 +185,8 @@ export function Recipes() {
 
     const sourceUnit = ingredient.unit || item.unit;
     const quantityInInventoryUnit = convertQuantity(ingredient.quantity, sourceUnit, item.unit);
-    const quantityForCost = quantityInInventoryUnit ?? ingredient.quantity;
-
-    return quantityForCost * item.unitCost;
+    if (quantityInInventoryUnit === null) return 0;
+    return quantityInInventoryUnit * item.unitCost;
   };
 
   const calculateRecipeCost = (recipeId: string) => {
@@ -523,54 +497,41 @@ export function Recipes() {
     resetRecipeForm();
   };
 
-  const handleRecipeScanned = (scannedData: { menuItemName: string; category: string; price: number; ingredients: string[] }) => {
+  const handleRecipeScanned = (scannedData: ScannedRecipeData) => {
     setScannedRecipeData(scannedData);
 
     const autoMappedIngredients: IngredientSelection[] = [];
-    const seen = new Set<string>();
-    scannedData.ingredients.forEach((line) => {
-      const match = findInventoryMatchForIngredientLine(line);
-      if (!match || seen.has(match.id)) return;
-      seen.add(match.id);
-      autoMappedIngredients.push({
-        inventoryItemId: match.id,
-        quantity: 0,
-        unit: match.unit,
-      });
-    });
-
-    const normalizedName = scannedData.menuItemName?.trim() || 'Scanned Recipe';
-    const normalizedCategory = scannedData.category?.trim() || 'Prepped Items';
-    const nextIngredients = autoMappedIngredients;
-    const nextCost = calculateIngredientCost(nextIngredients);
-
-    addPreppedRecipe({
-      menuItemName: normalizedName,
-      category: normalizedCategory,
-      ingredients: nextIngredients,
-      yieldQuantity: 1,
-      yieldUnit: 'batch',
-      cost: nextCost,
-      deletable: true,
+    let readyLineCount = 0;
+    scannedData.ingredients.forEach((ingredient) => {
+      const item = inventory.find(entry => entry.id === ingredient.matchedInventoryItemId);
+      if (!item || ingredient.matchConfidence < 0.7 || ingredient.quantity <= 0) return;
+      const quantityInInventoryUnit = convertQuantity(ingredient.quantity, ingredient.unit, item.unit);
+      if (quantityInInventoryUnit === null) return;
+      readyLineCount += 1;
+      const existing = autoMappedIngredients.find(entry => entry.inventoryItemId === item.id);
+      if (existing) {
+        existing.quantity += quantityInInventoryUnit;
+        return;
+      }
+      autoMappedIngredients.push({ inventoryItemId: item.id, quantity: quantityInInventoryUnit, unit: item.unit });
     });
 
     setEditingPrepId(null);
-    setPrepMenuItemName('');
-    setPrepCategory('Prepped Items');
-    setPrepYieldQuantity('1');
-    setPrepYieldUnit('batch');
-    setSelectedPrepIngredients([]);
+    setPrepMenuItemName(scannedData.menuItemName?.trim() || 'Scanned Recipe');
+    setPrepCategory(scannedData.category?.trim() || 'Prepped Items');
+    setPrepYieldQuantity(String(scannedData.yieldQuantity || 1));
+    setPrepYieldUnit(scannedData.yieldUnit || 'batch');
+    setSelectedPrepIngredients(autoMappedIngredients);
 
     setIsDialogOpen(false);
     setIsScanOpen(false);
     setActiveTab('preppedRecipes');
-    setIsPrepDialogOpen(false);
+    setIsPrepDialogOpen(true);
 
-    if (autoMappedIngredients.length > 0) {
-      showToast.success(`Recipe scanned and added to Recipes with ${autoMappedIngredients.length} mapped ingredients.`);
-    } else {
-      showToast.success('Recipe scanned and added to Recipes. Add ingredient mappings when ready.');
-    }
+    const reviewCount = scannedData.ingredients.length - readyLineCount;
+    showToast.success(reviewCount > 0
+      ? `AI matched ${readyLineCount} ingredient lines. Review ${reviewCount} before saving.`
+      : `AI matched and costed all ${readyLineCount} ingredient lines. Review before saving.`);
   };
 
   const openPrepDialog = (prepId?: string) => {
@@ -596,6 +557,15 @@ export function Recipes() {
     }
     if (selectedPrepIngredients.length === 0) {
       showToast.error('Add at least one ingredient');
+      return;
+    }
+
+    const invalidIngredient = selectedPrepIngredients.find(ingredient => {
+      const item = inventory.find(entry => entry.id === ingredient.inventoryItemId);
+      return !item || ingredient.quantity <= 0 || convertQuantity(ingredient.quantity, ingredient.unit, item.unit) === null;
+    });
+    if (invalidIngredient) {
+      showToast.error('Every ingredient needs a quantity and a compatible unit before the recipe can be costed.');
       return;
     }
 
@@ -736,19 +706,6 @@ export function Recipes() {
                     </CardContent>
                   </Card>
                 </div>
-
-                {scannedRecipeData && (
-                  <Card className="border-slate-200 bg-slate-50">
-                    <CardContent>
-                      <p className="text-sm font-medium text-slate-900">Scanned Ingredients</p>
-                      <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                        {scannedRecipeData.ingredients.map((ingredient, index) => (
-                          <li key={index}>• {ingredient}</li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                )}
 
                 {renderIngredientEditor(
                   selectedIngredients,
@@ -997,7 +954,7 @@ export function Recipes() {
                     </div>
                     <p className="text-right text-slate-500 truncate">{component.category}</p>
                     <p className="text-right font-semibold text-slate-900 tabular-nums">{component.yieldQuantity} {component.yieldUnit}</p>
-                    <p className="text-right font-semibold text-slate-900 tabular-nums">${component.cost.toFixed(2)}</p>
+                    <p className="text-right font-semibold text-slate-900 tabular-nums">${calculateIngredientCost(component.ingredients).toFixed(2)}</p>
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="outline" onClick={() => openPrepDialog(component.id)}>
                         Edit
@@ -1080,6 +1037,33 @@ export function Recipes() {
               </div>
             </div>
 
+            {scannedRecipeData && (
+              <Card className="border-violet-200 bg-violet-50">
+                <CardContent className="py-4">
+                  <p className="text-sm font-semibold text-violet-950">AI scan review</p>
+                  <p className="mt-1 text-xs text-violet-800">Costs below use current inventory prices, never AI-generated prices.</p>
+                  <div className="mt-3 space-y-2">
+                    {scannedRecipeData.ingredients.map((ingredient, index) => {
+                      const item = inventory.find(entry => entry.id === ingredient.matchedInventoryItemId);
+                      const converted = item ? convertQuantity(ingredient.quantity, ingredient.unit, item.unit) : null;
+                      const isReady = Boolean(item && ingredient.matchConfidence >= 0.7 && ingredient.quantity > 0 && converted !== null);
+                      return (
+                        <div key={`${ingredient.rawText}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-slate-900">{ingredient.quantity} {ingredient.unit} {ingredient.name}</p>
+                            <p className="truncate text-xs text-slate-500">{item ? `Matched to ${item.name}` : 'No inventory match'}</p>
+                          </div>
+                          <Badge className={isReady ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
+                            {isReady ? 'Cost-ready' : 'Review'}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {renderIngredientEditor(
               selectedPrepIngredients,
               handleAddPrepIngredient,
@@ -1106,7 +1090,7 @@ export function Recipes() {
         </DialogContent>
       </Dialog>
 
-      <RecipeScan isOpen={isScanOpen} onClose={() => setIsScanOpen(false)} onRecipeExtracted={handleRecipeScanned} />
+      <RecipeScan inventory={inventory} isOpen={isScanOpen} onClose={() => setIsScanOpen(false)} onRecipeExtracted={handleRecipeScanned} />
     </div>
   );
 }

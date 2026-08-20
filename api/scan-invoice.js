@@ -1,3 +1,5 @@
+import { requireActiveUser } from './_authenticated-user.js';
+
 const DEFAULT_MODEL = 'gpt-5.6-luna';
 const MAX_DOCUMENT_DATA_LENGTH = 6_000_000;
 const SUPPORTED_DOCUMENT_DATA_URL = /^data:(?:image\/(?:jpeg|png|webp)|application\/pdf);base64,/i;
@@ -155,6 +157,12 @@ export function mapInvoiceExtractionError(error) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    await requireActiveUser(req);
+  } catch (error) {
+    return res.status(Number(error?.status) || 401).json({ error: error?.message || 'Sign in is required' });
+  }
 
   const { imageData } = parseJsonBody(req);
   if (typeof imageData !== 'string' || !SUPPORTED_DOCUMENT_DATA_URL.test(imageData)) {

@@ -3,12 +3,14 @@ import { Outlet, Link, useLocation } from 'react-router';
 import {
   LayoutDashboard, Package, ChefHat,
   Users, LogOut, CreditCard, HelpCircle, MessageSquare, Bell,
-  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown,
+  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { apiRequest } from '../utils/api';
+import { AIChat } from './AIChat';
 
 function ZestIQLogo({ size = 36 }: { size?: number }) {
   const h = Math.round(size * 1.16);
@@ -34,7 +36,7 @@ function ZestIQLogo({ size = 36 }: { size?: number }) {
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, accountName, locations, activeLocationId, switchLocation } = useAuth();
+  const { user, logout, accountId, accountName, locations, activeLocationId, switchLocation } = useAuth();
   const [openTopMenu, setOpenTopMenu] = useState<string | null>(null);
   const closeTopMenuTimer = useRef<number | null>(null);
 
@@ -108,6 +110,20 @@ export function Layout() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!accountId) return;
+    void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/usage`, {
+      method: 'POST',
+      body: JSON.stringify({
+        eventName: 'page_view',
+        path: location.pathname,
+        metadata: { locationId: activeLocationId },
+      }),
+    }).catch(() => {
+      // Usage telemetry must never interrupt the user workflow.
+    });
+  }, [accountId, activeLocationId, location.pathname]);
+
   return (
     <div className="min-h-screen bg-[#F4F5F7] pb-20">
 
@@ -137,9 +153,16 @@ export function Layout() {
                 <p className="text-xs text-gray-400 mt-0.5">{user?.name || 'Team Member'}</p>
               </div>
               <div className="py-1">
+                {user?.platformAdmin && (
+                  <DropdownMenuItem onClick={() => navigate('/app/platform')} className="rounded-lg mx-1 bg-[#FEF9C3]/60 font-semibold"><Building2 className="w-4 h-4 mr-2.5 text-[#A16207]" />ZestIQ Admin</DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => navigate('/app/account')}      className="rounded-lg mx-1"><User     className="w-4 h-4 mr-2.5 text-gray-400" />Account</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/app/users')}        className="rounded-lg mx-1"><Users    className="w-4 h-4 mr-2.5 text-gray-400" />Users</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/app/payment-method')} className="rounded-lg mx-1"><CreditCard className="w-4 h-4 mr-2.5 text-gray-400" />Payment Method</DropdownMenuItem>
+                {user?.role === 'Owner' && (
+                  <>
+                    <DropdownMenuItem onClick={() => navigate('/app/users')} className="rounded-lg mx-1"><Users className="w-4 h-4 mr-2.5 text-gray-400" />Users & Usage</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/app/payment-method')} className="rounded-lg mx-1"><CreditCard className="w-4 h-4 mr-2.5 text-gray-400" />Subscription & Billing</DropdownMenuItem>
+                  </>
+                )}
               </div>
               <DropdownMenuSeparator />
               <div className="py-1">
@@ -283,6 +306,7 @@ export function Layout() {
           })}
         </div>
       </nav>
+      <AIChat />
     </div>
   );
 }
