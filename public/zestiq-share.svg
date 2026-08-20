@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="ZestIQ restaurant intelligence">
+  <rect width="1200" height="630" fill="#0B1220"/>
+  <circle cx="1090" cy="80" r="250" fill="#F5C10E" opacity=".08"/>
+  <circle cx="100" cy="610" r="260" fill="#F5C10E" opacity=".05"/>
+  <g transform="translate(74 68)">
+    <rect width="90" height="90" rx="23" fill="#F5C10E"/>
+    <path d="M25 29h42L31 64h38" fill="none" stroke="#0B1220" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M49 18c7-11 19-12 26-5-6 10-18 12-26 5Z" fill="#59A64A"/>
+  </g>
+  <text x="184" y="132" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="800">zest<tspan fill="#F5C10E">IQ</tspan></text>
+  <text x="74" y="270" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="800">Know what you have.</text>
+  <text x="74" y="350" fill="#F5C10E" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="800">Know what it costs.</text>
+  <text x="74" y="415" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="700">Inventory · Food cost · Labour · AI</text>
+  <g transform="translate(74 486)">
+    <rect width="1020" height="80" rx="22" fill="#FFFFFF" opacity=".08"/>
+    <text x="30" y="50" fill="#FFFFFF" opacity=".78" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="600">Restaurant intelligence that turns daily operations into margin.</text>
+  </g>
+</svg>

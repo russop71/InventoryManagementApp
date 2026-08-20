@@ -6,6 +6,7 @@ export function mergeLocationData(localData, remoteData) {
   const invoices = Array.isArray(remoteData?.invoices) ? remoteData.invoices : localData.invoices;
   const suppliers = Array.isArray(remoteData?.suppliers) ? remoteData.suppliers : localData.suppliers;
   const preppedRecipes = Array.isArray(remoteData?.preppedRecipes) ? remoteData.preppedRecipes : localData.preppedRecipes;
+  const inventoryCounts = Array.isArray(remoteData?.inventoryCounts) ? remoteData.inventoryCounts : localData.inventoryCounts;
 
   return {
     inventory,
@@ -15,5 +16,6 @@ export function mergeLocationData(localData, remoteData) {
     invoices,
     suppliers,
     preppedRecipes,
+    inventoryCounts,
   };
 }

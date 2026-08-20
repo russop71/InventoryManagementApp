@@ -1,12 +1,13 @@
 import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
+import { useLabor } from '../contexts/LaborContext';
 import { Link, useNavigate } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Flame, Wine, Beer, GlassWater, Coffee, DollarSign } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useState } from 'react';
 
@@ -16,6 +17,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { inventory, orders, recipes } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
+  const { targetLaborPercent, scheduledCostForRange } = useLabor();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [breakdownType, setBreakdownType] = useState<'items' | 'cost' | 'lowStock' | 'orders'>('items');
@@ -419,6 +421,11 @@ export function Dashboard() {
           : salesRangePreset === 'this-month'
             ? 'This month'
             : 'Last month';
+  const laborBounds = getPresetDateBounds(salesRangePreset);
+  const scheduledLaborCost = laborBounds.startDate && laborBounds.endDate
+    ? scheduledCostForRange(laborBounds.startDate, laborBounds.endDate)
+    : 0;
+  const scheduledLaborPercent = totalRevenue > 0 ? (scheduledLaborCost / totalRevenue) * 100 : 0;
 
   return (
     <div className="space-y-4">
@@ -430,7 +437,7 @@ export function Dashboard() {
       </div>
 
       {/* ── Compact 3-stat strip ─────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {/* Food Cost % */}
         <Card
           className={`border-0 shadow-sm overflow-hidden transition-all duration-200 ${totalRevenue > 0 ? 'cursor-pointer hover:shadow-md' : ''} ${
@@ -489,6 +496,15 @@ export function Dashboard() {
             <p className="text-[9px] text-gray-400 mt-1.5 font-semibold leading-tight">
               ${pendingOrdersValue.toFixed(0)} pending
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer overflow-hidden border-0 bg-white shadow-sm transition-all duration-200 hover:shadow-md" onClick={() => navigate('/app/labor')}>
+          <div className={`h-[3px] ${scheduledLaborPercent > targetLaborPercent ? 'bg-red-500' : 'bg-violet-500'}`} />
+          <CardContent className="p-3">
+            <div className="mb-2 flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Labour</span><UsersRound className="h-3 w-3 text-violet-500" /></div>
+            <div className={`text-2xl font-black tabular-nums leading-none ${scheduledLaborPercent > targetLaborPercent ? 'text-red-600' : 'text-violet-700'}`} style={{ fontFamily: 'var(--font-mono)' }}>{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</div>
+            <p className="mt-1.5 text-[9px] font-semibold leading-tight text-gray-400">Target {targetLaborPercent}% · view schedule</p>
           </CardContent>
         </Card>
       </div>

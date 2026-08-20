@@ -1,0 +1,13 @@
+{
+  "name": "ZestIQ",
+  "short_name": "ZestIQ",
+  "description": "Restaurant inventory, cost and labour intelligence.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#FBFAF6",
+  "theme_color": "#F5C10E",
+  "icons": [
+    { "src": "/zestiq-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/zestiq-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -20,7 +20,9 @@ const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 
-const LIVE_DATA_PATH = path.resolve(process.cwd(), 'server/data/live-data.json');
+const LIVE_DATA_PATH = process.env.ZESTIQ_LOCAL_DATA_PATH
+  ? path.resolve(process.env.ZESTIQ_LOCAL_DATA_PATH)
+  : path.resolve(process.cwd(), 'server/data/live-data.json');
 
 function normalizeId(input = '') {
   return String(input)
@@ -50,10 +52,10 @@ function roleFromEmail(email = '') {
 
 function resolvePersistentAccountId(email = '') {
   const normalized = String(email).trim().toLowerCase();
-  if (['demo@zestiq.com', 'russop71@gmail.com', 'russop71', 'owner@zestiq.com'].includes(normalized)) {
+  if (['russop71@gmail.com', 'russop71', 'owner@zestiq.com'].includes(normalized)) {
     return 'russop71';
   }
-  return normalizeId(normalized.split('@')[0] || 'local-account');
+  return normalizeId(normalized || 'local-account');
 }
 
 function accountFromEmail(email = '') {
@@ -120,6 +122,9 @@ function ensureAccount(data, accountId, accountName) {
       name: accountName,
       locations: [{ id: 'main', name: 'Main Location' }],
       users: [],
+      onboarding: accountId === 'demo-zestiq-com'
+        ? { status: 'completed', currentStep: 'count', completedSteps: ['restaurant', 'location', 'suppliers', 'inventory', 'recipes', 'count'], skippedSteps: [], startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        : { status: 'not_started', currentStep: 'restaurant', completedSteps: [], skippedSteps: [], startedAt: null, completedAt: null, updatedAt: null },
     };
   }
 
@@ -147,10 +152,17 @@ function buildDefaultLocationData() {
     inventory: [],
     recipes: [],
     storageAreas: [],
+    orders: [],
+    invoices: [],
+    suppliers: [],
+    preppedRecipes: [],
+    forecasts: [],
+    inventoryCounts: [],
     integrations: {
       toast: {
         connected: false,
-        apiKey: '',
+        provider: 'generic',
+        connectionMode: 'import',
         restaurantId: '',
         salesData: [],
         menuItems: [],
@@ -221,7 +233,7 @@ app.post('/api/v1/auth/login', (req, res) => {
   return res.json({
     token: issuedToken,
     user,
-    account: { id: account.id, name: account.name },
+    account: { id: account.id, name: account.name, onboarding: account.onboarding },
     locations: account.locations,
     activeLocationId: account.locations[0]?.id || 'main',
   });
@@ -244,7 +256,7 @@ app.get('/api/v1/auth/session/:token', (req, res) => {
   return res.json({
     token,
     user,
-    account: { id: account.id, name: account.name },
+    account: { id: account.id, name: account.name, onboarding: account.onboarding },
     locations: account.locations,
     activeLocationId: account.locations[0]?.id || 'main',
   });
@@ -432,7 +444,8 @@ app.put('/api/v1/accounts/:accountId/locations/:locationId/integrations/toast', 
     locationData.integrations = locationData.integrations || {};
     locationData.integrations.toast = {
       connected: typeof payload.connected === 'boolean' ? payload.connected : Boolean(existingToast.connected),
-      apiKey: typeof payload.apiKey === 'string' ? payload.apiKey : (existingToast.apiKey || ''),
+      provider: typeof payload.provider === 'string' ? payload.provider.slice(0, 80) : (existingToast.provider || 'generic'),
+      connectionMode: payload.connectionMode === 'direct' ? 'direct' : 'import',
       restaurantId: typeof payload.restaurantId === 'string' ? payload.restaurantId : (existingToast.restaurantId || ''),
       salesData: Array.isArray(payload.salesData) ? payload.salesData : (existingToast.salesData || []),
       menuItems: Array.isArray(payload.menuItems) ? payload.menuItems : (existingToast.menuItems || []),
@@ -469,6 +482,8 @@ app.post('/api/v1/accounts/:accountId/locations/:locationId/integrations/toast/i
     locationData.integrations.toast = {
       ...(locationData.integrations.toast || buildDefaultLocationData().integrations.toast),
       connected: true,
+      provider: String(req.body?.provider || locationData.integrations.toast?.provider || 'generic').slice(0, 80),
+      connectionMode: 'import',
       salesData: normalized.salesData,
       menuItems: normalized.menuItems,
       lastSync: new Date().toISOString(),

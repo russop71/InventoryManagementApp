@@ -401,7 +401,7 @@ export function Recipes() {
 
   const handleSyncToastItems = () => {
     if (!isConnected) {
-      showToast.error('Connect to Toast POS first');
+      showToast.error('Connect POS sales first');
       return;
     }
     if (menuItems.length === 0) {
@@ -409,7 +409,7 @@ export function Recipes() {
       return;
     }
     syncToastMenuItems(menuItems);
-    showToast.success(`Synced ${menuItems.length} menu items from Toast`);
+    showToast.success(`Synced ${menuItems.length} menu items from your POS`);
   };
 
   useEffect(() => {
@@ -828,7 +828,7 @@ export function Recipes() {
             </Card>
           ) : (
             <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-              <div className="grid items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[10px] uppercase tracking-[0.2em] text-slate-500" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr' }}>
+              <div className="hidden grid-cols-[minmax(180px,1.3fr)_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_0.9fr] items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[10px] uppercase tracking-[0.2em] text-slate-500 md:grid">
                 <span>Menu Item</span>
                 <span className="text-right">POS #</span>
                 <span className="text-right">Category</span>
@@ -845,11 +845,13 @@ export function Recipes() {
                   const marginPercent = recipe.price > 0 ? (margin / recipe.price) * 100 : 0;
                   const isTopSellerMatch = recipe.menuItemName.trim().toLowerCase() === normalizedTopSellerName;
                   return (
-                    <div
-                      key={recipe.id}
-                      className={`grid items-center gap-3 px-4 py-4 text-sm text-slate-700 ${isTopSellerMatch ? 'bg-amber-50' : ''}`}
-                      style={{ gridTemplateColumns: '1.3fr 0.9fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr' }}
-                    >
+                    <div key={recipe.id} className={isTopSellerMatch ? 'bg-amber-50' : ''}>
+                      <div className="p-4 md:hidden">
+                        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><button type="button" onClick={() => handleEditRecipe(recipe.id)} className="break-words text-left text-base font-black leading-snug text-slate-900">{recipe.menuItemName}</button><p className="mt-1 break-words text-xs text-slate-500">{recipe.category} · {recipe.ingredients.length} ingredients{recipe.externalId ? ` · POS ${recipe.externalId}` : ''}</p></div>{isTopSellerMatch && <Badge className="shrink-0 bg-amber-100 text-[10px] text-amber-800">Top Seller</Badge>}</div>
+                        <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Food cost</p><p className="mt-1 font-black text-slate-900">${recipeCost.toFixed(2)}</p><p className="text-[10px] text-slate-500">{foodCostPercent.toFixed(0)}%</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Price</p><p className="mt-1 font-black text-slate-900">${recipe.price.toFixed(2)}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Margin</p><p className="mt-1 font-black" style={{ color: getMarginColor(marginPercent) }}>${margin.toFixed(2)}</p><p className="text-[10px]" style={{ color: getMarginColor(marginPercent) }}>{marginPercent.toFixed(0)}%</p></div></div>
+                        <div className="mt-3 flex gap-2"><Button className="flex-1" size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}><Edit className="mr-1.5 h-4 w-4" />Edit</Button><Button size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
+                      </div>
+                      <div className="hidden grid-cols-[minmax(180px,1.3fr)_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_0.9fr] items-center gap-3 px-4 py-4 text-sm text-slate-700 md:grid">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <button
@@ -883,6 +885,7 @@ export function Recipes() {
                         <Button size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}>
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
+                      </div>
                       </div>
                     </div>
                   );

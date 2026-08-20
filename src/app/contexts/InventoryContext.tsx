@@ -6,6 +6,7 @@ import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
 import { buildDemoLocationData } from '../utils/demoData';
 import { mergeLocationData } from '../utils/locationDataMerge.js';
 import { hasDuplicateInvoiceNumber, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
+import type { InventoryCount } from '../utils/inventoryCounts';
 
 const DEFAULT_STORAGE_AREAS = ['Walk-In Cooler', 'Dry Storage', 'Freezer', 'Bar', 'Wine Cellar', 'Unassigned'] as const;
 
@@ -191,6 +192,7 @@ interface InventoryContextType {
   orders: DailyOrder[];
   invoices: InvoiceRecord[];
   suppliers: Supplier[];
+  inventoryCounts: InventoryCount[];
   isLocationLoaded: boolean;
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => InventoryItem;
   addStorageArea: (storageArea: string) => void;
@@ -215,6 +217,9 @@ interface InventoryContextType {
   addSupplier: (supplier: Omit<Supplier, 'id' | 'dateAdded'>) => void;
   updateSupplier: (id: string, supplier: Partial<Supplier>) => void;
   deleteSupplier: (id: string) => void;
+  saveInventoryCount: (count: InventoryCount) => void;
+  finalizeInventoryCount: (count: InventoryCount) => void;
+  deleteInventoryCount: (countId: string) => void;
 }
 
 interface LocationPayload {
@@ -225,6 +230,7 @@ interface LocationPayload {
   invoices?: InvoiceRecord[];
   suppliers?: Supplier[];
   preppedRecipes?: PreppedRecipe[];
+  inventoryCounts?: InventoryCount[];
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -334,6 +340,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [preppedRecipes, setPreppedRecipes] = useState<PreppedRecipe[]>([]);
+  const [inventoryCounts, setInventoryCounts] = useState<InventoryCount[]>([]);
   const [isLocationLoaded, setIsLocationLoaded] = useState(false);
 
   const localKey = (key: string) => {
@@ -349,6 +356,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextInvoices: InvoiceRecord[] = invoices,
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
+    nextInventoryCounts: InventoryCount[] = inventoryCounts,
   ) => {
     const inventoryKey = localKey('inventory');
     const recipesKey = localKey('recipes');
@@ -357,6 +365,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const invoicesKey = localKey('invoices');
     const suppliersKey = localKey('suppliers');
     const preppedRecipesKey = localKey('preppedRecipes');
+    const inventoryCountsKey = localKey('inventoryCounts');
     if (inventoryKey) localStorage.setItem(inventoryKey, JSON.stringify(nextInventory));
     if (recipesKey) localStorage.setItem(recipesKey, JSON.stringify(nextRecipes));
     if (storageAreasKey) localStorage.setItem(storageAreasKey, JSON.stringify(nextStorageAreas));
@@ -364,6 +373,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     if (invoicesKey) localStorage.setItem(invoicesKey, JSON.stringify(nextInvoices));
     if (suppliersKey) localStorage.setItem(suppliersKey, JSON.stringify(nextSuppliers));
     if (preppedRecipesKey) localStorage.setItem(preppedRecipesKey, JSON.stringify(nextPreppedRecipes));
+    if (inventoryCountsKey) localStorage.setItem(inventoryCountsKey, JSON.stringify(nextInventoryCounts));
   };
 
   const saveLocationData = (
@@ -374,6 +384,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextInvoices: InvoiceRecord[] = invoices,
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
+    nextInventoryCounts: InventoryCount[] = inventoryCounts,
   ) => {
     if (!accountId || !activeLocationId) return;
     const currentLocalInventory = readScopedJson<InventoryItem[]>(localKey('inventory'), []);
@@ -383,6 +394,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const currentLocalInvoices = readScopedJson<InvoiceRecord[]>(localKey('invoices'), []);
     const currentLocalSuppliers = readScopedJson<Supplier[]>(localKey('suppliers'), []);
     const currentLocalPreppedRecipes = readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []);
+    const currentLocalInventoryCounts = readScopedJson<InventoryCount[]>(localKey('inventoryCounts'), []);
 
     const effectiveInventory = nextInventory.length === 0 && currentLocalInventory.length > 0
       ? currentLocalInventory
@@ -405,6 +417,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const effectivePreppedRecipes = nextPreppedRecipes.length === 0 && currentLocalPreppedRecipes.length > 0
       ? currentLocalPreppedRecipes
       : nextPreppedRecipes;
+    const effectiveInventoryCounts = nextInventoryCounts.length === 0 && currentLocalInventoryCounts.length > 0
+      ? currentLocalInventoryCounts
+      : nextInventoryCounts;
 
     persistLocalLocationData(
       effectiveInventory,
@@ -414,6 +429,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       effectiveInvoices,
       effectiveSuppliers,
       effectivePreppedRecipes,
+      effectiveInventoryCounts,
     );
     if (!token) return;
     void apiRequest<LocationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/data`, {
@@ -426,6 +442,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         invoices: effectiveInvoices,
         suppliers: effectiveSuppliers,
         preppedRecipes: effectivePreppedRecipes,
+        inventoryCounts: effectiveInventoryCounts,
       }),
     }).catch(error => {
       console.error('Failed to sync location data', error);
@@ -448,11 +465,16 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }));
     const localRecipes = readScopedJson<Recipe[]>(localKey('recipes'), []);
     const localStorageAreas = readScopedJson<string[]>(localKey('storageAreas'), []);
+    const localInventoryCounts = readScopedJson<InventoryCount[]>(localKey('inventoryCounts'), []);
 
     const demoData = buildDemoLocationData();
-    const fallbackInventory = demoData.inventory as unknown as InventoryItem[];
-    const fallbackRecipes = demoData.recipes as unknown as Recipe[];
-    const fallbackStorageAreas = demoData.storageAreas;
+    const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
+    const fallbackInventory = isDemoAccount ? demoData.inventory as unknown as InventoryItem[] : [];
+    const fallbackRecipes = isDemoAccount ? demoData.recipes as unknown as Recipe[] : [];
+    const fallbackStorageAreas = isDemoAccount ? demoData.storageAreas : [...DEFAULT_STORAGE_AREAS];
+    const fallbackOrders = isDemoAccount ? demoData.orders as unknown as DailyOrder[] : [];
+    const fallbackInvoices = isDemoAccount ? demoData.invoices as unknown as InvoiceRecord[] : [];
+    const fallbackSuppliers = isDemoAccount ? demoData.suppliers as unknown as Supplier[] : [];
 
     if (!token) {
       const nextStorageAreas = sortUniqueStorageAreas([
@@ -463,10 +485,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setInventory(localInventory.length > 0 ? localInventory : fallbackInventory);
       setRecipes(localRecipes.length > 0 ? localRecipes : fallbackRecipes);
       setStorageAreas(nextStorageAreas.length > 0 ? nextStorageAreas : fallbackStorageAreas);
-      setOrders(readScopedJson<DailyOrder[]>(localKey('orders'), []));
-      setInvoices(readScopedJson<InvoiceRecord[]>(localKey('invoices'), []));
-      setSuppliers(readScopedJson<Supplier[]>(localKey('suppliers'), []));
+      const localOrders = readScopedJson<DailyOrder[]>(localKey('orders'), []);
+      const localInvoices = readScopedJson<InvoiceRecord[]>(localKey('invoices'), []);
+      const localSuppliers = readScopedJson<Supplier[]>(localKey('suppliers'), []);
+      setOrders(localOrders.length > 0 ? localOrders : fallbackOrders);
+      setInvoices(localInvoices.length > 0 ? localInvoices : fallbackInvoices);
+      setSuppliers(localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers);
       setPreppedRecipes(readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe)));
+      setInventoryCounts(localInventoryCounts);
       setIsLocationLoaded(true);
       return;
     }
@@ -482,6 +508,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           invoices: readScopedJson<InvoiceRecord[]>(localKey('invoices'), []),
           suppliers: readScopedJson<Supplier[]>(localKey('suppliers'), []),
           preppedRecipes: readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe)),
+          inventoryCounts: localInventoryCounts,
         },
         payload,
       );
@@ -497,9 +524,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const apiInvoices = merged.invoices || [];
       const apiSuppliers = merged.suppliers || [];
       const apiPreppedRecipes = (merged.preppedRecipes || []).map(recipe => normalizePreppedRecipe(recipe));
+      const apiInventoryCounts = merged.inventoryCounts || [];
 
-      const serverHasData = apiInventory.length > 0 || apiRecipes.length > 0 || apiStorageAreas.length > 0 || apiOrders.length > 0 || apiInvoices.length > 0 || apiSuppliers.length > 0 || apiPreppedRecipes.length > 0;
-      const hasLocalData = localInventory.length > 0 || localRecipes.length > 0 || localStorageAreas.length > 0 || readScopedJson<DailyOrder[]>(localKey('orders'), []).length > 0 || readScopedJson<InvoiceRecord[]>(localKey('invoices'), []).length > 0 || readScopedJson<Supplier[]>(localKey('suppliers'), []).length > 0 || readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).length > 0;
+      const serverHasData = apiInventory.length > 0 || apiRecipes.length > 0 || apiStorageAreas.length > 0 || apiOrders.length > 0 || apiInvoices.length > 0 || apiSuppliers.length > 0 || apiPreppedRecipes.length > 0 || apiInventoryCounts.length > 0;
+      const hasLocalData = localInventory.length > 0 || localRecipes.length > 0 || localStorageAreas.length > 0 || readScopedJson<DailyOrder[]>(localKey('orders'), []).length > 0 || readScopedJson<InvoiceRecord[]>(localKey('invoices'), []).length > 0 || readScopedJson<Supplier[]>(localKey('suppliers'), []).length > 0 || readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).length > 0 || localInventoryCounts.length > 0;
       const shouldPreferLocalInventory = !serverHasData && localInventory.length > 0;
       const apiIngredientCount = apiRecipes.reduce((count, recipe) => count + (recipe.ingredients?.length || 0), 0);
       const localIngredientCount = localRecipes.reduce((count, recipe) => count + (recipe.ingredients?.length || 0), 0);
@@ -508,10 +536,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const nextInventory = serverHasData ? apiInventory : (shouldPreferLocalInventory ? localInventory : (hasLocalData ? localInventory : fallbackInventory));
       const nextRecipes = serverHasData ? apiRecipes : (shouldPreferLocalRecipes ? localRecipes : (hasLocalData ? localRecipes : fallbackRecipes));
       const nextStorageAreas = serverHasData ? apiStorageAreas : (shouldPreferLocalInventory ? localStorageAreas : (hasLocalData ? localStorageAreas : fallbackStorageAreas));
-      const nextOrders = serverHasData ? apiOrders : readScopedJson<DailyOrder[]>(localKey('orders'), []);
-      const nextInvoices = serverHasData ? apiInvoices : readScopedJson<InvoiceRecord[]>(localKey('invoices'), []);
-      const nextSuppliers = serverHasData ? apiSuppliers : readScopedJson<Supplier[]>(localKey('suppliers'), []);
+      const localOrders = readScopedJson<DailyOrder[]>(localKey('orders'), []);
+      const localInvoices = readScopedJson<InvoiceRecord[]>(localKey('invoices'), []);
+      const localSuppliers = readScopedJson<Supplier[]>(localKey('suppliers'), []);
+      const nextOrders = serverHasData ? apiOrders : (localOrders.length > 0 ? localOrders : fallbackOrders);
+      const nextInvoices = serverHasData ? apiInvoices : (localInvoices.length > 0 ? localInvoices : fallbackInvoices);
+      const nextSuppliers = serverHasData ? apiSuppliers : (localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers);
       const nextPreppedRecipes = serverHasData ? apiPreppedRecipes : readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe));
+      const nextInventoryCounts = apiInventoryCounts.length > 0 ? apiInventoryCounts : localInventoryCounts;
 
       const inferredAreas = nextInventory.map(item => normalizeStorageArea(item.storageArea));
       const mergedStorageAreas = sortUniqueStorageAreas([
@@ -527,10 +559,13 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setInvoices(nextInvoices);
       setSuppliers(nextSuppliers);
       setPreppedRecipes(nextPreppedRecipes);
+      setInventoryCounts(nextInventoryCounts);
       setIsLocationLoaded(true);
 
       if (serverHasData && (nextInventory.length > 0 || nextRecipes.length > 0 || nextOrders.length > 0 || nextInvoices.length > 0 || nextSuppliers.length > 0 || nextPreppedRecipes.length > 0)) {
-        persistLocalLocationData(nextInventory, nextRecipes, nextStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes);
+        persistLocalLocationData(nextInventory, nextRecipes, nextStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextInventoryCounts);
+      } else if (isDemoAccount && !hasLocalData) {
+        persistLocalLocationData(nextInventory, nextRecipes, mergedStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextInventoryCounts);
       }
     } catch (error) {
       const localStorageAreas = sortUniqueStorageAreas([
@@ -538,12 +573,13 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         ...readScopedJson<string[]>(localKey('storageAreas'), []),
         ...localInventory.map(item => normalizeStorageArea(item.storageArea)),
       ]);
-      const fallbackInventory = buildDemoLocationData().inventory as unknown as InventoryItem[];
-      const fallbackRecipes = buildDemoLocationData().recipes as unknown as Recipe[];
-      const fallbackStorageAreas = buildDemoLocationData().storageAreas;
       setInventory(localInventory.length > 0 ? localInventory : fallbackInventory);
       setRecipes(localRecipes.length > 0 ? localRecipes : fallbackRecipes);
       setStorageAreas(localStorageAreas.length > 0 ? localStorageAreas : fallbackStorageAreas);
+      setOrders(readScopedJson<DailyOrder[]>(localKey('orders'), fallbackOrders));
+      setInvoices(readScopedJson<InvoiceRecord[]>(localKey('invoices'), fallbackInvoices));
+      setSuppliers(readScopedJson<Supplier[]>(localKey('suppliers'), fallbackSuppliers));
+      setInventoryCounts(localInventoryCounts);
       setIsLocationLoaded(true);
       if (!silent) {
         console.error('Failed to load location data', error);
@@ -560,6 +596,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setOrders([]);
       setSuppliers([]);
       setPreppedRecipes([]);
+      setInventoryCounts([]);
       setIsLocationLoaded(true);
       return;
     }
@@ -1256,6 +1293,34 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes);
   };
 
+  const saveInventoryCount = (count: InventoryCount) => {
+    const nextCounts = inventoryCounts.some(item => item.id === count.id)
+      ? inventoryCounts.map(item => (item.id === count.id ? count : item))
+      : [count, ...inventoryCounts];
+    setInventoryCounts(nextCounts);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, nextCounts);
+  };
+
+  const deleteInventoryCount = (countId: string) => {
+    const nextCounts = inventoryCounts.filter(item => item.id !== countId);
+    setInventoryCounts(nextCounts);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, nextCounts);
+  };
+
+  const finalizeInventoryCount = (count: InventoryCount) => {
+    const countedByItem = new Map(count.entries.map(entry => [entry.itemId, entry.counted]));
+    const now = new Date().toISOString();
+    const nextInventory = inventory.map(item => countedByItem.has(item.id)
+      ? { ...item, currentStock: countedByItem.get(item.id) || 0, lastCountedAt: now, lastUpdated: now }
+      : item);
+    const nextCounts = inventoryCounts.some(item => item.id === count.id)
+      ? inventoryCounts.map(item => (item.id === count.id ? count : item))
+      : [count, ...inventoryCounts];
+    setInventory(nextInventory);
+    setInventoryCounts(nextCounts);
+    saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, nextCounts);
+  };
+
   return (
     <InventoryContext.Provider
       value={{
@@ -1266,6 +1331,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         orders,
         invoices,
         suppliers,
+        inventoryCounts,
         isLocationLoaded,
         addInventoryItem,
         addStorageArea,
@@ -1291,6 +1357,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         addSupplier,
         updateSupplier,
         deleteSupplier,
+        saveInventoryCount,
+        finalizeInventoryCount,
+        deleteInventoryCount,
       }}
     >
       {children}

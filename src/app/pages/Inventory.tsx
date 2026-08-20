@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { parseInventoryCountCsv, buildInventoryUpdates } from '../utils/inventoryImport';
-import { createInventoryCount, loadInventoryCounts, saveInventoryCounts, type InventoryCount } from '../utils/inventoryCounts';
+import type { InventoryCount } from '../utils/inventoryCounts';
 import { useNavigate } from 'react-router';
 import {
   AlertTriangle,
@@ -39,7 +39,7 @@ const STATUS: Record<Status, { label: string; bg: string; color: string }> = {
 
 export function Inventory() {
   const navigate = useNavigate();
-  const { inventory, addInventoryItem, updateInventoryItem } = useInventory();
+  const { inventory, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount } = useInventory();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock'>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -118,30 +118,7 @@ export function Inventory() {
   const lowStockItems = inventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'low-stock').length;
   const outItems = inventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'out-of-stock').length;
   const wasteValue = inventory.reduce((sum, item) => sum + Math.max(0, item.currentStock - item.parLevel) * item.unitCost, 0);
-  const [countRows, setCountRows] = useState<InventoryCount[]>(() => loadInventoryCounts());
-
-  useEffect(() => {
-    const syncCounts = () => {
-      const stored = loadInventoryCounts();
-      if (stored.length > 0) {
-        setCountRows(stored);
-        return;
-      }
-
-      const initialCount = createInventoryCount(inventory, {
-        id: 'current',
-        countDate: 'Live inventory count',
-        description: 'Current count',
-        locked: 'Yes',
-      });
-      setCountRows([initialCount]);
-      saveInventoryCounts([initialCount]);
-    };
-
-    syncCounts();
-    window.addEventListener('inventory-counts-updated', syncCounts);
-    return () => window.removeEventListener('inventory-counts-updated', syncCounts);
-  }, [inventory]);
+  const countRows: InventoryCount[] = inventoryCounts;
 
   const selectedCountRow = countRows.find(row => row.id === selectedCountId) ?? null;
   const spreadsheetItems = selectedCountRow?.entries?.length
@@ -189,9 +166,7 @@ export function Inventory() {
   };
 
   const handleDeleteCount = (countId: string) => {
-    const nextCounts = countRows.filter(row => row.id !== countId);
-    setCountRows(nextCounts);
-    saveInventoryCounts(nextCounts);
+    deleteInventoryCount(countId);
     if (selectedCountId === countId) {
       setSelectedCountId('');
     }
@@ -332,6 +307,12 @@ export function Inventory() {
                   </div>
                 );
               })}
+              {countRows.length === 0 && (
+                <div className="px-4 py-10 text-center">
+                  <p className="text-sm font-bold text-gray-700">No completed counts yet</p>
+                  <p className="mt-1 text-xs text-gray-500">Start your first count to establish an accurate inventory baseline.</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -441,7 +422,8 @@ export function Inventory() {
         </button>
       </div>
 
-      <div className="grid px-4 py-2 bg-gray-50 border-b border-gray-100" style={{ gridTemplateColumns: '1fr 64px 64px 80px 58px 18px' }}>
+      <div className="hidden grid-cols-[28px_minmax(180px,1fr)_64px_64px_80px_58px_18px] border-b border-gray-100 bg-gray-50 px-4 py-2 md:grid">
+        <span />
         {(['ITEM', 'PAR LEVEL', 'ON HAND', 'STATUS', 'UNIT COST', ''] as const).map((header, index) => (
           <p key={header} className="text-[9px] font-black uppercase tracking-widest text-gray-400" style={{ textAlign: index === 0 ? 'left' : 'right' }}>
             {header}
@@ -473,8 +455,7 @@ export function Inventory() {
                     navigate(`/app/inventory/${item.id}`);
                   }
                 }}
-                className="grid cursor-pointer items-center px-4 py-3 transition-colors hover:bg-gray-50"
-                style={{ gridTemplateColumns: '28px 1fr 64px 64px 80px 58px 18px' }}
+                className="grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_18px] items-center px-4 py-3 transition-colors hover:bg-gray-50 md:grid-cols-[28px_minmax(180px,1fr)_64px_64px_80px_58px_18px]"
               >
                 <div className="flex items-center justify-center">
                   <input
@@ -488,20 +469,21 @@ export function Inventory() {
                     <Package className="h-[18px] w-[18px] text-gray-400" />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-bold leading-tight text-gray-900">{item.name}</p>
-                    <p className="mt-0.5 truncate text-[10px] text-gray-400">{item.category} · {item.supplier}</p>
+                    <p className="break-words text-[13px] font-bold leading-tight text-gray-900 md:truncate">{item.name}</p>
+                    <p className="mt-0.5 break-words text-[10px] text-gray-400 md:truncate">{item.category} · {item.supplier}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5 md:hidden"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">On hand {item.currentStock} {item.unit}</span><span className="rounded-full px-2 py-1 text-[10px] font-black" style={{ background: bg, color }}>{label}</span><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">${item.unitCost.toFixed(2)} / {item.unit}</span></div>
                   </div>
                 </div>
-                <p className="text-right text-[11px] text-gray-500 tabular-nums">{item.parLevel} <span className="text-[10px] text-gray-400">{item.unit}</span></p>
-                <p className="text-right text-[11px] font-bold tabular-nums" style={{ color: status === 'out-of-stock' ? '#DC2626' : status === 'low-stock' ? '#92400E' : '#374151' }}>
+                <p className="hidden text-right text-[11px] text-gray-500 tabular-nums md:block">{item.parLevel} <span className="text-[10px] text-gray-400">{item.unit}</span></p>
+                <p className="hidden text-right text-[11px] font-bold tabular-nums md:block" style={{ color: status === 'out-of-stock' ? '#DC2626' : status === 'low-stock' ? '#92400E' : '#374151' }}>
                   {item.currentStock} <span className="text-[10px] font-normal text-gray-400">{item.unit}</span>
                 </p>
-                <div className="flex justify-end">
+                <div className="hidden justify-end md:flex">
                   <span className="rounded-full px-2 py-1 text-[9px] font-black whitespace-nowrap" style={{ background: bg, color }}>
                     {label}
                   </span>
                 </div>
-                <p className="text-right text-[11px] font-semibold text-gray-700 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>${item.unitCost.toFixed(2)}</p>
+                <p className="hidden text-right text-[11px] font-semibold text-gray-700 tabular-nums md:block" style={{ fontFamily: 'var(--font-mono)' }}>${item.unitCost.toFixed(2)}</p>
                 <ChevronRight className="h-3.5 w-3.5 justify-self-end text-gray-300" />
               </div>
             );

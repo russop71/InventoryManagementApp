@@ -1,12 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Shield } from 'lucide-react';
+import { usePageSeo } from '../utils/seo';
 
 export function Privacy() {
+  usePageSeo({
+    title: 'ZestIQ Privacy Policy',
+    description: 'Learn how ZestIQ handles account, restaurant operations, integration, and demo-request information.',
+    path: '/privacy',
+  });
+
   return (
-    <div className="space-y-4">
+    <div className="mx-auto min-h-screen max-w-4xl space-y-4 bg-[#faf8f2] px-5 py-10 sm:px-8">
       <div>
         <h2 className="text-2xl font-semibold text-gray-900">Privacy Policy</h2>
-        <p className="text-sm text-gray-600 mt-1">Last updated: March 27, 2026</p>
+        <p className="text-sm text-gray-600 mt-1">Last updated: August 20, 2026</p>
       </div>
 
       <Card>
@@ -69,7 +76,7 @@ export function Privacy() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">5. Third-Party Integrations</h3>
             <p className="text-sm text-gray-600">
-              When you connect third-party services like Toast POS, we receive data from these platforms as necessary to provide our services. Your use of third-party integrations is subject to their respective privacy policies, and we encourage you to review them.
+              When you connect a third-party point-of-sale provider, we receive data from that platform as necessary to provide our services. Your use of third-party integrations is subject to the provider's privacy policy, and we encourage you to review it.
             </p>
           </section>
 
@@ -125,7 +132,11 @@ export function Privacy() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">12. Contact Us</h3>
             <p className="text-sm text-gray-600">
-              If you have any questions about this Privacy Policy, please contact us at privacy@zestiq.com or call (555) 123-4567.
+              If you have any questions about this Privacy Policy, please contact us at{' '}
+              <a className="font-medium text-gray-900 underline" href="mailto:privacy@zestiq.ca">
+                privacy@zestiq.ca
+              </a>
+              .
             </p>
           </section>
         </CardContent>

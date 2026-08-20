@@ -23,7 +23,7 @@ export function Help() {
   ];
 
   const popularArticles: HelpArticle[] = [
-    { id: '1', title: 'How to set up Toast POS integration', category: 'Integrations', icon: FileText },
+    { id: '1', title: 'How to connect or import from your POS', category: 'Integrations', icon: FileText },
     { id: '2', title: 'Understanding par levels and reorder points', category: 'Inventory', icon: Book },
     { id: '3', title: 'How AI forecasting works', category: 'AI & Forecasting', icon: Zap },
     { id: '4', title: 'Creating and managing recipes', category: 'Recipes', icon: Book },

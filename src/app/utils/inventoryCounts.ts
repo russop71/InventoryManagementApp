@@ -26,44 +26,10 @@ export interface InventoryCount {
   value: number;
 }
 
-const INVENTORY_COUNTS_KEY = 'inventory-counts-v1';
-
 function getInventoryStatus(current: number, par: number): InventoryCountStatus {
   if (current <= 0) return 'out-of-stock';
   if (current < par * 0.5) return 'low-stock';
   return 'in-stock';
-}
-
-export function loadInventoryCounts(): InventoryCount[] {
-  if (typeof window === 'undefined') return [];
-
-  try {
-    const raw = window.localStorage.getItem(INVENTORY_COUNTS_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw) as InventoryCount[];
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.map(count => ({
-      ...count,
-      countDate: count.countDate === 'Current inventory count' ? 'Live inventory count' : count.countDate,
-      description: count.description === 'Current inventory count' ? 'Live inventory count' : count.description,
-      countType: count.countType === 'day-start' ? 'day-start' : 'day-end',
-      entries: (count.entries || []).map(entry => ({
-        ...entry,
-        hypothetical: typeof entry.hypothetical === 'number' ? entry.hypothetical : entry.counted,
-        sales: typeof entry.sales === 'number' ? entry.sales : 0,
-        unitOptions: Array.isArray(entry.unitOptions) && entry.unitOptions.length > 0 ? entry.unitOptions.slice(0, 4) : [entry.unit],
-      })),
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export function saveInventoryCounts(counts: InventoryCount[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(INVENTORY_COUNTS_KEY, JSON.stringify(counts));
 }
 
 export function buildCountEntries(items: InventoryItem[]): InventoryCountEntry[] {

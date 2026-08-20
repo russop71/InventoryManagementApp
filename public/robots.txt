@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /employee
+Disallow: /login
+Disallow: /reset-password
+Disallow: /api/
+
+Sitemap: https://zestiq.ca/sitemap.xml

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useInventory } from '../contexts/InventoryContext';
-import { createInventoryCount, loadInventoryCounts, saveInventoryCounts, type InventoryCount } from '../utils/inventoryCounts';
+import { createInventoryCount, type InventoryCount } from '../utils/inventoryCounts';
 import { convertQuantity, formatUnitLabel, getCompatibleUnits, normalizeUnit } from '../utils/unitConversion';
 
 const Y = '#F5C10E';
@@ -12,7 +12,7 @@ const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export function InventoryCountEditor() {
   const navigate = useNavigate();
   const { countId } = useParams();
-  const { inventory } = useInventory();
+  const { inventory, inventoryCounts, finalizeInventoryCount, deleteInventoryCount } = useInventory();
 
   const [draft, setDraft] = useState<InventoryCount | null>(null);
   const [description, setDescription] = useState('');
@@ -46,8 +46,7 @@ export function InventoryCountEditor() {
   };
 
   useEffect(() => {
-    const counts = loadInventoryCounts();
-    const existing = counts.find(item => item.id === countId);
+    const existing = inventoryCounts.find(item => item.id === countId);
 
     if (countId && countId !== 'new' && existing) {
       setDraft(existing);
@@ -77,7 +76,7 @@ export function InventoryCountEditor() {
         nextCount.entries.map(entry => [entry.itemId, buildUnitSlots(entry.unit, entry.unitOptions || [])]),
       ),
     );
-  }, [countId, inventory]);
+  }, [countId, inventory, inventoryCounts]);
 
   const rows = useMemo(() => {
     if (!draft) return [];
@@ -181,21 +180,13 @@ export function InventoryCountEditor() {
       })),
     };
 
-    const counts = loadInventoryCounts();
-    const nextCounts = countId && countId !== 'new'
-      ? counts.map(item => (item.id === countId ? nextCount : item))
-      : [nextCount, ...counts.filter(item => item.id !== nextCount.id)];
-
-    saveInventoryCounts(nextCounts);
-    window.dispatchEvent(new Event('inventory-counts-updated'));
+    finalizeInventoryCount(nextCount);
     navigate('/app/inventory');
   };
 
   const handleDelete = () => {
     if (!draft) return;
-    const counts = loadInventoryCounts().filter(item => item.id !== draft.id);
-    saveInventoryCounts(counts);
-    window.dispatchEvent(new Event('inventory-counts-updated'));
+    deleteInventoryCount(draft.id);
     navigate('/app/inventory');
   };
 

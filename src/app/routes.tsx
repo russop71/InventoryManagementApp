@@ -27,6 +27,12 @@ import { Privacy } from "./pages/Privacy";
 import { Landing } from "./pages/Landing";
 import { ResetPassword } from "./pages/ResetPassword";
 import { PlatformAdmin } from "./pages/PlatformAdmin";
+import { Onboarding } from "./pages/Onboarding";
+import { LaborScheduling } from "./pages/LaborScheduling";
+import { EmployeeApp } from "./pages/EmployeeApp";
+import { BeverageCosting } from "./pages/BeverageCosting";
+import { BookDemo } from "./pages/BookDemo";
+import { RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo } from "./pages/RestaurantSeoPages";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 
@@ -40,8 +46,33 @@ export const router = createBrowserRouter([
     Component: Login,
   },
   {
+    path: "/book-demo",
+    Component: BookDemo,
+  },
+  {
+    path: "/privacy",
+    Component: Privacy,
+  },
+  {
+    path: "/restaurant-inventory-management-software",
+    Component: RestaurantInventorySeo,
+  },
+  {
+    path: "/restaurant-food-cost-software",
+    Component: RestaurantFoodCostSeo,
+  },
+  {
+    path: "/restaurant-invoice-scanner",
+    Component: RestaurantInvoiceScannerSeo,
+  },
+  {
     path: "/reset-password",
     Component: ResetPassword,
+  },
+  {
+    path: "/employee",
+    Component: AuthLayout,
+    children: [{ index: true, Component: EmployeeApp }],
   },
   {
     path: "/app",
@@ -52,6 +83,9 @@ export const router = createBrowserRouter([
         children: [
           { index: true, Component: Dashboard },
           { path: "dashboard", Component: Dashboard },
+          { path: "onboarding", Component: Onboarding },
+          { path: "labor", Component: LaborScheduling },
+          { path: "beverages", Component: BeverageCosting },
           { path: "inventory", Component: Inventory },
           { path: "inventory/counts/:countId", Component: InventoryCountEditor },
           { path: "inventory/:id", Component: InventoryDetail },

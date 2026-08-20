@@ -92,3 +92,21 @@ test('parses HTML table rows from a Marketman-style report', () => {
   assert.equal(result.salesData[0].topItems[0].itemName, 'Caesar Salad');
   assert.equal(result.salesData[0].topItems[0].quantity, 2);
 });
+
+test('normalizes common Canadian POS CSV headings, currency and business dates', () => {
+  const result = normalizePosImportPayload({
+    provider: 'touchbistro',
+    rows: [
+      { 'Business Date': '2026-08-18', 'Item Name': 'House Lager', 'Quantity Sold': '12', 'Net Sales': '$108.00', Category: 'Beer', 'Menu Price': '$9.00', Covers: '8' },
+      { 'Business Date': '2026-08-18', 'Item Name': 'House Lager', 'Quantity Sold': '3', 'Net Sales': '$27.00', Category: 'Beer', 'Menu Price': '$9.00', Covers: '0' },
+      { 'Business Date': '2026-08-19', Product: 'Cedar Salmon', 'Units Sold': '5', Sales: '$170.00', Department: 'Mains', Price: '$34.00', Guests: '5' },
+    ],
+  });
+
+  assert.equal(result.salesData.length, 2);
+  assert.equal(result.salesData[0].revenue, 135);
+  assert.equal(result.salesData[0].topItems[0].quantity, 15);
+  assert.equal(result.salesData[1].covers, 5);
+  assert.equal(result.menuItems[0].category, 'Beer');
+  assert.equal(result.menuItems[1].price, 34);
+});

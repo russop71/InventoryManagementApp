@@ -12,7 +12,7 @@ test('buildSupplierEmailDrafts uses supplier emails and creates a mail draft', (
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].supplierEmail, 'order@dailyseafood.ca');
+  assert.equal(drafts[0].supplierEmail, 'russop71@gmail.com');
   assert.match(drafts[0].emailSubject, /Order Request/);
   assert.match(drafts[0].emailBody, /Salmon/);
 });

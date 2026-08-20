@@ -8,6 +8,8 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VALID_ROLES = new Set(['Owner', 'Admin', 'Manager', 'Staff']);
 const VALID_STATUSES = new Set(['Active', 'Inactive']);
+const ONBOARDING_STEPS = ['restaurant', 'location', 'suppliers', 'inventory', 'recipes', 'count'];
+const ONBOARDING_STATUSES = new Set(['not_started', 'in_progress', 'completed', 'dismissed']);
 const BILLING_PRICE_IDS = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
 };
@@ -46,11 +48,100 @@ function accountNameFromSlug(slug) {
 }
 
 function defaultToast() {
-  return { connected: false, apiKey: '', restaurantId: '', salesData: [], menuItems: [], cogsCategories: [], lastSync: null };
+  return { connected: false, provider: 'generic', connectionMode: 'import', restaurantId: '', salesData: [], menuItems: [], cogsCategories: [], lastSync: null };
 }
 
 function defaultLocationData() {
-  return { inventory: [], recipes: [], storageAreas: [], orders: [], invoices: [], suppliers: [], preppedRecipes: [], forecasts: [], integrations: { toast: defaultToast() } };
+  return { inventory: [], recipes: [], storageAreas: [], orders: [], invoices: [], suppliers: [], preppedRecipes: [], forecasts: [], inventoryCounts: [], integrations: { toast: defaultToast() } };
+}
+
+function defaultLabor() {
+  return { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30 };
+}
+
+function normalizeLabor(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return defaultLabor();
+  const employees = Array.isArray(value.employees) ? value.employees.slice(0, 500).map(employee => ({
+    id: String(employee?.id || '').slice(0, 120),
+    name: String(employee?.name || '').trim().slice(0, 120),
+    role: String(employee?.role || '').trim().slice(0, 120),
+    hourlyRate: Math.max(0, Math.min(1000, Number(employee?.hourlyRate) || 0)),
+    active: employee?.active !== false,
+    email: String(employee?.email || '').trim().toLowerCase().slice(0, 254),
+  })).filter(employee => employee.id && employee.name) : [];
+  const employeeIds = new Set(employees.map(employee => employee.id));
+  const validStatus = new Set(['scheduled', 'confirmed', 'completed', 'called-off']);
+  const shifts = Array.isArray(value.shifts) ? value.shifts.slice(0, 10000).map(shift => ({
+    id: String(shift?.id || '').slice(0, 120),
+    employeeId: String(shift?.employeeId || '').slice(0, 120),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(shift?.date || '')) ? String(shift.date) : '',
+    start: /^\d{2}:\d{2}$/.test(String(shift?.start || '')) ? String(shift.start) : '09:00',
+    end: /^\d{2}:\d{2}$/.test(String(shift?.end || '')) ? String(shift.end) : '17:00',
+    breakMinutes: Math.max(0, Math.min(480, Number(shift?.breakMinutes) || 0)),
+    ...(Number.isFinite(Number(shift?.actualMinutes)) ? { actualMinutes: Math.max(0, Math.min(1440, Number(shift.actualMinutes))) } : {}),
+    status: validStatus.has(shift?.status) ? shift.status : 'scheduled',
+    notes: String(shift?.notes || '').slice(0, 500),
+  })).filter(shift => shift.id && shift.date && employeeIds.has(shift.employeeId)) : [];
+  const validRequestStatus = new Set(['pending', 'approved', 'declined', 'cancelled']);
+  const timeOffRequests = Array.isArray(value.timeOffRequests) ? value.timeOffRequests.slice(0, 5000).map(request => ({
+    id: String(request?.id || '').slice(0, 120), employeeId: String(request?.employeeId || '').slice(0, 120),
+    startDate: String(request?.startDate || '').slice(0, 10), endDate: String(request?.endDate || '').slice(0, 10),
+    reason: String(request?.reason || '').slice(0, 500),
+    status: validRequestStatus.has(request?.status) ? request.status : 'pending',
+    createdAt: String(request?.createdAt || new Date().toISOString()).slice(0, 40),
+  })).filter(request => request.id && employeeIds.has(request.employeeId)) : [];
+  const validSwapStatus = new Set(['pending', 'accepted', 'approved', 'declined', 'cancelled']);
+  const shiftIds = new Set(shifts.map(shift => shift.id));
+  const shiftSwapRequests = Array.isArray(value.shiftSwapRequests) ? value.shiftSwapRequests.slice(0, 5000).map(request => ({
+    id: String(request?.id || '').slice(0, 120), shiftId: String(request?.shiftId || '').slice(0, 120),
+    requesterEmployeeId: String(request?.requesterEmployeeId || '').slice(0, 120),
+    targetEmployeeId: String(request?.targetEmployeeId || '').slice(0, 120), note: String(request?.note || '').slice(0, 500),
+    status: validSwapStatus.has(request?.status) ? request.status : 'pending',
+    createdAt: String(request?.createdAt || new Date().toISOString()).slice(0, 40),
+  })).filter(request => request.id && shiftIds.has(request.shiftId) && employeeIds.has(request.requesterEmployeeId)) : [];
+  return {
+    employees,
+    shifts,
+    timeOffRequests,
+    shiftSwapRequests,
+    targetLaborPercent: Math.max(0, Math.min(100, Number(value.targetLaborPercent) || 30)),
+  };
+}
+
+function defaultOnboardingState() {
+  return {
+    status: 'not_started',
+    currentStep: 'restaurant',
+    completedSteps: [],
+    skippedSteps: [],
+    startedAt: null,
+    completedAt: null,
+    updatedAt: null,
+  };
+}
+
+function normalizeOnboardingState(value) {
+  const base = defaultOnboardingState();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return base;
+  const completedSteps = Array.isArray(value.completedSteps)
+    ? [...new Set(value.completedSteps.filter(step => ONBOARDING_STEPS.includes(step)))]
+    : [];
+  const skippedSteps = Array.isArray(value.skippedSteps)
+    ? [...new Set(value.skippedSteps.filter(step => ONBOARDING_STEPS.includes(step)))]
+    : [];
+  return {
+    status: ONBOARDING_STATUSES.has(value.status) ? value.status : base.status,
+    currentStep: ONBOARDING_STEPS.includes(value.currentStep) ? value.currentStep : base.currentStep,
+    completedSteps,
+    skippedSteps,
+    startedAt: typeof value.startedAt === 'string' ? value.startedAt : null,
+    completedAt: typeof value.completedAt === 'string' ? value.completedAt : null,
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
+  };
+}
+
+function mapAccount(row) {
+  return { id: row.id, name: row.name, onboarding: normalizeOnboardingState(row.onboarding_state) };
 }
 
 async function parseResponse(response) {
@@ -257,6 +348,7 @@ function mapLocationData(row) {
     suppliers: row?.suppliers || [],
     preppedRecipes: row?.prepped_recipes || [],
     forecasts: row?.forecasts || [],
+    inventoryCounts: row?.inventory_counts || [],
     integrations: row?.integrations || base.integrations,
   };
 }
@@ -505,7 +597,7 @@ async function sessionPayload(tokenPayload) {
     refreshToken: tokenPayload.refresh_token,
     expiresAt: tokenPayload.expires_at || (Math.floor(Date.now() / 1000) + Number(tokenPayload.expires_in || 3600)),
     user: mapSessionUser(appUser, authUser),
-    account: { id: account.id, name: account.name },
+    account: mapAccount(account),
     locations: locations.map(mapLocation),
     activeLocationId: locations[0]?.id || null,
   };
@@ -626,7 +718,7 @@ export default async function handler(req, res) {
         refreshToken: null,
         expiresAt: null,
         user: mapSessionUser(auth.appUser, auth.authUser),
-        account: { id: account.id, name: account.name },
+        account: mapAccount(account),
         locations: locations.map(mapLocation),
         activeLocationId: locations[0]?.id || null,
       });
@@ -812,7 +904,10 @@ export default async function handler(req, res) {
 
     if (segments[0] !== 'accounts' || !segments[1]) return json(res, 404, { error: 'not found' });
     const requestedAccountId = segments[1];
-    const ownerOnly = segments[2] === 'users' || segments[2] === 'billing' || (segments.length === 2 && method === 'DELETE');
+    const ownerOnly = segments[2] === 'users'
+      || segments[2] === 'billing'
+      || ((segments[2] === 'profile' || segments[2] === 'onboarding') && method !== 'GET')
+      || (segments.length === 2 && method === 'DELETE');
     const access = await requireAccountAccess(req, requestedAccountId, { ownerOnly });
     const account = access.account;
     const accountId = account.id;
@@ -826,6 +921,49 @@ export default async function handler(req, res) {
       }
       await supabase(`accounts?id=eq.${accountId}`, { method: 'DELETE', prefer: 'return=minimal' });
       return json(res, 200, { success: true });
+    }
+
+    if (segments[2] === 'profile' && method === 'PATCH') {
+      const name = String(req.body?.name || '').trim();
+      if (name.length < 2 || name.length > 120) {
+        return json(res, 400, { error: 'Restaurant name must be between 2 and 120 characters' });
+      }
+      const updated = await supabase(`accounts?id=eq.${accountId}&select=*`, {
+        method: 'PATCH',
+        prefer: 'return=representation',
+        body: { name, updated_at: new Date().toISOString() },
+      });
+      return json(res, 200, { account: mapAccount(updated[0] || { ...account, name }) });
+    }
+
+    if (segments[2] === 'onboarding') {
+      if (method === 'GET') {
+        return json(res, 200, { onboarding: normalizeOnboardingState(account.onboarding_state) });
+      }
+      if (method === 'PATCH') {
+        const current = normalizeOnboardingState(account.onboarding_state);
+        const requested = req.body || {};
+        const status = requested.status === undefined ? current.status : String(requested.status);
+        const currentStep = requested.currentStep === undefined ? current.currentStep : String(requested.currentStep);
+        if (!ONBOARDING_STATUSES.has(status)) return json(res, 400, { error: 'Invalid onboarding status' });
+        if (!ONBOARDING_STEPS.includes(currentStep)) return json(res, 400, { error: 'Invalid onboarding step' });
+        const now = new Date().toISOString();
+        const onboarding = normalizeOnboardingState({
+          ...current,
+          ...requested,
+          status,
+          currentStep,
+          startedAt: current.startedAt || (status === 'in_progress' ? now : null),
+          completedAt: status === 'completed' ? (current.completedAt || now) : null,
+          updatedAt: now,
+        });
+        await supabase(`accounts?id=eq.${accountId}`, {
+          method: 'PATCH',
+          prefer: 'return=minimal',
+          body: { onboarding_state: onboarding, updated_at: now },
+        });
+        return json(res, 200, { onboarding });
+      }
     }
 
     if (segments[2] === 'usage') {
@@ -1056,6 +1194,87 @@ export default async function handler(req, res) {
       if (!location) return json(res, 404, { error: 'location not found' });
       const locationId = location.id;
 
+      if (segments.length === 4 && method === 'PATCH') {
+        if (!['Owner', 'Admin'].includes(access.appUser.role)) {
+          return json(res, 403, { error: 'Owner or admin access is required to rename a location' });
+        }
+        const name = String(req.body?.name || '').trim();
+        if (name.length < 2 || name.length > 120) {
+          return json(res, 400, { error: 'Location name must be between 2 and 120 characters' });
+        }
+        await supabase(`locations?id=eq.${locationId}&account_id=eq.${accountId}`, {
+          method: 'PATCH',
+          prefer: 'return=minimal',
+          body: { name, updated_at: new Date().toISOString() },
+        });
+        const all = await listLocations(accountId);
+        return json(res, 200, { locations: all.map(mapLocation) });
+      }
+
+      if (segments[4] === 'labor') {
+        const rows = await supabase(`location_data?location_id=eq.${locationId}&select=*`);
+        const current = rows?.[0] || { location_id: locationId };
+        const integrations = current.integrations && typeof current.integrations === 'object' ? current.integrations : { toast: defaultToast() };
+        if (segments[5] === 'requests' && method === 'POST') {
+          const labor = normalizeLabor(integrations.labor);
+          const requestType = req.body?.type;
+          const incoming = req.body?.request || {};
+          const canManageLabor = ['Owner', 'Admin', 'Manager'].includes(access.appUser.role);
+          const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
+          if (!canManageLabor && !linkedEmployee) return json(res, 403, { error: 'Your login is not linked to an employee profile' });
+          if (!canManageLabor && incoming.employeeId !== linkedEmployee.id && incoming.requesterEmployeeId !== linkedEmployee.id) {
+            return json(res, 403, { error: 'Employees can only submit their own schedule requests' });
+          }
+          if (requestType === 'time-off') labor.timeOffRequests = [incoming, ...labor.timeOffRequests];
+          else if (requestType === 'shift-swap') {
+            const shift = labor.shifts.find(item => item.id === incoming.shiftId);
+            if (!shift || (!canManageLabor && shift.employeeId !== linkedEmployee.id)) return json(res, 403, { error: 'You can only swap one of your own upcoming shifts' });
+            labor.shiftSwapRequests = [incoming, ...labor.shiftSwapRequests];
+          } else return json(res, 400, { error: 'Unsupported labour request type' });
+          const normalized = normalizeLabor(labor);
+          await supabase(`location_data?location_id=eq.${locationId}`, { method: 'PATCH', prefer: 'return=minimal', body: { integrations: { ...integrations, labor: normalized }, updated_at: new Date().toISOString() } });
+          return json(res, 201, normalized);
+        }
+        if (segments[5] === 'requests' && method === 'PATCH') {
+          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) return json(res, 403, { error: 'Manager access is required to approve requests' });
+          const labor = normalizeLabor(integrations.labor);
+          const id = String(req.body?.id || '');
+          const status = String(req.body?.status || '');
+          if (!['approved', 'declined', 'cancelled'].includes(status)) return json(res, 400, { error: 'Unsupported request status' });
+          if (req.body?.type === 'time-off') labor.timeOffRequests = labor.timeOffRequests.map(request => request.id === id ? { ...request, status } : request);
+          else if (req.body?.type === 'shift-swap') {
+            labor.shiftSwapRequests = labor.shiftSwapRequests.map(request => request.id === id ? { ...request, status } : request);
+            const approved = labor.shiftSwapRequests.find(request => request.id === id && status === 'approved');
+            if (approved?.targetEmployeeId) labor.shifts = labor.shifts.map(shift => shift.id === approved.shiftId ? { ...shift, employeeId: approved.targetEmployeeId } : shift);
+          } else return json(res, 400, { error: 'Unsupported labour request type' });
+          const normalized = normalizeLabor(labor);
+          await supabase(`location_data?location_id=eq.${locationId}`, { method: 'PATCH', prefer: 'return=minimal', body: { integrations: { ...integrations, labor: normalized }, updated_at: new Date().toISOString() } });
+          return json(res, 200, normalized);
+        }
+        if (method === 'GET') {
+          const labor = normalizeLabor(integrations.labor);
+          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) {
+            const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
+            labor.employees = labor.employees.map(employee => ({ ...employee, hourlyRate: 0, email: employee.id === linkedEmployee?.id ? employee.email : '' }));
+            labor.shifts = labor.shifts.filter(shift => shift.employeeId === linkedEmployee?.id);
+            labor.timeOffRequests = labor.timeOffRequests.filter(request => request.employeeId === linkedEmployee?.id);
+            labor.shiftSwapRequests = labor.shiftSwapRequests.filter(request => request.requesterEmployeeId === linkedEmployee?.id || request.targetEmployeeId === linkedEmployee?.id);
+          }
+          return json(res, 200, labor);
+        }
+        if (method === 'PUT') {
+          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) {
+            return json(res, 403, { error: 'Owner, admin or manager access is required to manage labour' });
+          }
+          const labor = normalizeLabor(req.body);
+          await supabase(`location_data?location_id=eq.${locationId}`, {
+            method: 'PATCH', prefer: 'return=minimal',
+            body: { integrations: { ...integrations, labor }, updated_at: new Date().toISOString() },
+          });
+          return json(res, 200, labor);
+        }
+      }
+
       if (segments[4] === 'data') {
         const rows = await supabase(`location_data?location_id=eq.${locationId}&select=*`);
         const current = rows?.[0] || { location_id: locationId };
@@ -1075,6 +1294,7 @@ export default async function handler(req, res) {
             suppliers: Array.isArray(body.suppliers) ? body.suppliers : (current.suppliers || []),
             prepped_recipes: Array.isArray(body.preppedRecipes) ? body.preppedRecipes : (current.prepped_recipes || []),
             forecasts: Array.isArray(body.forecasts) ? body.forecasts : (current.forecasts || []),
+            inventory_counts: Array.isArray(body.inventoryCounts) ? body.inventoryCounts : (current.inventory_counts || []),
             integrations: current.integrations || { toast: defaultToast() },
             updated_at: new Date().toISOString(),
           };
@@ -1092,7 +1312,8 @@ export default async function handler(req, res) {
           const payload = req.body || {};
           const toastData = {
             connected: typeof payload.connected === 'boolean' ? payload.connected : Boolean(existingToast.connected),
-            apiKey: typeof payload.apiKey === 'string' ? payload.apiKey : (existingToast.apiKey || ''),
+            provider: typeof payload.provider === 'string' ? payload.provider.slice(0, 80) : (existingToast.provider || 'generic'),
+            connectionMode: payload.connectionMode === 'direct' ? 'direct' : 'import',
             restaurantId: typeof payload.restaurantId === 'string' ? payload.restaurantId : (existingToast.restaurantId || ''),
             salesData: Array.isArray(payload.salesData) ? payload.salesData : (existingToast.salesData || []),
             menuItems: Array.isArray(payload.menuItems) ? payload.menuItems : (existingToast.menuItems || []),
@@ -1105,7 +1326,16 @@ export default async function handler(req, res) {
         }
         if (segments[6] === 'import' && method === 'POST') {
           const normalized = normalizePosImportPayload(req.body || {});
-          const toastData = { ...existingToast, connected: true, salesData: normalized.salesData, menuItems: normalized.menuItems, lastSync: new Date().toISOString() };
+          if (!normalized.salesData.length) return json(res, 400, { error: 'No valid sales rows were found in that export' });
+          const toastData = {
+            ...existingToast,
+            connected: true,
+            provider: String(req.body?.provider || existingToast.provider || 'generic').slice(0, 80),
+            connectionMode: 'import',
+            salesData: normalized.salesData,
+            menuItems: normalized.menuItems,
+            lastSync: new Date().toISOString(),
+          };
           const integrations = { ...(current.integrations || {}), toast: toastData };
           await supabase(`location_data?location_id=eq.${locationId}`, { method: 'PATCH', prefer: 'return=minimal', body: { integrations, updated_at: new Date().toISOString() } });
           return json(res, 200, { toast: toastData });

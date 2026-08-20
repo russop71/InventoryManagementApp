@@ -9,6 +9,19 @@ export interface AccountLocation {
   name: string;
 }
 
+export type OnboardingStepId = 'restaurant' | 'location' | 'suppliers' | 'inventory' | 'recipes' | 'count';
+export type OnboardingStatus = 'not_started' | 'in_progress' | 'completed' | 'dismissed';
+
+export interface OnboardingProgress {
+  status: OnboardingStatus;
+  currentStep: OnboardingStepId;
+  completedSteps: OnboardingStepId[];
+  skippedSteps: OnboardingStepId[];
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface AuthUser {
   id?: string;
   email: string;
@@ -22,6 +35,7 @@ interface AuthContextType {
   user: AuthUser | null;
   accountId: string | null;
   accountName: string;
+  onboarding: OnboardingProgress;
   locations: AccountLocation[];
   activeLocationId: string | null;
   token: string | null;
@@ -32,6 +46,9 @@ interface AuthContextType {
   deleteCurrentAccount: () => Promise<void>;
   switchLocation: (locationId: string) => void;
   addLocation: (locationName: string) => Promise<void>;
+  updateLocation: (locationId: string, locationName: string) => Promise<void>;
+  updateAccountProfile: (accountName: string) => Promise<void>;
+  updateOnboarding: (updates: Partial<OnboardingProgress>) => Promise<OnboardingProgress>;
   updateLocalAccountProfile: (updates: { name?: string; accountName?: string }) => void;
 }
 
@@ -51,6 +68,7 @@ interface AuthApiResponse {
   account: {
     id: string;
     name: string;
+    onboarding?: OnboardingProgress;
   };
   locations: AccountLocation[];
   activeLocationId: string;
@@ -61,6 +79,7 @@ interface AuthState {
   user: AuthUser | null;
   accountId: string | null;
   accountName: string;
+  onboarding: OnboardingProgress;
   locations: AccountLocation[];
   activeLocationId: string | null;
   token: string | null;
@@ -68,6 +87,15 @@ interface AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_SESSION_KEY = 'zestiq:auth:session';
+const DEFAULT_ONBOARDING: OnboardingProgress = {
+  status: 'not_started',
+  currentStep: 'restaurant',
+  completedSteps: [],
+  skippedSteps: [],
+  startedAt: null,
+  completedAt: null,
+  updatedAt: null,
+};
 
 function readStoredSession(): StoredSession | null {
   const raw = localStorage.getItem(AUTH_SESSION_KEY);
@@ -93,6 +121,7 @@ function signedOutState(): AuthState {
     user: null,
     accountId: null,
     accountName: '',
+    onboarding: DEFAULT_ONBOARDING,
     locations: [],
     activeLocationId: null,
     token: null,
@@ -120,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: payload.user,
       accountId: payload.account.id,
       accountName: payload.account.name,
+      onboarding: payload.account.onboarding || DEFAULT_ONBOARDING,
       locations: payload.locations,
       activeLocationId,
       token: payload.token,
@@ -237,12 +267,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const updateLocation = async (locationId: string, locationName: string) => {
+    const normalizedName = locationName.trim();
+    const accountId = authState.accountId;
+    if (!normalizedName || !accountId) return;
+    const payload = await apiRequest<{ locations: AccountLocation[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(locationId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: normalizedName }),
+    });
+    setAuthState(current => ({ ...current, locations: payload.locations }));
+  };
+
+  const updateAccountProfile = async (accountName: string) => {
+    const normalizedName = accountName.trim();
+    const accountId = authState.accountId;
+    if (!normalizedName || !accountId) return;
+    const payload = await apiRequest<{ account: { id: string; name: string; onboarding: OnboardingProgress } }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/profile`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: normalizedName }),
+    });
+    setAuthState(current => ({
+      ...current,
+      accountName: payload.account.name,
+      onboarding: payload.account.onboarding || current.onboarding,
+    }));
+  };
+
+  const updateOnboarding = async (updates: Partial<OnboardingProgress>) => {
+    const accountId = authState.accountId;
+    if (!accountId) throw new Error('No company account is selected');
+    const payload = await apiRequest<{ onboarding: OnboardingProgress }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/onboarding`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    setAuthState(current => ({ ...current, onboarding: payload.onboarding }));
+    return payload.onboarding;
+  };
+
   const value = useMemo(
     () => ({
       isAuthenticated: authState.isAuthenticated,
       user: authState.user,
       accountId: authState.accountId,
       accountName: authState.accountName,
+      onboarding: authState.onboarding,
       locations: authState.locations,
       activeLocationId: authState.activeLocationId,
       token: authState.token,
@@ -253,6 +321,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteCurrentAccount,
       switchLocation,
       addLocation,
+      updateLocation,
+      updateAccountProfile,
+      updateOnboarding,
       updateLocalAccountProfile,
     }),
     [authState],

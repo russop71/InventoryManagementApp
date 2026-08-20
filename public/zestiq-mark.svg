@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ZestIQ">
+  <rect width="256" height="256" rx="60" fill="#F5C10E"/>
+  <path d="M62 72h132L83 184h111" fill="none" stroke="#0B1220" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M147 51c15-25 46-27 60-10-12 21-41 28-60 10Z" fill="#59A64A"/>
+</svg>

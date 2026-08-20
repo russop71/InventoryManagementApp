@@ -55,7 +55,7 @@ export function Terms() {
           <section>
             <h3 className="font-semibold text-gray-900 mb-2">5. Third-Party Integrations</h3>
             <p className="text-sm text-gray-600">
-              The Service may integrate with third-party services such as Toast POS. You acknowledge that your use of these integrations is subject to the respective third-party's terms of service and privacy policies.
+              The Service may integrate with third-party point-of-sale providers. You acknowledge that your use of these integrations is subject to the respective third party's terms of service and privacy policies.
             </p>
           </section>
 

@@ -52,12 +52,13 @@ function normalizeValue(value) {
 }
 
 export function parseInventoryCountCsv(text) {
+  const optionalNumber = value => String(value ?? '').trim() === '' ? null : Number(value);
   return csvToRows(text)
     .map(row => ({
       name: row.name || row.item || row['item name'] || row['inventory item'] || '',
-      currentStock: Number(row.currentstock || row.onhand || row.count || row.quantity || 0),
-      parLevel: Number(row.parlevel || row.par || row.minonhand || 0),
-      unitCost: Number(row.unitcost || row.cost || row.price || 0),
+      currentStock: optionalNumber(row.currentstock || row.onhand || row.count || row.quantity),
+      parLevel: optionalNumber(row.parlevel || row.par || row.minonhand),
+      unitCost: optionalNumber(row.unitcost || row.cost || row.price),
       supplier: row.supplier || row.vendor || '',
       category: row.category || row.group || '',
     }))

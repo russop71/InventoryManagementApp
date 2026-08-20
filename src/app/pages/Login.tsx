@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Input } from '../components/ui/input';
 import { Building, Lock, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,6 +28,9 @@ function ZestIQLogo({ size = 64 }: { size?: number }) {
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedReturnTo = new URLSearchParams(location.search).get('returnTo');
+  const returnTo = requestedReturnTo === '/employee' ? '/employee' : '/app';
   const [name, setName]           = useState('');
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail]         = useState('');
@@ -74,7 +77,7 @@ export function Login() {
       } else {
         await login(email, password);
         toast.success('Welcome back!');
-        navigate('/app');
+        navigate(returnTo);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : isSignup ? 'Unable to create account' : 'Unable to sign in');
@@ -88,7 +91,7 @@ export function Login() {
     try {
       await login('demo@zestiq.com', 'demo');
       toast.success('Logged in as Demo User');
-      navigate('/app');
+      navigate(returnTo);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Demo login failed');
     }

@@ -112,7 +112,7 @@ export function Forecasting() {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [draftEmails, setDraftEmails] = useState<SupplierEmail[]>([]);
 
-  // Calculate predicted item usage based on Toast sales data
+  // Calculate predicted item usage based on connected POS sales data
   const handleAutoPredict = async () => {
     if (!selectedDate || !expectedRevenue) {
       toast.error('Please enter a date and expected revenue');
@@ -120,7 +120,7 @@ export function Forecasting() {
     }
 
     if (!isConnected || salesData.length === 0) {
-      toast.error('Connect to Toast POS first so AI can learn from historical sales');
+      toast.error('Connect POS sales first so AI can learn from historical sales');
       return;
     }
 
@@ -352,7 +352,7 @@ Kitchen Management Team`;
     window.location.href = mailtoLink;
   };
 
-  // Calculate average revenue from Toast data for placeholder
+  // Calculate average revenue from connected POS data for placeholder
   const avgRevenue = isConnected && salesData.length > 0
     ? Math.round(salesData.reduce((sum, day) => sum + day.revenue, 0) / salesData.length)
     : 0;
@@ -375,7 +375,7 @@ Kitchen Management Team`;
             <DialogHeader>
               <DialogTitle>Create Sales Forecast</DialogTitle>
               <DialogDescription>
-                Use AI to predict ingredient usage based on Toast sales data.
+                Use AI to predict ingredient usage based on connected POS sales data.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddForecast} className="space-y-4">
@@ -415,7 +415,7 @@ Kitchen Management Team`;
                       disabled={!expectedRevenue || !selectedDate}
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
-                      Auto-Predict from Toast Sales
+                      Auto-Predict from POS Sales
                     </Button>
                     {avgRevenue > 0 && (
                       <p className="text-xs text-purple-700 mt-2 text-center">
@@ -539,7 +539,7 @@ Kitchen Management Team`;
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center">
                 <ShoppingBag className="w-5 h-5 mr-2 text-orange-600" />
-                Toast Sales Insights
+                POS Sales Insights
               </CardTitle>
               <Badge className="bg-orange-500 text-white">Live</Badge>
             </div>

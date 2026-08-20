@@ -3,21 +3,19 @@ import { router } from './routes';
 import { InventoryProvider } from './contexts/InventoryContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { LaborProvider } from './contexts/LaborContext';
 import { Toaster } from './components/ui/sonner';
-import { useEffect } from 'react';
 
 function App() {
-  useEffect(() => {
-    document.title = 'zestIQ - Restaurant Inventory Management';
-  }, []);
-
   return (
     <AuthProvider>
       <InventoryProvider>
-        <ToastProvider>
-          <RouterProvider router={router} />
-          <Toaster />
-        </ToastProvider>
+        <LaborProvider>
+          <ToastProvider>
+            <RouterProvider router={router} />
+            <Toaster />
+          </ToastProvider>
+        </LaborProvider>
       </InventoryProvider>
     </AuthProvider>
   );

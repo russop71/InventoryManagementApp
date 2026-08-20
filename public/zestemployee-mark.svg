@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ZestEmployee">
+  <rect width="512" height="512" rx="116" fill="#0B1220"/>
+  <path d="M129 126h254L171 337h212" fill="none" stroke="#F5C10E" stroke-width="60" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M284 82c30-48 89-51 115-18-23 40-78 53-115 18Z" fill="#59A64A"/>
+  <text x="256" y="436" text-anchor="middle" fill="#F5C10E" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="800" letter-spacing="7">EMPLOYEE</text>
+</svg>

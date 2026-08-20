@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-import { useInventory, type Recipe, type ToastMenuItem as InventoryToastMenuItem } from './InventoryContext';
+import { useInventory, type Recipe } from './InventoryContext';
 import { locationScopedStorageKey, readScopedJson } from '../utils/storageScope';
 import { apiRequest } from '../utils/api';
 
@@ -8,11 +8,7 @@ export interface ToastSalesData {
   date: string;
   covers: number;
   revenue: number;
-  topItems: {
-    itemName: string;
-    quantity: number;
-    revenue: number;
-  }[];
+  topItems: { itemName: string; quantity: number; revenue: number }[];
 }
 
 export interface ToastMenuItem {
@@ -21,41 +17,49 @@ export interface ToastMenuItem {
   category: string;
   cogsCategoryId?: string;
   price: number;
-  ingredients: {
-    inventoryItemId: string;
-    quantity: number;
-  }[];
+  ingredients: { inventoryItemId: string; quantity: number }[];
 }
 
-export interface CogsCategory {
-  id: string;
-  name: string;
-  color: string;
+export interface CogsCategory { id: string; name: string; color: string }
+
+export interface PosImportPayload {
+  provider?: string;
+  date?: string;
+  period?: string;
+  covers?: number;
+  revenue?: number;
+  rows?: Record<string, unknown>[];
+  salesData?: ToastSalesData[];
+  history?: ToastSalesData[];
+  menuItems?: ToastMenuItem[];
+  [key: string]: unknown;
 }
 
-interface ToastIntegrationPayload {
-  toast: {
-    connected: boolean;
-    apiKey: string;
-    restaurantId: string;
-    salesData: ToastSalesData[];
-    menuItems: ToastMenuItem[];
-    cogsCategories: CogsCategory[];
-    lastSync: string | null;
-  };
+interface PosState {
+  connected: boolean;
+  provider?: string;
+  connectionMode?: 'import' | 'direct';
+  restaurantId?: string;
+  salesData: ToastSalesData[];
+  menuItems: ToastMenuItem[];
+  cogsCategories: CogsCategory[];
+  lastSync: string | null;
 }
+
+interface ToastIntegrationPayload { toast: PosState }
 
 interface ToastContextType {
   isConnected: boolean;
-  apiKey: string;
+  provider: string;
+  connectionMode: 'import' | 'direct';
   restaurantId: string;
   salesData: ToastSalesData[];
   menuItems: ToastMenuItem[];
   cogsCategories: CogsCategory[];
-  connectToast: (apiKey: string, restaurantId: string) => void;
+  selectPosProvider: (provider: string) => void;
   disconnectToast: () => void;
   syncData: () => Promise<void>;
-  importSalesData: (payload: { salesData?: ToastSalesData[]; history?: ToastSalesData[]; menuItems?: ToastMenuItem[] }) => Promise<void>;
+  importSalesData: (payload: PosImportPayload) => Promise<void>;
   addCogsCategory: (name: string) => void;
   updateCogsCategory: (id: string, name: string) => void;
   deleteCogsCategory: (id: string) => void;
@@ -64,438 +68,153 @@ interface ToastContextType {
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
-const SALES_INTEGRATION_PAUSED = true;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const { accountId, activeLocationId, token } = useAuth();
-  const { recipes, inventory, syncToastMenuItems } = useInventory();
-
-  const buildToastMenuItemsFromRecipes = (sourceRecipes: Recipe[]): ToastMenuItem[] => {
-    return sourceRecipes
-      .map(recipe => ({
-        id: recipe.externalId || recipe.id,
-        name: recipe.menuItemName,
-        category: recipe.category,
-        cogsCategoryId: recipe.source === 'toast' ? recipe.externalId : undefined,
-        price: recipe.price,
-        ingredients: recipe.ingredients.map(ingredient => ({
-          inventoryItemId: ingredient.inventoryItemId,
-          quantity: ingredient.quantity,
-        })),
-      }));
-  };
-
-  const buildFallbackToastState = (sourceRecipes: Recipe[]) => {
-    const fallbackMenuItems = buildToastMenuItemsFromRecipes(sourceRecipes);
-    const seededMenuItems = fallbackMenuItems.length > 0
-      ? fallbackMenuItems
-      : [
-          { id: 'demo-toast-brunch-burger', name: 'Brunch Burger', category: 'Sandwich', price: 24, ingredients: [] },
-          { id: 'demo-toast-margherita-pizza', name: 'Margherita Pizza', category: 'Pizza', price: 22, ingredients: [] },
-          { id: 'demo-toast-chicken-sandwich', name: 'Chicken Sandwich', category: 'Sandwich', price: 19, ingredients: [] },
-        ];
-
-    return {
-      menuItems: seededMenuItems,
-      salesData: buildToastSalesData(seededMenuItems),
-    };
-  };
-
-  const buildToastSalesData = (sourceMenuItems: ToastMenuItem[]): ToastSalesData[] => {
-    const dates = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - index));
-      return date.toISOString().split('T')[0];
-    });
-
-    return dates.map((date, dayIndex) => {
-      const topItems = sourceMenuItems.length > 0
-        ? sourceMenuItems
-            .map((item, itemIndex) => {
-              const baseVolume = Math.max(2, Math.round((item.price / 14) + ((dayIndex + itemIndex) % 3) + 1));
-              const volumeMultiplier = dayIndex % 2 === 0 ? 1.1 : 0.95;
-              const quantity = Math.max(1, Math.round(baseVolume * volumeMultiplier));
-              return {
-                itemName: item.name,
-                quantity,
-                revenue: quantity * Math.max(item.price, 1),
-              };
-            })
-            .sort((left, right) => right.revenue - left.revenue)
-            .slice(0, 5)
-        : [];
-
-      const revenue = topItems.reduce((sum, item) => sum + item.revenue, 0);
-      const covers = Math.max(1, Math.round(revenue / 24));
-
-      return {
-        date,
-        covers,
-        revenue,
-        topItems,
-      };
-    });
-  };
-
-  const buildSeededToastState = (sourceRecipes: Recipe[]) => {
-    const fallbackMenuItems = buildToastMenuItemsFromRecipes(sourceRecipes);
-    const seededMenuItems = fallbackMenuItems.length > 0
-      ? fallbackMenuItems
-      : [
-          { id: 'toast-demo-burger', name: 'Brunch Burger', category: 'Sandwich', price: 24, ingredients: [] },
-          { id: 'toast-demo-pizza', name: 'Margherita Pizza', category: 'Pizza', price: 22, ingredients: [] },
-          { id: 'toast-demo-sandwich', name: 'Chicken Sandwich', category: 'Sandwich', price: 19, ingredients: [] },
-        ];
-
-    return {
-      menuItems: seededMenuItems,
-      salesData: buildToastSalesData(seededMenuItems),
-    };
-  };
-
+  const { accountId, activeLocationId, token, user } = useAuth();
+  const { recipes, syncToastMenuItems } = useInventory();
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const [isHydrated, setIsHydrated] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
-  const [apiKey, setApiKey] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
+  const [provider, setProvider] = useState('generic');
+  const [connectionMode, setConnectionMode] = useState<'import' | 'direct'>('import');
   const [restaurantId, setRestaurantId] = useState('');
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [cogsCategories, setCogsCategories] = useState<CogsCategory[]>([]);
-  const [salesData, setSalesData] = useState<ToastSalesData[]>(() => (SALES_INTEGRATION_PAUSED ? [] : buildToastSalesData([])));
+  const [salesData, setSalesData] = useState<ToastSalesData[]>([]);
   const [menuItems, setMenuItems] = useState<ToastMenuItem[]>([]);
+
+  const buildMenuItemsFromRecipes = (sourceRecipes: Recipe[]): ToastMenuItem[] => sourceRecipes.map(recipe => ({
+    id: recipe.externalId || recipe.id,
+    name: recipe.menuItemName,
+    category: recipe.category,
+    cogsCategoryId: recipe.source === 'toast' ? recipe.externalId : undefined,
+    price: recipe.price,
+    ingredients: recipe.ingredients.map(ingredient => ({ inventoryItemId: ingredient.inventoryItemId, quantity: ingredient.quantity })),
+  }));
+
+  const buildDemoSales = (items: ToastMenuItem[]): ToastSalesData[] => Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    const topItems = items.slice(0, 6).map((item, itemIndex) => {
+      const quantity = 12 + ((index * 7 + itemIndex * 5) % 28);
+      return { itemName: item.name, quantity, revenue: quantity * Math.max(item.price, 1) };
+    }).sort((left, right) => right.revenue - left.revenue).slice(0, 5);
+    const revenue = topItems.reduce((sum, item) => sum + item.revenue, 0);
+    return { date: date.toISOString().split('T')[0], covers: Math.max(1, Math.round(revenue / 31)), revenue, topItems };
+  });
+
+  const demoState = () => {
+    const recipeItems = buildMenuItemsFromRecipes(recipes);
+    const items = recipeItems.length > 0 ? recipeItems : [
+      { id: 'demo-burger', name: 'Brunch Burger', category: 'Food', price: 24, ingredients: [] },
+      { id: 'demo-salmon', name: 'Cedar Salmon', category: 'Food', price: 34, ingredients: [] },
+      { id: 'demo-negroni', name: 'House Negroni', category: 'Cocktail', price: 16, ingredients: [] },
+    ];
+    return { items, sales: buildDemoSales(items) };
+  };
 
   useEffect(() => {
     if (!accountId || !activeLocationId) {
-      setIsConnected(false);
-      setApiKey('');
-      setRestaurantId('');
-      setLastSync(null);
-      setCogsCategories([]);
-      setSalesData([]);
-      setMenuItems([]);
-      setIsHydrated(false);
+      setIsConnected(false); setProvider('generic'); setConnectionMode('import'); setRestaurantId('');
+      setLastSync(null); setCogsCategories([]); setSalesData([]); setMenuItems([]); setIsHydrated(false);
       return;
     }
 
-    if (SALES_INTEGRATION_PAUSED) {
-      setIsConnected(false);
-      setApiKey('');
-      setRestaurantId('');
-      setLastSync(null);
-      setCogsCategories([]);
-      setSalesData([]);
-      setMenuItems([]);
+    const read = <T,>(name: string, fallback: T) => readScopedJson<T>(locationScopedStorageKey(accountId, activeLocationId, name), fallback);
+    const restoreLocal = () => {
+      const restoredSales = read<ToastSalesData[]>('toastSalesData', []);
+      const restoredMenu = read<ToastMenuItem[]>('toastMenuItems', []);
+      const demo = isDemoAccount && (!restoredSales.length || !restoredMenu.length) ? demoState() : null;
+      const nextSales = restoredSales.length ? restoredSales : demo?.sales || [];
+      const nextMenu = restoredMenu.length ? restoredMenu : demo?.items || [];
+      setProvider(read<string>('posProvider', isDemoAccount ? 'toast' : 'generic'));
+      setConnectionMode(read<'import' | 'direct'>('posConnectionMode', 'import'));
+      setRestaurantId(read<string>('toastRestaurantId', ''));
+      setLastSync(read<string | null>('toastLastSync', isDemoAccount ? new Date().toISOString() : null));
+      setCogsCategories(read<CogsCategory[]>('toastCogsCategories', []));
+      setSalesData(nextSales); setMenuItems(nextMenu);
+      setIsConnected(read<boolean>('toastConnected', false) || nextSales.length > 0 || nextMenu.length > 0);
       setIsHydrated(true);
-      return;
-    }
-
-    const key = (name: string) => locationScopedStorageKey(accountId, activeLocationId, name);
-    const readScopedValue = <T,>(name: string, fallback: T): T => {
-      const scopedKey = key(name);
-      return readScopedJson<T>(scopedKey, fallback);
     };
 
-    const readScopedString = (name: string, fallback: string): string => {
-      const scopedKey = key(name);
-      const scopedRaw = localStorage.getItem(scopedKey);
-      if (scopedRaw !== null) {
-        try {
-          return JSON.parse(scopedRaw) as string;
-        } catch {
-          return scopedRaw;
-        }
-      }
-
-      return fallback;
-    };
-
-    const restoreFromLocal = () => {
-        const restoredConnected = readScopedValue<boolean>('toastConnected', false);
-        const restoredApiKey = readScopedString('toastApiKey', '');
-        const restoredRestaurantId = readScopedString('toastRestaurantId', '');
-        const restoredLastSync = readScopedValue<string | null>('toastLastSync', null);
-        const restoredCogsCategories = readScopedValue<CogsCategory[]>('toastCogsCategories', []);
-        const restoredSalesData = readScopedValue<ToastSalesData[]>('toastSalesData', []);
-        const restoredMenuItems = readScopedValue<ToastMenuItem[]>('toastMenuItems', []);
-        const fallbackToastState = buildFallbackToastState(recipes);
-        const nextMenuItems = restoredMenuItems.length > 0 ? restoredMenuItems : fallbackToastState.menuItems;
-        const nextSalesData = restoredSalesData.length > 0 ? restoredSalesData : fallbackToastState.salesData;
-
-        setIsConnected(restoredConnected);
-        setApiKey(restoredApiKey);
-        setRestaurantId(restoredRestaurantId);
-        setLastSync(restoredLastSync);
-        setCogsCategories(restoredCogsCategories);
-        setSalesData(nextSalesData);
-        setMenuItems(nextMenuItems);
-        setIsHydrated(true);
-    };
-
-    const restoreFromServer = async () => {
-      if (!token) {
-        restoreFromLocal();
-        return;
-      }
-
+    const restoreServer = async () => {
+      if (!token) return restoreLocal();
       try {
         const payload = await apiRequest<ToastIntegrationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`);
-        const serverToast = payload.toast || {};
-        const hasServerSales = Array.isArray(serverToast.salesData) && serverToast.salesData.length > 0;
-        const hasServerMenuItems = Array.isArray(serverToast.menuItems) && serverToast.menuItems.length > 0;
-        const fallbackToastState = buildSeededToastState(recipes);
-        const nextMenuItems = hasServerMenuItems ? serverToast.menuItems : fallbackToastState.menuItems;
-        const nextSalesData = hasServerSales ? serverToast.salesData : fallbackToastState.salesData;
-
-        setIsConnected(Boolean(serverToast.connected || hasServerSales || hasServerMenuItems || true));
-        setApiKey(serverToast.apiKey || '');
-        setRestaurantId(serverToast.restaurantId || '');
-        setLastSync(serverToast.lastSync || null);
-        setCogsCategories(serverToast.cogsCategories || []);
-        setSalesData(nextSalesData);
-        setMenuItems(nextMenuItems);
+        const state = payload.toast || {} as PosState;
+        const hasSales = Array.isArray(state.salesData) && state.salesData.length > 0;
+        const hasMenu = Array.isArray(state.menuItems) && state.menuItems.length > 0;
+        const demo = isDemoAccount && (!hasSales || !hasMenu) ? demoState() : null;
+        const nextSales = hasSales ? state.salesData : demo?.sales || [];
+        const nextMenu = hasMenu ? state.menuItems : demo?.items || [];
+        setProvider(state.provider || (isDemoAccount ? 'toast' : 'generic'));
+        setConnectionMode(state.connectionMode === 'direct' ? 'direct' : 'import');
+        setRestaurantId(state.restaurantId || ''); setLastSync(state.lastSync || (isDemoAccount ? new Date().toISOString() : null));
+        setCogsCategories(state.cogsCategories || []); setSalesData(nextSales); setMenuItems(nextMenu);
+        setIsConnected(Boolean(state.connected || nextSales.length || nextMenu.length));
         setIsHydrated(true);
-      } catch {
-        restoreFromLocal();
-      }
+      } catch { restoreLocal(); }
     };
-
-    void restoreFromServer();
-  }, [accountId, activeLocationId, token]);
+    void restoreServer();
+  }, [accountId, activeLocationId, token, isDemoAccount]);
 
   useEffect(() => {
     if (!accountId || !activeLocationId || !isHydrated) return;
-    localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastSalesData'), JSON.stringify(salesData));
+    const write = (name: string, value: unknown) => localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, name), JSON.stringify(value));
+    write('toastConnected', isConnected); write('posProvider', provider); write('posConnectionMode', connectionMode);
+    write('toastRestaurantId', restaurantId); write('toastLastSync', lastSync); write('toastCogsCategories', cogsCategories);
+    write('toastSalesData', salesData); write('toastMenuItems', menuItems);
     if (!token) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`, {
       method: 'PUT',
-      body: JSON.stringify({
-        connected: isConnected,
-        apiKey,
-        restaurantId,
-        salesData,
-        menuItems,
-        cogsCategories,
-        lastSync,
-      }),
-    }).catch(error => {
-      console.error('Failed to sync Toast integration state', error);
-    });
-  }, [salesData, accountId, activeLocationId, isHydrated, isConnected, apiKey, restaurantId, menuItems, cogsCategories, lastSync, token]);
+      body: JSON.stringify({ connected: isConnected, provider, connectionMode, restaurantId, salesData, menuItems, cogsCategories, lastSync }),
+    }).catch(error => console.error('Failed to save POS integration state', error));
+  }, [accountId, activeLocationId, token, isHydrated, isConnected, provider, connectionMode, restaurantId, lastSync, cogsCategories, salesData, menuItems]);
 
-  useEffect(() => {
-    if (!accountId || !activeLocationId || !isHydrated) return;
-    localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastMenuItems'), JSON.stringify(menuItems));
-  }, [menuItems, accountId, activeLocationId, isHydrated]);
-
-  useEffect(() => {
-    if (SALES_INTEGRATION_PAUSED) return;
-    if (!accountId || !activeLocationId || !isHydrated) return;
-    if (salesData.length > 0 || menuItems.length > 0) return;
-
-    const fallbackToastState = buildSeededToastState(recipes);
-    setIsConnected(true);
-    setMenuItems(fallbackToastState.menuItems);
-    setSalesData(fallbackToastState.salesData);
-    setLastSync(new Date().toISOString());
-  }, [accountId, activeLocationId, isHydrated, recipes, salesData.length, menuItems.length]);
-
-  useEffect(() => {
-    if (!accountId || !activeLocationId || !isHydrated) return;
-    localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastCogsCategories'), JSON.stringify(cogsCategories));
-  }, [cogsCategories, accountId, activeLocationId, isHydrated]);
-
-  useEffect(() => {
-    if (!accountId || !activeLocationId || !isHydrated) return;
-    localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastConnected'), JSON.stringify(isConnected));
-  }, [isConnected, accountId, activeLocationId, isHydrated]);
-
-  useEffect(() => {
-    if (!accountId || !activeLocationId || !isHydrated) return;
-    localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastApiKey'), JSON.stringify(apiKey));
-  }, [apiKey, accountId, activeLocationId, isHydrated]);
-
-  useEffect(() => {
-    if (!accountId || !activeLocationId || !isHydrated) return;
-    localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastRestaurantId'), JSON.stringify(restaurantId));
-  }, [restaurantId, accountId, activeLocationId, isHydrated]);
-
-  useEffect(() => {
-    if (!accountId || !activeLocationId || !isHydrated) return;
-    localStorage.setItem(locationScopedStorageKey(accountId, activeLocationId, 'toastLastSync'), JSON.stringify(lastSync));
-  }, [lastSync, accountId, activeLocationId, isHydrated]);
-
-  const connectToast = (key: string, id: string) => {
-    if (SALES_INTEGRATION_PAUSED) {
-      setApiKey('');
-      setRestaurantId('');
-      setIsConnected(false);
-      setLastSync(null);
-      setSalesData([]);
-      setMenuItems([]);
-      syncToastMenuItems([]);
-      return;
-    }
-
-    setApiKey(key);
-    setRestaurantId(id);
-    setIsConnected(true);
-    setLastSync(new Date().toISOString());
-
-    const seededMenuItems = buildToastMenuItemsFromRecipes(recipes);
-    const seededSalesData = buildToastSalesData(seededMenuItems.length > 0 ? seededMenuItems : [
-      { id: 'toast-demo-burger', name: 'Brunch Burger', category: 'Sandwich', price: 24, ingredients: [] },
-      { id: 'toast-demo-pizza', name: 'Margherita Pizza', category: 'Pizza', price: 22, ingredients: [] },
-      { id: 'toast-demo-sandwich', name: 'Chicken Sandwich', category: 'Sandwich', price: 19, ingredients: [] },
-    ]);
-
-    setMenuItems(seededMenuItems.length > 0 ? seededMenuItems : [
-      { id: 'toast-demo-burger', name: 'Brunch Burger', category: 'Sandwich', price: 24, ingredients: [] },
-      { id: 'toast-demo-pizza', name: 'Margherita Pizza', category: 'Pizza', price: 22, ingredients: [] },
-      { id: 'toast-demo-sandwich', name: 'Chicken Sandwich', category: 'Sandwich', price: 19, ingredients: [] },
-    ]);
-    setSalesData(seededSalesData);
-    syncToastMenuItems(seededMenuItems.length > 0 ? seededMenuItems : [
-      { id: 'toast-demo-burger', name: 'Brunch Burger', category: 'Sandwich', price: 24, ingredients: [] },
-      { id: 'toast-demo-pizza', name: 'Margherita Pizza', category: 'Pizza', price: 22, ingredients: [] },
-      { id: 'toast-demo-sandwich', name: 'Chicken Sandwich', category: 'Sandwich', price: 19, ingredients: [] },
-    ]);
-    void syncData();
-  };
+  const selectPosProvider = (nextProvider: string) => setProvider(nextProvider || 'generic');
 
   const disconnectToast = () => {
-    setIsConnected(false);
-    setApiKey('');
-    setRestaurantId('');
-    setLastSync(null);
-    setSalesData([]);
-    setMenuItems([]);
-    syncToastMenuItems([]);
+    setIsConnected(false); setConnectionMode('import'); setRestaurantId(''); setLastSync(null);
+    setSalesData([]); setMenuItems([]); syncToastMenuItems([]);
+  };
+
+  const importSalesData = async (payload: PosImportPayload) => {
+    if (!accountId || !activeLocationId) throw new Error('Choose a restaurant location before importing sales');
+    const selectedProvider = String(payload.provider || provider || 'generic');
+    const imported = await apiRequest<ToastIntegrationPayload>(
+      `/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast/import`,
+      { method: 'POST', body: JSON.stringify({ ...payload, provider: selectedProvider }) },
+    );
+    const next = imported.toast;
+    if (!next?.salesData?.length) throw new Error('No valid sales rows were found in that export');
+    const nextMenu = next.menuItems || [];
+    setProvider(next.provider || selectedProvider); setConnectionMode('import'); setIsConnected(true);
+    setSalesData(next.salesData); setMenuItems(nextMenu); setLastSync(next.lastSync || new Date().toISOString());
+    syncToastMenuItems(nextMenu);
+  };
+
+  const syncData = async () => {
+    if (!isConnected || !salesData.length) throw new Error('Import sales or activate a direct connector first');
+    await importSalesData({ provider, salesData, menuItems });
   };
 
   const addCogsCategory = (name: string) => {
     const normalized = name.trim();
     if (!normalized) return;
-    const newCategory: CogsCategory = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name: normalized,
-      color: ['#F59E0B','#8B5CF6','#DC2626','#0EA5E9','#14B8A6','#F97316'][cogsCategories.length % 6],
-    };
-    setCogsCategories(prev => [...prev, newCategory]);
+    setCogsCategories(previous => [...previous, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: normalized, color: ['#F59E0B', '#8B5CF6', '#DC2626', '#0EA5E9', '#14B8A6', '#F97316'][previous.length % 6] }]);
   };
-
-  const updateCogsCategory = (id: string, name: string) => {
-    setCogsCategories(prev => prev.map(cat => cat.id === id ? { ...cat, name: name.trim() || cat.name } : cat));
-  };
-
+  const updateCogsCategory = (id: string, name: string) => setCogsCategories(previous => previous.map(category => category.id === id ? { ...category, name: name.trim() || category.name } : category));
   const deleteCogsCategory = (id: string) => {
-    setCogsCategories(prev => prev.filter(cat => cat.id !== id));
-    setMenuItems(prev => prev.map(item => item.cogsCategoryId === id ? { ...item, cogsCategoryId: prev[0]?.id || undefined } : item));
+    setCogsCategories(previous => previous.filter(category => category.id !== id));
+    setMenuItems(previous => previous.map(item => item.cogsCategoryId === id ? { ...item, cogsCategoryId: undefined } : item));
   };
+  const assignMenuItemCogsCategory = (itemId: string, categoryId: string) => setMenuItems(previous => previous.map(item => item.id === itemId ? { ...item, cogsCategoryId: categoryId } : item));
 
-  const assignMenuItemCogsCategory = (itemId: string, categoryId: string) => {
-    setMenuItems(prev => prev.map(item => item.id === itemId ? { ...item, cogsCategoryId: categoryId } : item));
-  };
-
-  const importSalesData = async (payload: { salesData?: ToastSalesData[]; history?: ToastSalesData[]; menuItems?: ToastMenuItem[] }) => {
-    if (SALES_INTEGRATION_PAUSED) {
-      setIsConnected(false);
-      setApiKey('');
-      setRestaurantId('');
-      setLastSync(null);
-      setSalesData([]);
-      setMenuItems([]);
-      syncToastMenuItems([]);
-      return;
-    }
-
-    if (!accountId || !activeLocationId) return;
-
-    try {
-      const imported = await apiRequest<{ toast: { connected: boolean; apiKey: string; restaurantId: string; salesData: ToastSalesData[]; menuItems: ToastMenuItem[]; cogsCategories: CogsCategory[]; lastSync: string | null } }>(
-        `/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast/import`,
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        },
-      );
-
-      const nextToast = imported.toast || {};
-      const nextMenuItems = nextToast.menuItems && nextToast.menuItems.length > 0
-        ? nextToast.menuItems
-        : buildToastMenuItemsFromRecipes(recipes);
-      const nextSalesData = nextToast.salesData && nextToast.salesData.length > 0
-        ? nextToast.salesData
-        : buildToastSalesData(nextMenuItems);
-
-      setMenuItems(nextMenuItems);
-      setSalesData(nextSalesData);
-      setApiKey(nextToast.apiKey || apiKey);
-      setRestaurantId(nextToast.restaurantId || restaurantId);
-      setLastSync(nextToast.lastSync || new Date().toISOString());
-      setIsConnected(Boolean(nextToast.connected || true));
-      syncToastMenuItems(nextMenuItems);
-    } catch (error) {
-      console.error('Failed to import Toast POS data', error);
-      const syncedMenuItems = buildToastMenuItemsFromRecipes(recipes);
-      const nextSalesData = buildToastSalesData(syncedMenuItems.length > 0 ? syncedMenuItems : menuItems);
-
-      setMenuItems(syncedMenuItems);
-      setSalesData(nextSalesData);
-      syncToastMenuItems(syncedMenuItems);
-
-      const now = new Date().toISOString();
-      setLastSync(now);
-    }
-  };
-
-  const syncData = async () => {
-    if (SALES_INTEGRATION_PAUSED) {
-      setSalesData([]);
-      setMenuItems([]);
-      return;
-    }
-
-    await importSalesData({
-      salesData: salesData.length > 0 ? salesData : [],
-      menuItems: menuItems.length > 0 ? menuItems : [],
-    });
-  };
-
-  useEffect(() => {
-    if (SALES_INTEGRATION_PAUSED) return;
-    if (!isHydrated || !isConnected) return;
-    if (recipes.length === 0) return;
-    if (salesData.length > 0 && menuItems.length > 0) return;
-    void syncData();
-  }, [isHydrated, isConnected, recipes.length, salesData.length, menuItems.length]);
-
-  return (
-    <ToastContext.Provider
-      value={{
-        isConnected,
-        apiKey,
-        restaurantId,
-        salesData,
-        menuItems,
-        cogsCategories,
-        connectToast,
-        disconnectToast,
-        syncData,
-        importSalesData,
-        addCogsCategory,
-        updateCogsCategory,
-        deleteCogsCategory,
-        assignMenuItemCogsCategory,
-        lastSync,
-      }}
-    >
-      {children}
-    </ToastContext.Provider>
-  );
+  return <ToastContext.Provider value={{ isConnected, provider, connectionMode, restaurantId, salesData, menuItems, cogsCategories, selectPosProvider, disconnectToast, syncData, importSalesData, addCogsCategory, updateCogsCategory, deleteCogsCategory, assignMenuItemCogsCategory, lastSync }}>{children}</ToastContext.Provider>;
 }
 
 export function useToast() {
   const context = useContext(ToastContext);
-  if (context === undefined) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
+  if (!context) throw new Error('useToast must be used within a ToastProvider');
   return context;
 }
