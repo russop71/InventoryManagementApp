@@ -30,6 +30,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { usePageSeo } from '../utils/seo';
+import { ZestIQBrand } from '../components/ZestIQBrand';
 
 const DEMO_URL = '/book-demo';
 
@@ -119,15 +120,6 @@ const capabilityGroups = [
     ],
   },
 ];
-
-function Logo({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="flex items-center gap-2 text-2xl font-black tracking-tight">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#F5C10E]">Z</span>
-      <span className={compact ? 'landing-compact-word' : ''}>zest<span className="text-[#D9A900]">IQ</span></span>
-    </div>
-  );
-}
 
 function Product() {
   const reduceMotion = useReducedMotion();
@@ -299,7 +291,7 @@ function PhoneFrame({ children, label }: { children: React.ReactNode; label: str
 }
 
 function ManagementPhone() {
-  return <PhoneFrame label="ZestIQ management app screen"><div className="bg-[#0B1220] px-3 pb-4 pt-8 text-white"><div className="flex items-center gap-1.5 text-sm font-black"><span className="grid h-6 w-6 place-items-center rounded-lg bg-[#F5C10E] text-[11px] text-[#0B1220]">Z</span>zest<span className="text-[#F5C10E]">IQ</span></div><p className="mt-5 text-[8px] font-black uppercase tracking-wider text-white/40">Today at King Street</p><h3 className="mt-1 text-lg font-black">Protect the margin.</h3></div><div className="space-y-2 p-3"><div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Food cost</p><p className="mt-1 text-sm font-black text-emerald-600">28.4%</p></div><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Labour</p><p className="mt-1 text-sm font-black text-violet-600">29.7%</p></div></div><div className="rounded-xl bg-white p-3 shadow-sm"><div className="flex items-center justify-between"><p className="text-[9px] font-black">Needs attention</p><span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[6px] font-black text-red-600">3</span></div>{[['Salmon', '+8.4% cost'], ['Friday labour', '$312 over'], ['Pinot Grigio', 'Below par']].map(([name, value]) => <div key={name} className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2"><p className="text-[8px] font-bold">{name}</p><p className="text-[7px] font-black text-amber-700">{value}</p></div>)}</div><div className="rounded-xl bg-[#FFF7D1] p-3"><p className="text-[7px] font-black uppercase text-amber-700">AI order suggestion</p><p className="mt-1 text-[9px] font-black">$366 across 2 suppliers</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full w-3/4 rounded-full bg-[#F5C10E]" /></div></div></div><PhoneNav items={[[BarChart3, 'Today'], [PackageSearch, 'Stock'], [Wine, 'Beverage']]} /></PhoneFrame>;
+  return <PhoneFrame label="ZestIQ management app screen"><div className="bg-[#0B1220] px-3 pb-4 pt-8 text-white"><ZestIQBrand className="gap-1.5 text-white" markClassName="h-6 w-6 rounded-lg" wordmarkClassName="text-sm" /><p className="mt-5 text-[8px] font-black uppercase tracking-wider text-white/40">Today at King Street</p><h3 className="mt-1 text-lg font-black">Protect the margin.</h3></div><div className="space-y-2 p-3"><div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Food cost</p><p className="mt-1 text-sm font-black text-emerald-600">28.4%</p></div><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Labour</p><p className="mt-1 text-sm font-black text-violet-600">29.7%</p></div></div><div className="rounded-xl bg-white p-3 shadow-sm"><div className="flex items-center justify-between"><p className="text-[9px] font-black">Needs attention</p><span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[6px] font-black text-red-600">3</span></div>{[['Salmon', '+8.4% cost'], ['Friday labour', '$312 over'], ['Pinot Grigio', 'Below par']].map(([name, value]) => <div key={name} className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2"><p className="text-[8px] font-bold">{name}</p><p className="text-[7px] font-black text-amber-700">{value}</p></div>)}</div><div className="rounded-xl bg-[#FFF7D1] p-3"><p className="text-[7px] font-black uppercase text-amber-700">AI order suggestion</p><p className="mt-1 text-[9px] font-black">$366 across 2 suppliers</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full w-3/4 rounded-full bg-[#F5C10E]" /></div></div></div><PhoneNav items={[[BarChart3, 'Today'], [PackageSearch, 'Stock'], [Wine, 'Beverage']]} /></PhoneFrame>;
 }
 
 function EmployeePhone() {
@@ -320,7 +312,7 @@ export function Landing() {
     <div className="min-h-screen bg-[#FBFAF6] text-[#0B1220]">
       <header className="sticky top-0 z-40 border-b border-black/5 bg-[#FBFAF6]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
-          <Logo compact />
+          <ZestIQBrand compact />
           <nav className="hidden gap-7 text-sm font-bold md:flex">
             <a href="#platform">Platform</a>
             <a href="#product-tour">Product tour</a>
@@ -551,7 +543,7 @@ export function Landing() {
 
       <footer className="overflow-hidden bg-[#0B1220] text-white">
         <div className="mx-auto max-w-7xl px-5 pb-8 pt-14 sm:px-8 sm:pt-20">
-          <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><Logo /><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
+          <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><ZestIQBrand className="text-white" /><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
           <nav aria-label="Footer" className="grid gap-9 py-12 sm:grid-cols-2 lg:grid-cols-5">
             <FooterGroup title="Product" links={[["Product tour", "/#product-tour"], ["Capabilities", "/#capabilities"], ["Pricing", "/#pricing"], ["Demo account", "/login"]]} />
             <FooterGroup title="Operations" links={[["Inventory software", "/restaurant-inventory-management-software"], ["Food cost software", "/restaurant-food-cost-software"], ["Invoice scanner", "/restaurant-invoice-scanner"], ["Labour & scheduling", "/#capabilities"], ["Beverage costing", "/#capabilities"]]} />

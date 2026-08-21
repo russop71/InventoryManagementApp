@@ -5,26 +5,7 @@ import { Building, Lock, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
-
-// Lemon/speech-bubble logo — circle outline + 3 ascending bars + green leaf.
-// Dark variant (charcoal) used on yellow background so it stays visible.
-function ZestIQLogo({ size = 64 }: { size?: number }) {
-  const h = Math.round(size * 1.16);
-  return (
-    <svg width={size} height={h} viewBox="0 0 100 116" fill="none">
-      <path
-        d="M 12 52 C 22 28, 36 16, 50 16 C 64 16, 78 28, 88 52 C 78 76, 64 88, 50 88 C 36 88, 22 76, 12 52 Z"
-        stroke="#0F172A" strokeWidth="6" fill="none"
-        strokeLinejoin="round" strokeLinecap="round"
-      />
-      <rect x="34" y="62" width="6" height="14" rx="2" fill="#0F172A" />
-      <rect x="43" y="55" width="6" height="21" rx="2" fill="#0F172A" />
-      <rect x="52" y="47" width="6" height="29" rx="2" fill="#0F172A" />
-      <path d="M 58 16 C 64 3, 84 3, 88 16 C 80 23, 64 23, 58 16 Z" fill="#5FAF4B" />
-      <path d="M 60 16 C 69 12, 79 11, 86 16" stroke="#3F8D3A" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
+import { ZestIQBrand } from '../components/ZestIQBrand';
 
 export function Login() {
   const navigate = useNavigate();
@@ -115,11 +96,11 @@ export function Login() {
 
       {/* ── Yellow hero ───────────────────────────────── */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
-        <ZestIQLogo size={72} />
-        <div className="flex items-baseline mt-5">
-          <span className="font-black text-[40px] leading-none tracking-tight" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)' }}>zest</span>
-          <span className="ml-1 font-black text-[40px] leading-none tracking-tight" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)' }}>IQ</span>
-        </div>
+        <ZestIQBrand
+          className="rounded-3xl bg-[#FBFAF6] px-5 py-4 shadow-sm ring-1 ring-black/5"
+          markClassName="h-[72px] w-[72px] rounded-[18px]"
+          wordmarkClassName="text-[40px] text-[#0F172A]"
+        />
         <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
           Smarter Kitchens. Better Business.
         </p>

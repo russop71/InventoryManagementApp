@@ -8,16 +8,22 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useState } from 'react';
+import {
+  getLatestDraftInventoryCount,
+  getLatestFinalizedInventoryCount,
+  getUnusualInventoryLosses,
+  summarizeInventoryCount,
+} from '../utils/inventoryCountWorkflow.js';
 
 type SalesRangePreset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'last-month' | 'custom';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { inventory, orders, recipes } = useInventory();
+  const { inventory, orders, recipes, inventoryCounts } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
   const { employees, targetLaborPercent, laborCostBreakdownForRange } = useLabor();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -29,6 +35,10 @@ export function Dashboard() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
   const canManageLabor = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
+  const latestFinalizedInventoryCount = getLatestFinalizedInventoryCount(inventoryCounts);
+  const activeInventoryCountDraft = getLatestDraftInventoryCount(inventoryCounts);
+  const activeInventoryCountSummary = summarizeInventoryCount(activeInventoryCountDraft);
+  const inventoryLossAlert = getUnusualInventoryLosses(latestFinalizedInventoryCount);
 
   const lowStockItems = inventory.filter(
     item => item.currentStock < item.parLevel * 0.3
@@ -443,6 +453,24 @@ export function Dashboard() {
           <p className="text-xs text-gray-400 mt-0.5 font-semibold uppercase tracking-wider">Real-time overview</p>
         </div>
       </div>
+
+      {inventoryLossAlert.isUnusual && latestFinalizedInventoryCount && (
+        <Link to={`/app/inventory/counts/${latestFinalizedInventoryCount.id}`} className="block rounded-2xl bg-rose-700 p-4 text-white shadow-lg shadow-rose-900/15 transition hover:bg-rose-800">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15"><AlertTriangle className="h-5 w-5" /></div>
+              <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-100">Inventory loss alert</p><p className="mt-1 text-lg font-black">${inventoryLossAlert.totalLossValue.toFixed(2)} in unusual shortages</p><p className="mt-1 break-words text-xs text-rose-100">{inventoryLossAlert.items.slice(0, 3).map(item => item.name).join(', ')}{inventoryLossAlert.affectedItems > 3 ? ` +${inventoryLossAlert.affectedItems - 3} more` : ''}</p></div>
+            </div>
+            <ChevronRight className="mt-2 h-5 w-5 shrink-0" />
+          </div>
+        </Link>
+      )}
+
+      {activeInventoryCountDraft && (
+        <Link to={`/app/inventory/counts/${activeInventoryCountDraft.id}`} className="block rounded-2xl border border-amber-200 bg-amber-50 p-4 transition hover:bg-amber-100/70">
+          <div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-200/60"><Clock3 className="h-5 w-5 text-amber-900" /></div><div className="min-w-0"><p className="break-words text-sm font-black text-amber-950">Resume inventory count</p><p className="mt-1 text-xs text-amber-800">{activeInventoryCountSummary.completedItems}/{activeInventoryCountSummary.totalItems} items counted · {activeInventoryCountSummary.remainingItems} remaining</p></div></div><ChevronRight className="h-5 w-5 shrink-0 text-amber-900" /></div>
+        </Link>
+      )}
 
       {/* ── Compact 3-stat strip ─────────────────────── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

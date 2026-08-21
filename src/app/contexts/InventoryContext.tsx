@@ -72,6 +72,7 @@ export interface InventoryItem {
   }[];
   deletable?: boolean;
   inactive?: boolean;
+  countOrder?: number;
 }
 
 export interface Recipe {
@@ -1308,14 +1309,42 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const finalizeInventoryCount = (count: InventoryCount) => {
-    const countedByItem = new Map(count.entries.map(entry => [entry.itemId, entry.counted]));
+    const finalizedAt = count.finalizedAt || new Date().toISOString();
+    const finalizedCount: InventoryCount = {
+      ...count,
+      status: 'finalized',
+      locked: 'Yes',
+      updatedAt: finalizedAt,
+      finalizedAt,
+      entries: count.entries.map(entry => ({
+        ...entry,
+        isCounted: true,
+        value: entry.counted * entry.unitCost,
+      })),
+      value: count.entries.reduce((sum, entry) => sum + entry.counted * entry.unitCost, 0),
+    };
+    const countedByItem = new Map(finalizedCount.entries.map(entry => [entry.itemId, entry]));
     const now = new Date().toISOString();
-    const nextInventory = inventory.map(item => countedByItem.has(item.id)
-      ? { ...item, currentStock: countedByItem.get(item.id) || 0, lastCountedAt: now, lastUpdated: now }
-      : item);
-    const nextCounts = inventoryCounts.some(item => item.id === count.id)
-      ? inventoryCounts.map(item => (item.id === count.id ? count : item))
-      : [count, ...inventoryCounts];
+    const nextInventory = inventory.map(item => {
+      const countedEntry = countedByItem.get(item.id);
+      if (!countedEntry) return item;
+      const nextStock = Number(countedEntry.counted) || 0;
+      const change = nextStock - item.currentStock;
+      return {
+        ...item,
+        currentStock: nextStock,
+        countOrder: countedEntry.shelfOrder ?? item.countOrder,
+        lastCountedAt: now,
+        lastUpdated: now,
+        history: change === 0 ? item.history : [
+          ...(item.history || []),
+          { date: now, change, reason: `Inventory count finalized by ${finalizedCount.finalizedBy || 'manager'}`, newStock: nextStock },
+        ],
+      };
+    });
+    const nextCounts = inventoryCounts.some(item => item.id === finalizedCount.id)
+      ? inventoryCounts.map(item => (item.id === finalizedCount.id ? finalizedCount : item))
+      : [finalizedCount, ...inventoryCounts];
     setInventory(nextInventory);
     setInventoryCounts(nextCounts);
     saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, nextCounts);

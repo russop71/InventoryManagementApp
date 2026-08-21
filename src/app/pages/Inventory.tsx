@@ -4,9 +4,11 @@ import type { InventoryCount } from '../utils/inventoryCounts';
 import { useNavigate } from 'react-router';
 import {
   AlertTriangle,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Clock3,
   DollarSign,
   Download,
   Filter,
@@ -19,6 +21,12 @@ import {
   Upload,
 } from 'lucide-react';
 import { useInventory } from '../contexts/InventoryContext';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  getLatestDraftInventoryCount,
+  isInventoryCountFinalized,
+  summarizeInventoryCount,
+} from '../utils/inventoryCountWorkflow.js';
 
 const Y = '#F5C10E';
 const D = '#0F172A';
@@ -39,7 +47,9 @@ const STATUS: Record<Status, { label: string; bg: string; color: string }> = {
 
 export function Inventory() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { inventory, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount } = useInventory();
+  const canManageCounts = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock'>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -50,9 +60,6 @@ export function Inventory() {
   const [customStart, setCustomStart] = useState('2026-06-01');
   const [customEnd, setCustomEnd] = useState('2026-06-28');
   const [selectedCountId, setSelectedCountId] = useState('');
-  const [showAddCountDialog, setShowAddCountDialog] = useState(false);
-  const [newCountDescription, setNewCountDescription] = useState('');
-  const [newCountDate, setNewCountDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const handleAddItem = () => {
     const trimmedName = newItem.name.trim();
@@ -118,9 +125,17 @@ export function Inventory() {
   const lowStockItems = inventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'low-stock').length;
   const outItems = inventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'out-of-stock').length;
   const wasteValue = inventory.reduce((sum, item) => sum + Math.max(0, item.currentStock - item.parLevel) * item.unitCost, 0);
-  const countRows: InventoryCount[] = inventoryCounts;
+  const countRows: InventoryCount[] = [...inventoryCounts].sort((left, right) => {
+    const statusDifference = Number(isInventoryCountFinalized(left)) - Number(isInventoryCountFinalized(right));
+    if (statusDifference !== 0) return statusDifference;
+    const leftDate = new Date(left.updatedAt || left.finalizedAt || left.countDate).getTime();
+    const rightDate = new Date(right.updatedAt || right.finalizedAt || right.countDate).getTime();
+    return rightDate - leftDate;
+  });
+  const activeDraftCount = getLatestDraftInventoryCount(countRows);
 
   const selectedCountRow = countRows.find(row => row.id === selectedCountId) ?? null;
+  const selectedCountSummary = summarizeInventoryCount(selectedCountRow);
   const spreadsheetItems = selectedCountRow?.entries?.length
     ? selectedCountRow.entries
     : filteredItems.map(item => ({
@@ -162,10 +177,12 @@ export function Inventory() {
   const selectedRangeLabel = rangeOptions.find(option => option.key === selectedRange)?.label ?? 'Last month';
 
   const handleAddCount = () => {
-    navigate('/app/inventory/counts/new');
+    navigate(activeDraftCount ? `/app/inventory/counts/${activeDraftCount.id}` : '/app/inventory/counts/new');
   };
 
   const handleDeleteCount = (countId: string) => {
+    const count = countRows.find(row => row.id === countId);
+    if (!canManageCounts || !window.confirm(`Delete “${count?.description || 'this inventory count'}”? This cannot be recovered.`)) return;
     deleteInventoryCount(countId);
     if (selectedCountId === countId) {
       setSelectedCountId('');
@@ -186,10 +203,21 @@ export function Inventory() {
               className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-[#0F172A] shadow-sm"
               style={{ background: Y }}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Add count
+              {activeDraftCount ? <Clock3 className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+              {activeDraftCount ? 'Resume count' : 'Start count'}
             </button>
           </div>
+
+          {activeDraftCount && (
+            <button
+              type="button"
+              onClick={() => navigate(`/app/inventory/counts/${activeDraftCount.id}`)}
+              className="mt-3 flex w-full flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-left sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div><p className="text-sm font-black text-amber-950">Inventory count in progress</p><p className="mt-1 text-xs text-amber-800">{activeDraftCount.description} · {summarizeInventoryCount(activeDraftCount).completedItems}/{summarizeInventoryCount(activeDraftCount).totalItems} items counted</p></div>
+              <span className="shrink-0 text-xs font-black text-amber-900 underline">Resume where you left off</span>
+            </button>
+          )}
 
           <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white p-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative">
@@ -255,15 +283,14 @@ export function Inventory() {
           </div>
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
-            <div className="grid grid-cols-[1.4fr_0.8fr_1.2fr_0.6fr] bg-gray-50 px-4 py-3 text-[10px] font-black uppercase tracking-[0.24em] text-gray-400">
-              <div>Count date</div>
-              <div className="text-right">Value</div>
-              <div>Description</div>
-              <div className="text-right">Actions</div>
+            <div className="hidden grid-cols-[0.9fr_1.4fr_0.8fr_0.8fr_auto] bg-gray-50 px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400 sm:grid">
+              <div>Status</div><div>Count</div><div className="text-right">Progress</div><div className="text-right">Value</div><div className="text-right">Actions</div>
             </div>
             <div className="divide-y divide-gray-100 bg-white">
               {countRows.map(row => {
                 const isActive = selectedCountRow?.id === row.id;
+                const finalized = isInventoryCountFinalized(row);
+                const rowSummary = summarizeInventoryCount(row);
                 return (
                   <div
                     key={row.id}
@@ -276,61 +303,57 @@ export function Inventory() {
                         setSelectedCountId(current => (current === row.id ? '' : row.id));
                       }
                     }}
-                    className={`grid w-full grid-cols-[1.4fr_0.8fr_1.2fr_auto] items-center px-4 py-3 text-left text-sm transition-colors ${isActive ? 'bg-amber-50/70' : 'hover:bg-gray-50'}`}
+                    className={`grid w-full gap-3 px-4 py-4 text-left text-sm transition-colors sm:grid-cols-[0.9fr_1.4fr_0.8fr_0.8fr_auto] sm:items-center ${isActive ? 'bg-amber-50/70' : 'hover:bg-gray-50'}`}
                   >
-                    <div className="font-semibold text-gray-900">{row.countDate}</div>
-                    <div className="text-right font-semibold text-gray-700" style={{ fontFamily: 'var(--font-mono)' }}>{fmtVal(row.value)}</div>
-                    <div className="text-gray-500">{row.description}</div>
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedCountId(row.id);
-                          navigate(`/app/inventory/counts/${row.id}`);
-                        }}
-                        className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleDeleteCount(row.id);
-                        }}
-                        className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700"
-                      >
-                        Delete
-                      </button>
+                    <div><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${finalized ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>{finalized ? <CheckCircle2 className="h-3 w-3" /> : <Clock3 className="h-3 w-3" />}{finalized ? 'Finalized' : 'Draft'}</span></div>
+                    <div className="min-w-0"><p className="break-words font-black text-gray-900">{row.description}</p><p className="mt-1 text-xs text-gray-500">{row.countDate}{finalized && row.finalizedBy ? ` · ${row.finalizedBy}` : ''}</p></div>
+                    <div className="sm:text-right"><p className="font-black text-gray-800">{rowSummary.completedItems}/{rowSummary.totalItems}</p><p className="text-[10px] text-gray-500">{rowSummary.progressPercent.toFixed(0)}% counted</p></div>
+                    <div className="font-semibold text-gray-700 sm:text-right" style={{ fontFamily: 'var(--font-mono)' }}>{fmtVal(rowSummary.countedValue)}</div>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedCountId(row.id); navigate(`/app/inventory/counts/${row.id}`); }} className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-700">{finalized ? 'View' : 'Resume'}</button>
+                      {canManageCounts && <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteCount(row.id); }} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700">Delete</button>}
                     </div>
                   </div>
                 );
               })}
-              {countRows.length === 0 && (
-                <div className="px-4 py-10 text-center">
-                  <p className="text-sm font-bold text-gray-700">No completed counts yet</p>
-                  <p className="mt-1 text-xs text-gray-500">Start your first count to establish an accurate inventory baseline.</p>
-                </div>
-              )}
+              {countRows.length === 0 && <div className="px-4 py-10 text-center"><p className="text-sm font-bold text-gray-700">No inventory counts yet</p><p className="mt-1 text-xs text-gray-500">Start a mobile count to establish an accurate inventory baseline.</p></div>}
             </div>
           </div>
 
           {selectedCountId && selectedCountRow && (
             <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <div className="min-w-[860px]">
+              <div className="grid grid-cols-2 gap-2 border-b border-slate-100 bg-slate-50 p-3 sm:grid-cols-4">
+                <CountDetail label="Expected" value={fmtVal(selectedCountSummary.expectedValue)} />
+                <CountDetail label="Counted" value={fmtVal(selectedCountSummary.countedValue)} />
+                <CountDetail label="Variance" value={`${selectedCountSummary.varianceValue > 0 ? '+' : ''}${fmtVal(selectedCountSummary.varianceValue)}`} warning={selectedCountSummary.varianceValue < 0} />
+                <CountDetail label="Shortage" value={fmtVal(selectedCountSummary.lossValue)} warning={selectedCountSummary.lossValue > 0} />
+              </div>
+              <div className="divide-y divide-slate-100 md:hidden">
+                {spreadsheetItems.map(item => {
+                  const quantityVariance = item.counted - item.hypothetical;
+                  const dollarVariance = quantityVariance * item.unitCost;
+                  return (
+                    <button key={item.itemId} type="button" onClick={() => navigate(`/app/inventory/${item.itemId}`)} className="w-full p-4 text-left">
+                      <p className="break-words text-sm font-black leading-snug text-slate-900">{item.name}</p>
+                      <p className="mt-1 break-words text-[11px] text-slate-500">{item.storageArea || 'Unassigned'} · {item.unit}</p>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Expected</p><p className="mt-1 font-black">{item.hypothetical.toFixed(2)}</p></div><div><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Counted</p><p className="mt-1 font-black">{item.counted.toFixed(2)}</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Variance</p><p className={`mt-1 font-black ${dollarVariance < 0 ? 'text-rose-700' : dollarVariance > 0 ? 'text-emerald-700' : 'text-slate-600'}`}>{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} · {dollarVariance > 0 ? '+' : ''}{fmtVal(dollarVariance)}</p></div></div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <div className="min-w-[820px]">
                   <div className="grid grid-cols-[1.95fr_0.8fr_0.8fr_0.9fr_0.75fr_0.8fr] bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.24em] text-gray-400">
                     <div>Inventory item / prep</div>
-                    <div className="text-right">Hypothetical</div>
-                    <div className="text-right">Actual count</div>
-                    <div className="text-right">Amount</div>
-                    <div className="text-right">Usage</div>
+                    <div className="text-right">Previous</div>
+                    <div className="text-right">Expected</div>
+                    <div className="text-right">Counted</div>
+                    <div className="text-right">Variance</div>
                     <div className="text-right">Value</div>
                   </div>
                   <div className="divide-y divide-gray-100">
                     {spreadsheetItems.map(item => {
-                      const usage = item.hypothetical - item.counted;
+                      const variance = item.counted - item.hypothetical;
                       const statusMeta = STATUS[item.status];
                       return (
                         <button
@@ -344,15 +367,15 @@ export function Inventory() {
                               <Package className="h-[18px] w-[18px] text-gray-400" />
                             </div>
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-gray-900">{item.name}</p>
-                              <p className="mt-0.5 text-xs text-gray-500">{item.unit} · {statusMeta.label}</p>
+                              <p className="break-words text-sm font-semibold text-gray-900">{item.name}</p>
+                              <p className="mt-0.5 break-words text-xs text-gray-500">{item.storageArea || 'Unassigned'} · {item.unit} · {statusMeta.label}</p>
                             </div>
                           </div>
+                          <div className="text-right text-sm font-semibold text-gray-500">{Number(item.previousCounted ?? item.hypothetical).toFixed(2)}</div>
                           <div className="text-right text-sm font-semibold text-gray-500">{item.hypothetical.toFixed(2)}</div>
                           <div className="text-right text-sm font-semibold text-gray-900">{item.counted.toFixed(2)}</div>
-                          <div className="text-right text-sm font-semibold text-gray-700">{item.counted.toFixed(2)} {item.unit}</div>
-                          <div className={`text-right text-sm font-semibold ${usage < 0 ? 'text-rose-600' : usage === 0 ? 'text-gray-600' : 'text-emerald-600'}`}>
-                            {usage > 0 ? `+${usage.toFixed(2)}` : usage.toFixed(2)}
+                          <div className={`text-right text-sm font-semibold ${variance < 0 ? 'text-rose-600' : variance === 0 ? 'text-gray-600' : 'text-emerald-600'}`}>
+                            {variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)}
                           </div>
                           <div className="text-right text-sm font-semibold text-gray-700" style={{ fontFamily: 'var(--font-mono)' }}>{fmtVal(item.value)}</div>
                         </button>
@@ -491,19 +514,6 @@ export function Inventory() {
         )}
       </div>
 
-      {showAddCountDialog && (
-        <div className="mx-4 mb-4 rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-2">
-            <input value={newCountDescription} onChange={event => setNewCountDescription(event.target.value)} placeholder="Count description" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input type="date" value={newCountDate} onChange={event => setNewCountDate(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button onClick={handleAddCount} className="rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-semibold text-white">Save count</button>
-            <button onClick={() => setShowAddCountDialog(false)} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button>
-          </div>
-        </div>
-      )}
-
       {showAddDialog && (
         <div className="mx-4 mb-4 rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
           <div className="grid gap-3 md:grid-cols-2">
@@ -531,4 +541,8 @@ export function Inventory() {
       </div>
     </div>
   );
+}
+
+function CountDetail({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
+  return <div className="rounded-xl bg-white p-2"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p><p className={`mt-1 break-words text-sm font-black ${warning ? 'text-rose-700' : 'text-slate-800'}`}>{value}</p></div>;
 }
