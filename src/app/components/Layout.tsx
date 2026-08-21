@@ -11,27 +11,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
 import { AIChat } from './AIChat';
-
-function ZestIQLogo({ size = 36 }: { size?: number }) {
-  const h = Math.round(size * 1.16);
-  return (
-    <svg width={size} height={h} viewBox="0 0 100 116" fill="none">
-      <path
-        d="M 12 52 C 22 28, 36 16, 50 16 C 64 16, 78 28, 88 52 C 78 76, 64 88, 50 88 C 36 88, 22 76, 12 52 Z"
-        stroke="#0F172A"
-        strokeWidth="6"
-        fill="none"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <rect x="34" y="62" width="6" height="14" rx="2" fill="#0F172A" />
-      <rect x="43" y="55" width="6" height="21" rx="2" fill="#0F172A" />
-      <rect x="52" y="47" width="6" height="29" rx="2" fill="#0F172A" />
-      <path d="M 58 16 C 64 3, 84 3, 88 16 C 80 23, 64 23, 58 16 Z" fill="#5FAF4B" />
-      <path d="M 60 16 C 69 12, 79 11, 86 16" stroke="#3F8D3A" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
+import { ZestIQBrand } from './ZestIQBrand';
 
 export function Layout() {
   const location = useLocation();
@@ -202,15 +182,9 @@ export function Layout() {
           </DropdownMenu>
 
           {/* CENTER — ZestIQ logo + wordmark */}
-          <div className="flex items-center gap-2">
-            <ZestIQLogo size={36} />
-            <div className="flex items-baseline">
-              <span className="font-black text-[21px] leading-none tracking-tight text-[#0F172A]"
-                    style={{ fontFamily: 'var(--font-sans)' }}>zest</span>
-              <span className="font-black text-[21px] leading-none tracking-tight text-[#F5C10E]"
-                    style={{ fontFamily: 'var(--font-sans)' }}>IQ</span>
-            </div>
-          </div>
+          <Link to="/app" aria-label="ZestIQ dashboard" className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C10E]">
+            <ZestIQBrand wordmarkClassName="text-[21px] text-[#0F172A]" />
+          </Link>
 
           {/* RIGHT — bell */}
           <button
