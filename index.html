@@ -20,6 +20,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://zestiq.ca/" />
     <meta property="og:site_name" content="ZestIQ" />
+    <meta property="og:locale" content="en_CA" />
     <meta property="og:image" content="https://zestiq.ca/zestiq-share.png" />
     <meta property="og:image:secure_url" content="https://zestiq.ca/zestiq-share.png" />
     <meta property="og:image:type" content="image/png" />
@@ -35,28 +36,32 @@
     <link rel="manifest" href="/zestiq.webmanifest" />
     <meta name="theme-color" content="#F5C10E" />
     <link rel="canonical" href="https://zestiq.ca/" />
-    <script type="application/ld+json">
+    <script id="zestiq-home-schema" type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "ZestIQ",
-        "url": "https://zestiq.ca/",
-        "image": "https://zestiq.ca/zestiq-share.png",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "description": "Restaurant inventory management, food and beverage cost, invoice scanning, purchasing, labour and multi-location operations software.",
-        "offers": {
-          "@type": "Offer",
-          "price": "249.99",
-          "priceCurrency": "CAD",
-          "url": "https://zestiq.ca/#pricing"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "ZestIQ",
-          "url": "https://zestiq.ca/",
-          "logo": "https://zestiq.ca/zestiq-mark.svg"
-        }
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://zestiq.ca/#organization",
+            "name": "ZestIQ",
+            "url": "https://zestiq.ca/",
+            "logo": "https://zestiq.ca/zestiq-mark.svg",
+            "email": "demo@zestiq.ca",
+            "areaServed": "CA"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "ZestIQ",
+            "url": "https://zestiq.ca/",
+            "image": "https://zestiq.ca/zestiq-share.png",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "en-CA",
+            "description": "Restaurant inventory management, food and beverage cost, invoice scanning, purchasing, labour and multi-location operations software.",
+            "offers": { "@type": "Offer", "price": "249.99", "priceCurrency": "CAD", "url": "https://zestiq.ca/#pricing" },
+            "publisher": { "@id": "https://zestiq.ca/#organization" }
+          }
+        ]
       }
     </script>
 

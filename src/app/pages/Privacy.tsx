@@ -1,154 +1,19 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Shield } from 'lucide-react';
+import { LegalList, LegalNote, LegalSection, PublicLegalLayout } from '../components/PublicLegalLayout';
 import { usePageSeo } from '../utils/seo';
 
 export function Privacy() {
-  usePageSeo({
-    title: 'ZestIQ Privacy Policy',
-    description: 'Learn how ZestIQ handles account, restaurant operations, integration, and demo-request information.',
-    path: '/privacy',
-  });
-
-  return (
-    <div className="mx-auto min-h-screen max-w-4xl space-y-4 bg-[#faf8f2] px-5 py-10 sm:px-8">
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Privacy Policy</h2>
-        <p className="text-sm text-gray-600 mt-1">Last updated: August 20, 2026</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Shield className="w-5 h-5" />
-            <span>Your Privacy Matters</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="prose prose-sm max-w-none space-y-4">
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">1. Information We Collect</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              We collect information that you provide directly to us, including:
-            </p>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-              <li>Account information (name, email, restaurant name)</li>
-              <li>Payment information (processed securely through our payment provider)</li>
-              <li>Inventory data and usage patterns</li>
-              <li>Sales data from integrated POS systems</li>
-              <li>Communication preferences and support requests</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">2. How We Use Your Information</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              We use the information we collect to:
-            </p>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-              <li>Provide, maintain, and improve our services</li>
-              <li>Generate AI-powered inventory forecasts and recommendations</li>
-              <li>Process transactions and send related information</li>
-              <li>Send you technical notices and support messages</li>
-              <li>Respond to your comments and questions</li>
-              <li>Analyze usage patterns to improve user experience</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">3. Data Security</h3>
-            <p className="text-sm text-gray-600">
-              We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. This includes encryption of data in transit and at rest, regular security assessments, and strict access controls.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">4. Data Sharing</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              We do not sell your personal information. We may share your information only in the following circumstances:
-            </p>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-              <li>With your consent or at your direction</li>
-              <li>With service providers who assist in our operations (under strict confidentiality agreements)</li>
-              <li>To comply with legal obligations or protect rights and safety</li>
-              <li>In connection with a merger, sale, or acquisition (with notice to you)</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">5. Third-Party Integrations</h3>
-            <p className="text-sm text-gray-600">
-              When you connect a third-party point-of-sale provider, we receive data from that platform as necessary to provide our services. Your use of third-party integrations is subject to the provider's privacy policy, and we encourage you to review it.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">6. Data Retention</h3>
-            <p className="text-sm text-gray-600">
-              We retain your information for as long as your account is active or as needed to provide you services. You may request deletion of your data at any time, subject to legal retention requirements.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">7. Your Rights</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              You have the right to:
-            </p>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-              <li>Access, update, or delete your personal information</li>
-              <li>Object to processing of your personal information</li>
-              <li>Request restriction of processing</li>
-              <li>Data portability</li>
-              <li>Withdraw consent at any time</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">8. Cookies and Tracking</h3>
-            <p className="text-sm text-gray-600">
-              We use cookies and similar tracking technologies to track activity on our Service and hold certain information. You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">9. Children's Privacy</h3>
-            <p className="text-sm text-gray-600">
-              Our Service is not intended for use by children under the age of 18. We do not knowingly collect personal information from children under 18.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">10. International Data Transfers</h3>
-            <p className="text-sm text-gray-600">
-              Your information may be transferred to and maintained on computers located outside of your state, province, country, or other governmental jurisdiction where data protection laws may differ. We ensure appropriate safeguards are in place for such transfers.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">11. Changes to This Policy</h3>
-            <p className="text-sm text-gray-600">
-              We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">12. Contact Us</h3>
-            <p className="text-sm text-gray-600">
-              If you have any questions about this Privacy Policy, please contact us at{' '}
-              <a className="font-medium text-gray-900 underline" href="mailto:privacy@zestiq.ca">
-                privacy@zestiq.ca
-              </a>
-              .
-            </p>
-          </section>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="py-4">
-          <p className="text-xs text-gray-500 text-center">
-            Your privacy is important to us. We are committed to protecting your personal information and being transparent about our data practices.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  usePageSeo({ title: 'Privacy Policy | ZestIQ Canada', description: 'How ZestIQ collects, uses, shares, protects and retains personal information for its Canadian restaurant operations platform.', path: '/privacy' });
+  return <PublicLegalLayout eyebrow="Privacy & data protection" title="Privacy Policy" description="How ZestIQ handles personal information across our website, management platform, employee scheduling experience, integrations and AI features." lastUpdated="August 20, 2026">
+    <LegalNote>This policy is a Canadian SaaS privacy baseline reflecting PIPEDA principles and substantially similar provincial laws. Specific rights and obligations may vary by province and customer relationship.</LegalNote>
+    <LegalSection title="1. Who we are and when this policy applies"><p>ZestIQ provides restaurant inventory, purchasing, costing, scheduling, reporting and AI-assisted software. “ZestIQ,” “we,” “us” and “our” refer to the operator of zestiq.ca and the ZestIQ services.</p><p>For account, website, billing and demo-request information, ZestIQ generally decides why information is processed. For restaurant employee, supplier, POS and operating data entered by a customer, the customer generally controls the information and ZestIQ processes it to provide the service.</p><p>A company owner or administrator is responsible for appropriate employee and third-party notices, required consent and lawful use of the service.</p></LegalSection>
+    <LegalSection title="2. Information we collect"><LegalList><li><strong>Identity and contact:</strong> name, work email, phone number, role, restaurant or company name and demo-request details.</li><li><strong>Account and security:</strong> user ID, role, company and location access, authentication and reset records, sessions, last login and app usage.</li><li><strong>Restaurant operations:</strong> inventory, suppliers, invoices, orders, recipes, menu items, prices, sales summaries, waste, locations and forecasts.</li><li><strong>Employee scheduling:</strong> name, work contact details, role, hourly rate, schedule, availability, shift requests and optional time-off notes. Customers should not enter medical details unless necessary and lawful.</li><li><strong>Billing:</strong> plan, billing frequency, payment status, dates and limited payment-method details from Stripe. ZestIQ does not receive full card numbers or security codes.</li><li><strong>AI content:</strong> prompts, documents and images, extracted text, suggested matches and AI responses.</li><li><strong>Technical data:</strong> IP address, device and browser information, diagnostic logs, requests and browser storage required to run and secure the service.</li></LegalList></LegalSection>
+    <LegalSection title="3. How and why we use information"><p>We collect information from users and company administrators; through files, camera capture and forms; from authorized integrations; and automatically when the service is used.</p><LegalList><li>Provide, secure, support and administer accounts and subscriptions.</li><li>Keep companies and locations logically separated and enforce permissions.</li><li>Run inventory, invoice, recipe, ordering, costing, sales, labour and scheduling workflows.</li><li>Generate AI-assisted extraction, matching, forecasts and explanations.</li><li>Respond to demos, support, privacy requests and security incidents.</li><li>Diagnose errors, understand product usage and improve reliability.</li><li>Meet legal, regulatory, tax, accounting and security obligations.</li></LegalList><p>We limit collection, use and disclosure to appropriate identified purposes. Where consent is required, it may be withdrawn subject to legal or contractual limits and reasonable notice.</p></LegalSection>
+    <LegalSection title="4. AI processing and human review"><p>When a user activates an AI feature, relevant prompts, document content and authorized company data may be sent to OpenAI to produce the requested output. OpenAI states that API data is not used to train its models unless the API customer opts in, and that default abuse-monitoring logs may be retained for up to 30 days.</p><p>AI can be incomplete or incorrect. Users remain responsible for reviewing invoice posting, recipe matches, costs, orders, schedules and operational decisions. ZestIQ does not use AI to make solely automated decisions producing legal or similarly significant effects about individuals.</p><p>See our <a href="/ai-transparency" className="font-bold underline underline-offset-4">AI &amp; Data Transparency Notice</a>.</p></LegalSection>
+    <LegalSection title="5. When information is shared"><p>We do not sell personal information. We may disclose it to authorized company users; infrastructure, database, AI, payment, email and support providers; customer-selected integrations; professional advisers under confidentiality; transaction parties; and authorities where required or permitted by law.</p><p>Our current core provider list is on the <a href="/subprocessors" className="font-bold underline underline-offset-4">Subprocessors page</a>.</p></LegalSection>
+    <LegalSection title="6. Processing outside Canada"><p>Providers may process information in Canada, the United States or other countries where they operate. Information there may be accessible to local courts or authorities. We assess providers and use contractual, access and security measures appropriate to the information. Customers with residency requirements should contact us before enabling an integration or AI feature.</p></LegalSection>
+    <LegalSection title="7. Retention, deletion and safeguards"><p>We retain information only as long as reasonably needed to provide the service, resolve disputes, maintain security and satisfy legal, tax and accounting requirements. When no longer required, it is deleted, anonymized or securely disposed of, subject to backups and legal holds.</p><p>We use administrative, technical and physical safeguards appropriate to the sensitivity and volume of information, including role-based access, company and location scoping, monitoring and secure transmission. No internet service can guarantee absolute security.</p><p>We investigate incidents and notify customers, individuals or regulators where required. We keep breach records where the law requires them.</p></LegalSection>
+    <LegalSection title="8. Access, correction and choices"><p>Subject to applicable law, an individual may ask to access information under our control, understand its use and disclosure, correct it, withdraw consent or challenge our compliance. We may verify identity first and will respond within the legally required time.</p><p>For information managed by an employer or restaurant customer, contact that organization first. ZestIQ assists the customer as required by contract and law.</p></LegalSection>
+    <LegalSection title="9. Marketing, browser storage and children"><p>Commercial electronic messages are sent only with consent or another lawful basis, identify the sender and include an unsubscribe method. Necessary service, billing and security messages may still be sent.</p><p>We use essential browser storage and limited cookies for authentication, preferences and app operation. We do not currently use advertising cookies or behavioural advertising. See our <a href="/cookies" className="font-bold underline underline-offset-4">Cookie Policy</a>.</p><p>ZestIQ is a business service and is not directed to children under 18.</p></LegalSection>
+    <LegalSection title="10. Privacy accountability, complaints and changes"><p>ZestIQ’s Privacy Officer is responsible for this program. Send questions, access requests, complaints or incident reports to <a href="mailto:demo@zestiq.ca?subject=ZestIQ%20privacy%20request" className="font-bold underline underline-offset-4">demo@zestiq.ca</a> with “Privacy” in the subject. An individual may also contact the Office of the Privacy Commissioner of Canada or the applicable provincial regulator.</p><p>We may update this policy as the service, providers or law changes. We will post the revised version with a new effective date and give additional notice where required.</p></LegalSection>
+  </PublicLegalLayout>;
 }

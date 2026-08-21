@@ -120,11 +120,11 @@ const capabilityGroups = [
   },
 ];
 
-function Logo() {
+function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2 text-2xl font-black tracking-tight">
       <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#F5C10E]">Z</span>
-      <span>zest<span className="text-[#D9A900]">IQ</span></span>
+      <span className={compact ? 'landing-compact-word' : ''}>zest<span className="text-[#D9A900]">IQ</span></span>
     </div>
   );
 }
@@ -263,6 +263,37 @@ function PhoneShowcase() {
   );
 }
 
+function LiveProductTour() {
+  const reduceMotion = useReducedMotion();
+  const [activeScreen, setActiveScreen] = useState(0);
+  const screens = [
+    { label: 'Daily brief', title: 'See what needs attention today.', text: 'Live sales, food cost, labour, top sellers and operating signals come together in one working dashboard.', image: '/product-dashboard.png', alt: 'ZestIQ live demo dashboard showing restaurant sales and performance data', metric: '$7,532 in demo sales' },
+    { label: 'Inventory', title: 'Count and cost the stock you actually carry.', text: 'Move from storage areas and counts to item-level stock, pars, supplier choices and current restaurant cost.', image: '/product-inventory.png', alt: 'ZestIQ live inventory screen with count and item controls', metric: 'Food + beverage inventory' },
+    { label: 'Ordering', title: 'Turn low stock into a reviewable order.', text: 'Suggested purchasing connects on-hand inventory, pars, recent sales, suppliers and pack sizes before anyone sends an order.', image: '/product-ordering.png', alt: 'ZestIQ live ordering screen with forecasting and AI order controls', metric: 'Human-approved AI suggestions' },
+  ];
+
+  useEffect(() => {
+    if (reduceMotion) return undefined;
+    const timer = window.setInterval(() => setActiveScreen(current => (current + 1) % screens.length), 5200);
+    return () => window.clearInterval(timer);
+  }, [reduceMotion, screens.length]);
+
+  const active = screens[activeScreen];
+  return <section id="product-tour" className="overflow-hidden bg-[#EEF1F5]">
+    <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+      <div className="max-w-3xl"><p className="text-sm font-black uppercase tracking-[.2em] text-[#9A7600]">The working product</p><h2 className="mt-3 text-4xl font-black tracking-[-.035em] sm:text-6xl">A real restaurant demo—not a concept screen.</h2><p className="mt-5 text-lg leading-8 text-black/60">Explore genuine ZestIQ screens populated with a running demo restaurant. Choose a workflow or let the tour move for you.</p></div>
+      <div className="mt-12 grid gap-7 lg:grid-cols-[.72fr_1.28fr] lg:items-center">
+        <div className="space-y-3">{screens.map((screen, index) => <button key={screen.label} type="button" onClick={() => setActiveScreen(index)} className={`w-full rounded-3xl border p-5 text-left transition ${activeScreen === index ? 'border-[#0B1220] bg-[#0B1220] text-white shadow-xl' : 'border-black/10 bg-white hover:-translate-y-0.5 hover:shadow-md'}`}><div className="flex items-center justify-between gap-3"><span className={`text-xs font-black uppercase tracking-[.18em] ${activeScreen === index ? 'text-[#F5C10E]' : 'text-[#9A7600]'}`}>{screen.label}</span><span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-black ${activeScreen === index ? 'bg-[#F5C10E] text-[#0B1220]' : 'bg-black/5'}`}>0{index + 1}</span></div><h3 className="mt-3 text-xl font-black">{screen.title}</h3><p className={`mt-2 text-sm leading-6 ${activeScreen === index ? 'text-white/55' : 'text-black/50'}`}>{screen.text}</p></button>)}</div>
+        <div className="relative min-w-0">
+          <motion.div aria-hidden="true" className="absolute -inset-8 rounded-full bg-[#F5C10E]/20 blur-3xl" animate={reduceMotion ? undefined : { scale: [0.92, 1.04, 0.92], rotate: [0, 8, 0] }} transition={{ duration: 7, repeat: Infinity }} />
+          <div className="relative overflow-hidden rounded-[30px] border-[8px] border-[#0B1220] bg-[#0B1220] shadow-2xl"><div className="flex h-8 items-center gap-1.5 bg-[#0B1220] px-3"><span className="h-2.5 w-2.5 rounded-full bg-red-400" /><span className="h-2.5 w-2.5 rounded-full bg-[#F5C10E]" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span className="ml-3 truncate text-[10px] font-bold text-white/35">app.zestiq.ca · Main Location</span></div><AnimatePresence mode="wait"><motion.img key={active.image} src={active.image} alt={active.alt} initial={reduceMotion ? false : { opacity: 0, x: 35, scale: .98 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={reduceMotion ? undefined : { opacity: 0, x: -35 }} transition={{ duration: .38 }} className="block aspect-video w-full bg-white object-cover object-top" /></AnimatePresence></div>
+          <motion.div key={active.metric} initial={reduceMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="absolute -bottom-4 right-3 rounded-2xl bg-[#F5C10E] px-4 py-3 text-xs font-black text-[#0B1220] shadow-xl sm:right-6">{active.metric}</motion.div>
+        </div>
+      </div>
+    </div>
+  </section>;
+}
+
 function PhoneFrame({ children, label }: { children: React.ReactNode; label: string }) {
   return <div className="rounded-[36px] border-[7px] border-[#0B1220] bg-[#0B1220] p-1 shadow-2xl"><div className="relative aspect-[9/18.5] overflow-hidden rounded-[25px] bg-[#F4F5F7]"><div className="absolute left-1/2 top-1.5 z-10 h-4 w-20 -translate-x-1/2 rounded-full bg-[#0B1220]" /><span className="sr-only">{label}</span>{children}</div></div>;
 }
@@ -289,9 +320,10 @@ export function Landing() {
     <div className="min-h-screen bg-[#FBFAF6] text-[#0B1220]">
       <header className="sticky top-0 z-40 border-b border-black/5 bg-[#FBFAF6]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
-          <Logo />
+          <Logo compact />
           <nav className="hidden gap-7 text-sm font-bold md:flex">
             <a href="#platform">Platform</a>
+            <a href="#product-tour">Product tour</a>
             <a href="#capabilities">Capabilities</a>
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
@@ -352,6 +384,7 @@ export function Landing() {
         </section>
 
         <SavingsCalculator />
+        <LiveProductTour />
         <PhoneShowcase />
 
         <section id="platform" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
@@ -516,18 +549,22 @@ export function Landing() {
         </section>
       </main>
 
-      <footer className="border-t border-black/5 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
-          <Logo />
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold text-black/50"><Link to="/restaurant-inventory-management-software">Inventory software</Link><Link to="/restaurant-food-cost-software">Food cost software</Link><Link to="/restaurant-invoice-scanner">Invoice scanner</Link><Link to="/privacy">Privacy</Link></div>
-          <div className="flex flex-col gap-2 text-sm lg:items-end">
-            <p className="text-black/45">Restaurant inventory intelligence, built for operators.</p>
-            <p className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 font-bold text-red-700" aria-label="Proudly Canadian owned and operated">
-              <span aria-hidden="true">🇨🇦</span> Proudly Canadian owned &amp; operated
-            </p>
-          </div>
+      <footer className="overflow-hidden bg-[#0B1220] text-white">
+        <div className="mx-auto max-w-7xl px-5 pb-8 pt-14 sm:px-8 sm:pt-20">
+          <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><Logo /><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
+          <nav aria-label="Footer" className="grid gap-9 py-12 sm:grid-cols-2 lg:grid-cols-5">
+            <FooterGroup title="Product" links={[["Product tour", "/#product-tour"], ["Capabilities", "/#capabilities"], ["Pricing", "/#pricing"], ["Demo account", "/login"]]} />
+            <FooterGroup title="Operations" links={[["Inventory software", "/restaurant-inventory-management-software"], ["Food cost software", "/restaurant-food-cost-software"], ["Invoice scanner", "/restaurant-invoice-scanner"], ["Labour & scheduling", "/#capabilities"], ["Beverage costing", "/#capabilities"]]} />
+            <FooterGroup title="Platform" links={[["AI & data", "/ai-transparency"], ["Subprocessors", "/subprocessors"], ["Security & privacy", "/privacy"], ["Multi-location", "/#capabilities"], ["POS integrations", "/#capabilities"]]} />
+            <FooterGroup title="Company" links={[["Book a demo", "/book-demo"], ["Contact", "mailto:demo@zestiq.ca"], ["Canadian owned", "/#canadian-owned"], ["Legal centre", "/legal"]]} />
+            <FooterGroup title="Legal" links={[["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"], ["Cookie Policy", "/cookies"], ["AI Transparency", "/ai-transparency"]]} />
+          </nav>
+          <div id="canadian-owned" className="flex flex-col gap-4 border-t border-white/10 py-6 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 ZestIQ. All rights reserved.</p><p className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-bold text-white/70"><span aria-hidden="true">🇨🇦</span>Proudly Canadian owned &amp; operated</p></div>
+          <p aria-hidden="true" className="pointer-events-none -mb-[.17em] mt-2 whitespace-nowrap text-[18vw] font-black leading-[.78] tracking-[-.08em] text-[#F5C10E] opacity-95">zestIQ</p>
         </div>
       </footer>
     </div>
   );
 }
+
+function FooterGroup({ title, links }: { title: string; links: string[][] }) { return <div><p className="text-xs font-black uppercase tracking-[.18em] text-[#F5C10E]">{title}</p><ul className="mt-4 space-y-3">{links.map(([label, href]) => <li key={`${label}-${href}`}>{href.startsWith('mailto:') ? <a href={href} className="text-sm font-bold text-white/70 hover:text-white">{label}</a> : <Link to={href} className="text-sm font-bold text-white/70 hover:text-white">{label}</Link>}</li>)}</ul></div>; }

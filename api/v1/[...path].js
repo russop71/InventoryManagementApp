@@ -61,13 +61,21 @@ function defaultLabor() {
 
 function normalizeLabor(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaultLabor();
+  const validPayTypes = new Set(['hourly', 'salary']);
+  const validInviteStatuses = new Set(['not-invited', 'pending', 'active']);
   const employees = Array.isArray(value.employees) ? value.employees.slice(0, 500).map(employee => ({
     id: String(employee?.id || '').slice(0, 120),
     name: String(employee?.name || '').trim().slice(0, 120),
     role: String(employee?.role || '').trim().slice(0, 120),
+    department: String(employee?.department || 'Restaurant team').trim().slice(0, 120),
+    phone: String(employee?.phone || '').trim().slice(0, 40),
+    payType: validPayTypes.has(employee?.payType) ? employee.payType : 'hourly',
     hourlyRate: Math.max(0, Math.min(1000, Number(employee?.hourlyRate) || 0)),
+    annualSalary: Math.max(0, Math.min(1000000, Number(employee?.annualSalary) || 0)),
     active: employee?.active !== false,
     email: String(employee?.email || '').trim().toLowerCase().slice(0, 254),
+    inviteStatus: validInviteStatuses.has(employee?.inviteStatus) ? employee.inviteStatus : (employee?.email ? 'active' : 'not-invited'),
+    invitedAt: String(employee?.invitedAt || '').slice(0, 40),
   })).filter(employee => employee.id && employee.name) : [];
   const employeeIds = new Set(employees.map(employee => employee.id));
   const validStatus = new Set(['scheduled', 'confirmed', 'completed', 'called-off']);
@@ -80,6 +88,7 @@ function normalizeLabor(value) {
     breakMinutes: Math.max(0, Math.min(480, Number(shift?.breakMinutes) || 0)),
     ...(Number.isFinite(Number(shift?.actualMinutes)) ? { actualMinutes: Math.max(0, Math.min(1440, Number(shift.actualMinutes))) } : {}),
     status: validStatus.has(shift?.status) ? shift.status : 'scheduled',
+    tag: String(shift?.tag || '').trim().toUpperCase().slice(0, 40),
     notes: String(shift?.notes || '').slice(0, 500),
   })).filter(shift => shift.id && shift.date && employeeIds.has(shift.employeeId)) : [];
   const validRequestStatus = new Set(['pending', 'approved', 'declined', 'cancelled']);
@@ -1215,6 +1224,52 @@ export default async function handler(req, res) {
         const rows = await supabase(`location_data?location_id=eq.${locationId}&select=*`);
         const current = rows?.[0] || { location_id: locationId };
         const integrations = current.integrations && typeof current.integrations === 'object' ? current.integrations : { toast: defaultToast() };
+        if (segments[5] === 'invite' && method === 'POST') {
+          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) return json(res, 403, { error: 'Manager access is required to invite employees' });
+          const labor = normalizeLabor(integrations.labor);
+          const incoming = req.body?.employee || {};
+          const name = String(incoming.name || '').trim();
+          const email = String(incoming.email || '').trim().toLowerCase();
+          if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) return json(res, 400, { error: 'A valid employee name and email are required' });
+          if (labor.employees.some(employee => employee.email === email)) return json(res, 409, { error: 'That employee email is already on this location' });
+
+          const accountUsers = await supabase(`app_users?email=eq.${encodeURIComponent(email)}&select=*`);
+          const existingUser = accountUsers[0];
+          if (existingUser && existingUser.account_id !== accountId) return json(res, 409, { error: 'That email already belongs to another company account' });
+
+          let inviteStatus = 'active';
+          let invitedAt = '';
+          if (!existingUser) {
+            const redirectTo = `${appOrigin(req)}/reset-password`;
+            const invited = await supabaseAuth(`invite?redirect_to=${encodeURIComponent(redirectTo)}`, {
+              method: 'POST',
+              body: { email, data: { name, account_id: accountId, role: 'Staff', employee_app: true } },
+            });
+            await supabase('app_users', {
+              method: 'POST', prefer: 'return=minimal',
+              body: { account_id: accountId, auth_user_id: invited.id, name, email, role: 'Staff', status: 'Active' },
+            });
+            inviteStatus = 'pending';
+            invitedAt = new Date().toISOString();
+          }
+
+          const employee = normalizeLabor({ employees: [{
+            ...incoming,
+            id: `employee-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name,
+            email,
+            inviteStatus,
+            invitedAt,
+            active: true,
+          }] }).employees[0];
+          labor.employees.push(employee);
+          const normalized = normalizeLabor(labor);
+          await supabase(`location_data?location_id=eq.${locationId}`, {
+            method: 'PATCH', prefer: 'return=minimal',
+            body: { integrations: { ...integrations, labor: normalized }, updated_at: new Date().toISOString() },
+          });
+          return json(res, 201, { labor: normalized, employee, inviteSent: inviteStatus === 'pending' });
+        }
         if (segments[5] === 'requests' && method === 'POST') {
           const labor = normalizeLabor(integrations.labor);
           const requestType = req.body?.type;
@@ -1255,7 +1310,15 @@ export default async function handler(req, res) {
           const labor = normalizeLabor(integrations.labor);
           if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) {
             const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
-            labor.employees = labor.employees.map(employee => ({ ...employee, hourlyRate: 0, email: employee.id === linkedEmployee?.id ? employee.email : '' }));
+            labor.employees = labor.employees.map(employee => ({
+              ...employee,
+              hourlyRate: 0,
+              annualSalary: 0,
+              phone: employee.id === linkedEmployee?.id ? employee.phone : '',
+              email: employee.id === linkedEmployee?.id ? employee.email : '',
+              inviteStatus: employee.id === linkedEmployee?.id ? employee.inviteStatus : 'active',
+              invitedAt: '',
+            }));
             labor.shifts = labor.shifts.filter(shift => shift.employeeId === linkedEmployee?.id);
             labor.timeOffRequests = labor.timeOffRequests.filter(request => request.employeeId === linkedEmployee?.id);
             labor.shiftSwapRequests = labor.shiftSwapRequests.filter(request => request.requesterEmployeeId === linkedEmployee?.id || request.targetEmployeeId === linkedEmployee?.id);

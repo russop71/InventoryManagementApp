@@ -215,3 +215,15 @@
     min-width: 44px;
   }
 }
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media screen and (max-width: 639px) {
+  .landing-compact-word {
+    display: none;
+  }
+}

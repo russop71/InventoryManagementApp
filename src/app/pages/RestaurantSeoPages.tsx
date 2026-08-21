@@ -1,8 +1,8 @@
 import { Link } from 'react-router';
-import { ArrowRight, BarChart3, Check, ClipboardCheck, FileScan, PackageSearch, ReceiptText, ShieldCheck, Sparkles, TrendingDown } from 'lucide-react';
+import { ArrowRight, BarChart3, CalendarClock, Check, ClipboardCheck, FileScan, PackageSearch, ReceiptText, ShieldCheck, ShoppingCart, Sparkles, TrendingDown, Wine } from 'lucide-react';
 import { usePageSeo } from '../utils/seo';
 
-type PageKey = 'inventory' | 'foodCost' | 'invoiceScanner';
+type PageKey = 'inventory' | 'foodCost' | 'invoiceScanner' | 'labour' | 'beverage' | 'ordering';
 
 const pages = {
   inventory: {
@@ -44,11 +44,53 @@ const pages = {
     question: 'Can an AI invoice scanner update inventory safely?',
     answer: 'It should not post uncertain AI output without review. ZestIQ separates extraction from approval, flags fields that need attention and prevents duplicate invoice numbers so users remain in control of the final record.',
   },
+  labour: {
+    path: '/restaurant-labour-scheduling-software',
+    title: 'Restaurant Labour Scheduling Software Canada | ZestIQ',
+    description: 'Restaurant labour scheduling software for shifts, labour cost, sales comparison, employee availability, swaps and time-off requests.',
+    eyebrow: 'Restaurant labour scheduling software',
+    heading: 'See labour cost before the schedule becomes payroll.',
+    intro: 'ZestIQ puts planned hours, hourly rates, sales and target labour percentage on the same operating view. Managers can build the week while employees review shifts, request swaps and book time off.',
+    icon: CalendarClock,
+    points: ['Weekly scheduling by employee, role and location', 'Scheduled hours and labour cost compared with sales', 'Employee shift view, swap requests and time off', 'Owner visibility across restaurant locations'],
+    workflow: [['Plan', 'Build shifts against roles, availability and expected demand.'], ['Check', 'Compare scheduled labour dollars and percentage with sales targets.'], ['Publish', 'Give employees a clear mobile schedule and controlled request workflow.']],
+    question: 'What should restaurant scheduling software show an operator?',
+    answer: 'A schedule should be more than a calendar. Connecting planned hours and wage rates with sales helps managers see an overstaffed or understaffed service before the week is locked, while a simple employee workflow reduces message threads and missed requests.',
+  },
+  beverage: {
+    path: '/restaurant-beverage-costing-software',
+    title: 'Restaurant Beverage Costing Software | ZestIQ',
+    description: 'Liquor, wine and beer inventory and beverage costing software for bottles, cases, pours, cocktails, pars and drink margins.',
+    eyebrow: 'Restaurant beverage costing software',
+    heading: 'Run bar and kitchen cost from the same inventory system.',
+    intro: 'Track liquor, wine and beer by bottle, case and pour. ZestIQ connects purchase cost, bottle yield, cocktail recipes, bar pars and menu price so beverage margin is visible beside food cost.',
+    icon: Wine,
+    points: ['Bottle, case, keg and pour-aware inventory', 'Cost per drink and bottle-yield calculations', 'Cocktail, wine-by-the-glass and beer margin', 'Bar pars, price history and variance workflows'],
+    workflow: [['Receive', 'Capture beverage purchases and supplier prices from invoices.'], ['Cost', 'Convert bottle or case cost into the pour and recipe units actually sold.'], ['Control', 'Review bar stock, variance, drink margin and reorder needs.']],
+    question: 'Why separate beverage costing from basic food inventory?',
+    answer: 'Bar inventory has different units, yields and loss patterns. A useful full-restaurant system must understand the relationship between cases, bottles, ounces, pours and drink recipes while still reporting the total restaurant margin in one place.',
+  },
+  ordering: {
+    path: '/restaurant-ordering-forecasting-software',
+    title: 'Restaurant Ordering & Forecasting Software | ZestIQ',
+    description: 'Restaurant ordering software that connects on-hand inventory, pars, sales usage, supplier pack sizes and forecasts to suggested purchase orders.',
+    eyebrow: 'Restaurant ordering and forecasting software',
+    heading: 'Order from current stock and demand—not last week’s guess.',
+    intro: 'ZestIQ turns counts, pars, recent usage, supplier choices and pack sizes into a reviewable suggested order. Restaurant teams stay in control before anything is sent.',
+    icon: ShoppingCart,
+    points: ['Suggested quantities from on-hand stock and pars', 'Sales and usage signals for demand planning', 'Supplier-specific pricing and pack-size review', 'Human approval before purchase orders are placed'],
+    workflow: [['Measure', 'Use current counts, incoming orders and recent usage.'], ['Suggest', 'Calculate order needs against pars and supplier packs.'], ['Approve', 'Review quantities, cost and supplier before sending or receiving.']],
+    question: 'Can restaurant ordering recommendations be trusted?',
+    answer: 'They are most useful when the calculation is visible. ZestIQ treats forecasts as decision support: current stock, pars, sales and pack sizes provide the evidence, and an authorized user confirms the final order.',
+  },
 } satisfies Record<PageKey, { path: string; title: string; description: string; eyebrow: string; heading: string; intro: string; icon: typeof PackageSearch; points: string[]; workflow: string[][]; question: string; answer: string }>;
 
 export function RestaurantInventorySeo() { return <SeoPage pageKey="inventory" />; }
 export function RestaurantFoodCostSeo() { return <SeoPage pageKey="foodCost" />; }
 export function RestaurantInvoiceScannerSeo() { return <SeoPage pageKey="invoiceScanner" />; }
+export function RestaurantLabourSeo() { return <SeoPage pageKey="labour" />; }
+export function RestaurantBeverageSeo() { return <SeoPage pageKey="beverage" />; }
+export function RestaurantOrderingSeo() { return <SeoPage pageKey="ordering" />; }
 
 function SeoPage({ pageKey }: { pageKey: PageKey }) {
   const page = pages[pageKey];
@@ -63,9 +105,9 @@ function SeoPage({ pageKey }: { pageKey: PageKey }) {
 
       <section className="bg-[#F5C10E]"><div className="mx-auto grid max-w-7xl gap-8 px-5 py-20 sm:px-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-start"><div><Sparkles className="h-8 w-8" /><p className="mt-4 text-xs font-black uppercase tracking-[0.2em] text-black/45">Frequently asked</p></div><div><h2 className="text-3xl font-black tracking-tight sm:text-4xl">{page.question}</h2><p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-black/60">{page.answer}</p></div></div></section>
 
-      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8"><div className="grid gap-5 rounded-[32px] bg-white p-7 shadow-sm md:grid-cols-3 md:p-10"><SmallFeature icon={ClipboardCheck} title="Inventory to action" text="Counts and pars connect to purchasing and variance." /><SmallFeature icon={ReceiptText} title="Current cost" text="Invoices and supplier prices connect to recipe margins." /><SmallFeature icon={ShieldCheck} title="Company-isolated" text="Authorized users see only their company and locations." /></div><div className="mt-8 flex flex-wrap justify-center gap-4 text-sm font-black"><Link to={pages.inventory.path} className="underline underline-offset-4">Restaurant inventory software</Link><Link to={pages.foodCost.path} className="underline underline-offset-4">Food cost software</Link><Link to={pages.invoiceScanner.path} className="underline underline-offset-4">AI invoice scanner</Link></div></section>
+      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8"><div className="grid gap-5 rounded-[32px] bg-white p-7 shadow-sm md:grid-cols-3 md:p-10"><SmallFeature icon={ClipboardCheck} title="Inventory to action" text="Counts and pars connect to purchasing and variance." /><SmallFeature icon={ReceiptText} title="Current cost" text="Invoices and supplier prices connect to recipe margins." /><SmallFeature icon={ShieldCheck} title="Company-isolated" text="Authorized users see only their company and locations." /></div><div className="mt-8 flex flex-wrap justify-center gap-4 text-sm font-black"><Link to={pages.inventory.path} className="underline underline-offset-4">Inventory</Link><Link to={pages.foodCost.path} className="underline underline-offset-4">Food cost</Link><Link to={pages.invoiceScanner.path} className="underline underline-offset-4">Invoice scanning</Link><Link to={pages.labour.path} className="underline underline-offset-4">Labour scheduling</Link><Link to={pages.beverage.path} className="underline underline-offset-4">Beverage costing</Link><Link to={pages.ordering.path} className="underline underline-offset-4">Ordering</Link></div></section>
     </main>
-    <footer className="border-t border-black/5 bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-black/50 sm:flex-row sm:items-center sm:justify-between sm:px-8"><p>© ZestIQ · Restaurant operations intelligence</p><div className="flex gap-4"><Link to="/privacy">Privacy</Link><Link to="/book-demo">Book a demo</Link></div></div></footer>
+    <footer className="border-t border-black/5 bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-black/50 sm:flex-row sm:items-center sm:justify-between sm:px-8"><p>© 2026 ZestIQ · Canadian restaurant operations intelligence</p><div className="flex flex-wrap gap-4"><Link to="/legal">Legal centre</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/book-demo">Book a demo</Link></div></div></footer>
   </div>;
 }
 

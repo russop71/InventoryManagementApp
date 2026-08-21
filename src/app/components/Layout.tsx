@@ -39,6 +39,7 @@ export function Layout() {
   const { user, logout, accountId, accountName, onboarding, locations, activeLocationId, switchLocation } = useAuth();
   const [openTopMenu, setOpenTopMenu] = useState<string | null>(null);
   const closeTopMenuTimer = useRef<number | null>(null);
+  const canManageLabor = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
 
   const navItems = [
     { path: '/app', label: 'Dashboard', icon: LayoutDashboard },
@@ -46,7 +47,7 @@ export function Layout() {
     { path: '/app/recipes', label: 'Recipes', icon: ChefHat },
     { path: '/app/orders', label: 'Purchasing', icon: Truck },
     { path: '/app/invoices', label: 'Invoices', icon: Receipt },
-    { path: '/app/labor', label: 'Labour', icon: CalendarClock },
+    ...(canManageLabor ? [{ path: '/app/labor', label: 'Labour', icon: CalendarClock }] : []),
   ];
 
   const topMenuGroups = [
@@ -78,7 +79,7 @@ export function Layout() {
     {
       label: 'Team',
       items: [
-        { label: 'Labour & Scheduling', path: '/app/labor' },
+        ...(canManageLabor ? [{ label: 'Labour & Scheduling', path: '/app/labor' }] : [{ label: 'My schedule', path: '/employee' }]),
         ...(user?.role === 'Owner' ? [{ label: 'Users & Usage', path: '/app/users' }] : []),
       ],
     },
@@ -133,7 +134,7 @@ export function Layout() {
   }, [accountId, activeLocationId, location.pathname]);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] pb-20">
+    <div className="zestiq-app-shell min-h-screen overflow-x-clip bg-[#F4F5F7] pb-20">
 
       {/* ── White header ───────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-white shadow-sm border-b border-gray-100">
@@ -189,8 +190,8 @@ export function Layout() {
               </div>
               <DropdownMenuSeparator />
               <div className="py-1">
-                <DropdownMenuItem onClick={() => navigate('/app/terms')}   className="rounded-lg mx-1"><FileText className="w-4 h-4 mr-2.5 text-gray-400" />Terms of Service</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/app/privacy')} className="rounded-lg mx-1"><Shield   className="w-4 h-4 mr-2.5 text-gray-400" />Privacy Policy</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/terms')}   className="rounded-lg mx-1"><FileText className="w-4 h-4 mr-2.5 text-gray-400" />Terms of Service</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/privacy')} className="rounded-lg mx-1"><Shield   className="w-4 h-4 mr-2.5 text-gray-400" />Privacy Policy</DropdownMenuItem>
               </div>
               <DropdownMenuSeparator />
               <div className="py-1">
@@ -223,8 +224,8 @@ export function Layout() {
           </button>
         </div>
 
-        <div className="px-4 pb-3 flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1.5">
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1.5">
             {topMenuGroups.map(group => (
               <div
                 key={group.label}
@@ -271,7 +272,7 @@ export function Layout() {
               </div>
             ))}
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Location</span>
             <select
               className="h-8 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700"
@@ -289,7 +290,7 @@ export function Layout() {
       </header>
 
       {/* ── Content ──────────────────────────────────────── */}
-      <main className="px-4 py-4">
+      <main className="min-w-0 overflow-x-clip px-3 py-4 sm:px-4">
         {(onboarding.status === 'not_started' || onboarding.status === 'in_progress') && location.pathname !== '/app/onboarding' && (
           <Link to="/app/onboarding" className="mx-auto mb-4 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
             <span className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#F5C10E]"><Rocket className="h-4 w-4" /></span><span><span className="block text-sm font-black">Finish setting up ZestIQ</span><span className="block text-xs text-amber-800">Continue from {onboarding.currentStep}.</span></span></span>

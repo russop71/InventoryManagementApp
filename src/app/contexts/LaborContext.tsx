@@ -1,15 +1,22 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { apiRequest } from '../utils/api';
+import { calculateLaborCostBreakdown } from '../utils/labor.js';
 import { locationScopedStorageKey, readScopedJson } from '../utils/storageScope';
 
 export interface LaborEmployee {
   id: string;
   name: string;
   role: string;
+  department: string;
+  phone?: string;
+  payType: 'hourly' | 'salary';
   hourlyRate: number;
+  annualSalary: number;
   active: boolean;
   email?: string;
+  inviteStatus: 'not-invited' | 'pending' | 'active';
+  invitedAt?: string;
 }
 
 export interface LaborShift {
@@ -21,6 +28,7 @@ export interface LaborShift {
   breakMinutes: number;
   actualMinutes?: number;
   status: 'scheduled' | 'confirmed' | 'completed' | 'called-off';
+  tag?: string;
   notes?: string;
 }
 
@@ -55,6 +63,7 @@ export interface ShiftSwapRequest {
 interface LaborContextValue extends LaborData {
   isLaborLoaded: boolean;
   addEmployee: (employee: Omit<LaborEmployee, 'id'>) => void;
+  inviteEmployee: (employee: Omit<LaborEmployee, 'id' | 'inviteStatus' | 'invitedAt'>) => Promise<LaborEmployee>;
   updateEmployee: (id: string, updates: Partial<LaborEmployee>) => void;
   removeEmployee: (id: string) => void;
   addShift: (shift: Omit<LaborShift, 'id'>) => void;
@@ -67,6 +76,7 @@ interface LaborContextValue extends LaborData {
   setTargetLaborPercent: (value: number) => void;
   scheduledCostForRange: (startDate: string, endDate: string) => number;
   scheduledHoursForRange: (startDate: string, endDate: string) => number;
+  laborCostBreakdownForRange: (startDate: string, endDate: string) => { hourly: number; salaried: number; total: number };
 }
 
 const EMPTY_LABOR: LaborData = { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30 };
@@ -82,7 +92,14 @@ function shiftHours(shift: LaborShift) {
 
 function normalizeLaborData(value: Partial<LaborData> | null | undefined): LaborData {
   return {
-    employees: Array.isArray(value?.employees) ? value.employees : [],
+    employees: Array.isArray(value?.employees) ? value.employees.map(employee => ({
+      ...employee,
+      department: employee.department || 'Restaurant team',
+      payType: employee.payType === 'salary' ? 'salary' : 'hourly',
+      hourlyRate: Number(employee.hourlyRate) || 0,
+      annualSalary: Number(employee.annualSalary) || 0,
+      inviteStatus: employee.inviteStatus || (employee.email ? 'active' : 'not-invited'),
+    })) : [],
     shifts: Array.isArray(value?.shifts) ? value.shifts : [],
     timeOffRequests: Array.isArray(value?.timeOffRequests) ? value.timeOffRequests : [],
     shiftSwapRequests: Array.isArray(value?.shiftSwapRequests) ? value.shiftSwapRequests : [],
@@ -99,21 +116,22 @@ function buildDemoLabor(): LaborData {
     return value.toISOString().slice(0, 10);
   };
   const employees: LaborEmployee[] = [
-    { id: 'demo-labor-maya', name: 'Maya Chen', role: 'Chef de Cuisine', hourlyRate: 32, active: true, email: 'maya@example.test' },
-    { id: 'demo-labor-luca', name: 'Luca Romano', role: 'Line Cook', hourlyRate: 24, active: true, email: 'luca@example.test' },
-    { id: 'demo-labor-priya', name: 'Priya Shah', role: 'Server', hourlyRate: 18.5, active: true, email: 'priya@example.test' },
-    { id: 'demo-labor-noah', name: 'Noah Williams', role: 'Bartender', hourlyRate: 21, active: true, email: 'noah@example.test' },
-    { id: 'demo-labor-sofia', name: 'Sofia Martin', role: 'Host', hourlyRate: 17.5, active: true, email: 'sofia@example.test' },
+    { id: 'demo-labor-maya', name: 'Maya Chen', role: 'Chef de Cuisine', department: 'Back of house', payType: 'salary', hourlyRate: 0, annualSalary: 85000, active: true, email: 'maya@example.test', phone: '416-555-0141', inviteStatus: 'active' },
+    { id: 'demo-labor-luca', name: 'Luca Romano', role: 'Line Cook', department: 'Back of house', payType: 'hourly', hourlyRate: 24, annualSalary: 0, active: true, email: 'luca@example.test', phone: '416-555-0142', inviteStatus: 'active' },
+    { id: 'demo-labor-priya', name: 'Priya Shah', role: 'Server', department: 'Front of house', payType: 'hourly', hourlyRate: 18.5, annualSalary: 0, active: true, email: 'priya@example.test', phone: '416-555-0143', inviteStatus: 'active' },
+    { id: 'demo-labor-noah', name: 'Noah Williams', role: 'Bartender', department: 'Bar', payType: 'hourly', hourlyRate: 21, annualSalary: 0, active: true, email: 'noah@example.test', phone: '416-555-0144', inviteStatus: 'active' },
+    { id: 'demo-labor-sofia', name: 'Sofia Martin', role: 'Host', department: 'Front of house', payType: 'hourly', hourlyRate: 17.5, annualSalary: 0, active: true, email: 'sofia@example.test', phone: '416-555-0145', inviteStatus: 'active' },
   ];
   const templates = [
-    ['demo-labor-maya', '09:00', '17:00', 30], ['demo-labor-luca', '14:00', '22:30', 30],
-    ['demo-labor-priya', '16:00', '23:00', 30], ['demo-labor-noah', '16:00', '00:00', 30],
-    ['demo-labor-sofia', '16:30', '22:00', 15],
+    ['demo-labor-maya', '09:00', '17:00', 30, 'EXPO'], ['demo-labor-luca', '14:00', '22:30', 30, 'PREP'],
+    ['demo-labor-priya', '16:00', '23:00', 30, 'DINNER'], ['demo-labor-noah', '16:00', '00:00', 30, 'BAR CLOSE'],
+    ['demo-labor-sofia', '16:30', '22:00', 15, 'HOST'],
   ] as const;
-  const shifts = Array.from({ length: 7 }, (_, day) => templates.map(([employeeId, start, end, breakMinutes], index) => ({
+  const shifts = Array.from({ length: 7 }, (_, day) => templates.map(([employeeId, start, end, breakMinutes, tag], index) => ({
     id: `demo-shift-${day}-${index}`, employeeId, date: date(day), start, end, breakMinutes,
     actualMinutes: day < ((new Date().getDay() + 6) % 7) ? Math.round(shiftHours({ id: '', employeeId, date: '', start, end, breakMinutes, status: 'completed' }) * 60) : undefined,
     status: (day < ((new Date().getDay() + 6) % 7) ? 'completed' : 'confirmed') as LaborShift['status'],
+    tag,
   }))).flat();
   return {
     employees, shifts, targetLaborPercent: 30,
@@ -166,6 +184,21 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     }).catch(error => console.error('Failed to update employee labour request', error));
   };
 
+  const inviteEmployee = async (employee: Omit<LaborEmployee, 'id' | 'inviteStatus' | 'invitedAt'>) => {
+    if (token && accountId && activeLocationId) {
+      const response = await apiRequest<{ labor: LaborData; employee: LaborEmployee }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/invite`, {
+        method: 'POST', body: JSON.stringify({ employee }),
+      });
+      const next = normalizeLaborData(response.labor);
+      setData(next);
+      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
+      return response.employee;
+    }
+    const invited: LaborEmployee = { ...employee, id: `employee-${Date.now()}`, inviteStatus: employee.email ? 'pending' : 'not-invited', invitedAt: employee.email ? new Date().toISOString() : undefined };
+    commit(current => ({ ...current, employees: [...current.employees, invited] }));
+    return invited;
+  };
+
   useEffect(() => {
     if (!accountId || !activeLocationId) {
       setData(EMPTY_LABOR);
@@ -196,6 +229,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     ...data,
     isLaborLoaded,
     addEmployee: employee => commit(current => ({ ...current, employees: [...current.employees, { ...employee, id: `employee-${Date.now()}` }] })),
+    inviteEmployee,
     updateEmployee: (id, updates) => commit(current => ({ ...current, employees: current.employees.map(employee => employee.id === id ? { ...employee, ...updates } : employee) })),
     removeEmployee: id => commit(current => ({ ...current, employees: current.employees.filter(employee => employee.id !== id), shifts: current.shifts.filter(shift => shift.employeeId !== id) })),
     addShift: shift => commit(current => ({ ...current, shifts: [...current.shifts, { ...shift, id: `shift-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }] })),
@@ -221,11 +255,9 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     },
     setTargetLaborPercent: targetLaborPercent => commit(current => ({ ...current, targetLaborPercent: Math.min(100, Math.max(0, targetLaborPercent)) })),
     scheduledHoursForRange: (startDate, endDate) => data.shifts.filter(shift => shift.date >= startDate && shift.date <= endDate && shift.status !== 'called-off').reduce((sum, shift) => sum + shiftHours(shift), 0),
-    scheduledCostForRange: (startDate, endDate) => data.shifts.filter(shift => shift.date >= startDate && shift.date <= endDate && shift.status !== 'called-off').reduce((sum, shift) => {
-      const employee = data.employees.find(item => item.id === shift.employeeId);
-      return sum + shiftHours(shift) * (employee?.hourlyRate || 0);
-    }, 0),
-  }), [data, isLaborLoaded]);
+    scheduledCostForRange: (startDate, endDate) => calculateLaborCostBreakdown(data, startDate, endDate).total,
+    laborCostBreakdownForRange: (startDate, endDate) => calculateLaborCostBreakdown(data, startDate, endDate),
+  }), [data, isLaborLoaded, token, accountId, activeLocationId, storageKey]);
 
   return <LaborContext.Provider value={value}>{children}</LaborContext.Provider>;
 }

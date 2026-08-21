@@ -24,6 +24,7 @@ import { Help } from "./pages/Help";
 import { Contact } from "./pages/Contact";
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
+import { AITransparency, CookiePolicy, LegalCenter, Subprocessors } from "./pages/LegalPages";
 import { Landing } from "./pages/Landing";
 import { ResetPassword } from "./pages/ResetPassword";
 import { PlatformAdmin } from "./pages/PlatformAdmin";
@@ -32,7 +33,7 @@ import { LaborScheduling } from "./pages/LaborScheduling";
 import { EmployeeApp } from "./pages/EmployeeApp";
 import { BeverageCosting } from "./pages/BeverageCosting";
 import { BookDemo } from "./pages/BookDemo";
-import { RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo } from "./pages/RestaurantSeoPages";
+import { RestaurantBeverageSeo, RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo, RestaurantLabourSeo, RestaurantOrderingSeo } from "./pages/RestaurantSeoPages";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 
@@ -54,6 +55,26 @@ export const router = createBrowserRouter([
     Component: Privacy,
   },
   {
+    path: "/terms",
+    Component: Terms,
+  },
+  {
+    path: "/legal",
+    Component: LegalCenter,
+  },
+  {
+    path: "/cookies",
+    Component: CookiePolicy,
+  },
+  {
+    path: "/ai-transparency",
+    Component: AITransparency,
+  },
+  {
+    path: "/subprocessors",
+    Component: Subprocessors,
+  },
+  {
     path: "/restaurant-inventory-management-software",
     Component: RestaurantInventorySeo,
   },
@@ -64,6 +85,18 @@ export const router = createBrowserRouter([
   {
     path: "/restaurant-invoice-scanner",
     Component: RestaurantInvoiceScannerSeo,
+  },
+  {
+    path: "/restaurant-labour-scheduling-software",
+    Component: RestaurantLabourSeo,
+  },
+  {
+    path: "/restaurant-beverage-costing-software",
+    Component: RestaurantBeverageSeo,
+  },
+  {
+    path: "/restaurant-ordering-forecasting-software",
+    Component: RestaurantOrderingSeo,
   },
   {
     path: "/reset-password",

@@ -46,7 +46,7 @@ export function BookDemo() {
             <SelectField label="Number of venues" name="venues" options={['1 venue', '2–5 venues', '6–15 venues', '16–50 venues', '51+ venues']} />
             <label className="block"><span className="text-xs font-black text-slate-700">What is your main goal? <span className="text-red-500">*</span></span><textarea required name="goal" rows={4} placeholder="Reduce food cost, speed up counts, control labour, improve ordering…" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#B58B00] focus:ring-4 focus:ring-[#F5C10E]/15" /></label>
             <button type="submit" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#0B1220] px-6 font-black text-white transition hover:bg-[#172238]"><Mail className="h-4 w-4" />Request my demo<ArrowRight className="h-4 w-4" /></button>
-            <p className="text-center text-[11px] leading-5 text-slate-400">This opens a pre-filled email to demo@zestiq.ca for you to review and send. By continuing, you acknowledge our <Link to="/privacy" className="font-bold text-slate-600 underline underline-offset-2">Privacy Policy</Link>.</p>
+            <p className="text-center text-[11px] leading-5 text-slate-400">This opens a pre-filled email to demo@zestiq.ca for you to review and send. By continuing, you acknowledge our <Link to="/privacy" className="font-bold text-slate-600 underline underline-offset-2">Privacy Policy</Link> and <Link to="/terms" className="font-bold text-slate-600 underline underline-offset-2">Terms of Service</Link>.</p>
           </form>
         </section>
 

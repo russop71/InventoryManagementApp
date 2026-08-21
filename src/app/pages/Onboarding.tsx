@@ -23,20 +23,19 @@ function SetupProgress({ currentStep, completedSteps }: { currentStep: Onboardin
   const currentIndex = STEPS.findIndex(step => step.id === currentStep);
   return (
     <aside className="rounded-[28px] bg-[#0B1220] p-5 text-white lg:sticky lg:top-28 lg:self-start">
-      <div className="flex items-center gap-3 border-b border-white/10 pb-5">
+      <div className="flex min-w-0 items-center gap-3 border-b border-white/10 pb-5">
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#F5C10E] text-[#0B1220]"><Rocket className="h-5 w-5" /></div>
-        <div><p className="text-xs font-black uppercase tracking-[0.18em] text-white/45">First-run setup</p><p className="mt-1 font-black">Get useful data in</p></div>
+        <div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-white/45">First-run setup</p><p className="mt-1 break-words font-black leading-tight">Get useful data in</p></div>
       </div>
-      <ol className="mt-5 grid grid-cols-3 gap-2 lg:grid-cols-1">
+      <ol className="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-1">
         {STEPS.map((step, index) => {
           const complete = completedSteps.includes(step.id);
           const active = step.id === currentStep;
           const Icon = step.icon;
           return (
-            <li key={step.id} className={`flex items-center gap-3 rounded-2xl p-2.5 ${active ? 'bg-white text-[#0B1220]' : 'text-white/60'}`}>
+            <li key={step.id} aria-current={active ? 'step' : undefined} className={`flex min-w-0 items-center gap-2.5 rounded-2xl p-2.5 ${active ? 'bg-white text-[#0B1220]' : 'text-white/60'}`}>
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${complete ? 'bg-emerald-500 text-white' : active ? 'bg-[#F5C10E] text-[#0B1220]' : 'bg-white/10'}`}>{complete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}</span>
-              <span className="hidden lg:block"><span className="block text-[10px] font-black uppercase tracking-[0.16em] opacity-55">Step {index + 1}</span><span className="block text-sm font-bold">{step.label}</span></span>
-              <span className="text-[10px] font-bold lg:hidden">{index + 1}</span>
+              <span className="min-w-0"><span className="block text-[9px] font-black uppercase tracking-[0.12em] opacity-55 lg:text-[10px] lg:tracking-[0.16em]">Step {index + 1}</span><span className="block break-words text-xs font-bold leading-tight lg:text-sm">{step.label}</span></span>
             </li>
           );
         })}

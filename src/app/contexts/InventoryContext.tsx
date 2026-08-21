@@ -533,15 +533,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const localIngredientCount = localRecipes.reduce((count, recipe) => count + (recipe.ingredients?.length || 0), 0);
       const shouldPreferLocalRecipes = shouldPreferLocalInventory || (!serverHasData && localIngredientCount > apiIngredientCount);
 
-      const nextInventory = serverHasData ? apiInventory : (shouldPreferLocalInventory ? localInventory : (hasLocalData ? localInventory : fallbackInventory));
-      const nextRecipes = serverHasData ? apiRecipes : (shouldPreferLocalRecipes ? localRecipes : (hasLocalData ? localRecipes : fallbackRecipes));
-      const nextStorageAreas = serverHasData ? apiStorageAreas : (shouldPreferLocalInventory ? localStorageAreas : (hasLocalData ? localStorageAreas : fallbackStorageAreas));
+      const nextInventory = isDemoAccount && apiInventory.length === 0 ? fallbackInventory : (serverHasData ? apiInventory : (shouldPreferLocalInventory ? localInventory : (hasLocalData ? localInventory : fallbackInventory)));
+      const nextRecipes = isDemoAccount && apiRecipes.length === 0 ? fallbackRecipes : (serverHasData ? apiRecipes : (shouldPreferLocalRecipes ? localRecipes : (hasLocalData ? localRecipes : fallbackRecipes)));
+      const nextStorageAreas = isDemoAccount && apiStorageAreas.length === 0 ? fallbackStorageAreas : (serverHasData ? apiStorageAreas : (shouldPreferLocalInventory ? localStorageAreas : (hasLocalData ? localStorageAreas : fallbackStorageAreas)));
       const localOrders = readScopedJson<DailyOrder[]>(localKey('orders'), []);
       const localInvoices = readScopedJson<InvoiceRecord[]>(localKey('invoices'), []);
       const localSuppliers = readScopedJson<Supplier[]>(localKey('suppliers'), []);
-      const nextOrders = serverHasData ? apiOrders : (localOrders.length > 0 ? localOrders : fallbackOrders);
-      const nextInvoices = serverHasData ? apiInvoices : (localInvoices.length > 0 ? localInvoices : fallbackInvoices);
-      const nextSuppliers = serverHasData ? apiSuppliers : (localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers);
+      const nextOrders = isDemoAccount && apiOrders.length === 0 ? fallbackOrders : (serverHasData ? apiOrders : (localOrders.length > 0 ? localOrders : fallbackOrders));
+      const nextInvoices = isDemoAccount && apiInvoices.length === 0 ? fallbackInvoices : (serverHasData ? apiInvoices : (localInvoices.length > 0 ? localInvoices : fallbackInvoices));
+      const nextSuppliers = isDemoAccount && apiSuppliers.length === 0 ? fallbackSuppliers : (serverHasData ? apiSuppliers : (localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers));
       const nextPreppedRecipes = serverHasData ? apiPreppedRecipes : readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe));
       const nextInventoryCounts = apiInventoryCounts.length > 0 ? apiInventoryCounts : localInventoryCounts;
 

@@ -1,115 +1,22 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { FileText } from 'lucide-react';
+import { LegalList, LegalNote, LegalSection, PublicLegalLayout } from '../components/PublicLegalLayout';
+import { usePageSeo } from '../utils/seo';
 
 export function Terms() {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Terms of Service</h2>
-        <p className="text-sm text-gray-600 mt-1">Last updated: March 27, 2026</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <FileText className="w-5 h-5" />
-            <span>Terms & Conditions</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="prose prose-sm max-w-none space-y-4">
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">1. Acceptance of Terms</h3>
-            <p className="text-sm text-gray-600">
-              By accessing and using zestIQ Solutions ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">2. Use License</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              Permission is granted to temporarily access the Service for personal, non-transferable use only. This is the grant of a license, not a transfer of title, and under this license you may not:
-            </p>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-              <li>Modify or copy the materials</li>
-              <li>Use the materials for any commercial purpose</li>
-              <li>Attempt to decompile or reverse engineer any software</li>
-              <li>Remove any copyright or proprietary notations</li>
-              <li>Transfer the materials to another person</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">3. User Account</h3>
-            <p className="text-sm text-gray-600">
-              To access certain features of the Service, you must register for an account. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">4. Data Accuracy</h3>
-            <p className="text-sm text-gray-600">
-              While we strive to provide accurate inventory forecasting and AI-powered recommendations, you acknowledge that the Service's predictions are estimates and should be used as guidance only. You are responsible for verifying all orders and inventory decisions.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">5. Third-Party Integrations</h3>
-            <p className="text-sm text-gray-600">
-              The Service may integrate with third-party point-of-sale providers. You acknowledge that your use of these integrations is subject to the respective third party's terms of service and privacy policies.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">6. Payment Terms</h3>
-            <p className="text-sm text-gray-600">
-              Subscription fees are billed monthly in advance in Canadian dollars. ZestIQ Premium is CAD $249.99 per month for one location, and each additional location is CAD $100 per month. There is no free trial. All fees are non-refundable except as required by law. We reserve the right to change pricing with 30 days notice.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">7. Termination</h3>
-            <p className="text-sm text-gray-600">
-              We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms. Upon termination, your right to use the Service will immediately cease.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">8. Limitation of Liability</h3>
-            <p className="text-sm text-gray-600">
-              In no event shall zestIQ Solutions or its suppliers be liable for any damages arising out of the use or inability to use the Service, even if zestIQ Solutions has been notified of the possibility of such damages.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">9. Governing Law</h3>
-            <p className="text-sm text-gray-600">
-              These Terms shall be governed and construed in accordance with the laws of the State of New York, United States, without regard to its conflict of law provisions.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">10. Changes to Terms</h3>
-            <p className="text-sm text-gray-600">
-              We reserve the right to modify or replace these Terms at any time. If a revision is material, we will provide at least 30 days notice prior to any new terms taking effect.
-            </p>
-          </section>
-
-          <section>
-            <h3 className="font-semibold text-gray-900 mb-2">11. Contact Information</h3>
-            <p className="text-sm text-gray-600">
-              If you have any questions about these Terms, please contact us at legal@zestiq.com or call (555) 123-4567.
-            </p>
-          </section>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="py-4">
-          <p className="text-xs text-gray-500 text-center">
-            By using zestIQ Solutions, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  usePageSeo({ title: 'Terms of Service | ZestIQ Canada', description: 'Terms governing subscriptions and use of the ZestIQ restaurant inventory, costing, scheduling and AI operations platform.', path: '/terms' });
+  return <PublicLegalLayout eyebrow="Subscription agreement" title="Terms of Service" description="The agreement governing zestiq.ca, the ZestIQ management platform, ZestEmployee and related services." lastUpdated="August 20, 2026">
+    <LegalNote>These Terms are for business customers. A signed order form or separate agreement controls where it expressly conflicts with these Terms.</LegalNote>
+    <LegalSection title="1. Agreement and authority"><p>By creating an account, accepting an order, paying for or using the service, you agree to these Terms for yourself and the company you represent (“Customer”) and confirm you can bind Customer. The service is for authorized business users aged 18 or older.</p></LegalSection>
+    <LegalSection title="2. Service and accounts"><p>ZestIQ provides restaurant inventory, invoices, recipes, beverage costing, purchasing, forecasting, labour scheduling, reporting, employee self-service and AI-assisted features. Upcoming, beta, preview or activation-dependent features are not guaranteed until generally available or included in a signed order.</p><LegalList><li>Customer must provide accurate information and keep billing details current.</li><li>Each user must use an individual account and protect credentials.</li><li>Owners and administrators control users, roles, locations and permissions.</li><li>Customer must remove former users promptly and report suspected compromise.</li><li>Users must not attempt to access another company’s data.</li></LegalList></LegalSection>
+    <LegalSection title="3. Subscription, pricing and cancellation"><p>ZestIQ Premium is CAD $249.99 per month and includes one location. Each additional location is CAD $100 per month. There is no free trial. Taxes are additional.</p><p>Subscriptions are billed monthly in advance and automatically renew until cancelled. Customer authorizes recurring charges for fees, locations and taxes. We may change pricing on at least 30 days’ notice for a future renewal.</p><p>Customer may cancel before renewal. Cancellation takes effect at the end of the paid billing period. Paid fees are non-refundable except where required by law or agreed in writing. Failed payment may result in retries, feature restriction or suspension after reasonable notice.</p></LegalSection>
+    <LegalSection title="4. Customer data and privacy"><p>Customer owns data it submits and grants ZestIQ a limited right to host, copy, transmit, process and display it only to provide, secure and support the service, comply with law and follow Customer instructions.</p><p>Customer is responsible for the legality, accuracy and notices or consents required for employee, supplier, POS, invoice, sales and other data. See the <a href="/privacy" className="font-bold underline underline-offset-4">Privacy Policy</a> and <a href="/subprocessors" className="font-bold underline underline-offset-4">Subprocessors page</a>.</p></LegalSection>
+    <LegalSection title="5. AI and operational decisions"><p>AI extraction, matching, chat, forecasts and ordering outputs are probabilistic and may be wrong. Customer must review source records and outputs before posting invoices, changing costs, placing orders, publishing schedules or making financial, employment, food-safety or legal decisions.</p><p>ZestIQ does not provide accounting, tax, employment, legal, food-safety or financial advice. See the <a href="/ai-transparency" className="font-bold underline underline-offset-4">AI &amp; Data Transparency Notice</a>.</p></LegalSection>
+    <LegalSection title="6. Labour and employee features"><p>Scheduling, hourly-rate and labour-cost features are planning tools. Customer remains responsible for employment standards, overtime, breaks, payroll, tax, union, accessibility, human-rights and workplace privacy obligations in each jurisdiction.</p></LegalSection>
+    <LegalSection title="7. Acceptable use"><LegalList><li>Do not use the service unlawfully or violate privacy, employment or intellectual-property rights.</li><li>Do not upload malware, harmful content or data you are not authorized to process.</li><li>Do not bypass security, authentication, rate limits or company separation.</li><li>Do not reverse engineer, scrape, resell or use the service to build a competing product except where a restriction is prohibited by law.</li><li>Do not represent unreviewed AI output as verified fact.</li></LegalList></LegalSection>
+    <LegalSection title="8. Integrations, intellectual property and confidentiality"><p>Customer-selected POS, scheduling, payment or other integrations remain subject to their own terms. ZestIQ is not responsible for third-party availability or acts outside our control.</p><p>ZestIQ owns the service, software, design, documentation and trademarks. During an active subscription, Customer receives a limited, non-exclusive, non-transferable right to use the service internally.</p><p>Each party will protect the other’s non-public business, technical and financial information with reasonable care and use it only for the relationship, subject to standard exclusions and legally compelled disclosure.</p></LegalSection>
+    <LegalSection title="9. Availability, suspension and termination"><p>We aim for a reliable service but do not guarantee uninterrupted or error-free operation. Maintenance, internet failures, security events and third-party outages may affect availability. Any service level must be in a signed agreement.</p><p>We may suspend or terminate for material breach, unlawful or unsafe use, non-payment, security threats or legal requirements. Where practical, we will provide notice and a chance to cure. After termination, Customer should request any available export promptly; data may later be deleted subject to legal retention and backups.</p></LegalSection>
+    <LegalSection title="10. Disclaimers and liability"><p>To the maximum extent permitted by law, the service is provided “as is” and “as available.” We disclaim implied warranties of merchantability, fitness, non-infringement and guaranteed accuracy or savings, except rights that cannot legally be excluded.</p><p>Neither party is liable for indirect, consequential, special, exemplary or punitive damages or lost profits, revenue, goodwill or data. Except for payment obligations, confidentiality, infringement, fraud, wilful misconduct or liability that cannot be limited, total aggregate liability is limited to subscription fees paid or payable in the six months before the event giving rise to the claim.</p></LegalSection>
+    <LegalSection title="11. Indemnity"><p>Customer will defend and indemnify ZestIQ from third-party claims arising from Customer data, unlawful use or material breach of the data, labour or acceptable-use sections, except to the extent caused by ZestIQ.</p></LegalSection>
+    <LegalSection title="12. Ontario law, disputes and general terms"><p>These Terms are governed by Ontario law and applicable federal Canadian law. Courts in Toronto, Ontario have exclusive jurisdiction unless a non-waivable law provides otherwise. Before filing a claim, the parties will try in good faith for 30 days to resolve it.</p><p>Neither party is liable for events beyond reasonable control. Customer may not assign these Terms without consent except with a qualifying business sale. If a provision is unenforceable, the rest continues. These Terms and applicable orders are the entire agreement about the service.</p></LegalSection>
+    <LegalSection title="13. Changes and notices"><p>Material changes will be posted with a new effective date and, where appropriate, notified through the service or email. Continued use after the effective date means acceptance.</p><p>Send legal notices to <a href="mailto:demo@zestiq.ca?subject=ZestIQ%20legal%20notice" className="font-bold underline underline-offset-4">demo@zestiq.ca</a> with “Legal notice” in the subject. We may notify Customer through the owner email on file.</p></LegalSection>
+  </PublicLegalLayout>;
 }

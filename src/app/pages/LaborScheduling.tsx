@@ -1,10 +1,13 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, DollarSign, ExternalLink, Plus, Target, Trash2, UsersRound, X } from 'lucide-react';
-import { Link } from 'react-router';
+import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, DollarSign, ExternalLink, MailPlus, Plus, Target, Trash2, UsersRound, X } from 'lucide-react';
+import { Link, Navigate } from 'react-router';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
-import { useLabor } from '../contexts/LaborContext';
+import { useLabor, type LaborEmployee, type LaborShift } from '../contexts/LaborContext';
 import { useToast } from '../contexts/ToastContext';
+
+const SHIFT_TAGS = ['OPEN', 'CLOSE', 'ADMIN', 'TRAINING', 'ON-CALL', 'PREP', 'EXPO', 'BAR', 'HOST', 'DINNER'];
 
 function localDateKey(date: Date) {
   const year = date.getFullYear();
@@ -20,25 +23,51 @@ function startOfWeek(source: Date) {
   return date;
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(value);
+function formatMoney(value: number, digits = 0) {
+  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: digits }).format(value);
+}
+
+function shiftHours(shift: LaborShift) {
+  const [startHour, startMinute] = shift.start.split(':').map(Number);
+  const [endHour, endMinute] = shift.end.split(':').map(Number);
+  let minutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
+  if (minutes < 0) minutes += 24 * 60;
+  return Math.max(0, minutes - shift.breakMinutes) / 60;
+}
+
+function tagClass(tag = '') {
+  if (tag.includes('CLOSE')) return 'border-violet-200 bg-violet-50 text-violet-800';
+  if (tag.includes('OPEN')) return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  if (tag.includes('ON-CALL')) return 'border-orange-200 bg-orange-50 text-orange-800';
+  if (tag.includes('TRAIN')) return 'border-blue-200 bg-blue-50 text-blue-800';
+  if (tag.includes('ADMIN')) return 'border-slate-300 bg-slate-100 text-slate-700';
+  if (tag.includes('BAR')) return 'border-cyan-200 bg-cyan-50 text-cyan-800';
+  return 'border-amber-200 bg-amber-50 text-amber-900';
 }
 
 export function LaborScheduling() {
   const { user } = useAuth();
-  const { employees, shifts, timeOffRequests, shiftSwapRequests, targetLaborPercent, addEmployee, removeEmployee, addShift, removeShift, updateTimeOffRequest, updateShiftSwapRequest, setTargetLaborPercent, scheduledCostForRange, scheduledHoursForRange } = useLabor();
+  const { employees, shifts, timeOffRequests, shiftSwapRequests, targetLaborPercent, inviteEmployee, removeEmployee, addShift, removeShift, updateTimeOffRequest, updateShiftSwapRequest, setTargetLaborPercent, scheduledHoursForRange, laborCostBreakdownForRange } = useLabor();
   const { salesData } = useToast();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [view, setView] = useState<'schedule' | 'requests' | 'team'>('schedule');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
   const [employeeName, setEmployeeName] = useState('');
   const [employeeEmail, setEmployeeEmail] = useState('');
+  const [employeePhone, setEmployeePhone] = useState('');
   const [employeeRole, setEmployeeRole] = useState('Line Cook');
+  const [employeeDepartment, setEmployeeDepartment] = useState('Back of house');
+  const [employeePayType, setEmployeePayType] = useState<'hourly' | 'salary'>('hourly');
   const [employeeRate, setEmployeeRate] = useState('20');
+  const [employeeSalary, setEmployeeSalary] = useState('65000');
   const [shiftEmployeeId, setShiftEmployeeId] = useState('');
   const [shiftDate, setShiftDate] = useState(() => localDateKey(new Date()));
   const [shiftStart, setShiftStart] = useState('09:00');
   const [shiftEnd, setShiftEnd] = useState('17:00');
   const [shiftBreak, setShiftBreak] = useState('30');
+  const [shiftTag, setShiftTag] = useState('');
+  const [shiftNotes, setShiftNotes] = useState('');
   const canManage = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
@@ -49,25 +78,58 @@ export function LaborScheduling() {
   const startKey = localDateKey(days[0]);
   const endKey = localDateKey(days[6]);
   const weekHours = scheduledHoursForRange(startKey, endKey);
-  const weekCost = scheduledCostForRange(startKey, endKey);
+  const weekCost = laborCostBreakdownForRange(startKey, endKey);
   const weekSales = salesData.filter(day => day.date >= startKey && day.date <= endKey).reduce((sum, day) => sum + day.revenue, 0);
-  const labourPercent = weekSales > 0 ? (weekCost / weekSales) * 100 : 0;
-  const targetSales = targetLaborPercent > 0 ? weekCost / (targetLaborPercent / 100) : 0;
+  const labourPercent = weekSales > 0 ? (weekCost.total / weekSales) * 100 : 0;
+  const targetSales = targetLaborPercent > 0 ? weekCost.total / (targetLaborPercent / 100) : 0;
+  const activeEmployees = employees.filter(employee => employee.active).sort((left, right) => left.department.localeCompare(right.department) || left.name.localeCompare(right.name));
 
-  const submitEmployee = (event: FormEvent) => {
-    event.preventDefault();
-    if (!employeeName.trim()) return toast.error('Enter the employee name.');
-    addEmployee({ name: employeeName.trim(), email: employeeEmail.trim().toLowerCase(), role: employeeRole.trim() || 'Team Member', hourlyRate: Number(employeeRate) || 0, active: true });
+  if (!canManage) return <Navigate to="/employee" replace />;
+
+  const resetEmployeeForm = () => {
     setEmployeeName('');
     setEmployeeEmail('');
-    toast.success('Team member added.');
+    setEmployeePhone('');
+    setEmployeeRole('Line Cook');
+    setEmployeeDepartment('Back of house');
+    setEmployeePayType('hourly');
+    setEmployeeRate('20');
+    setEmployeeSalary('65000');
+  };
+
+  const submitEmployee = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!employeeName.trim() || !employeeEmail.trim()) return toast.error('Enter the employee name and email.');
+    setIsInviting(true);
+    try {
+      await inviteEmployee({
+        name: employeeName.trim(),
+        email: employeeEmail.trim().toLowerCase(),
+        phone: employeePhone.trim(),
+        role: employeeRole.trim() || 'Team Member',
+        department: employeeDepartment.trim() || 'Restaurant team',
+        payType: employeePayType,
+        hourlyRate: employeePayType === 'hourly' ? Number(employeeRate) || 0 : 0,
+        annualSalary: employeePayType === 'salary' ? Number(employeeSalary) || 0 : 0,
+        active: true,
+      });
+      resetEmployeeForm();
+      setInviteOpen(false);
+      toast.success('Employee profile saved and ZestEmployee access is ready.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to invite employee.');
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   const submitShift = (event: FormEvent) => {
     event.preventDefault();
-    const employeeId = shiftEmployeeId || employees[0]?.id;
-    if (!employeeId) return toast.error('Add a team member first.');
-    addShift({ employeeId, date: shiftDate, start: shiftStart, end: shiftEnd, breakMinutes: Number(shiftBreak) || 0, status: 'scheduled' });
+    const employeeId = shiftEmployeeId || activeEmployees[0]?.id;
+    if (!employeeId) return toast.error('Invite an employee first.');
+    addShift({ employeeId, date: shiftDate, start: shiftStart, end: shiftEnd, breakMinutes: Number(shiftBreak) || 0, status: 'scheduled', tag: shiftTag.trim().toUpperCase(), notes: shiftNotes.trim() });
+    setShiftTag('');
+    setShiftNotes('');
     toast.success('Shift added to the schedule.');
   };
 
@@ -78,69 +140,78 @@ export function LaborScheduling() {
   });
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="mx-auto max-w-[1500px] space-y-5">
       <section className="overflow-hidden rounded-[30px] bg-[#0B1220] p-6 text-white sm:p-8">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-          <div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5C10E]">Labour & scheduling</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Put labour on the same scoreboard as food cost.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Build the week, see scheduled hours and cost, and compare labour against sales before the schedule becomes a payroll problem.</p></div>
-          <div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1"><button onClick={() => setView('schedule')} className={`rounded-lg px-3 py-2 text-sm font-bold ${view === 'schedule' ? 'bg-[#F5C10E] text-[#0B1220]' : 'text-white/65'}`}>Schedule</button><button onClick={() => setView('requests')} className={`relative rounded-lg px-3 py-2 text-sm font-bold ${view === 'requests' ? 'bg-[#F5C10E] text-[#0B1220]' : 'text-white/65'}`}>Requests{timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length > 0 && <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] text-white">{timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length}</span>}</button><button onClick={() => setView('team')} className={`rounded-lg px-3 py-2 text-sm font-bold ${view === 'team' ? 'bg-[#F5C10E] text-[#0B1220]' : 'text-white/65'}`}>Team</button></div><Link to="/employee" className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-xs font-bold text-white/75">Open ZestEmployee<ExternalLink className="h-3.5 w-3.5" /></Link></div>
+          <div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5C10E]">Manager workspace</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Build the week by employee.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Employee rows, tagged shifts, salary-aware labour cost and team requests—protected for owners, admins and managers.</p></div>
+          <div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1"><ViewButton label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} /><ViewButton label="Requests" active={view === 'requests'} count={timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length} onClick={() => setView('requests')} /><ViewButton label="Employees" active={view === 'team'} onClick={() => setView('team')} /></div><button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C10E] px-3 py-2 text-xs font-black text-[#0B1220]"><MailPlus className="h-3.5 w-3.5" />Invite employee</button><Link to="/employee" className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-xs font-bold text-white/75">Preview ZestEmployee<ExternalLink className="h-3.5 w-3.5" /></Link></div>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Metric icon={Clock3} label="Scheduled hours" value={`${weekHours.toFixed(1)}h`} />
-        <Metric icon={DollarSign} label="Scheduled cost" value={formatMoney(weekCost)} />
-        <Metric icon={Target} label="Labour % of sales" value={weekSales > 0 ? `${labourPercent.toFixed(1)}%` : 'Waiting for sales'} tone={weekSales > 0 && labourPercent > targetLaborPercent ? 'warning' : 'normal'} />
-        <Metric icon={UsersRound} label="Active team" value={String(employees.filter(employee => employee.active).length)} />
+        <Metric icon={DollarSign} label="Hourly labour" value={formatMoney(weekCost.hourly)} />
+        <Metric icon={DollarSign} label="Salaried labour" value={formatMoney(weekCost.salaried)} />
+        <Metric icon={Target} label="Total vs sales" value={weekSales > 0 ? `${labourPercent.toFixed(1)}%` : formatMoney(weekCost.total)} tone={weekSales > 0 && labourPercent > targetLaborPercent ? 'warning' : 'normal'} />
+        <Metric icon={UsersRound} label="Active team" value={String(activeEmployees.length)} />
       </section>
 
       {view === 'schedule' && (
-        <div className="grid gap-5 xl:grid-cols-[1fr_310px]">
-          <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
               <div><p className="font-black text-slate-900">{days[0].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })} – {days[6].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}</p><p className="mt-1 text-xs text-slate-500">{formatMoney(targetSales)} sales needed to hit a {targetLaborPercent}% labour target.</p></div>
               <div className="flex gap-2"><button aria-label="Previous week" onClick={() => moveWeek(-7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronLeft className="h-4 w-4" /></button><button onClick={() => setWeekStart(startOfWeek(new Date()))} className="rounded-xl border border-slate-200 px-3 text-sm font-bold">Today</button><button aria-label="Next week" onClick={() => moveWeek(7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronRight className="h-4 w-4" /></button></div>
             </div>
-            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-7">
-              {days.map(day => {
-                const key = localDateKey(day);
-                const dayShifts = shifts.filter(shift => shift.date === key && shift.status !== 'called-off');
-                return <div key={key} className="min-w-0 rounded-2xl bg-slate-50 p-3"><div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{day.toLocaleDateString('en-CA', { weekday: 'short' })}</p><p className="font-black text-slate-900">{day.getDate()}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500">{dayShifts.length}</span></div><div className="mt-3 space-y-2">{dayShifts.map(shift => { const employee = employees.find(item => item.id === shift.employeeId); return <div key={shift.id} className="group rounded-xl border-l-4 border-[#F5C10E] bg-white p-2 shadow-sm"><p className="break-words text-xs font-black text-slate-900">{employee?.name || 'Team member'}</p><p className="mt-1 text-[10px] text-slate-500">{shift.start}–{shift.end}</p>{canManage && <button aria-label={`Delete ${employee?.name || 'shift'}`} onClick={() => removeShift(shift.id)} className="mt-2 text-[10px] font-bold text-red-500 sm:opacity-0 sm:group-hover:opacity-100">Remove</button>}</div>})}{dayShifts.length === 0 && <p className="py-4 text-center text-[10px] text-slate-400">No shifts</p>}</div></div>;
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1180px] border-collapse text-left">
+                <thead><tr className="bg-slate-50"><th className="sticky left-0 z-20 w-[210px] min-w-[210px] border-b border-r border-slate-200 bg-slate-50 p-3 text-[10px] font-black uppercase tracking-wider text-slate-500">Employee</th>{days.map(day => <th key={localDateKey(day)} className="min-w-[138px] border-b border-r border-slate-200 p-3 last:border-r-0"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{day.toLocaleDateString('en-CA', { weekday: 'short' })}</p><p className="mt-1 font-black text-slate-900">{day.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}</p></th>)}</tr></thead>
+                <tbody>{activeEmployees.map(employee => {
+                  const employeeWeekShifts = shifts.filter(shift => shift.employeeId === employee.id && shift.date >= startKey && shift.date <= endKey && shift.status !== 'called-off');
+                  const employeeHours = employeeWeekShifts.reduce((sum, shift) => sum + shiftHours(shift), 0);
+                  return <tr key={employee.id} className="align-top"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-3"><div className="flex items-start gap-2"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#FEF3C7] text-xs font-black text-[#0B1220]">{employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{employee.name}</p><p className="mt-0.5 break-words text-[10px] font-bold text-slate-500">{employee.role}</p><p className="mt-1 text-[10px] text-slate-400">{employeeWeekShifts.length} shifts · {employeeHours.toFixed(1)}h</p>{employee.payType === 'salary' && <span className="mt-1 inline-flex rounded-full bg-[#0B1220] px-2 py-0.5 text-[9px] font-black text-[#F5C10E]">SALARIED</span>}</div></div></th>{days.map(day => {
+                    const key = localDateKey(day);
+                    const dayShifts = employeeWeekShifts.filter(shift => shift.date === key);
+                    return <td key={key} className="h-[116px] border-b border-r border-slate-200 p-2 last:border-r-0"><div className="space-y-2">{dayShifts.map(shift => <div key={shift.id} className="group rounded-xl border border-l-4 border-l-[#F5C10E] bg-white p-2 shadow-sm"><div className="flex items-start justify-between gap-1"><p className="text-[11px] font-black text-slate-900">{shift.start}–{shift.end}</p><button aria-label={`Delete ${employee.name} shift`} onClick={() => removeShift(shift.id)} className="text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3 w-3" /></button></div>{shift.tag && <span className={`mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[8px] font-black tracking-wide ${tagClass(shift.tag)}`}>{shift.tag}</span>}{shift.notes && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{shift.notes}</p>}</div>)}{dayShifts.length === 0 && <p className="py-8 text-center text-[10px] text-slate-300">—</p>}</div></td>;
+                  })}</tr>;
+                })}{activeEmployees.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-sm text-slate-500">Invite employees to start building the schedule.</td></tr>}</tbody>
+              </table>
             </div>
           </section>
-          {canManage && <form onSubmit={submitShift} className="h-fit space-y-4 rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center gap-2"><Plus className="h-5 w-5 text-[#B58B00]" /><h2 className="font-black text-slate-900">Add a shift</h2></div><FormSelect label="Team member" value={shiftEmployeeId || employees[0]?.id || ''} onChange={setShiftEmployeeId} options={employees.filter(employee => employee.active).map(employee => ({ value: employee.id, label: `${employee.name} · ${employee.role}` }))} /><FormInput label="Date" type="date" value={shiftDate} onChange={setShiftDate} /><div className="grid grid-cols-2 gap-3"><FormInput label="Starts" type="time" value={shiftStart} onChange={setShiftStart} /><FormInput label="Ends" type="time" value={shiftEnd} onChange={setShiftEnd} /></div><FormInput label="Unpaid break (min)" type="number" value={shiftBreak} onChange={setShiftBreak} /><button type="submit" className="w-full rounded-xl bg-[#F5C10E] px-4 py-3 font-black text-[#0B1220]">Add shift</button></form>}
+          <form onSubmit={submitShift} className="h-fit space-y-4 rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center gap-2"><Plus className="h-5 w-5 text-[#B58B00]" /><h2 className="font-black text-slate-900">Add a shift</h2></div><FormSelect label="Employee" value={shiftEmployeeId || activeEmployees[0]?.id || ''} onChange={setShiftEmployeeId} options={activeEmployees.map(employee => ({ value: employee.id, label: `${employee.name} · ${employee.role}` }))} /><FormInput label="Date" type="date" value={shiftDate} onChange={setShiftDate} /><div className="grid grid-cols-2 gap-3"><FormInput label="Starts" type="time" value={shiftStart} onChange={setShiftStart} /><FormInput label="Ends" type="time" value={shiftEnd} onChange={setShiftEnd} /></div><FormInput label="Unpaid break (min)" type="number" value={shiftBreak} onChange={setShiftBreak} /><FormInput label="Shift tag" value={shiftTag} onChange={setShiftTag} placeholder="CLOSE, EXPO, TRAINING…" list="shift-tags" /><datalist id="shift-tags">{SHIFT_TAGS.map(tag => <option key={tag} value={tag} />)}</datalist><FormInput label="Shift notes" value={shiftNotes} onChange={setShiftNotes} placeholder="Section, training or handoff note" /><button type="submit" className="w-full rounded-xl bg-[#F5C10E] px-4 py-3 font-black text-[#0B1220]">Add tagged shift</button></form>
         </div>
       )}
 
-      {view === 'requests' && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <RequestQueue title="Time-off requests" empty="No time-off requests." icon={CalendarDays}>{timeOffRequests.map(request => { const employee = employees.find(item => item.id === request.employeeId); return <ManagerRequest key={request.id} title={employee?.name || 'Team member'} detail={`${request.startDate} → ${request.endDate}${request.reason ? ` · ${request.reason}` : ''}`} status={request.status} onApprove={() => updateTimeOffRequest(request.id, 'approved')} onDecline={() => updateTimeOffRequest(request.id, 'declined')} />; })}</RequestQueue>
-          <RequestQueue title="Shift-swap requests" empty="No shift-swap requests." icon={ArrowLeftRight}>{shiftSwapRequests.map(request => { const employee = employees.find(item => item.id === request.requesterEmployeeId); const target = employees.find(item => item.id === request.targetEmployeeId); const shift = shifts.find(item => item.id === request.shiftId); return <ManagerRequest key={request.id} title={`${employee?.name || 'Team member'}${target ? ` → ${target.name}` : ''}`} detail={`${shift?.date || 'Shift'} · ${shift?.start || ''}–${shift?.end || ''}${request.note ? ` · ${request.note}` : ''}`} status={request.status} onApprove={() => updateShiftSwapRequest(request.id, 'approved')} onDecline={() => updateShiftSwapRequest(request.id, 'declined')} />; })}</RequestQueue>
-        </div>
-      )}
+      {view === 'requests' && <div className="grid gap-5 lg:grid-cols-2"><RequestQueue title="Time-off requests" empty="No time-off requests." icon={CalendarDays}>{timeOffRequests.map(request => { const employee = employees.find(item => item.id === request.employeeId); return <ManagerRequest key={request.id} title={employee?.name || 'Team member'} detail={`${request.startDate} → ${request.endDate}${request.reason ? ` · ${request.reason}` : ''}`} status={request.status} onApprove={() => updateTimeOffRequest(request.id, 'approved')} onDecline={() => updateTimeOffRequest(request.id, 'declined')} />; })}</RequestQueue><RequestQueue title="Shift-swap requests" empty="No shift-swap requests." icon={ArrowLeftRight}>{shiftSwapRequests.map(request => { const employee = employees.find(item => item.id === request.requesterEmployeeId); const target = employees.find(item => item.id === request.targetEmployeeId); const shift = shifts.find(item => item.id === request.shiftId); return <ManagerRequest key={request.id} title={`${employee?.name || 'Team member'}${target ? ` → ${target.name}` : ''}`} detail={`${shift?.date || 'Shift'} · ${shift?.start || ''}–${shift?.end || ''}${request.note ? ` · ${request.note}` : ''}`} status={request.status} onApprove={() => updateShiftSwapRequest(request.id, 'approved')} onDecline={() => updateShiftSwapRequest(request.id, 'declined')} />; })}</RequestQueue></div>}
 
-      {view === 'team' && (
-        <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
-          <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm"><div className="border-b border-slate-100 p-5"><h2 className="font-black text-slate-900">Team & hourly rates</h2><p className="mt-1 text-sm text-slate-500">The email links this profile to the employee's ZestEmployee login.</p></div><div className="divide-y divide-slate-100">{employees.map(employee => <div key={employee.id} className="flex items-center gap-4 p-4"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 font-black text-slate-600">{employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0 flex-1"><p className="break-words font-black text-slate-900">{employee.name}</p><p className="break-words text-xs text-slate-500">{employee.role}{employee.email ? ` · ${employee.email}` : ' · Employee app not linked'}</p></div>{canManage && <><p className="text-sm font-black tabular-nums text-slate-800">${employee.hourlyRate.toFixed(2)}/hr</p><button aria-label={`Remove ${employee.name}`} onClick={() => removeEmployee(employee.id)} className="grid h-9 w-9 place-items-center rounded-xl text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button></>}</div>)}{employees.length === 0 && <div className="p-10 text-center text-sm text-slate-500">Add your team to start building a labour plan.</div>}</div></section>
-          {canManage && <form onSubmit={submitEmployee} className="h-fit space-y-4 rounded-3xl bg-white p-5 shadow-sm"><h2 className="font-black text-slate-900">Add team member</h2><FormInput label="Name" value={employeeName} onChange={setEmployeeName} placeholder="Employee name" /><FormInput label="Employee login email" type="email" value={employeeEmail} onChange={setEmployeeEmail} placeholder="employee@restaurant.ca" /><FormInput label="Role" value={employeeRole} onChange={setEmployeeRole} /><FormInput label="Hourly rate (CAD)" type="number" value={employeeRate} onChange={setEmployeeRate} /><button type="submit" className="w-full rounded-xl bg-[#F5C10E] px-4 py-3 font-black text-[#0B1220]">Add team member</button></form>}
-        </div>
-      )}
+      {view === 'team' && <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5"><div><h2 className="font-black text-slate-900">Employee directory</h2><p className="mt-1 text-sm text-slate-500">Contact, position, department, pay type and ZestEmployee invitation status stay with the protected company location.</p></div><button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#0B1220] px-4 py-3 text-sm font-black text-white"><MailPlus className="h-4 w-4 text-[#F5C10E]" />Invite employee</button></div><div className="divide-y divide-slate-100">{employees.map(employee => <EmployeeRow key={employee.id} employee={employee} onRemove={() => { if (window.confirm(`Remove ${employee.name} and all of their shifts from this location?`)) removeEmployee(employee.id); }} />)}{employees.length === 0 && <div className="p-10 text-center text-sm text-slate-500">Invite your first employee to create the labour directory.</div>}</div></section>}
 
-      {canManage && <section className="flex flex-col gap-3 rounded-3xl border border-amber-100 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-amber-950">Target labour percentage</p><p className="mt-1 text-sm text-amber-800">ZestIQ uses this target to show how much sales the schedule needs.</p></div><label className="flex items-center gap-2 font-black text-amber-950"><input aria-label="Target labour percentage" type="number" min="0" max="100" step="0.5" value={targetLaborPercent} onChange={event => setTargetLaborPercent(Number(event.target.value) || 0)} className="h-11 w-24 rounded-xl border border-amber-200 bg-white px-3 text-right" />%</label></section>}
+      <section className="flex flex-col gap-3 rounded-3xl border border-amber-100 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-amber-950">Target labour percentage</p><p className="mt-1 text-sm text-amber-800">Hourly scheduled labour plus prorated active salaries are measured against sales.</p></div><label className="flex items-center gap-2 font-black text-amber-950"><input aria-label="Target labour percentage" type="number" min="0" max="100" step="0.5" value={targetLaborPercent} onChange={event => setTargetLaborPercent(Number(event.target.value) || 0)} className="h-11 w-24 rounded-xl border border-amber-200 bg-white px-3 text-right" />%</label></section>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}><DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Invite an employee</DialogTitle><DialogDescription>Creates their protected employee profile and sends access to ZestEmployee. Managers can be hourly or salaried.</DialogDescription></DialogHeader><form onSubmit={submitEmployee} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><FormInput label="Full name" value={employeeName} onChange={setEmployeeName} placeholder="Employee name" required /><FormInput label="Work email" type="email" value={employeeEmail} onChange={setEmployeeEmail} placeholder="employee@restaurant.ca" required /><FormInput label="Phone" type="tel" value={employeePhone} onChange={setEmployeePhone} placeholder="416-555-0123" /><FormInput label="Position" value={employeeRole} onChange={setEmployeeRole} placeholder="General Manager" /><FormSelect label="Department" value={employeeDepartment} onChange={setEmployeeDepartment} options={['Management', 'Front of house', 'Back of house', 'Bar', 'Support'].map(value => ({ value, label: value }))} /><FormSelect label="Pay type" value={employeePayType} onChange={value => setEmployeePayType(value as 'hourly' | 'salary')} options={[{ value: 'hourly', label: 'Hourly' }, { value: 'salary', label: 'Salaried' }]} /></div>{employeePayType === 'salary' ? <FormInput label="Annual salary (CAD)" type="number" value={employeeSalary} onChange={setEmployeeSalary} /> : <FormInput label="Hourly rate (CAD)" type="number" value={employeeRate} onChange={setEmployeeRate} />}<div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setInviteOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold text-slate-700">Cancel</button><button type="submit" disabled={isInviting} className="rounded-xl bg-[#F5C10E] px-4 py-2.5 font-black text-[#0B1220] disabled:opacity-50">{isInviting ? 'Sending…' : 'Save & send invite'}</button></div></form></DialogContent></Dialog>
     </div>
   );
+}
+
+function ViewButton({ label, active, count = 0, onClick }: { label: string; active: boolean; count?: number; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`relative rounded-lg px-3 py-2 text-sm font-bold ${active ? 'bg-[#F5C10E] text-[#0B1220]' : 'text-white/65'}`}>{label}{count > 0 && <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] text-white">{count}</span>}</button>;
+}
+
+function EmployeeRow({ employee, onRemove }: { employee: LaborEmployee; onRemove: () => void }) {
+  const pay = employee.payType === 'salary' ? `${formatMoney(employee.annualSalary)}/yr` : `${formatMoney(employee.hourlyRate, 2)}/hr`;
+  return <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 font-black text-slate-600">{employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="break-words font-black text-slate-900">{employee.name}</p><span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${employee.inviteStatus === 'pending' ? 'bg-amber-50 text-amber-700' : employee.inviteStatus === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{employee.inviteStatus.replace('-', ' ')}</span></div><p className="mt-1 break-words text-xs text-slate-500">{employee.role} · {employee.department}</p><p className="mt-1 break-words text-xs text-slate-400">{employee.email || 'No email'}{employee.phone ? ` · ${employee.phone}` : ''}</p></div><div className="flex items-center justify-between gap-3 sm:justify-end"><div className="text-right"><p className="text-sm font-black tabular-nums text-slate-800">{pay}</p><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{employee.payType}</p></div><button aria-label={`Remove ${employee.name}`} onClick={onRemove} className="grid h-9 w-9 place-items-center rounded-xl text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button></div></div>;
 }
 
 function Metric({ icon: Icon, label, value, tone = 'normal' }: { icon: typeof CalendarDays; label: string; value: string; tone?: 'normal' | 'warning' }) {
   return <div className={`rounded-2xl border p-4 ${tone === 'warning' ? 'border-red-100 bg-red-50' : 'border-slate-100 bg-white'}`}><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon className="h-4 w-4" />{label}</div><p className={`mt-2 break-words text-xl font-black ${tone === 'warning' ? 'text-red-700' : 'text-slate-900'}`}>{value}</p></div>;
 }
 
-function FormInput({ label, value, onChange, type = 'text', placeholder }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) {
-  return <label className="block"><span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</span><input type={type} value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.01' : undefined} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm" /></label>;
+function FormInput({ label, value, onChange, type = 'text', placeholder, list, required = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; list?: string; required?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</span><input type={type} value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} list={list} required={required} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.01' : undefined} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm" /></label>;
 }
 
 function FormSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <label className="block"><span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</span><select value={value} onChange={event => onChange(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Select team member</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+  return <label className="block"><span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</span><select value={value} onChange={event => onChange(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Select</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
 function RequestQueue({ title, empty, icon: Icon, children }: { title: string; empty: string; icon: typeof CalendarDays; children: ReactNode }) {

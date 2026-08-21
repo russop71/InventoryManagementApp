@@ -1,6 +1,7 @@
 import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { useLabor } from '../contexts/LaborContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -15,9 +16,10 @@ type SalesRangePreset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'la
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { inventory, orders, recipes } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
-  const { targetLaborPercent, scheduledCostForRange } = useLabor();
+  const { employees, targetLaborPercent, laborCostBreakdownForRange } = useLabor();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [breakdownType, setBreakdownType] = useState<'items' | 'cost' | 'lowStock' | 'orders'>('items');
@@ -26,6 +28,7 @@ export function Dashboard() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
+  const canManageLabor = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
 
   const lowStockItems = inventory.filter(
     item => item.currentStock < item.parLevel * 0.3
@@ -422,10 +425,15 @@ export function Dashboard() {
             ? 'This month'
             : 'Last month';
   const laborBounds = getPresetDateBounds(salesRangePreset);
-  const scheduledLaborCost = laborBounds.startDate && laborBounds.endDate
-    ? scheduledCostForRange(laborBounds.startDate, laborBounds.endDate)
-    : 0;
-  const scheduledLaborPercent = totalRevenue > 0 ? (scheduledLaborCost / totalRevenue) * 100 : 0;
+  const laborBreakdown = laborBounds.startDate && laborBounds.endDate
+    ? laborCostBreakdownForRange(laborBounds.startDate, laborBounds.endDate)
+    : { hourly: 0, salaried: 0, total: 0 };
+  const scheduledLaborCost = laborBreakdown.total;
+  const scheduledLaborPercent = totalRevenue > 0 ? (laborBreakdown.total / totalRevenue) * 100 : 0;
+  const hourlyLaborPercent = totalRevenue > 0 ? (laborBreakdown.hourly / totalRevenue) * 100 : 0;
+  const salariedLaborPercent = totalRevenue > 0 ? (laborBreakdown.salaried / totalRevenue) * 100 : 0;
+  const salariedManagerCount = employees.filter(employee => employee.active && employee.payType === 'salary').length;
+  const hourlyShare = laborBreakdown.total > 0 ? (laborBreakdown.hourly / laborBreakdown.total) * 100 : 0;
 
   return (
     <div className="space-y-4">
@@ -499,24 +507,24 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer overflow-hidden border-0 bg-white shadow-sm transition-all duration-200 hover:shadow-md" onClick={() => navigate('/app/labor')}>
+        {canManageLabor && <Card className="cursor-pointer overflow-hidden border-0 bg-white shadow-sm transition-all duration-200 hover:shadow-md" onClick={() => navigate('/app/labor')}>
           <div className={`h-[3px] ${scheduledLaborPercent > targetLaborPercent ? 'bg-red-500' : 'bg-violet-500'}`} />
           <CardContent className="p-3">
             <div className="mb-2 flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Labour</span><UsersRound className="h-3 w-3 text-violet-500" /></div>
             <div className={`text-2xl font-black tabular-nums leading-none ${scheduledLaborPercent > targetLaborPercent ? 'text-red-600' : 'text-violet-700'}`} style={{ fontFamily: 'var(--font-mono)' }}>{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</div>
             <p className="mt-1.5 text-[9px] font-semibold leading-tight text-gray-400">Target {targetLaborPercent}% · view schedule</p>
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       <Card className="border-0 shadow-sm overflow-hidden bg-white">
-        <div className="h-[3px] bg-[#2563EB]" />
+        <div className="h-[3px] bg-[#F5C10E]" />
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 mb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-[#2563EB]/15 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-4 h-4 text-[#2563EB]" />
+                <div className="w-7 h-7 rounded-lg bg-[#F5C10E]/20 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-[#9A7600]" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-[#0F172A]">Sales</p>
@@ -556,7 +564,7 @@ export function Dashboard() {
                       setCustomEndDate('');
                     }
                   }}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest transition ${salesRangePreset === value ? 'bg-[#2563EB] text-white' : 'bg-slate100 text-slate-600 hover:bg-slate-200'}`}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest transition ${salesRangePreset === value ? 'bg-[#0B1220] text-[#F5C10E]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                 >
                   {label}
                 </button>
@@ -579,7 +587,7 @@ export function Dashboard() {
 
           {filteredSalesData.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
-              <span className="mb-2 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-blue-700">
+              <span className="mb-2 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-amber-800">
                 Sales
               </span>
               <p className="text-sm font-semibold text-gray-500">No sales data for this range</p>
@@ -587,10 +595,10 @@ export function Dashboard() {
             </div>
           ) : (
             <>
-              <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2">
+              <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-700">Sales</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-800">Sales</p>
                     <p className="text-[11px] font-semibold text-slate-700">{salesRangeLabel}</p>
                   </div>
                   <p className="text-[11px] font-semibold text-slate-600">{filteredSalesData.length} days</p>
@@ -633,7 +641,7 @@ export function Dashboard() {
                       formatter={(value: number) => [`$${value.toLocaleString('en-US')}`, 'Revenue']}
                       labelFormatter={(label) => `Date: ${label}`}
                     />
-                    <Line type="monotone" dataKey="revenue" stroke="#2563EB" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="revenue" stroke="#D9A900" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -665,6 +673,29 @@ export function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {canManageLabor && <Card className="overflow-hidden border-0 bg-[#0B1220] text-white shadow-sm">
+        <div className="h-[3px] bg-[#F5C10E]" />
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-black">Labour versus sales</p>
+              <p className="mt-1 text-xs text-white/45">{salesRangeLabel} · scheduled hourly labour plus prorated active salaries</p>
+            </div>
+            <Link to="/app/labor" className="inline-flex w-fit items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#F5C10E]">Open scheduler <ChevronRight className="h-3.5 w-3.5" /></Link>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <LaborSummary label="Sales" value={`$${totalRevenue.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`} detail={`${filteredSalesData.length} day${filteredSalesData.length === 1 ? '' : 's'} in range`} />
+            <LaborSummary label="Hourly labour" value={`$${laborBreakdown.hourly.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`} detail={totalRevenue > 0 ? `${hourlyLaborPercent.toFixed(1)}% of sales` : 'Waiting for sales'} />
+            <LaborSummary label="Salaried labour" value={`$${laborBreakdown.salaried.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`} detail={`${salariedManagerCount} salaried team member${salariedManagerCount === 1 ? '' : 's'} · ${totalRevenue > 0 ? `${salariedLaborPercent.toFixed(1)}% of sales` : 'prorated'}`} />
+            <LaborSummary label="Total labour" value={totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${laborBreakdown.total.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`} detail={`Target ${targetLaborPercent}% · ${scheduledLaborPercent > targetLaborPercent ? 'above target' : 'on target'}`} warning={totalRevenue > 0 && scheduledLaborPercent > targetLaborPercent} />
+          </div>
+          <div className="mt-4 rounded-2xl bg-white/5 p-3">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/40"><span>Labour mix</span><span>{hourlyShare.toFixed(0)}% hourly · {(100 - hourlyShare).toFixed(0)}% salaried</span></div>
+            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#F5C10E]" style={{ width: `${hourlyShare}%` }} /><div className="h-full flex-1 bg-white/35" /></div>
+          </div>
+        </CardContent>
+      </Card>}
 
       {/* ── COGS categories bar graph ────────────────────────────────── */}
       <div className="rounded-3xl border border-gray-100 bg-white shadow-sm overflow-hidden">
@@ -1078,7 +1109,7 @@ export function Dashboard() {
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <div className="bg-[#FEFCE8] rounded-xl p-2.5 shrink-0 mt-0.5">
-              <Sparkles className="w-5 h-5 text-[#2563EB]" />
+              <Sparkles className="w-5 h-5 text-[#B58B00]" />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-gray-900 text-sm">AI Order Assistant</h3>
@@ -1144,7 +1175,7 @@ export function Dashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center">
-                <Activity className="w-5 h-5 mr-2 text-[#2563EB]" />
+                <Activity className="w-5 h-5 mr-2 text-[#B58B00]" />
                 Usage Summary - This Week
               </CardTitle>
               <Badge className={variancePercent > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
@@ -1386,4 +1417,8 @@ export function Dashboard() {
       </div>
     </div>
   );
+}
+
+function LaborSummary({ label, value, detail, warning = false }: { label: string; value: string; detail: string; warning?: boolean }) {
+  return <div className="rounded-2xl border border-white/10 bg-white/5 p-3"><p className="text-[9px] font-black uppercase tracking-widest text-white/40">{label}</p><p className={`mt-2 break-words text-xl font-black tabular-nums ${warning ? 'text-red-300' : 'text-white'}`} style={{ fontFamily: 'var(--font-mono)' }}>{value}</p><p className={`mt-1 text-[10px] font-semibold leading-4 ${warning ? 'text-red-200/75' : 'text-white/40'}`}>{detail}</p></div>;
 }
