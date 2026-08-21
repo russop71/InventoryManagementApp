@@ -168,6 +168,23 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
     return convertedQuantity * item.unitCost;
   };
 
+  const updateIngredientInventoryMatch = (ingredientIndex: number, inventoryItemId: string) => {
+    if (!extractedData) return;
+    const selectedItem = inventory.find(item => item.id === inventoryItemId);
+    setExtractedData({
+      ...extractedData,
+      ingredients: extractedData.ingredients.map((ingredient, index) => index === ingredientIndex
+        ? {
+            ...ingredient,
+            name: selectedItem?.name || ingredient.name,
+            matchedInventoryItemId: selectedItem?.id || '',
+            matchedInventoryItemName: selectedItem?.name || '',
+            matchConfidence: selectedItem ? 1 : 0,
+          }
+        : ingredient),
+    });
+  };
+
   const readyIngredientCount = extractedData?.ingredients.filter(ingredient => ingredientCost(ingredient) !== null).length || 0;
   const reviewIngredientCount = (extractedData?.ingredients.length || 0) - readyIngredientCount;
   const recipeCost = extractedData?.ingredients.reduce((sum, ingredient) => sum + (ingredientCost(ingredient) || 0), 0) || 0;
@@ -296,7 +313,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
                     <div key={`${ingredient.rawText}-${index}`} className="rounded-xl border border-slate-200 bg-white p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-950">{ingredient.quantity} {ingredient.unit} {ingredient.name}</p>
+                          <p className="font-semibold text-slate-950">{ingredient.quantity} {ingredient.unit} {matchedItem?.name || ingredient.name}</p>
                           <p className="mt-1 text-xs text-slate-500">Handwriting: {ingredient.rawText || ingredient.name}</p>
                           <p className="mt-1 text-xs text-slate-600">
                             {matchedItem ? `Inventory: ${matchedItem.name} · ${matchedItem.supplier}` : 'No inventory match'}
@@ -308,6 +325,20 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
                           </Badge>
                           <p className="mt-2 text-sm font-bold text-slate-950">{cost === null ? 'Not costed' : `$${cost.toFixed(2)}`}</p>
                         </div>
+                      </div>
+                      <div className="mt-3">
+                        <Label htmlFor={`recipe-inventory-match-${index}`} className="text-xs">Inventory item</Label>
+                        <select
+                          id={`recipe-inventory-match-${index}`}
+                          value={ingredient.matchedInventoryItemId}
+                          onChange={event => updateIngredientInventoryMatch(index, event.target.value)}
+                          className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#E0B400] focus:ring-2 focus:ring-[#E0B400]/20"
+                        >
+                          <option value="">Choose an inventory item…</option>
+                          {inventory.map(item => (
+                            <option key={item.id} value={item.id}>{item.name} · {item.supplier}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   );

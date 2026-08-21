@@ -3,6 +3,15 @@ import { requireActiveUser } from './_authenticated-user.js';
 const DEFAULT_MODEL = 'gpt-5.6-luna';
 const MAX_IMAGE_DATA_LENGTH = 6_000_000;
 const SUPPORTED_IMAGE_DATA_URL = /^data:image\/(?:jpeg|png|webp);base64,/i;
+const MIN_NAME_MATCH_SCORE = 0.82;
+const MIN_NAME_MATCH_MARGIN = 0.06;
+const RECIPE_NAME_STOP_WORDS = new Set([
+  'bottle', 'bottles', 'can', 'cans', 'case', 'cases', 'cs', 'cup', 'cups', 'ea', 'each',
+  'g', 'gram', 'grams', 'jar', 'jars', 'kg', 'kilogram', 'kilograms', 'l', 'lb', 'lbs',
+  'liter', 'liters', 'litre', 'litres', 'ml', 'ounce', 'ounces', 'oz', 'pack', 'packs',
+  'pkg', 'pound', 'pounds', 'tablespoon', 'tablespoons', 'tbsp', 'teaspoon', 'teaspoons',
+  'tsp', 'unit', 'units',
+]);
 
 const recipeSchema = {
   type: 'object',
@@ -58,6 +67,96 @@ function normalizeInventoryCatalog(inventory) {
     .filter(item => item.id && item.name);
 }
 
+function singularizeIngredientToken(token) {
+  if (token.length <= 3 || token.endsWith('ss') || token.endsWith('us') || token.endsWith('is')) return token;
+  if (token.endsWith('ies') && token.length > 4) return `${token.slice(0, -3)}y`;
+  if (token.endsWith('oes') && token.length > 4) return token.slice(0, -2);
+  if (/(?:ches|shes|xes|zes)$/.test(token)) return token.slice(0, -2);
+  if (token.endsWith('s')) return token.slice(0, -1);
+  return token;
+}
+
+export function normalizeRecipeIngredientName(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\bevoo\b/g, 'extra virgin olive oil')
+    .replace(/\ball[\s-]+purpose\b/g, 'ap')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .filter(token => token && !/^\d+(?:\.\d+)?$/.test(token) && !RECIPE_NAME_STOP_WORDS.has(token))
+    .map(singularizeIngredientToken)
+    .join(' ')
+    .trim();
+}
+
+function ingredientNameScore(sourceName, inventoryName) {
+  const source = normalizeRecipeIngredientName(sourceName);
+  const candidate = normalizeRecipeIngredientName(inventoryName);
+  if (!source || !candidate) return 0;
+  if (source === candidate) return 1;
+
+  const sourceTokens = new Set(source.split(' '));
+  const candidateTokens = new Set(candidate.split(' '));
+  const sharedCount = [...sourceTokens].filter(token => candidateTokens.has(token)).length;
+  if (sharedCount === 0) return 0;
+
+  const sourceCoverage = sharedCount / sourceTokens.size;
+  const candidateCoverage = sharedCount / candidateTokens.size;
+  if (sourceCoverage === 1) return 0.9 + (0.09 * candidateCoverage);
+  if (candidateCoverage === 1) return 0.78 + (0.08 * sourceCoverage);
+
+  const diceScore = (2 * sharedCount) / (sourceTokens.size + candidateTokens.size);
+  return diceScore >= 0.8 ? 0.72 + (0.18 * diceScore) : 0.55 * diceScore;
+}
+
+function bestIngredientScore(ingredient, catalogItem) {
+  const extractedName = String(ingredient?.name || '').trim();
+  const rawText = String(ingredient?.rawText || '').trim();
+  return Math.max(
+    ingredientNameScore(extractedName, catalogItem.name),
+    ingredientNameScore(rawText, catalogItem.name),
+  );
+}
+
+function resolveInventoryMatch(ingredient, catalog) {
+  const requestedId = String(ingredient?.matchedInventoryItemId || '').trim();
+  const requestedItem = catalog.find(item => item.id === requestedId);
+  const suppliedConfidence = Number(ingredient?.matchConfidence);
+  const aiConfidence = Number.isFinite(suppliedConfidence)
+    ? Math.min(1, Math.max(0, suppliedConfidence))
+    : 0;
+  const ranked = catalog
+    .map(item => ({ item, score: bestIngredientScore(ingredient, item) }))
+    .filter(entry => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.item.name.localeCompare(right.item.name));
+  const best = ranked[0];
+  const runnerUp = ranked[1];
+
+  if (best?.score >= MIN_NAME_MATCH_SCORE) {
+    const tied = runnerUp && (best.score - runnerUp.score) < MIN_NAME_MATCH_MARGIN;
+    if (!tied) return { item: best.item, confidence: best.score };
+
+    const requestedRank = requestedItem
+      ? ranked.find(entry => entry.item.id === requestedItem.id)
+      : null;
+    if (requestedRank && (best.score - requestedRank.score) < MIN_NAME_MATCH_MARGIN && aiConfidence >= 0.7) {
+      return { item: requestedRank.item, confidence: Math.max(requestedRank.score, aiConfidence) };
+    }
+    return null;
+  }
+
+  if (requestedItem) {
+    const requestedScore = bestIngredientScore(ingredient, requestedItem);
+    if (requestedScore >= 0.72 && aiConfidence >= 0.7) {
+      return { item: requestedItem, confidence: Math.max(requestedScore, aiConfidence) };
+    }
+  }
+
+  return null;
+}
+
 export function extractResponseText(payload) {
   if (typeof payload?.output_text === 'string') return payload.output_text;
   for (const item of payload?.output || []) {
@@ -70,24 +169,21 @@ export function extractResponseText(payload) {
 
 export function normalizeScannedRecipe(payload, inventoryCatalog = []) {
   const catalog = normalizeInventoryCatalog(inventoryCatalog);
-  const catalogById = new Map(catalog.map(item => [item.id, item]));
   const source = payload || {};
   const ingredients = Array.isArray(source.ingredients)
     ? source.ingredients.map(item => {
-        const requestedId = String(item?.matchedInventoryItemId || '').trim();
-        const catalogItem = catalogById.get(requestedId);
+        const inventoryMatch = resolveInventoryMatch(item, catalog);
+        const catalogItem = inventoryMatch?.item;
         const quantity = Number(item?.quantity);
-        const confidence = Number(item?.matchConfidence);
+        const extractedName = String(item?.name || 'Unknown ingredient').trim() || 'Unknown ingredient';
         return {
-          rawText: String(item?.rawText || item?.name || '').trim(),
-          name: String(item?.name || 'Unknown ingredient').trim() || 'Unknown ingredient',
+          rawText: String(item?.rawText || extractedName).trim(),
+          name: catalogItem?.name || extractedName,
           quantity: Number.isFinite(quantity) && quantity >= 0 ? quantity : 0,
           unit: String(item?.unit || catalogItem?.unit || 'ea').trim() || 'ea',
           matchedInventoryItemId: catalogItem?.id || '',
           matchedInventoryItemName: catalogItem?.name || '',
-          matchConfidence: catalogItem && Number.isFinite(confidence)
-            ? Math.min(1, Math.max(0, confidence))
-            : 0,
+          matchConfidence: inventoryMatch?.confidence || 0,
         };
       })
     : [];
@@ -123,8 +219,9 @@ async function extractRecipe(imageData, inventoryCatalog, apiKey) {
             text: [
               'Read this handwritten or printed restaurant recipe.',
               'Transcribe the recipe name, category, selling price when present, yield, and every ingredient quantity and unit.',
-              'Match each ingredient to the closest item in the inventory catalog below.',
-              'Use matchedInventoryItemId only when it exactly equals an ID from the catalog. Otherwise return an empty string.',
+              'Match each ingredient to an item in the inventory catalog below by its saved inventory name.',
+              'When matched, copy the catalog name exactly into name and copy its exact ID into matchedInventoryItemId.',
+              'Never invent, paraphrase, or alter a matched inventory name or ID. If the match is ambiguous, return the transcribed ingredient name and an empty matchedInventoryItemId.',
               'Set matchConfidence from 0 to 1. Use a conservative score when the handwriting or match is uncertain.',
               'Do not invent costs or prices. Costs are calculated separately from stored inventory prices.',
               `Inventory catalog: ${JSON.stringify(inventoryCatalog)}`,
