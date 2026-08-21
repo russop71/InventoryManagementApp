@@ -68,7 +68,7 @@ function statusClass(status: string) {
 }
 
 export function PaymentMethod() {
-  const { user, accountId, accountName, locations } = useAuth();
+  const { user, accountId, accountName, locations, productAccess, refreshSession } = useAuth();
   const isOwner = user?.role === 'Owner';
   const [billing, setBilling] = useState<BillingDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -81,12 +81,17 @@ export function PaymentMethod() {
       const payload = await apiRequest<{ billing: BillingDetails }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing`);
       setBilling(payload.billing);
       setLocationCount(Math.max(1, locations.length, 1 + Number(payload.billing.additionalLocationQuantity || 0)));
+      const checkoutSucceeded = new URLSearchParams(window.location.search).get('checkout') === 'success';
+      if (payload.billing.status === 'active' && !productAccess && checkoutSucceeded && sessionStorage.getItem('zestiq:billing-refresh') !== 'done') {
+        sessionStorage.setItem('zestiq:billing-refresh', 'done');
+        await refreshSession();
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to load billing');
     } finally {
       setIsLoading(false);
     }
-  }, [accountId, isOwner, locations.length]);
+  }, [accountId, isOwner, locations.length, productAccess]);
 
   useEffect(() => {
     void loadBilling();

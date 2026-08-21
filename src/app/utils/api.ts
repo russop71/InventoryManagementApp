@@ -24,6 +24,20 @@ function readSession(): StoredSession | null {
   }
 }
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 async function request<T>(path: string, init: RequestInit | undefined, allowRefresh: boolean): Promise<T> {
   const session = readSession();
   const response = await fetch(buildUrl(path), {
@@ -55,13 +69,17 @@ async function request<T>(path: string, init: RequestInit | undefined, allowRefr
 
   if (!response.ok) {
     let message = `Request failed (${response.status})`;
+    let code: string | undefined;
+    let details: unknown;
     try {
       const body = await response.json();
       if (body?.error) message = body.error;
+      code = body?.code;
+      details = body;
     } catch {
       // keep fallback
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status, code, details);
   }
 
   return response.json() as Promise<T>;

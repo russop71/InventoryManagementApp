@@ -52,16 +52,13 @@ function roleFromEmail(email = '') {
 
 function resolvePersistentAccountId(email = '') {
   const normalized = String(email).trim().toLowerCase();
-  if (['russop71@gmail.com', 'russop71', 'owner@zestiq.com'].includes(normalized)) {
-    return 'russop71';
-  }
   return normalizeId(normalized || 'local-account');
 }
 
 function accountFromEmail(email = '') {
   const normalized = String(email).trim().toLowerCase();
   const accountId = resolvePersistentAccountId(normalized);
-  const username = accountId === 'russop71' ? 'Russop71' : (normalized.split('@')[0] || 'local-account');
+  const username = normalized.split('@')[0] || 'local-account';
   const displayName = String(username)
     .split(/[-_]/)
     .filter(Boolean)

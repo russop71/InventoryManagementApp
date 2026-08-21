@@ -69,6 +69,17 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
+const DEMO_COGS_CATEGORIES: CogsCategory[] = [
+  { id: 'demo-food', name: 'Food', color: '#F59E0B' },
+  { id: 'demo-beverage', name: 'Beverage', color: '#8B5CF6' },
+];
+
+function demoCogsCategory(category: string) {
+  return ['wine', 'cocktail', 'beer', 'beverage'].includes(String(category || '').trim().toLowerCase())
+    ? 'demo-beverage'
+    : 'demo-food';
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const { accountId, activeLocationId, token, user } = useAuth();
   const { recipes, syncToastMenuItems } = useInventory();
@@ -87,20 +98,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     id: recipe.externalId || recipe.id,
     name: recipe.menuItemName,
     category: recipe.category,
-    cogsCategoryId: recipe.source === 'toast' ? recipe.externalId : undefined,
+    cogsCategoryId: demoCogsCategory(recipe.category),
     price: recipe.price,
     ingredients: recipe.ingredients.map(ingredient => ({ inventoryItemId: ingredient.inventoryItemId, quantity: ingredient.quantity })),
   }));
 
-  const buildDemoSales = (items: ToastMenuItem[]): ToastSalesData[] => Array.from({ length: 7 }, (_, index) => {
+  const buildDemoSales = (items: ToastMenuItem[]): ToastSalesData[] => Array.from({ length: 30 }, (_, index) => {
     const date = new Date();
-    date.setDate(date.getDate() - (6 - index));
-    const topItems = items.slice(0, 6).map((item, itemIndex) => {
-      const quantity = 12 + ((index * 7 + itemIndex * 5) % 28);
+    date.setDate(date.getDate() - (29 - index));
+    const dayOfWeek = date.getDay();
+    const demandFactor = dayOfWeek === 5 || dayOfWeek === 6 ? 1.35 : dayOfWeek === 0 ? 1.18 : 0.94;
+    const topItems = items.map((item, itemIndex) => {
+      const menuMix = Math.max(0.58, 1.32 - itemIndex * 0.045);
+      const baseQuantity = 16 + ((index * 11 + itemIndex * 7) % 34);
+      const quantity = Math.max(1, Math.round(baseQuantity * demandFactor * menuMix));
       return { itemName: item.name, quantity, revenue: quantity * Math.max(item.price, 1) };
-    }).sort((left, right) => right.revenue - left.revenue).slice(0, 5);
+    }).sort((left, right) => right.revenue - left.revenue);
     const revenue = topItems.reduce((sum, item) => sum + item.revenue, 0);
-    return { date: date.toISOString().split('T')[0], covers: Math.max(1, Math.round(revenue / 31)), revenue, topItems };
+    return { date: date.toISOString().split('T')[0], covers: Math.max(1, Math.round(revenue / 42)), revenue, topItems };
   });
 
   const demoState = () => {
@@ -110,7 +125,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       { id: 'demo-salmon', name: 'Cedar Salmon', category: 'Food', price: 34, ingredients: [] },
       { id: 'demo-negroni', name: 'House Negroni', category: 'Cocktail', price: 16, ingredients: [] },
     ];
-    return { items, sales: buildDemoSales(items) };
+    return { items, sales: buildDemoSales(items), cogsCategories: DEMO_COGS_CATEGORIES };
   };
 
   useEffect(() => {
@@ -122,15 +137,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
     const read = <T,>(name: string, fallback: T) => readScopedJson<T>(locationScopedStorageKey(accountId, activeLocationId, name), fallback);
     const restoreLocal = () => {
+      if (isDemoAccount) {
+        const demo = demoState();
+        setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+        setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories);
+        setSalesData(demo.sales); setMenuItems(demo.items); setIsConnected(true); setIsHydrated(true);
+        return;
+      }
       const restoredSales = read<ToastSalesData[]>('toastSalesData', []);
       const restoredMenu = read<ToastMenuItem[]>('toastMenuItems', []);
-      const demo = isDemoAccount && (!restoredSales.length || !restoredMenu.length) ? demoState() : null;
-      const nextSales = restoredSales.length ? restoredSales : demo?.sales || [];
-      const nextMenu = restoredMenu.length ? restoredMenu : demo?.items || [];
-      setProvider(read<string>('posProvider', isDemoAccount ? 'toast' : 'generic'));
+      const nextSales = restoredSales;
+      const nextMenu = restoredMenu;
+      setProvider(read<string>('posProvider', 'generic'));
       setConnectionMode(read<'import' | 'direct'>('posConnectionMode', 'import'));
       setRestaurantId(read<string>('toastRestaurantId', ''));
-      setLastSync(read<string | null>('toastLastSync', isDemoAccount ? new Date().toISOString() : null));
+      setLastSync(read<string | null>('toastLastSync', null));
       setCogsCategories(read<CogsCategory[]>('toastCogsCategories', []));
       setSalesData(nextSales); setMenuItems(nextMenu);
       setIsConnected(read<boolean>('toastConnected', false) || nextSales.length > 0 || nextMenu.length > 0);
@@ -141,15 +162,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       if (!token) return restoreLocal();
       try {
         const payload = await apiRequest<ToastIntegrationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`);
+        if (isDemoAccount) {
+          const demo = demoState();
+          setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+          setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories);
+          setSalesData(demo.sales); setMenuItems(demo.items); setIsConnected(true); setIsHydrated(true);
+          return;
+        }
         const state = payload.toast || {} as PosState;
         const hasSales = Array.isArray(state.salesData) && state.salesData.length > 0;
         const hasMenu = Array.isArray(state.menuItems) && state.menuItems.length > 0;
-        const demo = isDemoAccount && (!hasSales || !hasMenu) ? demoState() : null;
-        const nextSales = hasSales ? state.salesData : demo?.sales || [];
-        const nextMenu = hasMenu ? state.menuItems : demo?.items || [];
-        setProvider(state.provider || (isDemoAccount ? 'toast' : 'generic'));
+        const nextSales = hasSales ? state.salesData : [];
+        const nextMenu = hasMenu ? state.menuItems : [];
+        setProvider(state.provider || 'generic');
         setConnectionMode(state.connectionMode === 'direct' ? 'direct' : 'import');
-        setRestaurantId(state.restaurantId || ''); setLastSync(state.lastSync || (isDemoAccount ? new Date().toISOString() : null));
+        setRestaurantId(state.restaurantId || ''); setLastSync(state.lastSync || null);
         setCogsCategories(state.cogsCategories || []); setSalesData(nextSales); setMenuItems(nextMenu);
         setIsConnected(Boolean(state.connected || nextSales.length || nextMenu.length));
         setIsHydrated(true);
@@ -157,6 +184,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     };
     void restoreServer();
   }, [accountId, activeLocationId, token, isDemoAccount]);
+
+  useEffect(() => {
+    if (!isDemoAccount || !isHydrated || recipes.length === 0) return;
+    const demo = demoState();
+    setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+    setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories);
+    setSalesData(demo.sales); setMenuItems(demo.items); setIsConnected(true);
+  }, [isDemoAccount, isHydrated, recipes]);
 
   useEffect(() => {
     if (!accountId || !activeLocationId || !isHydrated) return;
@@ -171,9 +206,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }).catch(error => console.error('Failed to save POS integration state', error));
   }, [accountId, activeLocationId, token, isHydrated, isConnected, provider, connectionMode, restaurantId, lastSync, cogsCategories, salesData, menuItems]);
 
-  const selectPosProvider = (nextProvider: string) => setProvider(nextProvider || 'generic');
+  const selectPosProvider = (nextProvider: string) => setProvider(isDemoAccount ? 'toast' : (nextProvider || 'generic'));
 
   const disconnectToast = () => {
+    if (isDemoAccount) {
+      const demo = demoState();
+      setIsConnected(true); setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+      setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories); setSalesData(demo.sales); setMenuItems(demo.items);
+      syncToastMenuItems(demo.items);
+      return;
+    }
     setIsConnected(false); setConnectionMode('import'); setRestaurantId(''); setLastSync(null);
     setSalesData([]); setMenuItems([]); syncToastMenuItems([]);
   };

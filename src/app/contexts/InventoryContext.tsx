@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 import { locationScopedStorageKey, readScopedJson } from '../utils/storageScope';
-import { apiRequest } from '../utils/api';
+import { ApiError, apiRequest } from '../utils/api';
 import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
-import { buildDemoLocationData } from '../utils/demoData';
+import { buildDemoLocationData, DEMO_DATA_VERSION } from '../utils/demoData';
 import { mergeLocationData } from '../utils/locationDataMerge.js';
 import { hasDuplicateInvoiceNumber, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
+import { findBestSupplierMatch, mergeDuplicateSuppliers, normalizeSupplierName } from '../utils/supplierMatching.js';
 import type { InventoryCount } from '../utils/inventoryCounts';
 
 const DEFAULT_STORAGE_AREAS = ['Walk-In Cooler', 'Dry Storage', 'Freezer', 'Bar', 'Wine Cellar', 'Unassigned'] as const;
@@ -232,6 +234,8 @@ interface LocationPayload {
   suppliers?: Supplier[];
   preppedRecipes?: PreppedRecipe[];
   inventoryCounts?: InventoryCount[];
+  integrations?: { demoDataVersion?: string; [key: string]: unknown };
+  version?: string | null;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -248,90 +252,9 @@ function normalizePreppedRecipe(recipe: Partial<PreppedRecipe> & Pick<PreppedRec
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const { user, accountId, activeLocationId, token } = useAuth();
   const pollRef = useRef<number | null>(null);
-
-  const MARKETMAN_SUPPLIER_TARGET_EMAIL = 'russop71@gmail.com';
-
-  const MARKETMAN_SUPPLIER_CONTACTS: Record<string, Pick<Supplier, 'contactPerson' | 'email' | 'phone' | 'address' | 'paymentTerms' | 'notes'>> = {
-    'daily seafood': {
-      contactPerson: '',
-      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
-      phone: '416-4619449',
-      address: '',
-      paymentTerms: '',
-      notes: '',
-    },
-    woodward: {
-      contactPerson: '',
-      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
-      phone: '905-847-7200',
-      address: '',
-      paymentTerms: '',
-      notes: '',
-    },
-    eccolo: {
-      contactPerson: '',
-      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
-      phone: '416-661-1994',
-      address: '',
-      paymentTerms: '',
-      notes: '',
-    },
-    bondi: {
-      contactPerson: '',
-      email: MARKETMAN_SUPPLIER_TARGET_EMAIL,
-      phone: '',
-      address: '',
-      paymentTerms: '',
-      notes: '',
-    },
-  };
-
-  const getMarketmanContactByName = (name: string) => {
-    const normalized = name.trim().toLowerCase();
-    if (normalized.includes('daily seafood')) return MARKETMAN_SUPPLIER_CONTACTS['daily seafood'];
-    if (normalized.includes('woodward')) return MARKETMAN_SUPPLIER_CONTACTS.woodward;
-    if (normalized.includes('eccolo')) return MARKETMAN_SUPPLIER_CONTACTS.eccolo;
-    if (normalized.includes('bondi')) return MARKETMAN_SUPPLIER_CONTACTS.bondi;
-    return null;
-  };
-
-  const createMarketmanSeedSuppliers = (): Supplier[] => {
-    const now = new Date().toISOString();
-    return [
-      {
-        id: `${Date.now()}-daily-seafood`,
-        name: 'Daily Seafood',
-        ...MARKETMAN_SUPPLIER_CONTACTS['daily seafood'],
-        category: 'Seafood',
-        dateAdded: now,
-        source: 'manual',
-      },
-      {
-        id: `${Date.now()}-woodward`,
-        name: 'Woodward',
-        ...MARKETMAN_SUPPLIER_CONTACTS.woodward,
-        category: 'Other',
-        dateAdded: now,
-        source: 'manual',
-      },
-      {
-        id: `${Date.now()}-eccolo`,
-        name: 'Eccolo',
-        ...MARKETMAN_SUPPLIER_CONTACTS.eccolo,
-        category: 'Other',
-        dateAdded: now,
-        source: 'manual',
-      },
-      {
-        id: `${Date.now()}-bondi-produce`,
-        name: 'Bondi Produce',
-        ...MARKETMAN_SUPPLIER_CONTACTS.bondi,
-        category: 'Produce',
-        dateAdded: now,
-        source: 'manual',
-      },
-    ];
-  };
+  const locationVersionsRef = useRef<Map<string, string>>(new Map());
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const savesPendingRef = useRef(0);
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [storageAreas, setStorageAreas] = useState<string[]>([]);
@@ -433,21 +356,46 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       effectiveInventoryCounts,
     );
     if (!token) return;
-    void apiRequest<LocationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/data`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        inventory: effectiveInventory,
-        recipes: effectiveRecipes,
-        storageAreas: effectiveStorageAreas,
-        orders: effectiveOrders,
-        invoices: effectiveInvoices,
-        suppliers: effectiveSuppliers,
-        preppedRecipes: effectivePreppedRecipes,
-        inventoryCounts: effectiveInventoryCounts,
-      }),
-    }).catch(error => {
-      console.error('Failed to sync location data', error);
-    });
+    const locationId = activeLocationId;
+    const requestPath = `/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(locationId)}/data`;
+    const snapshot = {
+      inventory: effectiveInventory,
+      recipes: effectiveRecipes,
+      storageAreas: effectiveStorageAreas,
+      orders: effectiveOrders,
+      invoices: effectiveInvoices,
+      suppliers: effectiveSuppliers,
+      preppedRecipes: effectivePreppedRecipes,
+      inventoryCounts: effectiveInventoryCounts,
+    };
+    savesPendingRef.current += 1;
+    saveQueueRef.current = saveQueueRef.current
+      .then(async () => {
+        let version = locationVersionsRef.current.get(locationId);
+        if (!version) {
+          const latest = await apiRequest<LocationPayload>(requestPath);
+          version = latest.version || undefined;
+          if (version) locationVersionsRef.current.set(locationId, version);
+        }
+        if (!version) throw new Error('The latest location version could not be loaded');
+        const saved = await apiRequest<LocationPayload>(requestPath, {
+          method: 'PUT',
+          body: JSON.stringify({ ...snapshot, version }),
+        });
+        if (saved.version) locationVersionsRef.current.set(locationId, saved.version);
+      })
+      .catch(async error => {
+        console.error('Failed to sync location data', error);
+        if (error instanceof ApiError && error.code === 'VERSION_CONFLICT') {
+          toast.warning('Another manager saved first. ZestIQ loaded the latest company data; please review your change.');
+          await loadLocationData(true);
+          return;
+        }
+        toast.error(error instanceof Error ? error.message : 'Unable to save this change');
+      })
+      .finally(() => {
+        savesPendingRef.current = Math.max(0, savesPendingRef.current - 1);
+      });
   };
 
   const loadLocationData = async (silent = false) => {
@@ -499,7 +447,27 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const payload = await apiRequest<LocationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/data`);
+      const locationDataPath = `/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/data`;
+      let payload = await apiRequest<LocationPayload>(locationDataPath);
+      if (isDemoAccount && payload.integrations?.demoDataVersion !== DEMO_DATA_VERSION && payload.version) {
+        payload = await apiRequest<LocationPayload>(locationDataPath, {
+          method: 'PUT',
+          body: JSON.stringify({
+            inventory: fallbackInventory,
+            recipes: fallbackRecipes,
+            storageAreas: fallbackStorageAreas,
+            orders: fallbackOrders,
+            invoices: fallbackInvoices,
+            suppliers: fallbackSuppliers,
+            preppedRecipes: [],
+            inventoryCounts: [],
+            demoDataVersion: DEMO_DATA_VERSION,
+            version: payload.version,
+          }),
+        });
+        toast.success('The demo restaurant has been refreshed with matching inventory, recipes and POS menu items.');
+      }
+      if (payload.version) locationVersionsRef.current.set(activeLocationId, payload.version);
       const merged = mergeLocationData(
         {
           inventory: localInventory,
@@ -527,7 +495,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const apiPreppedRecipes = (merged.preppedRecipes || []).map(recipe => normalizePreppedRecipe(recipe));
       const apiInventoryCounts = merged.inventoryCounts || [];
 
-      const serverHasData = apiInventory.length > 0 || apiRecipes.length > 0 || apiStorageAreas.length > 0 || apiOrders.length > 0 || apiInvoices.length > 0 || apiSuppliers.length > 0 || apiPreppedRecipes.length > 0 || apiInventoryCounts.length > 0;
+      const serverHasData = Boolean(payload.version);
       const hasLocalData = localInventory.length > 0 || localRecipes.length > 0 || localStorageAreas.length > 0 || readScopedJson<DailyOrder[]>(localKey('orders'), []).length > 0 || readScopedJson<InvoiceRecord[]>(localKey('invoices'), []).length > 0 || readScopedJson<Supplier[]>(localKey('suppliers'), []).length > 0 || readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).length > 0 || localInventoryCounts.length > 0;
       const shouldPreferLocalInventory = !serverHasData && localInventory.length > 0;
       const apiIngredientCount = apiRecipes.reduce((count, recipe) => count + (recipe.ingredients?.length || 0), 0);
@@ -609,32 +577,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const ordersKey = localKey('orders');
     const invoicesKey = localKey('invoices');
     const suppliersKey = localKey('suppliers');
-    const suppliersSeedKey = localKey('suppliers-seed-marketman-russop71-v1');
     const preppedKey = localKey('preppedRecipes');
-    const normalizedEmail = user?.email?.trim().toLowerCase() || '';
 
     setForecasts(readScopedJson<ForecastData[]>(forecastKey, []));
     setOrders(readScopedJson<DailyOrder[]>(ordersKey, []));
     setInvoices(readScopedJson<InvoiceRecord[]>(invoicesKey, []));
-    const existingSuppliers = readScopedJson<Supplier[]>(suppliersKey, []);
-    const hasSeededSuppliers = suppliersSeedKey ? localStorage.getItem(suppliersSeedKey) === 'true' : false;
-
-    if (
-      normalizedEmail === MARKETMAN_SUPPLIER_TARGET_EMAIL &&
-      existingSuppliers.length === 0 &&
-      !hasSeededSuppliers
-    ) {
-      const seeded = createMarketmanSeedSuppliers();
-      setSuppliers(seeded);
-      if (suppliersKey) {
-        localStorage.setItem(suppliersKey, JSON.stringify(seeded));
-      }
-      if (suppliersSeedKey) {
-        localStorage.setItem(suppliersSeedKey, 'true');
-      }
-    } else {
-      setSuppliers(existingSuppliers);
-    }
+    setSuppliers(readScopedJson<Supplier[]>(suppliersKey, []));
 
     setPreppedRecipes(readScopedJson<PreppedRecipe[]>(preppedKey, []).map(recipe => normalizePreppedRecipe(recipe)));
   }, [accountId, activeLocationId, user?.email, token]);
@@ -644,7 +592,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     if (pollRef.current) window.clearInterval(pollRef.current);
 
     pollRef.current = window.setInterval(() => {
-      void loadLocationData(true);
+      if (savesPendingRef.current === 0) void loadLocationData(true);
     }, 5000);
 
     return () => {
@@ -680,49 +628,20 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [suppliers, accountId, activeLocationId]);
 
   useEffect(() => {
+    if (!isLocationLoaded || !accountId || !activeLocationId || suppliers.length < 2) return;
+    const consolidated = mergeDuplicateSuppliers(suppliers);
+    if (consolidated.length === suppliers.length) return;
+    setSuppliers(consolidated);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, consolidated, preppedRecipes, inventoryCounts);
+    const mergedCount = suppliers.length - consolidated.length;
+    toast.success(`Merged ${mergedCount} duplicate supplier ${mergedCount === 1 ? 'record' : 'records'}.`);
+  }, [suppliers, isLocationLoaded, accountId, activeLocationId]);
+
+  useEffect(() => {
     const key = localKey('preppedRecipes');
     if (!key) return;
     localStorage.setItem(key, JSON.stringify(preppedRecipes));
   }, [preppedRecipes, accountId, activeLocationId]);
-
-  useEffect(() => {
-    if (!accountId || !activeLocationId) return;
-    const normalizedEmail = user?.email?.trim().toLowerCase() || '';
-    if (normalizedEmail !== MARKETMAN_SUPPLIER_TARGET_EMAIL) return;
-
-    const suppliersKey = localKey('suppliers');
-    if (!suppliersKey || suppliers.length === 0) return;
-
-    let changed = false;
-    const nextSuppliers = suppliers.map(supplier => {
-      const marketmanDefaults = getMarketmanContactByName(supplier.name);
-      if (!marketmanDefaults) return supplier;
-
-      const nextSupplier: Supplier = { ...supplier };
-      if (!nextSupplier.contactPerson && marketmanDefaults.contactPerson) {
-        nextSupplier.contactPerson = marketmanDefaults.contactPerson;
-        changed = true;
-      }
-      if (!nextSupplier.email && marketmanDefaults.email) {
-        nextSupplier.email = marketmanDefaults.email;
-        changed = true;
-      }
-      if (!nextSupplier.phone && marketmanDefaults.phone) {
-        nextSupplier.phone = marketmanDefaults.phone;
-        changed = true;
-      }
-      if (!nextSupplier.address && marketmanDefaults.address) {
-        nextSupplier.address = marketmanDefaults.address;
-        changed = true;
-      }
-      return nextSupplier;
-    });
-
-    if (changed) {
-      setSuppliers(nextSuppliers);
-      localStorage.setItem(suppliersKey, JSON.stringify(nextSuppliers));
-    }
-  }, [suppliers, accountId, activeLocationId, user?.email]);
 
   const addInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
     const newItem: InventoryItem = {
@@ -1069,8 +988,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
 
     const now = new Date().toISOString();
-    const supplierName = invoiceInput.vendor.trim() || 'Unknown supplier';
-    const normalizedSupplier = supplierName.toLowerCase();
+    const consolidatedSuppliers = mergeDuplicateSuppliers(suppliers);
+    const supplierMatch = findBestSupplierMatch(invoiceInput.vendor, consolidatedSuppliers);
+    const supplierName = supplierMatch?.supplier.name || invoiceInput.vendor.trim() || 'Unknown supplier';
+    const normalizedSupplier = normalizeSupplierName(supplierName);
     const supplierSlug = normalizedSupplier.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'supplier';
     const nextInventory = inventory.map(item => ({
       ...item,
@@ -1105,8 +1026,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
               isMain: true,
               isLocal: true,
             }];
-        const matchingOption = existingOptions.find(option => option.supplier.trim().toLowerCase() === normalizedSupplier);
-        const isPrimarySupplier = shouldBecomePrimary || matchingOption?.isMain === true || existingItem.supplier.trim().toLowerCase() === normalizedSupplier;
+        const matchingOption = existingOptions.find(option => normalizeSupplierName(option.supplier) === normalizedSupplier);
+        const isPrimarySupplier = shouldBecomePrimary || matchingOption?.isMain === true || normalizeSupplierName(existingItem.supplier) === normalizedSupplier;
         const supplierOption = {
           id: matchingOption?.id || `${existingItem.id}-${supplierSlug}`,
           productName: scannedItem.name.trim() || existingItem.name,
@@ -1196,9 +1117,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       invoiceItems.push({ itemId, quantity, cost: totalCost });
     });
 
-    const nextSuppliers = suppliers.some(supplier => supplier.name.trim().toLowerCase() === normalizedSupplier)
-      ? suppliers
-      : [...suppliers, {
+    const nextSuppliers = consolidatedSuppliers.some(supplier => normalizeSupplierName(supplier.name) === normalizedSupplier)
+      ? consolidatedSuppliers
+      : [...consolidatedSuppliers, {
           id: `${Date.now()}-${supplierSlug}`,
           name: supplierName,
           contactPerson: '',

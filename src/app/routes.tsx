@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter } from "react-router";
 import { Dashboard } from "./pages/Dashboard";
 import { Inventory } from "./pages/Inventory";
 import { InventoryDetail } from "./pages/InventoryDetail";
@@ -32,13 +32,10 @@ import { LaborScheduling } from "./pages/LaborScheduling";
 import { EmployeeApp } from "./pages/EmployeeApp";
 import { BeverageCosting } from "./pages/BeverageCosting";
 import { BookDemo } from "./pages/BookDemo";
+import { Onboarding } from "./pages/Onboarding";
 import { RestaurantBeverageSeo, RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo, RestaurantLabourSeo, RestaurantOrderingSeo } from "./pages/RestaurantSeoPages";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
-
-function AppHomeRedirect() {
-  return <Navigate to="/app" replace />;
-}
 
 export const router = createBrowserRouter([
   {
@@ -119,7 +116,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, Component: Dashboard },
           { path: "dashboard", Component: Dashboard },
-          { path: "onboarding", Component: AppHomeRedirect },
+          { path: "onboarding", Component: Onboarding },
           { path: "labor", Component: LaborScheduling },
           { path: "beverages", Component: BeverageCosting },
           { path: "inventory", Component: Inventory },

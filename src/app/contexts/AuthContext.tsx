@@ -35,11 +35,14 @@ interface AuthContextType {
   user: AuthUser | null;
   accountId: string | null;
   accountName: string;
+  billingStatus: string;
+  productAccess: boolean;
   onboarding: OnboardingProgress;
   locations: AccountLocation[];
   activeLocationId: string | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginDemo: () => Promise<void>;
   register: (name: string, companyName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   changePassword: (password: string) => Promise<void>;
@@ -49,6 +52,7 @@ interface AuthContextType {
   updateLocation: (locationId: string, locationName: string) => Promise<void>;
   updateAccountProfile: (accountName: string) => Promise<void>;
   updateOnboarding: (updates: Partial<OnboardingProgress>) => Promise<OnboardingProgress>;
+  refreshSession: () => Promise<void>;
   updateLocalAccountProfile: (updates: { name?: string; accountName?: string }) => void;
 }
 
@@ -69,6 +73,8 @@ interface AuthApiResponse {
     id: string;
     name: string;
     onboarding?: OnboardingProgress;
+    billingStatus?: string;
+    productAccess?: boolean;
   };
   locations: AccountLocation[];
   activeLocationId: string;
@@ -79,6 +85,8 @@ interface AuthState {
   user: AuthUser | null;
   accountId: string | null;
   accountName: string;
+  billingStatus: string;
+  productAccess: boolean;
   onboarding: OnboardingProgress;
   locations: AccountLocation[];
   activeLocationId: string | null;
@@ -121,6 +129,8 @@ function signedOutState(): AuthState {
     user: null,
     accountId: null,
     accountName: '',
+    billingStatus: 'not_configured',
+    productAccess: false,
     onboarding: DEFAULT_ONBOARDING,
     locations: [],
     activeLocationId: null,
@@ -149,6 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: payload.user,
       accountId: payload.account.id,
       accountName: payload.account.name,
+      billingStatus: payload.account.billingStatus || 'not_configured',
+      productAccess: payload.account.productAccess === true,
       onboarding: payload.account.onboarding || DEFAULT_ONBOARDING,
       locations: payload.locations,
       activeLocationId,
@@ -199,12 +211,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applySession(payload);
   };
 
+  const loginDemo = async () => {
+    const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/demo', { method: 'POST' });
+    applySession(payload);
+  };
+
   const register = async (name: string, companyName: string, email: string, password: string) => {
     const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ name, companyName, email, password }),
     });
     applySession(payload);
+  };
+
+  const refreshSession = async () => {
+    const stored = readStoredSession();
+    if (!stored?.token) throw new Error('Sign in is required');
+    const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/session');
+    applySession(payload, stored);
   };
 
   const logout = () => {
@@ -310,11 +334,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: authState.user,
       accountId: authState.accountId,
       accountName: authState.accountName,
+      billingStatus: authState.billingStatus,
+      productAccess: authState.productAccess,
       onboarding: authState.onboarding,
       locations: authState.locations,
       activeLocationId: authState.activeLocationId,
       token: authState.token,
       login,
+      loginDemo,
       register,
       logout,
       changePassword,
@@ -324,6 +351,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateLocation,
       updateAccountProfile,
       updateOnboarding,
+      refreshSession,
       updateLocalAccountProfile,
     }),
     [authState],

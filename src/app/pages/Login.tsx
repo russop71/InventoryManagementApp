@@ -20,7 +20,7 @@ export function Login() {
   const [isSignup, setIsSignup]   = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const { login, register } = useAuth();
+  const { login, loginDemo, register } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +70,7 @@ export function Login() {
     setIsLoading(true);
     await new Promise(r => setTimeout(r, 700));
     try {
-      await login('demo@zestiq.com', 'demo');
+      await loginDemo();
       toast.success('Logged in as Demo User');
       navigate(returnTo);
     } catch (error) {
