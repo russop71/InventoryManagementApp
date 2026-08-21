@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiRequest } from '../utils/api';
 import { clearAllAccountScopedData } from '../utils/storageScope';
+import { clearDemoSessionReset } from '../utils/demoSession.js';
 
 export type UserRole = 'Owner' | 'Admin' | 'Manager' | 'Staff';
 
@@ -212,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginDemo = async () => {
+    clearDemoSessionReset();
     const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/demo', { method: 'POST' });
     applySession(payload);
   };

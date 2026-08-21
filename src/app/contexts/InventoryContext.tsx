@@ -5,6 +5,7 @@ import { locationScopedStorageKey, readScopedJson } from '../utils/storageScope'
 import { ApiError, apiRequest } from '../utils/api';
 import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
 import { buildDemoLocationData, DEMO_DATA_VERSION } from '../utils/demoData';
+import { markDemoSessionReset, shouldResetDemoSession } from '../utils/demoSession.js';
 import { mergeLocationData } from '../utils/locationDataMerge.js';
 import { hasDuplicateInvoiceNumber, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
 import { findBestSupplierMatch, mergeDuplicateSuppliers, normalizeSupplierName } from '../utils/supplierMatching.js';
@@ -449,7 +450,11 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     try {
       const locationDataPath = `/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/data`;
       let payload = await apiRequest<LocationPayload>(locationDataPath);
-      if (isDemoAccount && payload.integrations?.demoDataVersion !== DEMO_DATA_VERSION && payload.version) {
+      const shouldRefreshDemo = isDemoAccount && (
+        shouldResetDemoSession(DEMO_DATA_VERSION)
+        || payload.integrations?.demoDataVersion !== DEMO_DATA_VERSION
+      );
+      if (shouldRefreshDemo && payload.version) {
         payload = await apiRequest<LocationPayload>(locationDataPath, {
           method: 'PUT',
           body: JSON.stringify({
@@ -465,6 +470,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             version: payload.version,
           }),
         });
+        markDemoSessionReset(DEMO_DATA_VERSION);
         toast.success('Zestaurant has been refreshed with matching inventory, recipes and POS menu items.');
       }
       if (payload.version) locationVersionsRef.current.set(activeLocationId, payload.version);
