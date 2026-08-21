@@ -1,9 +1,8 @@
-import { Navigate, Outlet, useLocation } from 'react-router';
+import { Navigate, Outlet } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 export function AuthLayout() {
-  const { isAuthenticated, onboarding, user } = useAuth();
-  const location = useLocation();
+  const { isAuthenticated } = useAuth();
 
   // Loading state
   if (isAuthenticated === null) {
@@ -17,13 +16,6 @@ export function AuthLayout() {
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
-  }
-
-  const setupExempt = location.pathname === '/app/onboarding'
-    || location.pathname === '/app/payment-method'
-    || location.pathname === '/app/payment';
-  if (user?.role === 'Owner' && onboarding.status === 'not_started' && !setupExempt) {
-    return <Navigate to="/app/onboarding" replace />;
   }
 
   // Render protected routes

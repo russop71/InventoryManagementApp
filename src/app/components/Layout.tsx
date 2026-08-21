@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router';
 import {
   LayoutDashboard, Package, ChefHat,
   Users, LogOut, CreditCard, HelpCircle, MessageSquare, Bell,
-  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Rocket, Wine,
+  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Wine,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useNavigate } from 'react-router';
@@ -36,7 +36,7 @@ function ZestIQLogo({ size = 36 }: { size?: number }) {
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, accountId, accountName, onboarding, locations, activeLocationId, switchLocation } = useAuth();
+  const { user, logout, accountId, accountName, locations, activeLocationId, switchLocation } = useAuth();
   const [openTopMenu, setOpenTopMenu] = useState<string | null>(null);
   const closeTopMenuTimer = useRef<number | null>(null);
   const canManageLabor = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
@@ -168,7 +168,6 @@ export function Layout() {
                 <DropdownMenuItem onClick={() => navigate('/app/account')}      className="rounded-lg mx-1"><User     className="w-4 h-4 mr-2.5 text-gray-400" />Account</DropdownMenuItem>
                 {user?.role === 'Owner' && (
                   <>
-                    <DropdownMenuItem onClick={() => navigate('/app/onboarding')} className="rounded-lg mx-1"><Rocket className="w-4 h-4 mr-2.5 text-gray-400" />Setup Guide</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/app/users')} className="rounded-lg mx-1"><Users className="w-4 h-4 mr-2.5 text-gray-400" />Users & Usage</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/app/payment-method')} className="rounded-lg mx-1"><CreditCard className="w-4 h-4 mr-2.5 text-gray-400" />Subscription & Billing</DropdownMenuItem>
                   </>
@@ -291,12 +290,6 @@ export function Layout() {
 
       {/* ── Content ──────────────────────────────────────── */}
       <main className="min-w-0 overflow-x-clip px-3 py-4 sm:px-4">
-        {(onboarding.status === 'not_started' || onboarding.status === 'in_progress') && location.pathname !== '/app/onboarding' && (
-          <Link to="/app/onboarding" className="mx-auto mb-4 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
-            <span className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#F5C10E]"><Rocket className="h-4 w-4" /></span><span><span className="block text-sm font-black">Finish setting up ZestIQ</span><span className="block text-xs text-amber-800">Continue from {onboarding.currentStep}.</span></span></span>
-            <span className="text-sm font-black">Continue →</span>
-          </Link>
-        )}
         <Outlet />
       </main>
 
