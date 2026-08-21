@@ -465,7 +465,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             version: payload.version,
           }),
         });
-        toast.success('The demo restaurant has been refreshed with matching inventory, recipes and POS menu items.');
+        toast.success('Zestaurant has been refreshed with matching inventory, recipes and POS menu items.');
       }
       if (payload.version) locationVersionsRef.current.set(activeLocationId, payload.version);
       const merged = mergeLocationData(

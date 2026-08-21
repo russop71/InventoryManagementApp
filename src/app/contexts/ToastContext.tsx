@@ -139,7 +139,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const restoreLocal = () => {
       if (isDemoAccount) {
         const demo = demoState();
-        setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+        setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestaurant');
         setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories);
         setSalesData(demo.sales); setMenuItems(demo.items); setIsConnected(true); setIsHydrated(true);
         return;
@@ -164,7 +164,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         const payload = await apiRequest<ToastIntegrationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`);
         if (isDemoAccount) {
           const demo = demoState();
-          setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+          setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestaurant');
           setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories);
           setSalesData(demo.sales); setMenuItems(demo.items); setIsConnected(true); setIsHydrated(true);
           return;
@@ -188,7 +188,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isDemoAccount || !isHydrated || recipes.length === 0) return;
     const demo = demoState();
-    setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+    setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestaurant');
     setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories);
     setSalesData(demo.sales); setMenuItems(demo.items); setIsConnected(true);
   }, [isDemoAccount, isHydrated, recipes]);
@@ -211,7 +211,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const disconnectToast = () => {
     if (isDemoAccount) {
       const demo = demoState();
-      setIsConnected(true); setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestiq-demo-restaurant');
+      setIsConnected(true); setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestaurant');
       setLastSync(new Date().toISOString()); setCogsCategories(demo.cogsCategories); setSalesData(demo.sales); setMenuItems(demo.items);
       syncToastMenuItems(demo.items);
       return;

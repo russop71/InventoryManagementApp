@@ -621,7 +621,15 @@ async function ensureDemoLogin() {
   const email = 'demo@zestiq.com';
   const password = process.env.DEMO_ACCOUNT_PASSWORD;
   if (!password) throw Object.assign(new Error('The demo account is not configured'), { status: 503 });
-  const { account } = await ensureAccountForEmail(email, 'zestIQ Demo');
+  let { account } = await ensureAccountForEmail(email, 'Zestaurant');
+  if (account.name !== 'Zestaurant') {
+    const updated = await supabase(`accounts?id=eq.${encodeURIComponent(account.id)}&select=*`, {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: { name: 'Zestaurant', updated_at: new Date().toISOString() },
+    });
+    account = updated[0] || { ...account, name: 'Zestaurant' };
+  }
   let appUsers = await supabase(`app_users?email=eq.${encodeURIComponent(email)}&select=*`);
   let appUser = appUsers?.[0];
   let authUser = appUser?.auth_user_id ? { id: appUser.auth_user_id } : await findAuthUserByEmail(email);

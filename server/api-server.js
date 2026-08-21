@@ -58,6 +58,7 @@ function resolvePersistentAccountId(email = '') {
 function accountFromEmail(email = '') {
   const normalized = String(email).trim().toLowerCase();
   const accountId = resolvePersistentAccountId(normalized);
+  if (normalized === 'demo@zestiq.com') return { id: accountId, name: 'Zestaurant' };
   const username = normalized.split('@')[0] || 'local-account';
   const displayName = String(username)
     .split(/[-_]/)
@@ -195,6 +196,7 @@ app.post('/api/v1/auth/login', (req, res) => {
 
   const result = withLiveData(data => {
     const account = ensureAccount(data, accountId, accountName);
+    if (normalizedEmail === 'demo@zestiq.com') account.name = 'Zestaurant';
     const now = new Date().toISOString();
     const existingUser = account.users.find(user => user.email === normalizedEmail);
 
