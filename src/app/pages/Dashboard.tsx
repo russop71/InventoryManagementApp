@@ -199,13 +199,13 @@ export function Dashboard() {
   const handleCategoryClick = (_: any, index: number) => {
     const categoryId = cogsCategoryTotals[index]?.categoryId;
     if (categoryId) {
-      navigate(`/cogs?category=${encodeURIComponent(categoryId)}`);
+      navigate(`/app/cogs?category=${encodeURIComponent(categoryId)}`);
     }
   };
 
   const handleCategoryCardClick = (categoryId: string) => {
     if (categoryId) {
-      navigate(`/cogs?category=${encodeURIComponent(categoryId)}`);
+      navigate(`/app/cogs?category=${encodeURIComponent(categoryId)}`);
     }
   };
 
