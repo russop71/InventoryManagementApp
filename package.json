@@ -6,7 +6,10 @@
   "scripts": {
     "build": "vite build && node scripts/generate-static-routes.mjs",
     "dev": "vite",
-    "server": "node server/api-server.js"
+    "server": "node server/api-server.js",
+    "test": "node --test",
+    "backup": "node scripts/backup-supabase.mjs",
+    "backup:verify": "node scripts/verify-backup.mjs"
   },
   "dependencies": {
       "react": "18.3.1",

@@ -117,7 +117,7 @@ export function Layout() {
     <div className="zestiq-app-shell min-h-screen overflow-x-clip bg-[#F4F5F7] pb-20">
 
       {/* ── White header ───────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-white shadow-sm border-b border-gray-100">
+      <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-3">
 
           {/* LEFT — hamburger (3 dark lines) */}
@@ -200,49 +200,53 @@ export function Layout() {
         <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1.5">
             {topMenuGroups.map(group => (
-              <div
+              <DropdownMenu
                 key={group.label}
-                className="relative"
-                onMouseEnter={() => openMenu(group.label)}
-                onMouseLeave={scheduleMenuClose}
-                onFocusCapture={() => openMenu(group.label)}
-                onBlurCapture={event => {
-                  const next = event.relatedTarget as Node | null;
-                  if (!next || !event.currentTarget.contains(next)) {
-                    scheduleMenuClose();
-                  }
+                open={openTopMenu === group.label}
+                onOpenChange={open => {
+                  clearTopMenuCloseTimer();
+                  setOpenTopMenu(open ? group.label : null);
                 }}
               >
-                <button
-                  type="button"
-                  aria-expanded={openTopMenu === group.label}
-                  onClick={() => setOpenTopMenu(current => (current === group.label ? null : group.label))}
-                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600 transition hover:bg-white hover:text-[#0F172A]"
+                <div
+                  onMouseEnter={() => openMenu(group.label)}
+                  onMouseLeave={scheduleMenuClose}
                 >
-                  <span>{group.label}</span>
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-                <div className={`absolute left-0 top-full z-20 pt-2 ${openTopMenu === group.label ? 'block' : 'hidden'}`}>
-                  <div className="min-w-[180px] rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-expanded={openTopMenu === group.label}
+                      className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600 transition hover:bg-white hover:text-[#0F172A]"
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    sideOffset={8}
+                    onMouseEnter={clearTopMenuCloseTimer}
+                    onMouseLeave={scheduleMenuClose}
+                    className="z-[100] min-w-[190px] rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl"
+                  >
                     {group.items.map(item => {
                       const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
                       return (
-                        <button
+                        <DropdownMenuItem
                           key={item.path}
-                          type="button"
-                          onClick={() => {
+                          onSelect={() => {
                             setOpenTopMenu(null);
                             navigate(item.path);
                           }}
-                          className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition ${active ? 'bg-[#FEF3C7] text-[#0F172A]' : 'text-gray-700 hover:bg-gray-50'}`}
+                          className={`flex w-full cursor-pointer items-center rounded-xl px-3 py-2 text-left text-sm transition ${active ? 'bg-[#FEF3C7] text-[#0F172A]' : 'text-gray-700 hover:bg-gray-50'}`}
                         >
                           {item.label}
-                        </button>
+                        </DropdownMenuItem>
                       );
                     })}
-                  </div>
+                  </DropdownMenuContent>
                 </div>
-              </div>
+              </DropdownMenu>
             ))}
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">

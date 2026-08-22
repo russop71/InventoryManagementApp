@@ -11,6 +11,7 @@ import { Badge } from '../components/ui/badge';
 import { Calendar, Plus, TrendingUp, Sparkles, ShoppingBag, DollarSign, Mail, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SupplierEmail {
   supplier: string;
@@ -102,6 +103,8 @@ async function resolveEventContext(targetDate: string) {
 }
 
 export function Forecasting() {
+  const { accountName } = useAuth();
+  const restaurantName = accountName?.trim() || 'Your Restaurant';
   const { inventory, forecasts, addForecast, generateDailyOrder, suppliers } = useInventory();
   const { isConnected, salesData, menuItems } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -299,11 +302,11 @@ export function Forecasting() {
         totalCost: orderItem.quantity * orderItem.item.unitCost,
       }));
 
-      const emailBody = `Subject: Order Request for ${forecastDate} - Gusto 501
+      const emailBody = `Subject: Order Request for ${forecastDate} - ${restaurantName}
 
 Dear ${supplier} Team,
 
-We'd like to place the following order for Gusto 501 based on our sales forecast for ${forecastDate}:
+We'd like to place the following order for ${restaurantName} based on our sales forecast for ${forecastDate}:
 
 ORDER DETAILS:
 ${emailItems.map((item, idx) => 
@@ -323,9 +326,8 @@ Please confirm availability and estimated delivery date at your earliest conveni
 Thank you for your continued partnership.
 
 Best regards,
-Gusto 501 - 86'D Solutions
-Pasquale Russo
-Kitchen Management Team`;
+${restaurantName}
+Restaurant Operations Team`;
 
       return {
         supplier,
@@ -333,7 +335,7 @@ Kitchen Management Team`;
         items: emailItems,
         totalCost,
         emailBody,
-        emailSubject: `Order Request for ${forecastDate} - Gusto 501`,
+        emailSubject: `Order Request for ${forecastDate} - ${restaurantName}`,
       };
     });
 

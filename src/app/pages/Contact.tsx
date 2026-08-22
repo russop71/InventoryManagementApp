@@ -203,10 +203,9 @@ export function Contact() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-600">
-            86'D Solutions<br />
-            123 Restaurant Row<br />
-            New York, NY 10001<br />
-            United States
+            ZestIQ<br />
+            Canadian-owned, serving restaurant operators across Canada<br />
+            demo@zestiq.ca
           </p>
         </CardContent>
       </Card>

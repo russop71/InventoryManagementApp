@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Trash2 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
+import { findBestSupplierMatch } from '../utils/supplierMatching.js';
 
 interface InvoiceItem {
   name: string;
@@ -26,12 +27,13 @@ interface ExtractedInvoice {
 }
 
 export function InvoiceScanner() {
-  const { importScannedInvoice } = useInventory();
+  const { importScannedInvoice, suppliers } = useInventory();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedInvoice | null>(null);
   const [editedItems, setEditedItems] = useState<InvoiceItem[]>([]);
+  const [supplierMatchMessage, setSupplierMatchMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,6 +87,15 @@ export function InvoiceScanner() {
             total: Number(json.total) || 0
           };
 
+          const supplierMatch = findBestSupplierMatch(parsed.vendor, suppliers);
+          if (supplierMatch) {
+            setSupplierMatchMessage(parsed.vendor === supplierMatch.supplier.name
+              ? `Using existing supplier: ${supplierMatch.supplier.name}`
+              : `Matched “${parsed.vendor}” to existing supplier “${supplierMatch.supplier.name}”.`);
+            parsed.vendor = supplierMatch.supplier.name;
+          } else {
+            setSupplierMatchMessage('No existing supplier matched. Review the supplier name before saving.');
+          }
           setExtractedData(parsed);
           setEditedItems(parsed.items);
         } catch (err) {
@@ -135,6 +146,7 @@ export function InvoiceScanner() {
     setPreviewUrl(null);
     setExtractedData(null);
     setEditedItems([]);
+    setSupplierMatchMessage('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -147,6 +159,7 @@ export function InvoiceScanner() {
     setPreviewUrl(null);
     setExtractedData(null);
     setEditedItems([]);
+    setSupplierMatchMessage('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -272,6 +285,7 @@ export function InvoiceScanner() {
                 <div>
                   <p className="text-xs text-green-700">Vendor</p>
                   <p className="text-sm font-semibold text-green-900">{extractedData.vendor}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-green-700">{supplierMatchMessage}</p>
                 </div>
                 <div>
                   <p className="text-xs text-green-700">Invoice #</p>

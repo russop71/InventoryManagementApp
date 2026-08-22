@@ -77,24 +77,14 @@
 
   After DNS propagates, HTTPS certificates are issued automatically by Vercel/Netlify.
 
-  ## Important data note
-
-  Current app data is stored in browser localStorage. That means:
-
-  - Data persists for a user on the same browser/device.
-  - Data is not automatically shared across different devices.
-
-  If you want true cloud sync for accounts, users, and locations across all devices, the next step is adding a backend database and auth API.
-
   ## Live shared data layer
 
-  The app now includes a backend API for shared data across users/devices:
+  Production uses Supabase authentication and a company/location-scoped PostgreSQL data layer. The API provides shared data across authorized users and devices for:
 
   - Accounts
   - Users
   - Locations
   - Inventory
-  - Recipes
+  - Recipes, invoices, counts, ordering, labour, billing metadata, and audit events
 
-  Current backend persistence uses a server-side JSON store at `server/data/live-data.json`.
-  
+  Browser storage is only a scoped local cache. The Express JSON server under `server/` is a local-development fallback and is not the production database. See `docs/LAUNCH_OPERATIONS.md` for production configuration, readiness checks, billing validation, backups, and incident response.

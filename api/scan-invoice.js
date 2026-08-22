@@ -1,4 +1,5 @@
 import { requireActiveUser } from './_authenticated-user.js';
+import { enforceAiQuota, recordAiUsage } from './_ai-quota.js';
 
 const DEFAULT_MODEL = 'gpt-5.6-luna';
 const MAX_DOCUMENT_DATA_LENGTH = 6_000_000;
@@ -143,6 +144,7 @@ async function extractInvoice(imageData, apiKey) {
 
 export function mapInvoiceExtractionError(error) {
   const status = Number(error?.status);
+  if (error?.code === 'AI_DAILY_LIMIT') return { status: 429, error: error.message };
   if ([401, 403].includes(status)) {
     return { status: 503, error: 'AI invoice scanning is not configured correctly' };
   }
@@ -158,8 +160,9 @@ export function mapInvoiceExtractionError(error) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  let appUser;
   try {
-    await requireActiveUser(req);
+    ({ appUser } = await requireActiveUser(req));
   } catch (error) {
     return res.status(Number(error?.status) || 401).json({ error: error?.message || 'Sign in is required' });
   }
@@ -176,7 +179,10 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(503).json({ error: 'AI invoice scanning is not configured' });
 
   try {
-    return res.status(200).json(await extractInvoice(imageData, apiKey));
+    await enforceAiQuota({ accountId: appUser.account_id, userId: appUser.id, eventName: 'ai_invoice_scan' });
+    const result = await extractInvoice(imageData, apiKey);
+    await recordAiUsage({ accountId: appUser.account_id, userId: appUser.id, eventName: 'ai_invoice_scan', path: '/app/invoice-scanner' }).catch(() => {});
+    return res.status(200).json(result);
   } catch (error) {
     console.error('api/scan-invoice error', error);
     const mappedError = mapInvoiceExtractionError(error);

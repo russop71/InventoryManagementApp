@@ -1,5 +1,10 @@
 import { normalizePosImportPayload } from '../../server/pos-import.js';
 import { extractResponseText } from '../scan.js';
+import { enforceAiQuota, recordAiUsage } from '../_ai-quota.js';
+import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAccount, isPlatformAdminEmail, validateFinalizedCounts } from '../_launch-controls.js';
+import { enforceRateLimit } from '../_request-guard.js';
+import { launchReadiness } from '../_launch-readiness.js';
+import { reportServerError } from '../_observability.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,12 +21,6 @@ const BILLING_PRICE_IDS = {
 const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION;
 const PREMIUM_MONTHLY_CAD_CENTS = 24999;
 const ADDITIONAL_LOCATION_CAD_CENTS = 10000;
-const PLATFORM_ADMIN_EMAILS = new Set(
-  String(process.env.ZESTIQ_PLATFORM_ADMIN_EMAILS || 'russop71@gmail.com')
-    .split(',')
-    .map(email => email.trim().toLowerCase())
-    .filter(Boolean),
-);
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -39,7 +38,6 @@ function userNameFromEmail(email = '') {
 
 export function accountSlugFromEmail(email = '') {
   const normalized = String(email).trim().toLowerCase();
-  if (['russop71@gmail.com', 'russop71', 'owner@zestiq.com'].includes(normalized)) return 'russop71';
   return normalizeSlug(normalized || 'local-account');
 }
 
@@ -149,8 +147,14 @@ function normalizeOnboardingState(value) {
   };
 }
 
-function mapAccount(row) {
-  return { id: row.id, name: row.name, onboarding: normalizeOnboardingState(row.onboarding_state) };
+function mapAccount(row, authUser) {
+  return {
+    id: row.id,
+    name: row.name,
+    onboarding: normalizeOnboardingState(row.onboarding_state),
+    billingStatus: row.billing_status || 'not_configured',
+    productAccess: hasProductAccess({ account: row, authUser }),
+  };
 }
 
 async function parseResponse(response) {
@@ -333,8 +337,8 @@ function mapUser(row) {
   };
 }
 
-export function isPlatformAdmin(authUser) {
-  return PLATFORM_ADMIN_EMAILS.has(String(authUser?.email || '').trim().toLowerCase());
+export function isPlatformAdmin(authUser, configuredEmails) {
+  return isPlatformAdminEmail(authUser?.email, configuredEmails);
 }
 
 function mapSessionUser(appUser, authUser) {
@@ -359,6 +363,7 @@ function mapLocationData(row) {
     forecasts: row?.forecasts || [],
     inventoryCounts: row?.inventory_counts || [],
     integrations: row?.integrations || base.integrations,
+    version: row?.updated_at || null,
   };
 }
 
@@ -606,7 +611,7 @@ async function sessionPayload(tokenPayload) {
     refreshToken: tokenPayload.refresh_token,
     expiresAt: tokenPayload.expires_at || (Math.floor(Date.now() / 1000) + Number(tokenPayload.expires_in || 3600)),
     user: mapSessionUser(appUser, authUser),
-    account: mapAccount(account),
+    account: mapAccount(account, authUser),
     locations: locations.map(mapLocation),
     activeLocationId: locations[0]?.id || null,
   };
@@ -614,8 +619,17 @@ async function sessionPayload(tokenPayload) {
 
 async function ensureDemoLogin() {
   const email = 'demo@zestiq.com';
-  const password = process.env.DEMO_ACCOUNT_PASSWORD || 'zestiq-public-demo-2026!';
-  const { account } = await ensureAccountForEmail(email, 'zestIQ Demo');
+  const password = process.env.DEMO_ACCOUNT_PASSWORD;
+  if (!password) throw Object.assign(new Error('The demo account is not configured'), { status: 503 });
+  let { account } = await ensureAccountForEmail(email, 'Zestaurant');
+  if (account.name !== 'Zestaurant') {
+    const updated = await supabase(`accounts?id=eq.${encodeURIComponent(account.id)}&select=*`, {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: { name: 'Zestaurant', updated_at: new Date().toISOString() },
+    });
+    account = updated[0] || { ...account, name: 'Zestaurant' };
+  }
   let appUsers = await supabase(`app_users?email=eq.${encodeURIComponent(email)}&select=*`);
   let appUser = appUsers?.[0];
   let authUser = appUser?.auth_user_id ? { id: appUser.auth_user_id } : await findAuthUserByEmail(email);
@@ -670,6 +684,7 @@ export default async function handler(req, res) {
     const method = req.method || 'GET';
 
     if (segments[0] === 'auth' && segments[1] === 'register' && method === 'POST') {
+      enforceRateLimit(req, res, 'auth-register', { limit: 5, windowMs: 60 * 60 * 1000 });
       const name = String(req.body?.name || '').trim();
       const email = String(req.body?.email || '').trim().toLowerCase();
       const password = String(req.body?.password || '');
@@ -699,13 +714,17 @@ export default async function handler(req, res) {
     }
 
     if (segments[0] === 'auth' && segments[1] === 'login' && method === 'POST') {
+      enforceRateLimit(req, res, 'auth-login', { limit: 12, windowMs: 15 * 60 * 1000 });
       const email = String(req.body?.email || '').trim().toLowerCase();
       const password = String(req.body?.password || '');
       if (!email || !password) return json(res, 400, { error: 'email and password are required' });
-      const tokenPayload = email === 'demo@zestiq.com' && password === 'demo'
-        ? await ensureDemoLogin()
-        : await signInWithPassword(email, password);
+      const tokenPayload = await signInWithPassword(email, password);
       return json(res, 200, await sessionPayload(tokenPayload));
+    }
+
+    if (segments[0] === 'auth' && segments[1] === 'demo' && method === 'POST') {
+      enforceRateLimit(req, res, 'auth-demo', { limit: 20, windowMs: 60 * 60 * 1000 });
+      return json(res, 200, await sessionPayload(await ensureDemoLogin()));
     }
 
     if (segments[0] === 'auth' && segments[1] === 'refresh' && method === 'POST') {
@@ -727,7 +746,7 @@ export default async function handler(req, res) {
         refreshToken: null,
         expiresAt: null,
         user: mapSessionUser(auth.appUser, auth.authUser),
-        account: mapAccount(account),
+        account: mapAccount(account, auth.authUser),
         locations: locations.map(mapLocation),
         activeLocationId: locations[0]?.id || null,
       });
@@ -748,6 +767,7 @@ export default async function handler(req, res) {
     }
 
     if (segments[0] === 'auth' && segments[1] === 'recover' && method === 'POST') {
+      enforceRateLimit(req, res, 'auth-recover', { limit: 4, windowMs: 60 * 60 * 1000 });
       const email = String(req.body?.email || '').trim().toLowerCase();
       if (!email) return json(res, 400, { error: 'email is required' });
       const redirectTo = `${appOrigin(req)}/reset-password`;
@@ -762,6 +782,18 @@ export default async function handler(req, res) {
       const auth = await getAuthContext(req);
       if (!isPlatformAdmin(auth.authUser)) {
         return json(res, 403, { error: 'ZestIQ platform administrator access is required' });
+      }
+
+      if (segments[1] === 'readiness' && method === 'GET') {
+        const readiness = launchReadiness();
+        const checks = [...readiness.checks];
+        try {
+          await validateCheckoutPricing(2);
+          checks.push({ name: 'stripePriceValidation', ok: true });
+        } catch (error) {
+          checks.push({ name: 'stripePriceValidation', ok: false, detail: error.message });
+        }
+        return json(res, checks.every(check => check.ok) ? 200 : 503, { ready: checks.every(check => check.ok), checks });
       }
 
       if (segments[1] === 'accounts' && segments.length === 2 && method === 'GET') {
@@ -921,6 +953,18 @@ export default async function handler(req, res) {
     const account = access.account;
     const accountId = account.id;
 
+    const accessExempt = segments[2] === 'billing'
+      || segments[2] === 'profile'
+      || (segments.length === 2 && method === 'DELETE');
+    if (!accessExempt && !hasProductAccess({ account, authUser: access.authUser })) {
+      return json(res, 402, {
+        error: access.appUser.role === 'Owner'
+          ? 'Activate the ZestIQ Premium subscription to use the workspace.'
+          : 'This company subscription is not active. Ask the company owner to update billing.',
+        code: 'SUBSCRIPTION_REQUIRED',
+      });
+    }
+
     if (segments.length === 2 && method === 'DELETE') {
       const members = await supabase(`app_users?account_id=eq.${accountId}&select=auth_user_id`);
       for (const member of members) {
@@ -942,7 +986,7 @@ export default async function handler(req, res) {
         prefer: 'return=representation',
         body: { name, updated_at: new Date().toISOString() },
       });
-      return json(res, 200, { account: mapAccount(updated[0] || { ...account, name }) });
+      return json(res, 200, { account: mapAccount(updated[0] || { ...account, name }, access.authUser) });
     }
 
     if (segments[2] === 'onboarding') {
@@ -1008,6 +1052,7 @@ export default async function handler(req, res) {
       const rows = await supabase(`location_data?location_id=eq.${location.id}&select=*`);
       const data = mapLocationData(rows?.[0] || {});
       const companyContext = buildAssistantContext(account, location, data);
+      await enforceAiQuota({ accountId, userId: access.appUser.id, eventName: 'ai_assistant' });
       const history = Array.isArray(req.body?.history)
         ? req.body.history.slice(-10).flatMap(entry => {
             const role = entry?.role === 'assistant' ? 'assistant' : entry?.role === 'user' ? 'user' : null;
@@ -1027,11 +1072,7 @@ export default async function handler(req, res) {
         ].join('\n'),
         messages: [...history, { role: 'user', content: message }],
       });
-      await supabase('app_usage_events', {
-        method: 'POST',
-        prefer: 'return=minimal',
-        body: { account_id: accountId, user_id: access.appUser.id, event_name: 'ai_assistant', path: '/app/assistant', metadata: { location_id: location.id } },
-      }).catch(() => {});
+      await recordAiUsage({ accountId, userId: access.appUser.id, eventName: 'ai_assistant', path: '/app/assistant', metadata: { location_id: location.id } }).catch(() => {});
       return json(res, 200, { answer });
     }
 
@@ -1044,6 +1085,7 @@ export default async function handler(req, res) {
         return json(res, 200, { users: rows.map(row => ({ ...mapUser(row), usage: usage[row.id] })) });
       }
       if (segments.length === 3 && method === 'POST') {
+        if (!canAdministerAccount(access.appUser.role)) return json(res, 403, { error: 'Owner or admin access is required to add locations' });
         const name = String(req.body?.name || '').trim();
         const email = String(req.body?.email || '').trim().toLowerCase();
         const role = String(req.body?.role || 'Staff');
@@ -1343,12 +1385,20 @@ export default async function handler(req, res) {
         const current = rows?.[0] || { location_id: locationId };
         if (method === 'GET') return json(res, 200, mapLocationData(current));
         if (method === 'PUT') {
+          if (!canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to change restaurant data' });
           const body = req.body || {};
+          const expectedVersion = typeof body.version === 'string' ? body.version : '';
+          const currentVersion = String(current.updated_at || '');
+          if (!expectedVersion) return json(res, 428, { error: 'Reload this location before saving changes', code: 'VERSION_REQUIRED' });
+          if (expectedVersion !== currentVersion) return json(res, 409, { error: 'Another user saved changes first. Your screen has been refreshed so you can review them.', code: 'VERSION_CONFLICT', version: currentVersion });
           const nextInvoices = Array.isArray(body.invoices) ? body.invoices : (current.invoices || []);
           const duplicateInvoiceNumber = findDuplicateInvoiceNumber(nextInvoices);
           if (duplicateInvoiceNumber) return json(res, 409, { error: `Invoice ${duplicateInvoiceNumber} already exists` });
+          const nextCounts = Array.isArray(body.inventoryCounts) ? body.inventoryCounts : (current.inventory_counts || []);
+          const countValidation = validateFinalizedCounts(current.inventory_counts || [], nextCounts);
+          if (!countValidation.valid) return json(res, 409, { error: countValidation.error, code: 'FINALIZED_COUNT_LOCKED' });
+          const updatedAt = new Date().toISOString();
           const next = {
-            location_id: locationId,
             inventory: Array.isArray(body.inventory) ? body.inventory : (current.inventory || []),
             recipes: Array.isArray(body.recipes) ? body.recipes : (current.recipes || []),
             storage_areas: Array.isArray(body.storageAreas) ? body.storageAreas : (current.storage_areas || []),
@@ -1357,11 +1407,18 @@ export default async function handler(req, res) {
             suppliers: Array.isArray(body.suppliers) ? body.suppliers : (current.suppliers || []),
             prepped_recipes: Array.isArray(body.preppedRecipes) ? body.preppedRecipes : (current.prepped_recipes || []),
             forecasts: Array.isArray(body.forecasts) ? body.forecasts : (current.forecasts || []),
-            inventory_counts: Array.isArray(body.inventoryCounts) ? body.inventoryCounts : (current.inventory_counts || []),
-            integrations: current.integrations || { toast: defaultToast() },
-            updated_at: new Date().toISOString(),
+            inventory_counts: nextCounts,
+            integrations: {
+              ...(current.integrations || { toast: defaultToast() }),
+              ...(isDemoAccount(account) && typeof body.demoDataVersion === 'string'
+                ? { demoDataVersion: body.demoDataVersion.slice(0, 80) }
+                : {}),
+            },
+            updated_at: updatedAt,
           };
-          const saved = await supabase('location_data?on_conflict=location_id&select=*', { method: 'POST', prefer: 'resolution=merge-duplicates,return=representation', body: next });
+          const saved = await supabase(`location_data?location_id=eq.${locationId}&updated_at=eq.${encodeURIComponent(expectedVersion)}&select=*`, { method: 'PATCH', prefer: 'return=representation', body: next });
+          if (!saved?.length) return json(res, 409, { error: 'Another user saved changes first. Reload and review the latest data.', code: 'VERSION_CONFLICT' });
+          await supabase('app_usage_events', { method: 'POST', prefer: 'return=minimal', body: { account_id: accountId, user_id: access.appUser.id, event_name: 'location_data_saved', path: '/app', metadata: { location_id: locationId, from_version: expectedVersion, to_version: updatedAt } } }).catch(() => {});
           return json(res, 200, mapLocationData(saved[0]));
         }
       }
@@ -1372,6 +1429,7 @@ export default async function handler(req, res) {
         const existingToast = current.integrations?.toast || defaultToast();
         if (segments.length === 6 && method === 'GET') return json(res, 200, { toast: existingToast });
         if (segments.length === 6 && method === 'PUT') {
+          if (!canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to manage POS data' });
           const payload = req.body || {};
           const toastData = {
             connected: typeof payload.connected === 'boolean' ? payload.connected : Boolean(existingToast.connected),
@@ -1388,6 +1446,7 @@ export default async function handler(req, res) {
           return json(res, 200, { toast: toastData });
         }
         if (segments[6] === 'import' && method === 'POST') {
+          if (!canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to import POS data' });
           const normalized = normalizePosImportPayload(req.body || {});
           if (!normalized.salesData.length) return json(res, 400, { error: 'No valid sales rows were found in that export' });
           const toastData = {
@@ -1410,7 +1469,8 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('ZestIQ API error', error);
     const status = Number(error.status) || 500;
+    if (status >= 500) void reportServerError(error, { route: req.url, method: req.method, requestId: req.headers?.['x-vercel-id'] });
     const message = status >= 500 ? (error.message || 'internal server error') : (error.message || 'request failed');
-    return json(res, status, { error: message });
+    return json(res, status, { error: message, ...(error.code ? { code: error.code } : {}) });
   }
 }

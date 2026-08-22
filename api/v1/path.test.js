@@ -10,7 +10,7 @@ test('identifierFilter uses UUID columns for canonical database IDs', () => {
 });
 
 test('identifierFilter uses slug columns for fallback session identifiers', () => {
-  assert.equal(identifierFilter('id', 'slug', 'russop71'), 'slug=eq.russop71');
+  assert.equal(identifierFilter('id', 'slug', 'restaurant-owner'), 'slug=eq.restaurant-owner');
   assert.equal(identifierFilter('id', 'slug', 'Main Location'), 'slug=eq.Main%20Location');
 });
 
@@ -18,12 +18,13 @@ test('company account slugs keep businesses with similar usernames separate', ()
   assert.equal(accountSlugFromEmail('owner@company-a.ca'), 'owner-company-a-ca');
   assert.equal(accountSlugFromEmail('owner@company-b.ca'), 'owner-company-b-ca');
   assert.notEqual(accountSlugFromEmail('owner@company-a.ca'), accountSlugFromEmail('owner@company-b.ca'));
-  assert.notEqual(accountSlugFromEmail('demo@zestiq.com'), accountSlugFromEmail('russop71@gmail.com'));
+  assert.notEqual(accountSlugFromEmail('demo@zestiq.com'), accountSlugFromEmail('founder@zestiq.ca'));
 });
 
 test('platform administration is independent from a company owner role', () => {
-  assert.equal(isPlatformAdmin({ email: 'russop71@gmail.com' }), true);
-  assert.equal(isPlatformAdmin({ email: 'owner@another-company.ca' }), false);
+  assert.equal(isPlatformAdmin({ email: 'admin@zestiq.ca' }, 'admin@zestiq.ca'), true);
+  assert.equal(isPlatformAdmin({ email: 'owner@another-company.ca' }, 'admin@zestiq.ca'), false);
+  assert.equal(isPlatformAdmin({ email: 'admin@zestiq.ca' }, ''), false);
 });
 
 test('findDuplicateInvoiceNumber rejects formatting variants of the same invoice number', () => {

@@ -25,7 +25,7 @@ function SetupProgress({ currentStep, completedSteps }: { currentStep: Onboardin
     <aside className="rounded-[28px] bg-[#0B1220] p-5 text-white lg:sticky lg:top-28 lg:self-start">
       <div className="flex min-w-0 items-center gap-3 border-b border-white/10 pb-5">
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#F5C10E] text-[#0B1220]"><Rocket className="h-5 w-5" /></div>
-        <div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-white/45">First-run setup</p><p className="mt-1 break-words font-black leading-tight">Get useful data in</p></div>
+        <div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-white/45">Workspace launch</p><p className="mt-1 break-words font-black leading-tight">Get useful data in</p></div>
       </div>
       <ol className="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-1">
         {STEPS.map((step, index) => {
@@ -203,7 +203,7 @@ export function Onboarding() {
   return (
     <div className="mx-auto max-w-6xl py-3 sm:py-6">
       <div className="mb-5 flex items-center justify-between gap-4">
-        <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#9A7600]">ZestIQ setup guide</p><p className="mt-1 text-sm text-slate-500">A useful workspace in six short steps.</p></div>
+        <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#9A7600]">Launch your workspace</p><p className="mt-1 text-sm text-slate-500">Connect the restaurant data that powers ZestIQ.</p></div>
         <button type="button" onClick={() => navigate('/app')} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">Save & exit</button>
       </div>
       <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
