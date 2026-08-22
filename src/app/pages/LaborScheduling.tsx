@@ -124,7 +124,6 @@ export function LaborScheduling() {
   const todayCost = laborCostBreakdownForRange(todayKey, todayKey);
   const weekSales = salesData.filter(day => day.date >= startKey && day.date <= endKey).reduce((sum, day) => sum + day.revenue, 0);
   const labourPercent = weekSales > 0 ? (weekCost.total / weekSales) * 100 : 0;
-  const targetSales = targetLaborPercent > 0 ? weekCost.total / (targetLaborPercent / 100) : 0;
   const activeEmployees = employees.filter(employee => employee.active).sort((left, right) => left.department.localeCompare(right.department) || left.name.localeCompare(right.name));
 
   if (!canManage) return <Navigate to="/employee" replace />;
@@ -240,7 +239,7 @@ export function LaborScheduling() {
         <div className="grid gap-5">
           <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-              <div><p className="font-black text-slate-900">{days[0].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })} – {days[6].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}</p><p className="mt-1 text-xs text-slate-500">Drag a shift to move it, or use Copy then select a matching-position cell. {formatMoney(targetSales)} sales needed to hit a {targetLaborPercent}% labour target.</p></div>
+              <div><p className="font-black text-slate-900">{days[0].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })} – {days[6].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}</p></div>
               <div className="flex gap-2"><button aria-label="Previous week" onClick={() => moveWeek(-7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronLeft className="h-4 w-4" /></button><button onClick={() => setWeekStart(startOfWeek(new Date()))} className="rounded-xl border border-slate-200 px-3 text-sm font-bold">Today</button><button aria-label="Next week" onClick={() => moveWeek(7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronRight className="h-4 w-4" /></button></div>
             </div>
             <div className="overflow-x-auto">
