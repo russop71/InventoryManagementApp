@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -28,6 +29,7 @@ interface ExtractedInvoice {
 
 export function InvoiceScanner() {
   const { importScannedInvoice, suppliers } = useInventory();
+  const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -151,7 +153,9 @@ export function InvoiceScanner() {
       fileInputRef.current.value = '';
     }
 
-    alert(`Successfully processed ${editedItems.length} invoice items. Existing products were matched and supplier pricing was saved separately.`);
+    // Take the operator straight to the record that was just posted. This makes
+    // it clear that scanning creates both inventory updates and an invoice.
+    navigate(`/app/invoices?invoice=${encodeURIComponent(result.invoice?.id || '')}`);
   };
 
   const handleClearAll = () => {
@@ -399,7 +403,7 @@ export function InvoiceScanner() {
                   className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Save to Inventory ({editedItems.length} items)
+                  Save Invoice & Update Inventory ({editedItems.length} items)
                 </Button>
               </div>
             </CardContent>
