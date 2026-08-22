@@ -35,6 +35,28 @@ function shiftHours(shift: LaborShift) {
   return Math.max(0, minutes - shift.breakMinutes) / 60;
 }
 
+function formatShiftTime(value: string, useAmPm: boolean) {
+  if (!useAmPm) return value;
+  const [hour, minute] = value.split(':').map(Number);
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  return `${((hour + 11) % 12) + 1}:${String(minute).padStart(2, '0')} ${suffix}`;
+}
+
+function isNightShift(shift: LaborShift) {
+  const startHour = Number(shift.start.split(':')[0]);
+  return startHour >= 17 || startHour < 5;
+}
+
+function shiftAccentClass(tag = '') {
+  if (tag.includes('CLOSE')) return 'border-l-violet-500';
+  if (tag.includes('OPEN')) return 'border-l-emerald-500';
+  if (tag.includes('ON-CALL')) return 'border-l-orange-500';
+  if (tag.includes('TRAIN')) return 'border-l-blue-500';
+  if (tag.includes('ADMIN')) return 'border-l-slate-500';
+  if (tag.includes('BAR')) return 'border-l-cyan-500';
+  return 'border-l-amber-500';
+}
+
 function tagClass(tag = '') {
   if (tag.includes('CLOSE')) return 'border-violet-200 bg-violet-50 text-violet-800';
   if (tag.includes('OPEN')) return 'border-emerald-200 bg-emerald-50 text-emerald-800';
@@ -68,6 +90,7 @@ export function LaborScheduling() {
   const [shiftBreak, setShiftBreak] = useState('30');
   const [shiftTag, setShiftTag] = useState('');
   const [shiftNotes, setShiftNotes] = useState('');
+  const [useAmPm, setUseAmPm] = useState(true);
   const canManage = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
@@ -79,6 +102,8 @@ export function LaborScheduling() {
   const endKey = localDateKey(days[6]);
   const weekHours = scheduledHoursForRange(startKey, endKey);
   const weekCost = laborCostBreakdownForRange(startKey, endKey);
+  const todayKey = localDateKey(new Date());
+  const todayCost = laborCostBreakdownForRange(todayKey, todayKey);
   const weekSales = salesData.filter(day => day.date >= startKey && day.date <= endKey).reduce((sum, day) => sum + day.revenue, 0);
   const labourPercent = weekSales > 0 ? (weekCost.total / weekSales) * 100 : 0;
   const targetSales = targetLaborPercent > 0 ? weekCost.total / (targetLaborPercent / 100) : 0;
@@ -141,16 +166,18 @@ export function LaborScheduling() {
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <section className="overflow-hidden rounded-[30px] bg-[#0B1220] p-6 text-white sm:p-8">
-        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-          <div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5C10E]">Manager workspace</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Build the week by employee.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Employee rows, tagged shifts, salary-aware labour cost and team requests—protected for owners, admins and managers.</p></div>
-          <div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1"><ViewButton label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} /><ViewButton label="Requests" active={view === 'requests'} count={timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length} onClick={() => setView('requests')} /><ViewButton label="Employees" active={view === 'team'} onClick={() => setView('team')} /></div><button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C10E] px-3 py-2 text-xs font-black text-[#0B1220]"><MailPlus className="h-3.5 w-3.5" />Invite employee</button></div>
+      <section className="overflow-hidden rounded-2xl bg-[#0B1220] p-3 text-white sm:p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-1 rounded-xl bg-white/10 p-1 sm:flex-none"><ViewButton label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} /><ViewButton label="Requests" active={view === 'requests'} count={timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length} onClick={() => setView('requests')} /><ViewButton label="Employees" active={view === 'team'} onClick={() => setView('team')} /></div>
+          <button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C10E] px-3 py-2.5 text-xs font-black text-[#0B1220]"><MailPlus className="h-3.5 w-3.5" />Invite employee</button>
+          <button type="button" onClick={() => setUseAmPm(current => !current)} className="rounded-xl border border-white/20 px-3 py-2.5 text-xs font-black text-white">{useAmPm ? '12-hour time' : '24-hour time'}</button>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Metric icon={Clock3} label="Scheduled hours" value={`${weekHours.toFixed(1)}h`} />
-        <Metric icon={DollarSign} label="Hourly labour" value={formatMoney(weekCost.hourly)} />
+        <Metric icon={DollarSign} label="Today's labour" value={formatMoney(todayCost.total)} />
+        <Metric icon={DollarSign} label="Projected labour" value={formatMoney(weekCost.total)} />
         <Metric icon={DollarSign} label="Salaried labour" value={formatMoney(weekCost.salaried)} />
         <Metric icon={Target} label="Total vs sales" value={weekSales > 0 ? `${labourPercent.toFixed(1)}%` : formatMoney(weekCost.total)} tone={weekSales > 0 && labourPercent > targetLaborPercent ? 'warning' : 'normal'} />
         <Metric icon={UsersRound} label="Active team" value={String(activeEmployees.length)} />
@@ -172,7 +199,7 @@ export function LaborScheduling() {
                   return <tr key={employee.id} className="align-top"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-3"><div className="flex items-start gap-2"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#FEF3C7] text-xs font-black text-[#0B1220]">{employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{employee.name}</p><p className="mt-0.5 break-words text-[10px] font-bold text-slate-500">{employee.role}</p><p className="mt-1 text-[10px] text-slate-400">{employeeWeekShifts.length} shifts · {employeeHours.toFixed(1)}h</p>{employee.payType === 'salary' && <span className="mt-1 inline-flex rounded-full bg-[#0B1220] px-2 py-0.5 text-[9px] font-black text-[#F5C10E]">SALARIED</span>}</div></div></th>{days.map(day => {
                     const key = localDateKey(day);
                     const dayShifts = employeeWeekShifts.filter(shift => shift.date === key);
-                    return <td key={key} className="h-[116px] border-b border-r border-slate-200 p-2 last:border-r-0"><div className="space-y-2">{dayShifts.map(shift => <div key={shift.id} className="group rounded-xl border border-l-4 border-l-[#F5C10E] bg-white p-2 shadow-sm"><div className="flex items-start justify-between gap-1"><p className="text-[11px] font-black text-slate-900">{shift.start}–{shift.end}</p><button aria-label={`Delete ${employee.name} shift`} onClick={() => removeShift(shift.id)} className="text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3 w-3" /></button></div>{shift.tag && <span className={`mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[8px] font-black tracking-wide ${tagClass(shift.tag)}`}>{shift.tag}</span>}{shift.notes && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{shift.notes}</p>}</div>)}{dayShifts.length === 0 && <p className="py-8 text-center text-[10px] text-slate-300">—</p>}</div></td>;
+                    return <td key={key} className="h-[116px] border-b border-r border-slate-200 p-2 last:border-r-0"><div className="space-y-2">{dayShifts.map(shift => <div key={shift.id} className={`group rounded-xl border border-l-4 p-2 shadow-sm ${shiftAccentClass(shift.tag)} ${isNightShift(shift) ? 'bg-slate-100' : 'bg-white'}`}><div className="flex items-start justify-between gap-1"><p className="text-[11px] font-black text-slate-900">{formatShiftTime(shift.start, useAmPm)}–{formatShiftTime(shift.end, useAmPm)}</p><button aria-label={`Delete ${employee.name} shift`} onClick={() => removeShift(shift.id)} className="text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3 w-3" /></button></div>{shift.tag && <span className={`mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[8px] font-black tracking-wide ${tagClass(shift.tag)}`}>{shift.tag}</span>}{shift.notes && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{shift.notes}</p>}</div>)}{dayShifts.length === 0 && <p className="py-8 text-center text-[10px] text-slate-300">—</p>}</div></td>;
                   })}</tr>;
                 })}{activeEmployees.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-sm text-slate-500">Invite employees to start building the schedule.</td></tr>}</tbody>
               </table>
