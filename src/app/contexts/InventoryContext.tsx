@@ -393,16 +393,27 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           // Retry this exact snapshot against the newest version so a completed
           // invoice scan is not silently replaced by the older server snapshot.
           try {
-            const latest = await apiRequest<LocationPayload>(requestPath);
-            const latestVersion = latest.version || undefined;
-            if (!latestVersion) throw new Error('The latest location version could not be loaded');
-            const saved = await apiRequest<LocationPayload>(requestPath, {
-              method: 'PUT',
-              body: JSON.stringify({ ...snapshot, version: latestVersion }),
-            });
-            if (saved.version) locationVersionsRef.current.set(locationId, saved.version);
-            toast.success('Your change was saved after refreshing the workspace.');
-            return;
+            // A demo reset or another queued save can update the version between
+            // our refresh and retry. Refresh-and-retry a few times before ever
+            // asking the operator to repeat a completed action.
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              const latest = await apiRequest<LocationPayload>(requestPath);
+              const latestVersion = latest.version || undefined;
+              if (!latestVersion) throw new Error('The latest location version could not be loaded');
+              try {
+                const saved = await apiRequest<LocationPayload>(requestPath, {
+                  method: 'PUT',
+                  body: JSON.stringify({ ...snapshot, version: latestVersion }),
+                });
+                if (saved.version) locationVersionsRef.current.set(locationId, saved.version);
+                toast.success('Your change was saved after refreshing the workspace.');
+                return;
+              } catch (retryError) {
+                if (!(retryError instanceof ApiError) || retryError.code !== 'VERSION_CONFLICT' || attempt === 2) {
+                  throw retryError;
+                }
+              }
+            }
           } catch (retryError) {
             console.error('Failed to retry location save', retryError);
             toast.error('Your change could not be saved. Please try again.');
