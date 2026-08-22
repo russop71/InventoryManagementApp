@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, DollarSign, MailPlus, Plus, Target, Trash2, UsersRound, X } from 'lucide-react';
+import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Copy, DollarSign, MailPlus, Plus, Target, Trash2, UsersRound, X } from 'lucide-react';
 import { Navigate } from 'react-router';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -69,7 +69,7 @@ function tagClass(tag = '') {
 
 export function LaborScheduling() {
   const { user } = useAuth();
-  const { employees, shifts, timeOffRequests, shiftSwapRequests, targetLaborPercent, inviteEmployee, removeEmployee, addShift, removeShift, updateTimeOffRequest, updateShiftSwapRequest, setTargetLaborPercent, scheduledHoursForRange, laborCostBreakdownForRange } = useLabor();
+  const { employees, shifts, timeOffRequests, shiftSwapRequests, targetLaborPercent, inviteEmployee, removeEmployee, addShift, updateShift, removeShift, updateTimeOffRequest, updateShiftSwapRequest, setTargetLaborPercent, scheduledHoursForRange, laborCostBreakdownForRange } = useLabor();
   const { salesData } = useToast();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [view, setView] = useState<'schedule' | 'requests' | 'team'>('schedule');
@@ -91,6 +91,8 @@ export function LaborScheduling() {
   const [shiftTag, setShiftTag] = useState('');
   const [shiftNotes, setShiftNotes] = useState('');
   const [useAmPm, setUseAmPm] = useState(true);
+  const [draggedShiftId, setDraggedShiftId] = useState<string | null>(null);
+  const [copiedShiftId, setCopiedShiftId] = useState<string | null>(null);
   const canManage = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
@@ -164,6 +166,35 @@ export function LaborScheduling() {
     return next;
   });
 
+  const placeShift = (employeeId: string, date: string) => {
+    const shiftId = draggedShiftId || copiedShiftId;
+    const source = shifts.find(shift => shift.id === shiftId);
+    const sourceEmployee = employees.find(employee => employee.id === source?.employeeId);
+    const targetEmployee = employees.find(employee => employee.id === employeeId);
+    if (!source || !sourceEmployee || !targetEmployee) return;
+    if (sourceEmployee.role !== targetEmployee.role) {
+      toast.error(`Only ${sourceEmployee.role} shifts can be assigned to another ${sourceEmployee.role}.`);
+      setDraggedShiftId(null);
+      return;
+    }
+    if (copiedShiftId) {
+      addShift({ ...source, employeeId, date });
+      toast.success(`Copied shift to ${targetEmployee.name}.`);
+      setCopiedShiftId(null);
+      return;
+    }
+    const targetShift = shifts.find(shift => shift.id !== source.id && shift.employeeId === employeeId && shift.date === date && shift.status !== 'called-off');
+    if (targetShift) {
+      updateShift(source.id, { employeeId, date });
+      updateShift(targetShift.id, { employeeId: source.employeeId, date: source.date });
+      toast.success(`Swapped shifts between ${sourceEmployee.name} and ${targetEmployee.name}.`);
+    } else {
+      updateShift(source.id, { employeeId, date });
+      toast.success(`Moved shift to ${targetEmployee.name}.`);
+    }
+    setDraggedShiftId(null);
+  };
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
       <section className="overflow-hidden rounded-2xl bg-[#0B1220] p-3 text-white sm:p-4">
@@ -187,7 +218,7 @@ export function LaborScheduling() {
         <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-              <div><p className="font-black text-slate-900">{days[0].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })} – {days[6].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}</p><p className="mt-1 text-xs text-slate-500">{formatMoney(targetSales)} sales needed to hit a {targetLaborPercent}% labour target.</p></div>
+              <div><p className="font-black text-slate-900">{days[0].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })} – {days[6].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}</p><p className="mt-1 text-xs text-slate-500">Drag a shift to move it, or use Copy then select a matching-position cell. {formatMoney(targetSales)} sales needed to hit a {targetLaborPercent}% labour target.</p></div>
               <div className="flex gap-2"><button aria-label="Previous week" onClick={() => moveWeek(-7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronLeft className="h-4 w-4" /></button><button onClick={() => setWeekStart(startOfWeek(new Date()))} className="rounded-xl border border-slate-200 px-3 text-sm font-bold">Today</button><button aria-label="Next week" onClick={() => moveWeek(7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronRight className="h-4 w-4" /></button></div>
             </div>
             <div className="overflow-x-auto">
@@ -199,7 +230,8 @@ export function LaborScheduling() {
                   return <tr key={employee.id} className="align-top"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-3"><div className="flex items-start gap-2"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#FEF3C7] text-xs font-black text-[#0B1220]">{employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{employee.name}</p><p className="mt-0.5 break-words text-[10px] font-bold text-slate-500">{employee.role}</p><p className="mt-1 text-[10px] text-slate-400">{employeeWeekShifts.length} shifts · {employeeHours.toFixed(1)}h</p>{employee.payType === 'salary' && <span className="mt-1 inline-flex rounded-full bg-[#0B1220] px-2 py-0.5 text-[9px] font-black text-[#F5C10E]">SALARIED</span>}</div></div></th>{days.map(day => {
                     const key = localDateKey(day);
                     const dayShifts = employeeWeekShifts.filter(shift => shift.date === key);
-                    return <td key={key} className="h-[116px] border-b border-r border-slate-200 p-2 last:border-r-0"><div className="space-y-2">{dayShifts.map(shift => <div key={shift.id} className={`group rounded-xl border border-l-4 p-2 shadow-sm ${shiftAccentClass(shift.tag)} ${isNightShift(shift) ? 'bg-slate-100' : 'bg-white'}`}><div className="flex items-start justify-between gap-1"><p className="text-[11px] font-black text-slate-900">{formatShiftTime(shift.start, useAmPm)}–{formatShiftTime(shift.end, useAmPm)}</p><button aria-label={`Delete ${employee.name} shift`} onClick={() => removeShift(shift.id)} className="text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3 w-3" /></button></div>{shift.tag && <span className={`mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[8px] font-black tracking-wide ${tagClass(shift.tag)}`}>{shift.tag}</span>}{shift.notes && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{shift.notes}</p>}</div>)}{dayShifts.length === 0 && <p className="py-8 text-center text-[10px] text-slate-300">—</p>}</div></td>;
+                    const isCopyTarget = copiedShiftId && employees.find(item => item.id === shifts.find(item => item.id === copiedShiftId)?.employeeId)?.role === employee.role;
+                    return <td key={key} onDragOver={event => event.preventDefault()} onDrop={() => placeShift(employee.id, key)} onClick={() => copiedShiftId && placeShift(employee.id, key)} className={`h-[116px] border-b border-r border-slate-200 p-2 last:border-r-0 ${isCopyTarget ? 'cursor-copy bg-amber-50/70' : ''}`}><div className="space-y-2">{dayShifts.map(shift => <div key={shift.id} draggable onDragStart={() => setDraggedShiftId(shift.id)} onDragEnd={() => setDraggedShiftId(null)} className={`group cursor-grab rounded-xl border border-l-4 p-2 shadow-sm active:cursor-grabbing ${shiftAccentClass(shift.tag)} ${isNightShift(shift) ? 'bg-slate-100' : 'bg-white'}`}><div className="flex items-start justify-between gap-1"><p className="text-[11px] font-black text-slate-900">{formatShiftTime(shift.start, useAmPm)}–{formatShiftTime(shift.end, useAmPm)}</p><div className="flex items-center gap-1"><button aria-label={`Copy ${employee.name} shift`} onClick={event => { event.stopPropagation(); setCopiedShiftId(shift.id); setDraggedShiftId(null); toast.message('Select a matching-position schedule cell to copy this shift.'); }} className="text-slate-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><Copy className="h-3 w-3" /></button><button aria-label={`Delete ${employee.name} shift`} onClick={event => { event.stopPropagation(); removeShift(shift.id); }} className="text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3 w-3" /></button></div></div>{shift.tag && <span className={`mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[8px] font-black tracking-wide ${tagClass(shift.tag)}`}>{shift.tag}</span>}{shift.notes && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{shift.notes}</p>}</div>)}{dayShifts.length === 0 && <p className="py-8 text-center text-[10px] text-slate-300">—</p>}</div></td>;
                   })}</tr>;
                 })}{activeEmployees.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-sm text-slate-500">Invite employees to start building the schedule.</td></tr>}</tbody>
               </table>
