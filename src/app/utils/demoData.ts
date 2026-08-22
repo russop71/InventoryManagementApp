@@ -24,11 +24,12 @@ export interface DemoLocationData {
   }>;
   storageAreas: string[];
   suppliers: Array<Record<string, unknown>>;
+  preppedRecipes: Array<Record<string, unknown>>;
   orders: Array<Record<string, unknown>>;
   invoices: Array<Record<string, unknown>>;
 }
 
-export const DEMO_DATA_VERSION = '2026-08-22-restaurant-v3';
+export const DEMO_DATA_VERSION = '2026-08-22-restaurant-v4';
 
 export function buildDemoLocationData(): DemoLocationData {
   const inventory = [
@@ -104,6 +105,10 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-tequila', name: 'Blanco Tequila 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 8, unit: 'bottle', unitCost: 38.5, parLevel: 12, supplier: 'Ontario Beverage Retail' },
       { id: 'demo-triple-sec', name: 'Orange Liqueur 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 5, unit: 'bottle', unitCost: 27.8, parLevel: 8, supplier: 'Ontario Beverage Retail' },
       { id: 'demo-cabernet', name: 'House Cabernet', category: 'Wine', storageArea: 'Wine Cellar', currentStock: 15, unit: 'bottle', unitCost: 16.25, parLevel: 24, supplier: 'Cellar Door Imports' },
+      { id: 'demo-mayo', name: 'Real Mayonnaise', category: 'Condiments', storageArea: 'Walk-In Cooler', currentStock: 8, unit: 'L', unitCost: 6.8, parLevel: 12, supplier: 'Maple Foodservice' },
+      { id: 'demo-ketchup', name: 'Tomato Ketchup', category: 'Condiments', storageArea: 'Dry Storage', currentStock: 6, unit: 'L', unitCost: 4.6, parLevel: 10, supplier: 'Maple Foodservice' },
+      { id: 'demo-pickles', name: 'Dill Pickles', category: 'Condiments', storageArea: 'Walk-In Cooler', currentStock: 4, unit: 'L', unitCost: 7.4, parLevel: 7, supplier: 'Harbour Specialty Foods' },
+      { id: 'demo-basil', name: 'Fresh Basil', category: 'Produce', storageArea: 'Walk-In Cooler', currentStock: 1.2, unit: 'kg', unitCost: 18.5, parLevel: 2, supplier: 'Northern Produce Co.' },
     ];
   const recipes = [
       {
@@ -113,7 +118,7 @@ export function buildDemoLocationData(): DemoLocationData {
         price: 24,
         ingredients: [
           { inventoryItemId: 'demo-ground-beef', quantity: 0.5, unit: 'lb' },
-          { inventoryItemId: 'demo-mozzarella', quantity: 0.1, unit: 'lb' },
+          { inventoryItemId: 'demo-mozzarella', quantity: 0.1, unit: 'lb' }, { inventoryItemId: 'demo-mayo', quantity: 0.025, unit: 'L' }, { inventoryItemId: 'demo-ketchup', quantity: 0.01, unit: 'L' }, { inventoryItemId: 'demo-pickles', quantity: 0.015, unit: 'L' },
         ],
       },
       {
@@ -123,7 +128,7 @@ export function buildDemoLocationData(): DemoLocationData {
         price: 22,
         ingredients: [
           { inventoryItemId: 'demo-mozzarella', quantity: 0.3, unit: 'lb' },
-          { inventoryItemId: 'demo-tomato-sauce', quantity: 0.2, unit: 'case' },
+          { inventoryItemId: 'demo-tomato-sauce', quantity: 0.2, unit: 'case' }, { inventoryItemId: 'demo-garlic', quantity: 0.01, unit: 'lb' }, { inventoryItemId: 'demo-olive-oil', quantity: 0.01, unit: 'L' }, { inventoryItemId: 'demo-basil', quantity: 0.005, unit: 'kg' },
         ],
       },
       {
@@ -138,7 +143,7 @@ export function buildDemoLocationData(): DemoLocationData {
       },
       { id: 'demo-salmon', menuItemName: 'Crispy Skin Salmon', category: 'Main', price: 34, ingredients: [{ inventoryItemId: 'demo-salmon', quantity: 0.5, unit: 'lb' }, { inventoryItemId: 'demo-potatoes', quantity: 0.4, unit: 'lb' }, { inventoryItemId: 'demo-olive-oil', quantity: 0.03, unit: 'L' }] },
       { id: 'demo-arugula-salad', menuItemName: 'Arugula & Parmigiano', category: 'Starter', price: 17, ingredients: [{ inventoryItemId: 'demo-arugula', quantity: 0.15, unit: 'lb' }, { inventoryItemId: 'demo-parmigiano', quantity: 0.04, unit: 'kg' }, { inventoryItemId: 'demo-olive-oil', quantity: 0.02, unit: 'L' }] },
-      { id: 'demo-smash-burger', menuItemName: 'Double Smash Burger', category: 'Main', price: 26, ingredients: [{ inventoryItemId: 'demo-ground-beef', quantity: 0.5, unit: 'lb' }, { inventoryItemId: 'demo-brioche', quantity: 1, unit: 'each' }, { inventoryItemId: 'demo-mozzarella', quantity: 0.08, unit: 'lb' }] },
+      { id: 'demo-smash-burger', menuItemName: 'Double Smash Burger', category: 'Main', price: 26, ingredients: [{ inventoryItemId: 'demo-ground-beef', quantity: 0.5, unit: 'lb' }, { inventoryItemId: 'demo-brioche', quantity: 1, unit: 'each' }, { inventoryItemId: 'demo-mozzarella', quantity: 0.08, unit: 'lb' }, { inventoryItemId: 'demo-mayo', quantity: 0.025, unit: 'L' }, { inventoryItemId: 'demo-ketchup', quantity: 0.01, unit: 'L' }, { inventoryItemId: 'demo-pickles', quantity: 0.015, unit: 'L' }] },
       { id: 'demo-fries', menuItemName: 'Sea Salt Fries', category: 'Side', price: 9, ingredients: [{ inventoryItemId: 'demo-potatoes', quantity: 0.6, unit: 'lb' }, { inventoryItemId: 'demo-olive-oil', quantity: 0.03, unit: 'L' }] },
       { id: 'demo-wine-glass', menuItemName: 'Pinot Grigio · 5oz', category: 'Wine', price: 14, ingredients: [{ inventoryItemId: 'demo-wine', quantity: 0.2, unit: 'bottle' }] },
       { id: 'demo-martini', menuItemName: 'House Martini', category: 'Cocktail', price: 18, ingredients: [{ inventoryItemId: 'demo-gin', quantity: 0.08, unit: 'bottle' }] },
@@ -168,6 +173,12 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-supplier-spirits', name: 'Ontario Beverage Retail', contactPerson: 'Licensee Desk', email: 'licensee@example.test', phone: '416-555-0164', address: 'Toronto, ON', category: 'Liquor', paymentTerms: 'Due on order', notes: '', dateAdded: now, source: 'manual' },
       { id: 'demo-supplier-beer', name: 'Ontario Beer Supply', contactPerson: 'Licensee Desk', email: 'beer@example.test', phone: '416-555-0168', address: 'Toronto, ON', category: 'Beer', paymentTerms: 'Due on order', notes: '', dateAdded: now, source: 'manual' },
       { id: 'demo-supplier-coffee', name: 'Northline Coffee Roasters', contactPerson: 'Account Representative', email: 'coffee@example.test', phone: '416-555-0180', address: 'Toronto, ON', category: 'Coffee', paymentTerms: 'Net 14', notes: 'Weekly standing order', dateAdded: now, source: 'manual' },
+    ],
+    preppedRecipes: [
+      { id: 'demo-prep-burger-sauce', menuItemName: 'Zest Burger Sauce', category: 'Sauce', ingredients: [{ inventoryItemId: 'demo-mayo', quantity: 1.2, unit: 'L' }, { inventoryItemId: 'demo-ketchup', quantity: 0.45, unit: 'L' }, { inventoryItemId: 'demo-pickles', quantity: 0.3, unit: 'L' }], yieldQuantity: 24, yieldUnit: 'portions', cost: 12.75, deletable: false },
+      { id: 'demo-prep-pizza-sauce', menuItemName: 'Slow-Simmer Pizza Sauce', category: 'Sauce', ingredients: [{ inventoryItemId: 'demo-tomato-sauce', quantity: 1, unit: 'case' }, { inventoryItemId: 'demo-garlic', quantity: 0.2, unit: 'lb' }, { inventoryItemId: 'demo-olive-oil', quantity: 0.2, unit: 'L' }, { inventoryItemId: 'demo-basil', quantity: 0.06, unit: 'kg' }], yieldQuantity: 10, yieldUnit: 'L', cost: 7.91, deletable: false },
+      { id: 'demo-prep-herb-aioli', menuItemName: 'Roasted Garlic Aioli', category: 'Sauce', ingredients: [{ inventoryItemId: 'demo-mayo', quantity: 1, unit: 'L' }, { inventoryItemId: 'demo-garlic', quantity: 0.25, unit: 'lb' }, { inventoryItemId: 'demo-lemon', quantity: 4, unit: 'each' }], yieldQuantity: 20, yieldUnit: 'portions', cost: 10.99, deletable: false },
+      { id: 'demo-prep-citrus-vinaigrette', menuItemName: 'Citrus Vinaigrette', category: 'Dressing', ingredients: [{ inventoryItemId: 'demo-olive-oil', quantity: 0.75, unit: 'L' }, { inventoryItemId: 'demo-lemon', quantity: 8, unit: 'each' }], yieldQuantity: 18, yieldUnit: 'portions', cost: 14.06, deletable: false },
     ],
     orders: [
       { id: 'demo-order-1', date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), items: [{ itemId: 'demo-salmon', quantity: 12, cost: 177.6 }, { itemId: 'demo-parmigiano', quantity: 6, cost: 189 }], totalCost: 366.6, status: 'pending' },
