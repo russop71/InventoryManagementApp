@@ -389,9 +389,26 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       .catch(async error => {
         console.error('Failed to sync location data', error);
         if (error instanceof ApiError && error.code === 'VERSION_CONFLICT') {
-          toast.warning('Another manager saved first. ZestIQ loaded the latest company data; please review your change.');
-          await loadLocationData(true);
-          return;
+          // The initial location version may be stale while the app is opening.
+          // Retry this exact snapshot against the newest version so a completed
+          // invoice scan is not silently replaced by the older server snapshot.
+          try {
+            const latest = await apiRequest<LocationPayload>(requestPath);
+            const latestVersion = latest.version || undefined;
+            if (!latestVersion) throw new Error('The latest location version could not be loaded');
+            const saved = await apiRequest<LocationPayload>(requestPath, {
+              method: 'PUT',
+              body: JSON.stringify({ ...snapshot, version: latestVersion }),
+            });
+            if (saved.version) locationVersionsRef.current.set(locationId, saved.version);
+            toast.success('Your change was saved after refreshing the workspace.');
+            return;
+          } catch (retryError) {
+            console.error('Failed to retry location save', retryError);
+            toast.error('Your change could not be saved. Please try again.');
+            await loadLocationData(true);
+            return;
+          }
         }
         toast.error(error instanceof Error ? error.message : 'Unable to save this change');
       })
