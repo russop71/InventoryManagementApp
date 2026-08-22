@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, DollarSign, ExternalLink, MailPlus, Plus, Target, Trash2, UsersRound, X } from 'lucide-react';
-import { Link, Navigate } from 'react-router';
+import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, DollarSign, MailPlus, Plus, Target, Trash2, UsersRound, X } from 'lucide-react';
+import { Navigate } from 'react-router';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
@@ -144,7 +144,7 @@ export function LaborScheduling() {
       <section className="overflow-hidden rounded-[30px] bg-[#0B1220] p-6 text-white sm:p-8">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5C10E]">Manager workspace</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Build the week by employee.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Employee rows, tagged shifts, salary-aware labour cost and team requests—protected for owners, admins and managers.</p></div>
-          <div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1"><ViewButton label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} /><ViewButton label="Requests" active={view === 'requests'} count={timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length} onClick={() => setView('requests')} /><ViewButton label="Employees" active={view === 'team'} onClick={() => setView('team')} /></div><button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C10E] px-3 py-2 text-xs font-black text-[#0B1220]"><MailPlus className="h-3.5 w-3.5" />Invite employee</button><Link to="/employee" className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-xs font-bold text-white/75">Preview ZestEmployee<ExternalLink className="h-3.5 w-3.5" /></Link></div>
+          <div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1"><ViewButton label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} /><ViewButton label="Requests" active={view === 'requests'} count={timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length} onClick={() => setView('requests')} /><ViewButton label="Employees" active={view === 'team'} onClick={() => setView('team')} /></div><button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C10E] px-3 py-2 text-xs font-black text-[#0B1220]"><MailPlus className="h-3.5 w-3.5" />Invite employee</button></div>
         </div>
       </section>
 
