@@ -915,50 +915,53 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       orderId: newOrder.id,
     };
 
-    setOrders(prev => {
-      const nextOrders = [...prev, newOrder];
-      saveLocationData(inventory, recipes, storageAreas, nextOrders, invoices, suppliers, preppedRecipes);
-      return nextOrders;
-    });
-    setInvoices(prev => {
-      const nextInvoices = [...prev, newInvoice];
-      saveLocationData(inventory, recipes, storageAreas, orders, nextInvoices, suppliers, preppedRecipes);
-      return nextInvoices;
-    });
+    const nextOrders = [...orders, newOrder];
+    const nextInvoices = [...invoices, newInvoice];
+    setOrders(nextOrders);
+    setInvoices(nextInvoices);
+    saveLocationData(inventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
   };
 
   const updateOrderStatus = (orderId: string, status: DailyOrder['status']) => {
-    setOrders(prev => {
-      const nextOrders = prev.map(order => (order.id === orderId ? { ...order, status } : order));
-      saveLocationData(inventory, recipes, storageAreas, nextOrders, invoices, suppliers, preppedRecipes);
-      return nextOrders;
-    });
+    const order = orders.find(entry => entry.id === orderId);
+    if (!order) return;
 
-    if (status === 'received') {
-      const order = orders.find(entry => entry.id === orderId);
-      if (!order) return;
+    const nextOrders = orders.map(entry => (entry.id === orderId ? { ...entry, status } : entry));
+    const isFirstReceipt = status === 'received' && order.status !== 'received';
+    const nextInventory = isFirstReceipt
+      ? inventory.map(item => {
+          const matchingItem = order.items.find(entry => entry.itemId === item.id);
+          if (!matchingItem) return item;
+          return {
+            ...item,
+            currentStock: item.currentStock + matchingItem.quantity,
+            lastUpdated: new Date().toISOString(),
+          };
+        })
+      : inventory;
+    const linkedInvoice = invoices.find(invoice => invoice.orderId === orderId);
+    const primarySupplier = order.items
+      .map(line => inventory.find(item => item.id === line.itemId)?.supplier)
+      .find(Boolean) || 'Supplier';
+    const nextInvoices = status === 'received'
+      ? linkedInvoice
+        ? invoices.map(invoice => invoice.orderId === orderId ? { ...invoice, status: 'received' } : invoice)
+        : [...invoices, {
+            id: `${Date.now()}-invoice`,
+            date: new Date().toISOString(),
+            invoiceNumber: `PO-${order.id.slice(-8).toUpperCase()}`,
+            supplier: primarySupplier,
+            items: order.items,
+            totalAmount: order.totalCost,
+            status: 'received' as const,
+            orderId,
+          }]
+      : invoices;
 
-      const nextInventory = inventory.map(item => {
-        const matchingItem = order.items.find(entry => entry.itemId === item.id);
-        if (!matchingItem) return item;
-        return {
-          ...item,
-          currentStock: item.currentStock + matchingItem.quantity,
-          lastUpdated: new Date().toISOString(),
-        };
-      });
-
-      setInventory(nextInventory);
-      saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes);
-
-      setInvoices(prev => {
-        const nextInvoices = prev.map(invoice => (
-          invoice.orderId === orderId ? { ...invoice, status: 'received' } : invoice
-        ));
-        saveLocationData(inventory, recipes, storageAreas, orders, nextInvoices, suppliers, preppedRecipes);
-        return nextInvoices;
-      });
-    }
+    setOrders(nextOrders);
+    setInventory(nextInventory);
+    setInvoices(nextInvoices);
+    saveLocationData(nextInventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
   };
 
   const addInvoice = (invoiceInput: Omit<InvoiceRecord, 'id'>) => {
