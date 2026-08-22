@@ -10,6 +10,7 @@ export interface LaborEmployee {
   role: string;
   department: string;
   phone?: string;
+  clockInNumber?: string;
   payType: 'hourly' | 'salary';
   hourlyRate: number;
   annualSalary: number;
@@ -92,13 +93,14 @@ function shiftHours(shift: LaborShift) {
 
 function normalizeLaborData(value: Partial<LaborData> | null | undefined): LaborData {
   return {
-    employees: Array.isArray(value?.employees) ? value.employees.map(employee => ({
+    employees: Array.isArray(value?.employees) ? value.employees.map((employee, index) => ({
       ...employee,
       department: employee.department || 'Restaurant team',
       payType: employee.payType === 'salary' ? 'salary' : 'hourly',
       hourlyRate: Number(employee.hourlyRate) || 0,
       annualSalary: Number(employee.annualSalary) || 0,
       inviteStatus: employee.inviteStatus || (employee.email ? 'active' : 'not-invited'),
+      clockInNumber: employee.clockInNumber || String(index + 1).padStart(4, '0'),
     })) : [],
     shifts: Array.isArray(value?.shifts) ? value.shifts : [],
     timeOffRequests: Array.isArray(value?.timeOffRequests) ? value.timeOffRequests : [],
@@ -116,11 +118,11 @@ function buildDemoLabor(): LaborData {
     return value.toISOString().slice(0, 10);
   };
   const employees: LaborEmployee[] = [
-    { id: 'demo-labor-maya', name: 'Maya Chen', role: 'Chef de Cuisine', department: 'Back of house', payType: 'salary', hourlyRate: 0, annualSalary: 85000, active: true, email: 'maya@example.test', phone: '416-555-0141', inviteStatus: 'active' },
-    { id: 'demo-labor-luca', name: 'Luca Romano', role: 'Line Cook', department: 'Back of house', payType: 'hourly', hourlyRate: 24, annualSalary: 0, active: true, email: 'luca@example.test', phone: '416-555-0142', inviteStatus: 'active' },
-    { id: 'demo-labor-priya', name: 'Priya Shah', role: 'Server', department: 'Front of house', payType: 'hourly', hourlyRate: 18.5, annualSalary: 0, active: true, email: 'priya@example.test', phone: '416-555-0143', inviteStatus: 'active' },
-    { id: 'demo-labor-noah', name: 'Noah Williams', role: 'Bartender', department: 'Bar', payType: 'hourly', hourlyRate: 21, annualSalary: 0, active: true, email: 'noah@example.test', phone: '416-555-0144', inviteStatus: 'active' },
-    { id: 'demo-labor-sofia', name: 'Sofia Martin', role: 'Host', department: 'Front of house', payType: 'hourly', hourlyRate: 17.5, annualSalary: 0, active: true, email: 'sofia@example.test', phone: '416-555-0145', inviteStatus: 'active' },
+    { id: 'demo-labor-maya', name: 'Maya Chen', role: 'Chef de Cuisine', department: 'Back of house', payType: 'salary', hourlyRate: 0, annualSalary: 85000, active: true, email: 'maya@example.test', phone: '416-555-0141', clockInNumber: '1001', inviteStatus: 'active' },
+    { id: 'demo-labor-luca', name: 'Luca Romano', role: 'Line Cook', department: 'Back of house', payType: 'hourly', hourlyRate: 24, annualSalary: 0, active: true, email: 'luca@example.test', phone: '416-555-0142', clockInNumber: '1002', inviteStatus: 'active' },
+    { id: 'demo-labor-priya', name: 'Priya Shah', role: 'Server', department: 'Front of house', payType: 'hourly', hourlyRate: 18.5, annualSalary: 0, active: true, email: 'priya@example.test', phone: '416-555-0143', clockInNumber: '1003', inviteStatus: 'active' },
+    { id: 'demo-labor-noah', name: 'Noah Williams', role: 'Bartender', department: 'Bar', payType: 'hourly', hourlyRate: 21, annualSalary: 0, active: true, email: 'noah@example.test', phone: '416-555-0144', clockInNumber: '1004', inviteStatus: 'active' },
+    { id: 'demo-labor-sofia', name: 'Sofia Martin', role: 'Host', department: 'Front of house', payType: 'hourly', hourlyRate: 17.5, annualSalary: 0, active: true, email: 'sofia@example.test', phone: '416-555-0145', clockInNumber: '1005', inviteStatus: 'active' },
   ];
   const templates = [
     ['demo-labor-maya', '09:00', '17:00', 30, 'EXPO'], ['demo-labor-luca', '14:00', '22:30', 30, 'PREP'],
