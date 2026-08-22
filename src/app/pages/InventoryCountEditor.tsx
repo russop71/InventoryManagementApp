@@ -22,6 +22,7 @@ import {
   isInventoryCountFinalized,
   summarizeInventoryCount,
 } from '../utils/inventoryCountWorkflow.js';
+import { convertQuantity, formatUnitLabel, getCompatibleUnits } from '../utils/unitConversion';
 
 const Y = '#F5C10E';
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,6 +59,8 @@ export function InventoryCountEditor() {
   const [groupFilter, setGroupFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [saveState, setSaveState] = useState('Not saved yet');
+  const [countUnits, setCountUnits] = useState<Record<string, string>>({});
+  const [countInputs, setCountInputs] = useState<Record<string, string>>({});
 
   const canFinalize = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
   const isFinalized = isInventoryCountFinalized(draft);
@@ -172,17 +175,34 @@ export function InventoryCountEditor() {
     }));
   }, [draft, groupFilter, itemMeta, search, storageFilter, supplierFilter]);
 
-  const updateEntry = (itemId: string, rawValue: string) => {
+  const countUnitFor = (entry: InventoryCountEntry) => countUnits[entry.itemId] || entry.unit;
+  const countInputFor = (entry: InventoryCountEntry, complete: boolean) => {
+    if (countInputs[entry.itemId] !== undefined) return countInputs[entry.itemId];
+    if (!complete) return '';
+    const converted = convertQuantity(entry.counted, entry.unit, countUnitFor(entry));
+    return converted === null ? String(entry.counted) : String(Number(converted.toFixed(4)));
+  };
+  const changeCountUnit = (entry: InventoryCountEntry, unit: string) => {
+    setCountUnits(current => ({ ...current, [entry.itemId]: unit }));
+    if (countInputs[entry.itemId] !== undefined || !draft || !isInventoryCountEntryComplete(entry, draft)) return;
+    const converted = convertQuantity(entry.counted, entry.unit, unit);
+    setCountInputs(current => ({ ...current, [entry.itemId]: converted === null ? String(entry.counted) : String(Number(converted.toFixed(4))) }));
+  };
+  const updateEntry = (itemId: string, rawValue: string, inputUnit?: string) => {
     if (isFinalized) return;
+    setCountInputs(current => ({ ...current, [itemId]: rawValue }));
     setDraft(current => {
       if (!current) return current;
       const isCounted = rawValue.trim() !== '';
-      const counted = isCounted ? Math.max(0, Number(rawValue) || 0) : 0;
       return {
         ...current,
-        entries: current.entries.map(entry => entry.itemId === itemId
-          ? { ...entry, counted, isCounted, value: counted * entry.unitCost }
-          : entry),
+        entries: current.entries.map(entry => {
+          if (entry.itemId !== itemId) return entry;
+          const entered = Math.max(0, Number(rawValue) || 0);
+          const converted = inputUnit ? convertQuantity(entered, inputUnit, entry.unit) : entered;
+          const counted = isCounted ? Math.max(0, converted ?? entered) : 0;
+          return { ...entry, counted, isCounted, value: counted * entry.unitCost };
+        }),
       };
     });
     setSaveState('Unsaved changes');
@@ -379,7 +399,11 @@ export function InventoryCountEditor() {
                     entry={entry}
                     count={draft}
                     readOnly={isFinalized}
-                    onChange={value => updateEntry(entry.itemId, value)}
+                    onChange={value => updateEntry(entry.itemId, value, countUnitFor(entry))}
+                    unit={countUnitFor(entry)}
+                    units={getCompatibleUnits(entry.unit)}
+                    value={countInputFor(entry, isInventoryCountEntryComplete(entry, draft))}
+                    onUnitChange={unit => changeCountUnit(entry, unit)}
                     onMoveUp={() => moveEntry(area, entry.itemId, -1)}
                     onMoveDown={() => moveEntry(area, entry.itemId, 1)}
                     disableMoveUp={index === 0}
@@ -403,7 +427,7 @@ export function InventoryCountEditor() {
                         <div className="text-right text-sm font-semibold text-slate-500">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)}</div>
                         <div className="text-right text-sm font-semibold text-slate-700">{entry.hypothetical.toFixed(2)}</div>
                         <div className="text-right">
-                          {isFinalized ? <span className="text-sm font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</span> : <input aria-label={`Count ${entry.name}`} type="number" min="0" step="0.01" value={complete ? entry.counted : ''} onChange={event => updateEntry(entry.itemId, event.target.value)} className="h-10 w-full min-w-[100px] rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" />}
+                          {isFinalized ? <span className="text-sm font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</span> : <div className="flex min-w-[150px] gap-1"><input aria-label={`Count ${entry.name}`} type="number" min="0" step="0.01" value={countInputFor(entry, complete)} onChange={event => updateEntry(entry.itemId, event.target.value, countUnitFor(entry))} className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={countUnitFor(entry)} onChange={event => changeCountUnit(entry, event.target.value)} className="h-10 max-w-[72px] rounded-xl border border-slate-200 bg-white px-1 text-xs font-bold">{getCompatibleUnits(entry.unit).map(unit => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></div>}
                         </div>
                         <div className={`text-right text-sm font-black ${!complete ? 'text-slate-300' : dollarVariance < 0 ? 'text-rose-600' : dollarVariance > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>{complete ? <><span className="block">{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit}</span><span className="text-[10px]">{dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span></> : 'Not counted'}</div>
                         <div className="flex justify-end gap-1">{!isFinalized && <><OrderButton label={`Move ${entry.name} up`} disabled={index === 0} onClick={() => moveEntry(area, entry.itemId, -1)} icon="up" /><OrderButton label={`Move ${entry.name} down`} disabled={index === entries.length - 1} onClick={() => moveEntry(area, entry.itemId, 1)} icon="down" /></>}</div>
@@ -447,7 +471,7 @@ function OrderButton({ label, disabled, onClick, icon }: { label: string; disabl
   return <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 disabled:opacity-25">{icon === 'up' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}</button>;
 }
 
-function MobileCountRow({ entry, count, readOnly, onChange, onMoveUp, onMoveDown, disableMoveUp, disableMoveDown }: { entry: InventoryCountEntry; count: InventoryCount; readOnly: boolean; onChange: (value: string) => void; onMoveUp: () => void; onMoveDown: () => void; disableMoveUp: boolean; disableMoveDown: boolean }) {
+function MobileCountRow({ entry, count, readOnly, onChange, unit, units, value, onUnitChange, onMoveUp, onMoveDown, disableMoveUp, disableMoveDown }: { entry: InventoryCountEntry; count: InventoryCount; readOnly: boolean; onChange: (value: string) => void; unit: string; units: Array<{ value: string; label: string }>; value: string; onUnitChange: (unit: string) => void; onMoveUp: () => void; onMoveDown: () => void; disableMoveUp: boolean; disableMoveDown: boolean }) {
   const complete = isInventoryCountEntryComplete(entry, count);
   const quantityVariance = complete ? entry.counted - entry.hypothetical : 0;
   const dollarVariance = quantityVariance * entry.unitCost;
@@ -457,7 +481,7 @@ function MobileCountRow({ entry, count, readOnly, onChange, onMoveUp, onMoveDown
       {!readOnly && <div className="flex shrink-0 gap-1"><OrderButton label={`Move ${entry.name} up`} disabled={disableMoveUp} onClick={onMoveUp} icon="up" /><OrderButton label={`Move ${entry.name} down`} disabled={disableMoveDown} onClick={onMoveDown} icon="down" /></div>}
     </div>
     <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Previous count</p><p className="mt-1 font-black text-slate-700">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)} {entry.unit}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Expected now</p><p className="mt-1 font-black text-slate-700">{entry.hypothetical.toFixed(2)} {entry.unit}</p></div></div>
-    <label className="mt-3 block"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Actual count ({entry.unit})</span>{readOnly ? <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xl font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</div> : <input aria-label={`Count ${entry.name}`} type="number" inputMode="decimal" min="0" step="0.01" value={complete ? entry.counted : ''} onChange={event => onChange(event.target.value)} placeholder="Enter count" className="mt-1 h-14 w-full rounded-xl border-2 border-slate-200 bg-white px-4 text-xl font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" />}</label>
+    <label className="mt-3 block"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Actual count</span>{readOnly ? <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xl font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</div> : <div className="mt-1 flex gap-2"><input aria-label={`Count ${entry.name}`} type="number" inputMode="decimal" min="0" step="0.01" value={value} onChange={event => onChange(event.target.value)} placeholder="Enter count" className="h-14 min-w-0 flex-1 rounded-xl border-2 border-slate-200 bg-white px-4 text-xl font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={unit} onChange={event => onUnitChange(event.target.value)} className="h-14 rounded-xl border-2 border-slate-200 bg-white px-2 text-sm font-black text-slate-700">{units.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>}</label>
     <div className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold ${!complete ? 'bg-slate-50 text-slate-400' : dollarVariance < 0 ? 'bg-rose-50 text-rose-700' : dollarVariance > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'}`}><span>{complete ? 'Variance' : 'Waiting for count'}</span>{complete && <span>{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit} · {dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span>}</div>
   </div>;
 }
