@@ -212,8 +212,8 @@ function SavingsCalculator() {
           <h2 className="mt-3 text-4xl font-black tracking-[-.035em] sm:text-5xl">What could tighter food and labour control be worth?</h2>
           <p className="mt-5 text-lg leading-8 text-black/60">Move the controls to match your restaurant. This is a planning estimate—not a promised saving—and shows why small operational improvements matter.</p>
           <div className="mt-7 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-[#FBFAF6] p-4"><p className="text-[10px] font-black uppercase tracking-wider text-black/40">Food opportunity</p><p className="mt-2 text-2xl font-black">{money(foodOpportunity)}<span className="text-sm text-black/40">/mo</span></p></div>
-            <div className="rounded-2xl bg-[#FBFAF6] p-4"><p className="text-[10px] font-black uppercase tracking-wider text-black/40">Labour opportunity</p><p className="mt-2 text-2xl font-black">{money(laborOpportunity)}<span className="text-sm text-black/40">/mo</span></p></div>
+            <div className="rounded-2xl bg-[#FBFAF6] p-4"><p className="text-[10px] font-black uppercase tracking-wider text-black/40">Food opportunity</p><p className="mt-2 text-2xl font-black">{foodImprovement}%</p></div>
+            <div className="rounded-2xl bg-[#FBFAF6] p-4"><p className="text-[10px] font-black uppercase tracking-wider text-black/40">Labour opportunity</p><p className="mt-2 text-2xl font-black">{laborImprovement}%</p></div>
           </div>
         </div>
         <div className="overflow-hidden rounded-[32px] bg-[#0B1220] text-white shadow-2xl">
