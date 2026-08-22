@@ -47,6 +47,21 @@ function isNightShift(shift: LaborShift) {
   return startHour >= 17 || startHour < 5;
 }
 
+function shiftsOverlap(left: LaborShift, right: LaborShift) {
+  const minutes = (value: string) => {
+    const [hour, minute] = value.split(':').map(Number);
+    return hour * 60 + minute;
+  };
+  const range = (shift: LaborShift) => {
+    const start = minutes(shift.start);
+    const rawEnd = minutes(shift.end);
+    return [start, rawEnd <= start ? rawEnd + 24 * 60 : rawEnd] as const;
+  };
+  const [leftStart, leftEnd] = range(left);
+  const [rightStart, rightEnd] = range(right);
+  return leftStart < rightEnd && rightStart < leftEnd;
+}
+
 function shiftAccentClass(tag = '') {
   if (tag.includes('CLOSE')) return 'border-l-violet-500';
   if (tag.includes('OPEN')) return 'border-l-emerald-500';
@@ -185,21 +200,20 @@ export function LaborScheduling() {
       setDraggedShiftId(null);
       return;
     }
+    const overlappingShift = shifts.find(shift => shift.id !== source.id && shift.employeeId === employeeId && shift.date === date && shift.status !== 'called-off' && shiftsOverlap(source, shift));
+    if (overlappingShift && !window.confirm(`${targetEmployee.name} already has an overlapping ${formatShiftTime(overlappingShift.start, useAmPm)}–${formatShiftTime(overlappingShift.end, useAmPm)} shift. Add this shift anyway?`)) {
+      setDraggedShiftId(null);
+      setCopiedShiftId(null);
+      return;
+    }
     if (copiedShiftId) {
       addShift({ ...source, employeeId, date });
       toast.success(`Copied shift to ${targetEmployee.name}.`);
       setCopiedShiftId(null);
       return;
     }
-    const targetShift = shifts.find(shift => shift.id !== source.id && shift.employeeId === employeeId && shift.date === date && shift.status !== 'called-off');
-    if (targetShift) {
-      updateShift(source.id, { employeeId, date });
-      updateShift(targetShift.id, { employeeId: source.employeeId, date: source.date });
-      toast.success(`Swapped shifts between ${sourceEmployee.name} and ${targetEmployee.name}.`);
-    } else {
-      updateShift(source.id, { employeeId, date });
-      toast.success(`Moved shift to ${targetEmployee.name}.`);
-    }
+    updateShift(source.id, { employeeId, date });
+    toast.success(`Moved shift to ${targetEmployee.name}.`);
     setDraggedShiftId(null);
   };
 
