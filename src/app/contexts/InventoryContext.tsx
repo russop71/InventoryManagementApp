@@ -425,6 +425,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const fallbackOrders = isDemoAccount ? demoData.orders as unknown as DailyOrder[] : [];
     const fallbackInvoices = isDemoAccount ? demoData.invoices as unknown as InvoiceRecord[] : [];
     const fallbackSuppliers = isDemoAccount ? demoData.suppliers as unknown as Supplier[] : [];
+    const fallbackPreppedRecipes = isDemoAccount ? demoData.preppedRecipes as unknown as PreppedRecipe[] : [];
 
     if (!token) {
       const nextStorageAreas = sortUniqueStorageAreas([
@@ -441,7 +442,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setOrders(localOrders.length > 0 ? localOrders : fallbackOrders);
       setInvoices(localInvoices.length > 0 ? localInvoices : fallbackInvoices);
       setSuppliers(localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers);
-      setPreppedRecipes(readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe)));
+      const localPreppedRecipes = readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe));
+      setPreppedRecipes(localPreppedRecipes.length > 0 ? localPreppedRecipes : fallbackPreppedRecipes);
       setInventoryCounts(localInventoryCounts);
       setIsLocationLoaded(true);
       return;
@@ -464,7 +466,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             orders: fallbackOrders,
             invoices: fallbackInvoices,
             suppliers: fallbackSuppliers,
-            preppedRecipes: [],
+            preppedRecipes: fallbackPreppedRecipes,
             inventoryCounts: [],
             demoDataVersion: DEMO_DATA_VERSION,
             version: payload.version,
@@ -517,7 +519,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const nextOrders = isDemoAccount && apiOrders.length === 0 ? fallbackOrders : (serverHasData ? apiOrders : (localOrders.length > 0 ? localOrders : fallbackOrders));
       const nextInvoices = isDemoAccount && apiInvoices.length === 0 ? fallbackInvoices : (serverHasData ? apiInvoices : (localInvoices.length > 0 ? localInvoices : fallbackInvoices));
       const nextSuppliers = isDemoAccount && apiSuppliers.length === 0 ? fallbackSuppliers : (serverHasData ? apiSuppliers : (localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers));
-      const nextPreppedRecipes = serverHasData ? apiPreppedRecipes : readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe));
+      const nextPreppedRecipes = isDemoAccount && apiPreppedRecipes.length === 0 ? fallbackPreppedRecipes : (serverHasData ? apiPreppedRecipes : readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe)));
       const nextInventoryCounts = apiInventoryCounts.length > 0 ? apiInventoryCounts : localInventoryCounts;
 
       const inferredAreas = nextInventory.map(item => normalizeStorageArea(item.storageArea));
