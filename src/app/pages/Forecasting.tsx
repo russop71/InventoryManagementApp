@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { apiRequest } from '../utils/api';
 import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
@@ -103,7 +103,7 @@ async function resolveEventContext(targetDate: string) {
 }
 
 export function Forecasting() {
-  const { accountName } = useAuth();
+  const { accountName, user } = useAuth();
   const restaurantName = accountName?.trim() || 'Your Restaurant';
   const { inventory, forecasts, addForecast, generateDailyOrder, suppliers } = useInventory();
   const { isConnected, salesData, menuItems } = useToast();
@@ -114,6 +114,7 @@ export function Forecasting() {
   const [predictedMenuItems, setPredictedMenuItems] = useState<{ name: string; quantity: number }[]>([]);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [draftEmails, setDraftEmails] = useState<SupplierEmail[]>([]);
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
 
   // Calculate predicted item usage based on connected POS sales data
   const handleAutoPredict = async () => {
@@ -359,6 +360,59 @@ Restaurant Operations Team`;
     ? Math.round(salesData.reduce((sum, day) => sum + day.revenue, 0) / salesData.length)
     : 0;
 
+  const salesProjection = useMemo(() => {
+    if (!salesData.length) return [];
+    const recentWeek = salesData.slice(-7);
+    const previousWeek = salesData.slice(-14, -7);
+    const recentAverage = recentWeek.reduce((sum, day) => sum + day.revenue, 0) / Math.max(recentWeek.length, 1);
+    const previousAverage = previousWeek.reduce((sum, day) => sum + day.revenue, 0) / Math.max(previousWeek.length, 1);
+    const trend = previousAverage > 0 ? Math.min(1.12, Math.max(0.9, recentAverage / previousAverage)) : 1;
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(12, 0, 0, 0);
+      date.setDate(date.getDate() + index + 1);
+      const matchingDays = salesData.filter(day => new Date(`${day.date}T12:00:00`).getDay() === date.getDay());
+      const baseline = matchingDays.length
+        ? matchingDays.reduce((sum, day) => sum + day.revenue, 0) / matchingDays.length
+        : recentAverage;
+      const revenue = Math.round(baseline * trend);
+      return {
+        date: date.toISOString().slice(0, 10),
+        label: date.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }),
+        revenue,
+        covers: Math.round(revenue / 42),
+      };
+    });
+  }, [salesData]);
+
+  const buildDemoForecast = () => {
+    const tomorrow = salesProjection[0];
+    if (!tomorrow) return;
+    const usage = new Map<string, number>();
+    const menuPrediction = menuItems.map(menuItem => {
+      const historicQuantity = salesData.reduce((sum, day) => {
+        const line = day.topItems.find(item => item.itemName === menuItem.name);
+        return sum + (line?.quantity || 0);
+      }, 0) / Math.max(salesData.length, 1);
+      const quantity = Math.max(1, Math.round(historicQuantity * (tomorrow.revenue / Math.max(avgRevenue, 1))));
+      menuItem.ingredients.forEach(ingredient => {
+        usage.set(ingredient.inventoryItemId, (usage.get(ingredient.inventoryItemId) || 0) + ingredient.quantity * quantity);
+      });
+      return { name: menuItem.name, quantity };
+    });
+
+    setSelectedDate(tomorrow.date);
+    setExpectedRevenue(tomorrow.revenue);
+    setPredictedMenuItems(menuPrediction);
+    setSelectedItems(Array.from(usage.entries()).map(([itemId, expectedUsage]) => ({
+      itemId,
+      expectedUsage: Math.round(expectedUsage * 100) / 100,
+    })).filter(item => inventory.some(inventoryItem => inventoryItem.id === item.itemId)));
+    setIsAddDialogOpen(true);
+    toast.success("Tomorrow's Zestaurant sales projection is ready to review.");
+  };
+
   return (
     <div className="space-y-4 pb-20">
       <div className="flex justify-between items-center">
@@ -534,6 +588,39 @@ Restaurant Operations Team`;
           </DialogContent>
         </Dialog>
       </div>
+
+      {salesProjection.length > 0 && (
+        <Card className="overflow-hidden border-[#F5C10E]/40 bg-[#0F172A] text-white">
+          <CardContent className="p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5C10E]">Sales projection</p>
+                <h3 className="mt-1 text-2xl font-black">Plan the next seven days.</h3>
+                <p className="mt-1 text-sm text-white/60">Built from {salesData.length} days of POS sales, day-of-week patterns and recent trend.</p>
+              </div>
+              {isDemoAccount && (
+                <Button onClick={buildDemoForecast} className="bg-[#F5C10E] font-bold text-[#0F172A] hover:bg-[#ffd34a]">
+                  <Sparkles className="mr-2 h-4 w-4" /> Build tomorrow's forecast
+                </Button>
+              )}
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+              {salesProjection.map((day, index) => (
+                <div key={day.date} className={`rounded-xl p-3 ${index === 0 ? 'bg-[#F5C10E] text-[#0F172A]' : 'bg-white/10'}`}>
+                  <p className="text-[11px] font-bold opacity-70">{day.label}</p>
+                  <p className="mt-2 text-lg font-black">${day.revenue.toLocaleString('en-CA')}</p>
+                  <p className="mt-1 text-[11px] font-medium opacity-70">{day.covers} covers</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-white/70">
+              <span>Projected food spend: <strong className="text-white">28%</strong></span>
+              <span>Projected labour: <strong className="text-white">29%</strong></span>
+              <span>Tomorrow: <strong className="text-white">${salesProjection[0]?.revenue.toLocaleString('en-CA')}</strong></span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isConnected && salesData.length > 0 && (
         <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
