@@ -91,7 +91,9 @@ export function Orders() {
   const { accountId, accountName, user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
-  const [detailId, setDetailId]   = useState<string | null>(null);
+  // Keep the selected order itself. Some imported/demo orders can be refreshed
+  // while the dialog is opening, which made an ID lookup briefly return empty.
+  const [detailOrder, setDetailOrder] = useState<(typeof orders)[number] | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<OrderSuggestion[] | null>(null);
@@ -113,8 +115,6 @@ export function Orders() {
 
   const sorted   = [...orders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const filtered = activeTab === 'all' ? sorted : sorted.filter(o => o.status === activeTab);
-
-  const detailOrder = orders.find(o => o.id === detailId);
 
   const restaurantName = useMemo(() => {
     if (accountId) {
@@ -743,7 +743,7 @@ export function Orders() {
               <button
                 key={order.id}
                 onClick={() => {
-                  setDetailId(order.id);
+                  setDetailOrder(order);
                   resetEditableItems(order.id);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-4 bg-white active:bg-gray-50 transition-colors text-left"
@@ -944,7 +944,7 @@ export function Orders() {
       </Dialog>
 
       {/* Detail dialog */}
-      <Dialog open={!!detailId} onOpenChange={open => !open && setDetailId(null)}>
+      <Dialog open={!!detailOrder} onOpenChange={open => !open && setDetailOrder(null)}>
         <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
@@ -1052,13 +1052,13 @@ export function Orders() {
                 <div className="flex gap-2 pt-2">
                   {detailOrder.status === 'pending' && (
                     <Button className="flex-1 font-bold" style={{ background: D, color: '#fff' }}
-                      onClick={() => { handleStatus(detailOrder.id, 'ordered'); setDetailId(null); }}>
+                      onClick={() => { handleStatus(detailOrder.id, 'ordered'); setDetailOrder(null); }}>
                       <Truck className="w-4 h-4 mr-1.5" /> Mark In Transit
                     </Button>
                   )}
                   {detailOrder.status === 'ordered' && (
                     <Button className="flex-1 font-bold" style={{ background: '#166534', color: '#fff' }}
-                      onClick={() => { handleStatus(detailOrder.id, 'received'); setDetailId(null); }}>
+                      onClick={() => { handleStatus(detailOrder.id, 'received'); setDetailOrder(null); }}>
                       <CheckCircle2 className="w-4 h-4 mr-1.5" /> Mark Received
                     </Button>
                   )}
@@ -1067,7 +1067,7 @@ export function Orders() {
                       <CheckCircle2 className="w-4 h-4" /> Order Complete
                     </div>
                   )}
-                  <Button variant="outline" className="flex-1" onClick={() => setDetailId(null)}>Close</Button>
+                  <Button variant="outline" className="flex-1" onClick={() => setDetailOrder(null)}>Close</Button>
                 </div>
               </div>
             );
