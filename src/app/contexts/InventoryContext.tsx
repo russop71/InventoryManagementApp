@@ -185,6 +185,7 @@ export interface ScannedInvoiceInput {
 interface InvoiceMutationResult {
   success: boolean;
   error?: string;
+  invoice?: InvoiceRecord;
 }
 
 interface InventoryContextType {
@@ -1161,7 +1162,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setSuppliers(nextSuppliers);
     setStorageAreas(nextStorageAreas);
     saveLocationData(nextInventory, recipes, nextStorageAreas, orders, nextInvoices, nextSuppliers, preppedRecipes);
-    return { success: true };
+    return { success: true, invoice: newInvoice };
   };
 
   const deleteInvoice = (invoiceId: string) => {
