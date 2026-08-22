@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
 import type { InventoryItem, InvoiceRecord, OrderItem } from '../contexts/InventoryContext';
 import { Card, CardContent } from '../components/ui/card';
@@ -9,6 +9,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { CalendarDays, FileText, DollarSign, Pencil, Trash2, Save, X, Plus, ScanLine, ChevronDown, Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { calculateInvoiceTotal, filterInvoiceItems } from '../utils/invoiceWorkflow';
+import { toast } from 'sonner';
 
 function fmtDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -24,6 +25,7 @@ function fmtMoney(value: number) {
 
 export function Invoices() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { invoices, inventory, addInvoice, updateInvoice, deleteInvoice, updateOrderStatus } = useInventory();
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
@@ -31,12 +33,20 @@ export function Invoices() {
   const [itemSearch, setItemSearch] = useState<string>('');
   const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'open' | 'received' | 'cancelled'>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<'all' | 'current-month' | 'last-30-days'>('current-month');
+  const [dateFilter, setDateFilter] = useState<'all' | 'current-month' | 'last-30-days'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const sortedInvoices = useMemo(() => {
     return [...invoices].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
   }, [invoices]);
+
+  useEffect(() => {
+    const invoiceId = new URLSearchParams(location.search).get('invoice');
+    if (!invoiceId || !invoices.some(invoice => invoice.id === invoiceId)) return;
+    setDateFilter('all');
+    setInvoiceFilter('all');
+    setExpandedInvoiceId(invoiceId);
+  }, [invoices, location.search]);
 
   const getItemName = (itemId: string) => inventory.find(item => item.id === itemId)?.name || itemId;
 
@@ -141,11 +151,14 @@ export function Invoices() {
   };
 
   const handleDeleteInvoice = (invoice: InvoiceRecord) => {
-    if (!window.confirm(`Delete ${invoice.invoiceNumber}?`)) return;
     deleteInvoice(invoice.id);
     if (editingInvoiceId === invoice.id) {
       setEditingInvoiceId(null);
     }
+    if (expandedInvoiceId === invoice.id) {
+      setExpandedInvoiceId(null);
+    }
+    toast.success(`Invoice ${invoice.invoiceNumber} deleted.`);
   };
 
   const handleCreateInvoice = () => {
@@ -313,7 +326,7 @@ export function Invoices() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
                           </Button>
-                          <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteInvoice(invoice)}>
+                          <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={event => { event.stopPropagation(); handleDeleteInvoice(invoice); }}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </Button>
