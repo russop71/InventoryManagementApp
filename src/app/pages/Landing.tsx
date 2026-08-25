@@ -259,9 +259,9 @@ function LiveProductTour() {
   const reduceMotion = useReducedMotion();
   const [activeScreen, setActiveScreen] = useState(0);
   const screens = [
-    { label: 'Daily brief', title: 'See what needs attention today.', text: 'Live sales, food cost, labour, top sellers and operating signals come together in one working dashboard.', image: '/product-dashboard.png', alt: 'ZestIQ live demo dashboard showing restaurant sales and performance data', metric: '$7,532 in demo sales' },
-    { label: 'Inventory', title: 'Count and cost the stock you actually carry.', text: 'Move from storage areas and counts to item-level stock, pars, supplier choices and current restaurant cost.', image: '/product-inventory.png', alt: 'ZestIQ live inventory screen with count and item controls', metric: 'Food + beverage inventory' },
-    { label: 'Ordering', title: 'Turn low stock into a reviewable order.', text: 'Suggested purchasing connects on-hand inventory, pars, recent sales, suppliers and pack sizes before anyone sends an order.', image: '/product-ordering.png', alt: 'ZestIQ live ordering screen with forecasting and AI order controls', metric: 'Human-approved AI suggestions' },
+    { label: 'Daily brief', title: 'See what needs attention today.', text: 'Live sales, food cost, labour, top sellers and operating signals come together in one working dashboard.', image: '/product-dashboard.png', alt: 'ZestIQ live demo dashboard showing restaurant sales and performance data' },
+    { label: 'Inventory', title: 'Count and cost the stock you actually carry.', text: 'Move from storage areas and counts to item-level stock, pars, supplier choices and current restaurant cost.', image: '/product-inventory.png', alt: 'ZestIQ live inventory screen with count and item controls' },
+    { label: 'Ordering', title: 'Turn low stock into a reviewable order.', text: 'Suggested purchasing connects on-hand inventory, pars, recent sales, suppliers and pack sizes before anyone sends an order.', image: '/product-ordering.png', alt: 'ZestIQ live ordering screen with forecasting and AI order controls' },
   ];
 
   useEffect(() => {
@@ -279,7 +279,6 @@ function LiveProductTour() {
         <div className="relative min-w-0">
           <motion.div aria-hidden="true" className="absolute -inset-8 rounded-full bg-[#F5C10E]/20 blur-3xl" animate={reduceMotion ? undefined : { scale: [0.92, 1.04, 0.92], rotate: [0, 8, 0] }} transition={{ duration: 7, repeat: Infinity }} />
           <div className="relative overflow-hidden rounded-[30px] border-[8px] border-[#0B1220] bg-[#0B1220] shadow-2xl"><div className="flex h-8 items-center gap-1.5 bg-[#0B1220] px-3"><span className="h-2.5 w-2.5 rounded-full bg-red-400" /><span className="h-2.5 w-2.5 rounded-full bg-[#F5C10E]" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span className="ml-3 truncate text-[10px] font-bold text-white/35">app.zestiq.ca · Main Location</span></div><AnimatePresence mode="wait"><motion.img key={active.image} src={active.image} alt={active.alt} initial={reduceMotion ? false : { opacity: 0, x: 35, scale: .98 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={reduceMotion ? undefined : { opacity: 0, x: -35 }} transition={{ duration: .38 }} className="block aspect-video w-full bg-white object-cover object-top" /></AnimatePresence></div>
-          <motion.div key={active.metric} initial={reduceMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="absolute -bottom-4 right-3 rounded-2xl bg-[#F5C10E] px-4 py-3 text-xs font-black text-[#0B1220] shadow-xl sm:right-6">{active.metric}</motion.div>
         </div>
       </div>
     </div>
