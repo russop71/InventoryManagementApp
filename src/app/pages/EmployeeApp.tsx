@@ -11,7 +11,7 @@ export function EmployeeApp() {
   const navigate = useNavigate();
   const { user, accountName, logout } = useAuth();
   const { employees, shifts, timeOffRequests, shiftSwapRequests, requestTimeOff, updateTimeOffRequest, requestShiftSwap, updateShiftSwapRequest } = useLabor();
-  const canPreview = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
+  const canPreview = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const linkedEmployee = employees.find(employee => employee.email?.toLowerCase() === user?.email.toLowerCase());
   const [previewEmployeeId, setPreviewEmployeeId] = useState(linkedEmployee?.id || employees[0]?.id || '');
   const employee = linkedEmployee || (canPreview ? employees.find(item => item.id === previewEmployeeId) : undefined);
