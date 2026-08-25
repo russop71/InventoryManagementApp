@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { useAuth } from '../contexts/AuthContext';
@@ -73,6 +74,7 @@ export function PaymentMethod() {
   const [billing, setBilling] = useState<BillingDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [locationCount, setLocationCount] = useState(Math.max(1, locations.length));
+  const [commitmentAccepted, setCommitmentAccepted] = useState(false);
 
   const loadBilling = useCallback(async () => {
     if (!accountId || !isOwner) return;
@@ -106,7 +108,7 @@ export function PaymentMethod() {
     try {
       const result = await apiRequest<{ url: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing/checkout`, {
         method: 'POST',
-        body: JSON.stringify({ plan, locationCount }),
+        body: JSON.stringify({ plan, locationCount, commitmentAccepted: true }),
       });
       window.location.assign(result.url);
     } catch (error) {
@@ -228,10 +230,19 @@ export function PaymentMethod() {
                     CAD ${(249.99 + Math.max(0, locationCount - 1) * 100).toFixed(2)}/month
                   </p>
                 </div>
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
+                  <p className="font-bold text-slate-950">12-month commitment</p>
+                  <p className="mt-1 leading-5">Your subscription is billed monthly, with an initial 12-month term. It automatically renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.</p>
+                  <label className="mt-3 flex cursor-pointer items-start gap-2 leading-5">
+                    <Checkbox checked={commitmentAccepted} onCheckedChange={checked => setCommitmentAccepted(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#0F172A]" />
+                    <span>I understand and agree to the 12-month commitment and 90-day non-renewal notice.</span>
+                  </label>
+                  <a href="/terms" target="_blank" rel="noreferrer" className="mt-2 inline-block font-semibold text-slate-900 underline underline-offset-2">Read Terms of Service</a>
+                </div>
                 <Button
                   type="button"
                   className="mt-4 w-full bg-[#0F172A] text-white hover:bg-[#1E293B]"
-                  disabled={isLoading || current || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured)}
+                  disabled={isLoading || current || !commitmentAccepted || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured)}
                   onClick={() => void openCheckout(plan.id)}
                 >
                   {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${(249.99 + Math.max(0, locationCount - 1) * 100).toFixed(2)}/month`}
