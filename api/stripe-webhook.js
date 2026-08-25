@@ -10,6 +10,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.s
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION;
+const FALLBACK_AGREEMENT_VERSION = '2026-08-25';
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -52,6 +53,33 @@ async function updateAccount(accountId, patch) {
   if (!response.ok) throw new Error(`Unable to update billing state (${response.status})`);
 }
 
+async function recordSubscriptionAgreement(accountId, checkoutSession, acceptedAt) {
+  if (!SUPABASE_SECRET_KEY || !accountId) return;
+  const customerAccepted = checkoutSession?.consent?.terms_of_service === 'accepted';
+  if (!customerAccepted) return;
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/subscription_agreements`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_SECRET_KEY,
+      Authorization: `Bearer ${SUPABASE_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=ignore-duplicates,return=minimal',
+    },
+    body: JSON.stringify({
+      account_id: accountId,
+      agreement_version: checkoutSession?.metadata?.agreement_version || FALLBACK_AGREEMENT_VERSION,
+      accepted_at: acceptedAt,
+      customer_accepted: true,
+      acceptance_channel: 'stripe_checkout',
+      customer_email: checkoutSession?.customer_details?.email || checkoutSession?.customer_email || null,
+      stripe_checkout_session_id: checkoutSession?.id || null,
+      stripe_customer_id: typeof checkoutSession?.customer === 'string' ? checkoutSession.customer : checkoutSession?.customer?.id || null,
+      stripe_subscription_id: typeof checkoutSession?.subscription === 'string' ? checkoutSession.subscription : checkoutSession?.subscription?.id || null,
+    }),
+  });
+  if (!response.ok) throw new Error(`Unable to record subscription agreement (${response.status})`);
+}
+
 function unixDate(value) {
   return Number(value) > 0 ? new Date(Number(value) * 1000).toISOString() : null;
 }
@@ -73,12 +101,16 @@ export default async function handler(req, res) {
     if (event.type === 'checkout.session.completed') {
       const accountId = object.client_reference_id || object.metadata?.account_id;
       if (accountId) {
+        const acceptedAt = unixDate(object.created) || new Date().toISOString();
         await updateAccount(accountId, {
           stripe_customer_id: typeof object.customer === 'string' ? object.customer : object.customer?.id,
           stripe_subscription_id: typeof object.subscription === 'string' ? object.subscription : object.subscription?.id,
           billing_plan: object.metadata?.plan || null,
           billing_status: object.payment_status === 'paid' ? 'active' : 'incomplete',
           additional_location_quantity: Math.max(0, Number(object.metadata?.location_count || 1) - 1),
+        });
+        await recordSubscriptionAgreement(accountId, object, acceptedAt).catch(error => {
+          console.error('Unable to record subscription agreement', error);
         });
       }
     }
