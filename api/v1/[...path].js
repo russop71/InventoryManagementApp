@@ -21,6 +21,7 @@ const BILLING_PRICE_IDS = {
 const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION;
 const PREMIUM_MONTHLY_CAD_CENTS = 24999;
 const ADDITIONAL_LOCATION_CAD_CENTS = 10000;
+const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -925,11 +926,13 @@ export default async function handler(req, res) {
             'metadata[location_count]': String(locationCount),
             'metadata[commitment_accepted]': 'true',
             'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+            'metadata[agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
             'subscription_data[metadata][account_id]': clientAccount.id,
             'subscription_data[metadata][plan]': plan,
             'subscription_data[metadata][location_count]': String(locationCount),
             'subscription_data[metadata][commitment_accepted]': 'true',
             'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+            'subscription_data[metadata][agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
             success_url: `${appOrigin(req)}/app/payment-method?checkout=success`,
             cancel_url: `${appOrigin(req)}/app/payment-method?checkout=cancelled`,
             allow_promotion_codes: 'true',
@@ -1198,11 +1201,13 @@ export default async function handler(req, res) {
           'metadata[location_count]': String(locationCount),
           'metadata[commitment_accepted]': 'true',
           'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+          'metadata[agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
           'subscription_data[metadata][account_id]': accountId,
           'subscription_data[metadata][plan]': plan,
           'subscription_data[metadata][location_count]': String(locationCount),
           'subscription_data[metadata][commitment_accepted]': 'true',
           'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+          'subscription_data[metadata][agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
           success_url: `${origin}/app/payment-method?checkout=success`,
           cancel_url: `${origin}/app/payment-method?checkout=cancelled`,
           allow_promotion_codes: 'true',
