@@ -11,6 +11,8 @@ test('new clients are gated until the CAD Premium subscription is active', () =>
 
 test('manager permissions do not give staff access to company operations', () => {
   assert.equal(canManageOperations('Manager'), true);
+  assert.equal(canManageOperations('BOH Manager'), true);
+  assert.equal(canManageOperations('FOH Manager'), true);
   assert.equal(canManageOperations('Staff'), false);
   assert.equal(canAdministerAccount('Admin'), true);
   assert.equal(canAdministerAccount('Manager'), false);
