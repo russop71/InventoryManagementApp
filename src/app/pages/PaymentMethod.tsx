@@ -44,6 +44,9 @@ interface BillingDetails {
     hostedInvoiceUrl: string | null;
     invoicePdf: string | null;
   }>;
+  commitmentEndsAt?: string | null;
+  nonRenewalRequestedAt?: string | null;
+  nonRenewalEffectiveAt?: string | null;
 }
 
 const PLANS: Array<{ id: BillingPlan; name: string; price: string; detail: string }> = [
@@ -166,6 +169,20 @@ export function PaymentMethod() {
     }
   };
 
+  const requestNonRenewal = async () => {
+    if (!accountId || !billing || !window.confirm(`This does not cancel service today. Billing and access continue through ${formatDate(billing.commitmentEndsAt || null)}. Submit a non-renewal request for that date?`)) return;
+    setIsLoading(true);
+    try {
+      const result = await apiRequest<{ nonRenewalRequestedAt: string; nonRenewalEffectiveAt: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing/non-renewal`, { method: 'POST' });
+      setBilling(current => current ? { ...current, nonRenewalRequestedAt: result.nonRenewalRequestedAt, nonRenewalEffectiveAt: result.nonRenewalEffectiveAt } : current);
+      toast.success(`Non-renewal scheduled for ${formatDate(result.nonRenewalEffectiveAt)}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to request non-renewal');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!isOwner) {
     return (
       <Card className="border-amber-200 bg-amber-50">
@@ -247,6 +264,21 @@ export function PaymentMethod() {
           </CardContent>
         </Card>
       </div>
+
+      {billing?.customerCreated && (
+        <Card>
+          <CardHeader><CardTitle>Committed term & non-renewal</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-sm text-slate-600">
+              <p className="font-semibold text-slate-950">Current commitment ends {formatDate(billing.commitmentEndsAt || null)}</p>
+              {billing.nonRenewalEffectiveAt
+                ? <p className="mt-1 text-amber-800">Non-renewal is scheduled. Service and monthly billing continue through {formatDate(billing.nonRenewalEffectiveAt)}.</p>
+                : <p className="mt-1">Non-renewal must be submitted at least 90 days before term end. It does not cancel service early.</p>}
+            </div>
+            {!billing.nonRenewalEffectiveAt && <Button type="button" variant="outline" disabled={isLoading || !billing.commitmentEndsAt} onClick={() => void requestNonRenewal()}>Request non-renewal</Button>}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
