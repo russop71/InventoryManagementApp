@@ -19,7 +19,7 @@ export function Layout() {
   const { user, logout, accountId, accountName, locations, activeLocationId, switchLocation } = useAuth();
   const [openTopMenu, setOpenTopMenu] = useState<string | null>(null);
   const closeTopMenuTimer = useRef<number | null>(null);
-  const canManageLabor = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
+  const canManageLabor = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
 
   const navItems = [
     { path: '/app', label: 'Dashboard', icon: LayoutDashboard },
