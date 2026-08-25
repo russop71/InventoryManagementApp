@@ -84,6 +84,20 @@ function unixDate(value) {
   return Number(value) > 0 ? new Date(Number(value) * 1000).toISOString() : null;
 }
 
+function checkoutPaymentSucceeded(session) {
+  return session?.payment_status === 'paid' || session?.payment_status === 'no_payment_required';
+}
+
+async function activateAccountFromCheckout(accountId, session) {
+  await updateAccount(accountId, {
+    stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
+    stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
+    billing_plan: session.metadata?.plan || null,
+    billing_status: checkoutPaymentSucceeded(session) ? 'active' : 'incomplete',
+    additional_location_quantity: Math.max(0, Number(session.metadata?.location_count || 1) - 1),
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' });
   if (!STRIPE_WEBHOOK_SECRET) return json(res, 503, { error: 'Stripe webhook is not configured' });
@@ -98,17 +112,11 @@ export default async function handler(req, res) {
     const event = JSON.parse(payload.toString('utf8'));
     const object = event?.data?.object || {};
 
-    if (event.type === 'checkout.session.completed') {
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const accountId = object.client_reference_id || object.metadata?.account_id;
       if (accountId) {
         const acceptedAt = unixDate(object.created) || new Date().toISOString();
-        await updateAccount(accountId, {
-          stripe_customer_id: typeof object.customer === 'string' ? object.customer : object.customer?.id,
-          stripe_subscription_id: typeof object.subscription === 'string' ? object.subscription : object.subscription?.id,
-          billing_plan: object.metadata?.plan || null,
-          billing_status: object.payment_status === 'paid' ? 'active' : 'incomplete',
-          additional_location_quantity: Math.max(0, Number(object.metadata?.location_count || 1) - 1),
-        });
+        await activateAccountFromCheckout(accountId, object);
         await recordSubscriptionAgreement(accountId, object, acceptedAt).catch(error => {
           console.error('Unable to record subscription agreement', error);
         });
