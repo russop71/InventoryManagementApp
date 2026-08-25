@@ -908,6 +908,7 @@ export default async function handler(req, res) {
             return json(res, 409, { error: 'This client already has a Stripe subscription. Manage it in Stripe instead of creating a duplicate.' });
           }
           const plan = String(req.body?.plan || '');
+          if (req.body?.commitmentAccepted !== true) return json(res, 400, { error: 'Confirm the 12-month commitment and 90-day non-renewal notice before creating checkout.' });
           const priceId = BILLING_PRICE_IDS[plan];
           if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
           const locationCount = requestedLocationCount(req.body);
@@ -922,12 +923,18 @@ export default async function handler(req, res) {
             'metadata[account_id]': clientAccount.id,
             'metadata[plan]': plan,
             'metadata[location_count]': String(locationCount),
+            'metadata[commitment_accepted]': 'true',
+            'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
             'subscription_data[metadata][account_id]': clientAccount.id,
             'subscription_data[metadata][plan]': plan,
             'subscription_data[metadata][location_count]': String(locationCount),
+            'subscription_data[metadata][commitment_accepted]': 'true',
+            'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
             success_url: `${appOrigin(req)}/app/payment-method?checkout=success`,
             cancel_url: `${appOrigin(req)}/app/payment-method?checkout=cancelled`,
             allow_promotion_codes: 'true',
+            'consent_collection[terms_of_service]': 'required',
+            'custom_text[submit][message]': 'By subscribing, you agree to a 12-month initial commitment billed monthly. The subscription renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.',
           };
           if (locationCount > 1) {
             form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
@@ -1175,6 +1182,7 @@ export default async function handler(req, res) {
           return json(res, 409, { error: 'A subscription already exists. Use the Stripe billing portal to manage it.' });
         }
         const plan = String(req.body?.plan || '');
+        if (req.body?.commitmentAccepted !== true) return json(res, 400, { error: 'Confirm the 12-month commitment and 90-day non-renewal notice before starting checkout.' });
         const priceId = BILLING_PRICE_IDS[plan];
         if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
         const locationCount = requestedLocationCount(req.body);
@@ -1188,12 +1196,18 @@ export default async function handler(req, res) {
           'metadata[account_id]': accountId,
           'metadata[plan]': plan,
           'metadata[location_count]': String(locationCount),
+          'metadata[commitment_accepted]': 'true',
+          'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
           'subscription_data[metadata][account_id]': accountId,
           'subscription_data[metadata][plan]': plan,
           'subscription_data[metadata][location_count]': String(locationCount),
+          'subscription_data[metadata][commitment_accepted]': 'true',
+          'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
           success_url: `${origin}/app/payment-method?checkout=success`,
           cancel_url: `${origin}/app/payment-method?checkout=cancelled`,
           allow_promotion_codes: 'true',
+          'consent_collection[terms_of_service]': 'required',
+          'custom_text[submit][message]': 'By subscribing, you agree to a 12-month initial commitment billed monthly. The subscription renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.',
         };
         if (locationCount > 1) {
           form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
