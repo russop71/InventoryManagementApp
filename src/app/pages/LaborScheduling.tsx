@@ -111,7 +111,7 @@ export function LaborScheduling() {
   const [useAmPm, setUseAmPm] = useState(true);
   const [draggedShiftId, setDraggedShiftId] = useState<string | null>(null);
   const [copiedShiftId, setCopiedShiftId] = useState<string | null>(null);
-  const canManage = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
+  const canManage = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = new Date(weekStart);
