@@ -19,6 +19,7 @@ const BILLING_PRICE_IDS = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
 };
 const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION;
+const STRIPE_BILLING_PORTAL_CONFIGURATION_ID = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID;
 const PREMIUM_MONTHLY_CAD_CENTS = 24999;
 const ADDITIONAL_LOCATION_CAD_CENTS = 10000;
 const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
@@ -372,6 +373,24 @@ function stripeDate(value) {
   return Number(value) > 0 ? new Date(Number(value) * 1000).toISOString() : null;
 }
 
+export function commitmentDates(startDate) {
+  const startsAt = new Date(startDate);
+  if (Number.isNaN(startsAt.getTime())) return null;
+  const endsAt = new Date(startsAt);
+  endsAt.setUTCFullYear(endsAt.getUTCFullYear() + 1);
+  const noticeDeadline = new Date(endsAt);
+  noticeDeadline.setUTCDate(noticeDeadline.getUTCDate() - 90);
+  return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), noticeDeadline: noticeDeadline.toISOString() };
+}
+
+export function canRequestNonRenewal(commitmentEndsAt, now = new Date()) {
+  const endsAt = new Date(commitmentEndsAt);
+  if (Number.isNaN(endsAt.getTime())) return false;
+  const noticeDeadline = new Date(endsAt);
+  noticeDeadline.setUTCDate(noticeDeadline.getUTCDate() - 90);
+  return now.getTime() <= noticeDeadline.getTime();
+}
+
 function mapBilling(account, details = {}) {
   return {
     configured: Boolean(STRIPE_SECRET_KEY && BILLING_PRICE_IDS.monthly),
@@ -380,6 +399,9 @@ function mapBilling(account, details = {}) {
     plan: account.billing_plan || null,
     status: account.billing_status || 'not_configured',
     additionalLocationQuantity: Number(account.additional_location_quantity || 0),
+    commitmentEndsAt: account.commitment_ends_at || null,
+    nonRenewalRequestedAt: account.non_renewal_requested_at || null,
+    nonRenewalEffectiveAt: account.non_renewal_effective_at || null,
     currentPeriodEnd: account.current_period_end || null,
     subscriptionStartedAt: null,
     billingFrequency: null,
@@ -1225,11 +1247,33 @@ export default async function handler(req, res) {
       }
       if (segments[3] === 'portal' && method === 'POST') {
         if (!account.stripe_customer_id) return json(res, 409, { error: 'Start a subscription before opening the billing portal' });
+        if (!STRIPE_BILLING_PORTAL_CONFIGURATION_ID) return json(res, 503, { error: 'Configure a Stripe customer portal that permits payment-method updates but does not permit subscription cancellation.' });
         const session = await stripe('billing_portal/sessions', {
           customer: account.stripe_customer_id,
           return_url: `${appOrigin(req)}/app/payment-method`,
+          configuration: STRIPE_BILLING_PORTAL_CONFIGURATION_ID,
         });
         return json(res, 200, { url: session.url });
+      }
+      if (segments[3] === 'non-renewal' && method === 'POST') {
+        if (!account.stripe_subscription_id) return json(res, 409, { error: 'An active Stripe subscription is required before requesting non-renewal.' });
+        const commitment = commitmentDates(account.commitment_started_at || account.created_at);
+        const commitmentEndsAt = account.commitment_ends_at || commitment?.endsAt;
+        if (!commitmentEndsAt) return json(res, 409, { error: 'The commitment term could not be determined.' });
+        if (!canRequestNonRenewal(commitmentEndsAt)) return json(res, 409, { error: 'Non-renewal notice must be received at least 90 days before the commitment term ends.' });
+        const effectiveAt = new Date(commitmentEndsAt);
+        await stripe(`subscriptions/${encodeURIComponent(account.stripe_subscription_id)}`, {
+          cancel_at: String(Math.floor(effectiveAt.getTime() / 1000)),
+          'metadata[non_renewal_requested]': 'true',
+          'metadata[non_renewal_effective_at]': effectiveAt.toISOString(),
+        });
+        const requestedAt = new Date().toISOString();
+        await supabase(`accounts?id=eq.${encodeURIComponent(accountId)}`, {
+          method: 'PATCH',
+          prefer: 'return=minimal',
+          body: { non_renewal_requested_at: requestedAt, non_renewal_effective_at: effectiveAt.toISOString(), updated_at: requestedAt },
+        });
+        return json(res, 200, { nonRenewalRequestedAt: requestedAt, nonRenewalEffectiveAt: effectiveAt.toISOString() });
       }
     }
 
