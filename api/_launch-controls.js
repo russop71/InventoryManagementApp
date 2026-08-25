@@ -1,5 +1,5 @@
 const ACTIVE_BILLING_STATUSES = new Set(['active']);
-const MANAGEMENT_ROLES = new Set(['Owner', 'Admin', 'Manager']);
+const MANAGEMENT_ROLES = new Set(['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager']);
 const ACCOUNT_ADMIN_ROLES = new Set(['Owner', 'Admin']);
 
 export function configuredValues(value = '') {
