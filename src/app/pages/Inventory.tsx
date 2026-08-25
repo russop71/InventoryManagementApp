@@ -49,7 +49,7 @@ export function Inventory() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { inventory, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount } = useInventory();
-  const canManageCounts = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
+  const canManageCounts = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock'>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
