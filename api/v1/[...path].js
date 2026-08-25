@@ -11,7 +11,7 @@ const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPAB
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const VALID_ROLES = new Set(['Owner', 'Admin', 'Manager', 'Staff']);
+const VALID_ROLES = new Set(['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager', 'Staff']);
 const VALID_STATUSES = new Set(['Active', 'Inactive']);
 const ONBOARDING_STEPS = ['restaurant', 'location', 'suppliers', 'inventory', 'recipes', 'count'];
 const ONBOARDING_STATUSES = new Set(['not_started', 'in_progress', 'completed', 'dismissed']);
@@ -1330,7 +1330,7 @@ export default async function handler(req, res) {
         const current = rows?.[0] || { location_id: locationId };
         const integrations = current.integrations && typeof current.integrations === 'object' ? current.integrations : { toast: defaultToast() };
         if (segments[5] === 'invite' && method === 'POST') {
-          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) return json(res, 403, { error: 'Manager access is required to invite employees' });
+          if (!['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role)) return json(res, 403, { error: 'Manager access is required to invite employees' });
           const labor = normalizeLabor(integrations.labor);
           const incoming = req.body?.employee || {};
           const name = String(incoming.name || '').trim();
@@ -1379,7 +1379,7 @@ export default async function handler(req, res) {
           const labor = normalizeLabor(integrations.labor);
           const requestType = req.body?.type;
           const incoming = req.body?.request || {};
-          const canManageLabor = ['Owner', 'Admin', 'Manager'].includes(access.appUser.role);
+          const canManageLabor = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role);
           const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
           if (!canManageLabor && !linkedEmployee) return json(res, 403, { error: 'Your login is not linked to an employee profile' });
           if (!canManageLabor && incoming.employeeId !== linkedEmployee.id && incoming.requesterEmployeeId !== linkedEmployee.id) {
@@ -1396,7 +1396,7 @@ export default async function handler(req, res) {
           return json(res, 201, normalized);
         }
         if (segments[5] === 'requests' && method === 'PATCH') {
-          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) return json(res, 403, { error: 'Manager access is required to approve requests' });
+          if (!['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role)) return json(res, 403, { error: 'Manager access is required to approve requests' });
           const labor = normalizeLabor(integrations.labor);
           const id = String(req.body?.id || '');
           const status = String(req.body?.status || '');
@@ -1413,7 +1413,7 @@ export default async function handler(req, res) {
         }
         if (method === 'GET') {
           const labor = normalizeLabor(integrations.labor);
-          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) {
+          if (!['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role)) {
             const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
             labor.employees = labor.employees.map(employee => ({
               ...employee,
@@ -1431,7 +1431,7 @@ export default async function handler(req, res) {
           return json(res, 200, labor);
         }
         if (method === 'PUT') {
-          if (!['Owner', 'Admin', 'Manager'].includes(access.appUser.role)) {
+          if (!['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role)) {
             return json(res, 403, { error: 'Owner, admin or manager access is required to manage labour' });
           }
           const labor = normalizeLabor(req.body);
