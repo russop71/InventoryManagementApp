@@ -62,7 +62,7 @@ export function InventoryCountEditor() {
   const [countUnits, setCountUnits] = useState<Record<string, string>>({});
   const [countInputs, setCountInputs] = useState<Record<string, string>>({});
 
-  const canFinalize = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
+  const canFinalize = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const isFinalized = isInventoryCountFinalized(draft);
 
   useEffect(() => {
