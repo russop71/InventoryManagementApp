@@ -95,17 +95,29 @@ function unixDate(value) {
   return Number(value) > 0 ? new Date(Number(value) * 1000).toISOString() : null;
 }
 
+function commitmentEnd(startDate) {
+  const start = new Date(startDate);
+  const end = new Date(start);
+  end.setUTCFullYear(end.getUTCFullYear() + 1);
+  return end.toISOString();
+}
+
 function checkoutPaymentSucceeded(session) {
   return session?.payment_status === 'paid' || session?.payment_status === 'no_payment_required';
 }
 
 async function activateAccountFromCheckout(accountId, session) {
+  const startedAt = unixDate(session.created) || new Date().toISOString();
   await updateAccount(accountId, {
     stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
     stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
     billing_plan: session.metadata?.plan || null,
     billing_status: checkoutPaymentSucceeded(session) ? 'active' : 'incomplete',
     additional_location_quantity: Math.max(0, Number(session.metadata?.location_count || 1) - 1),
+    commitment_started_at: startedAt,
+    commitment_ends_at: commitmentEnd(startedAt),
+    non_renewal_requested_at: null,
+    non_renewal_effective_at: null,
   });
 }
 
