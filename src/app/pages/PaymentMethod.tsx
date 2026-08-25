@@ -87,7 +87,9 @@ export function PaymentMethod() {
       if (payload.billing.status === 'active' && !productAccess && checkoutSucceeded && sessionStorage.getItem('zestiq:billing-refresh') !== 'done') {
         sessionStorage.setItem('zestiq:billing-refresh', 'done');
         await refreshSession();
+        window.location.replace('/app/onboarding?activated=payment');
       }
+      return payload.billing;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to load billing');
     } finally {
@@ -101,6 +103,23 @@ export function PaymentMethod() {
     if (checkout === 'success') toast.success('Subscription checkout completed. Billing details will update shortly.');
     if (checkout === 'cancelled') toast.info('Checkout was cancelled. No payment was taken.');
   }, [loadBilling]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('checkout') !== 'success' || productAccess) return;
+    let stopped = false;
+    let attempts = 0;
+    let retryTimer: number | undefined;
+    const waitForActivation = async () => {
+      await loadBilling();
+      attempts += 1;
+      if (!stopped && attempts < 12) retryTimer = window.setTimeout(() => void waitForActivation(), 2500);
+    };
+    void waitForActivation();
+    return () => {
+      stopped = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [loadBilling, productAccess]);
 
   const openCheckout = async (plan: BillingPlan) => {
     if (!accountId) return;
