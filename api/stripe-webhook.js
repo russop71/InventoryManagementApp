@@ -80,6 +80,17 @@ async function recordSubscriptionAgreement(accountId, checkoutSession, acceptedA
   if (!response.ok) throw new Error(`Unable to record subscription agreement (${response.status})`);
 }
 
+async function accountIdForStripeSubscription(subscription) {
+  const subscriptionId = typeof subscription === 'string' ? subscription : subscription?.id;
+  if (!SUPABASE_SECRET_KEY || !subscriptionId) return null;
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/accounts?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}&select=id&limit=1`, {
+    headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` },
+  });
+  if (!response.ok) return null;
+  const rows = await response.json();
+  return rows?.[0]?.id || null;
+}
+
 function unixDate(value) {
   return Number(value) > 0 ? new Date(Number(value) * 1000).toISOString() : null;
 }
@@ -112,14 +123,16 @@ export default async function handler(req, res) {
     const event = JSON.parse(payload.toString('utf8'));
     const object = event?.data?.object || {};
 
-    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded' || event.type === 'checkout.session.async_payment_failed') {
       const accountId = object.client_reference_id || object.metadata?.account_id;
       if (accountId) {
         const acceptedAt = unixDate(object.created) || new Date().toISOString();
         await activateAccountFromCheckout(accountId, object);
-        await recordSubscriptionAgreement(accountId, object, acceptedAt).catch(error => {
-          console.error('Unable to record subscription agreement', error);
-        });
+        if (event.type !== 'checkout.session.async_payment_failed') {
+          await recordSubscriptionAgreement(accountId, object, acceptedAt).catch(error => {
+            console.error('Unable to record subscription agreement', error);
+          });
+        }
       }
     }
 
@@ -143,7 +156,8 @@ export default async function handler(req, res) {
 
     if (event.type === 'invoice.payment_succeeded' || event.type === 'invoice.payment_failed') {
       const subscriptionDetails = object.parent?.subscription_details || {};
-      const accountId = subscriptionDetails.metadata?.account_id || object.subscription_details?.metadata?.account_id;
+      const metadataAccountId = subscriptionDetails.metadata?.account_id || object.subscription_details?.metadata?.account_id;
+      const accountId = metadataAccountId || await accountIdForStripeSubscription(object.subscription);
       if (accountId) {
         await updateAccount(accountId, {
           stripe_customer_id: typeof object.customer === 'string' ? object.customer : object.customer?.id,
