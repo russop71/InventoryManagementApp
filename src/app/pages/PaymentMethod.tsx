@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, CreditCard, Download, ExternalLink, LockKeyhole, Receipt, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Check, CreditCard, Download, ExternalLink, LockKeyhole, Receipt, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -68,6 +68,20 @@ function statusClass(status: string) {
   return 'bg-slate-100 text-slate-700';
 }
 
+function paymentMethodExpired(method: BillingDetails['paymentMethods'][number]) {
+  if (!method.expMonth || !method.expYear) return false;
+  const expiry = new Date(method.expYear, method.expMonth, 1);
+  return expiry <= new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+}
+
+function billingAttentionMessage(status: string) {
+  if (status === 'past_due') return 'Your most recent payment did not go through. Update the payment method in Stripe to restore access.';
+  if (status === 'unpaid') return 'This subscription is unpaid. Update the payment method in Stripe to restore access.';
+  if (status === 'incomplete') return 'The first subscription payment is incomplete. Complete payment in Stripe to activate the account.';
+  if (status === 'canceled') return 'This subscription has been cancelled. Contact ZestIQ to discuss reactivation.';
+  return '';
+}
+
 export function PaymentMethod() {
   const { user, accountId, accountName, locations, productAccess, refreshSession } = useAuth();
   const isOwner = user?.role === 'Owner';
@@ -75,6 +89,8 @@ export function PaymentMethod() {
   const [isLoading, setIsLoading] = useState(false);
   const [locationCount, setLocationCount] = useState(Math.max(1, locations.length));
   const [commitmentAccepted, setCommitmentAccepted] = useState(false);
+  const billingNeedsAttention = ['past_due', 'unpaid', 'incomplete', 'canceled'].includes(billing?.status || '');
+  const expiredPaymentMethod = (billing?.paymentMethods || []).some(paymentMethodExpired);
 
   const loadBilling = useCallback(async () => {
     if (!accountId || !isOwner) return;
@@ -190,6 +206,21 @@ export function PaymentMethod() {
         </Card>
       )}
 
+      {(billingNeedsAttention || expiredPaymentMethod) && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+              <div>
+                <p className="font-bold text-red-950">Payment action required</p>
+                <p className="mt-1 text-sm leading-5 text-red-800">{billingNeedsAttention ? billingAttentionMessage(billing?.status || '') : 'A saved card has expired. Update the payment method in Stripe before the next renewal.'}</p>
+              </div>
+            </div>
+            {billing?.customerCreated && <Button type="button" disabled={isLoading} onClick={() => void openPortal()} className="bg-red-700 text-white hover:bg-red-800">Update payment method <ExternalLink className="ml-2 h-4 w-4" /></Button>}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="py-4">
@@ -277,17 +308,18 @@ export function PaymentMethod() {
           <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Payment information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {(billing?.paymentMethods || []).length > 0 ? billing?.paymentMethods.map(method => (
+          {(billing?.paymentMethods || []).length > 0 ? billing?.paymentMethods.map(method => {
+            const expired = paymentMethodExpired(method);
+            return (
             <div key={method.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
               <div>
                 <p className="font-semibold capitalize text-slate-950">{method.brand} •••• {method.last4}</p>
                 <p className="mt-1 text-sm text-slate-500">{method.holderName || billing?.customerEmail || 'Company payment method'}</p>
               </div>
-              <p className="text-sm text-slate-600">
-                Expires {method.expMonth?.toString().padStart(2, '0')}/{method.expYear}
-              </p>
+              <div className="text-right"><p className={`text-sm ${expired ? 'font-semibold text-red-700' : 'text-slate-600'}`}>{expired ? 'Expired · ' : ''}Expires {method.expMonth?.toString().padStart(2, '0')}/{method.expYear}</p></div>
             </div>
-          )) : (
+            );
+          }) : (
             <p className="py-5 text-center text-sm text-slate-500">No Stripe payment method is attached yet.</p>
           )}
           <p className="text-xs text-slate-500">Only card brand, last four digits, and expiry are displayed. zestIQ never stores full card numbers or security codes.</p>
@@ -303,7 +335,7 @@ export function PaymentMethod() {
             <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
               <div>
                 <p className="font-semibold text-slate-950">{payment.number || 'Stripe invoice'}</p>
-                <p className="mt-1 text-sm text-slate-500">{formatDate(payment.date)} · <span className="capitalize">{payment.status}</span></p>
+                <p className={`mt-1 text-sm ${payment.status === 'paid' ? 'text-slate-500' : 'font-semibold text-red-700'}`}>{formatDate(payment.date)} · <span className="capitalize">{payment.status}</span></p>
               </div>
               <div className="flex items-center gap-3">
                 <p className="font-bold text-slate-950">{payment.currency} {payment.amount.toFixed(2)}</p>
