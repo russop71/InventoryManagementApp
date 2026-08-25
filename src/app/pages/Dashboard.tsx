@@ -34,7 +34,7 @@ export function Dashboard() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
-  const canManageLabor = user?.role === 'Owner' || user?.role === 'Admin' || user?.role === 'Manager';
+  const canManageLabor = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const latestFinalizedInventoryCount = getLatestFinalizedInventoryCount(inventoryCounts);
   const activeInventoryCountDraft = getLatestDraftInventoryCount(inventoryCounts);
   const activeInventoryCountSummary = summarizeInventoryCount(activeInventoryCountDraft);
@@ -444,6 +444,16 @@ export function Dashboard() {
   const salariedLaborPercent = totalRevenue > 0 ? (laborBreakdown.salaried / totalRevenue) * 100 : 0;
   const salariedManagerCount = employees.filter(employee => employee.active && employee.payType === 'salary').length;
   const hourlyShare = laborBreakdown.total > 0 ? (laborBreakdown.hourly / laborBreakdown.total) * 100 : 0;
+  const isBohManager = user?.role === 'BOH Manager';
+  const isFohManager = user?.role === 'FOH Manager';
+  const firstName = String(user?.name || '').trim().split(/\s+/)[0] || 'there';
+  const beverageCogs = cogsCategoryTotals.find(category => /beverage|wine|beer|cocktail|bar/i.test(category.name))?.totalCOGS || 0;
+  const briefTitle = isBohManager ? 'Kitchen brief' : isFohManager ? 'Service & bar brief' : 'Daily operations brief';
+  const briefSummary = isBohManager
+    ? `${lowStockItems.length ? `${lowStockItems.length} item${lowStockItems.length === 1 ? '' : 's'} need attention before service.` : 'Stock is set for service.'}`
+    : isFohManager
+      ? `${todaysCovers ? `${todaysCovers} covers are recorded for the latest service day.` : 'Connect or import POS sales to track today’s service.'}`
+      : `${lowStockItems.length || pendingOrdersCount ? `${lowStockItems.length} low-stock item${lowStockItems.length === 1 ? '' : 's'} · ${pendingOrdersCount} order${pendingOrdersCount === 1 ? '' : 's'} pending.` : 'Nothing urgent is waiting right now.'}`;
 
   return (
     <div className="space-y-4">
@@ -453,6 +463,33 @@ export function Dashboard() {
           <p className="text-xs text-gray-400 mt-0.5 font-semibold uppercase tracking-wider">Real-time overview</p>
         </div>
       </div>
+
+      <section className="overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white shadow-lg shadow-slate-900/10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F5C10E]">Today at a glance</p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight">Good morning, {firstName}.</h1>
+            <p className="mt-1 text-sm font-bold text-white">{briefTitle}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{briefSummary}</p>
+          </div>
+          <Badge className="border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-black text-white">{user?.role || 'Team member'}</Badge>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          {isBohManager ? <>
+            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} waiting to be received</p></Link>
+          </> : isFohManager ? <>
+            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Sales</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todaysRevenue.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">{todaysCovers} covers · ${todaysAvgCheck.toFixed(0)} average check</p></Link>
+            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · view schedule</p></Link>
+            <Link to="/app/beverages" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Bar & beverage</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${beverageCogs.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">Beverage COGS in the selected period</p></Link>
+          </> : <>
+            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link>
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
+          </>}
+        </div>
+      </section>
 
       {inventoryLossAlert.isUnusual && latestFinalizedInventoryCount && (
         <Link to={`/app/inventory/counts/${latestFinalizedInventoryCount.id}`} className="block rounded-2xl bg-rose-700 p-4 text-white shadow-lg shadow-rose-900/15 transition hover:bg-rose-800">
