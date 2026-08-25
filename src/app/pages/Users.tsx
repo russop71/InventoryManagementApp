@@ -21,7 +21,7 @@ interface CompanyUser {
   id: string;
   name: string;
   email: string;
-  role: 'Owner' | 'Admin' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Staff';
   status: 'Active' | 'Inactive';
   lastLogin: string;
   usage?: UserUsage;
@@ -36,7 +36,7 @@ function formatDate(value: string | null | undefined) {
 function roleBadgeClass(role: CompanyUser['role']) {
   if (role === 'Owner') return 'bg-[#0F172A] text-white';
   if (role === 'Admin') return 'bg-red-100 text-red-800';
-  if (role === 'Manager') return 'bg-[#FEF9C3] text-[#1E3A5F]';
+  if (role === 'Manager' || role === 'BOH Manager' || role === 'FOH Manager') return 'bg-[#FEF9C3] text-[#1E3A5F]';
   return 'bg-slate-100 text-slate-700';
 }
 
@@ -208,6 +208,8 @@ export function Users() {
                   <select id="team-role" name="role" defaultValue={selectedUser?.role || 'Staff'} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
                     <option value="Staff">Staff</option>
                     <option value="Manager">Manager</option>
+                    <option value="BOH Manager">BOH management</option>
+                    <option value="FOH Manager">FOH management</option>
                     <option value="Admin">Admin</option>
                     <option value="Owner">Owner</option>
                   </select>
