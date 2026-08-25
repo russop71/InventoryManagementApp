@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -74,6 +75,7 @@ export function PlatformAdmin() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [paymentLink, setPaymentLink] = useState('');
   const [billableLocationCount, setBillableLocationCount] = useState(1);
+  const [commitmentConfirmed, setCommitmentConfirmed] = useState(false);
 
   const loadClients = useCallback(async () => {
     if (!user?.platformAdmin) return;
@@ -102,6 +104,7 @@ export function PlatformAdmin() {
   const openClient = async (clientId: string) => {
     setIsLoading(true);
     setPaymentLink('');
+    setCommitmentConfirmed(false);
     try {
       const result = await apiRequest<{ client: ClientDetail }>(`/api/v1/platform/accounts/${encodeURIComponent(clientId)}`);
       setSelectedClient(result.client);
@@ -142,7 +145,7 @@ export function PlatformAdmin() {
     try {
       const result = await apiRequest<{ url: string }>(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/billing/checkout`, {
         method: 'POST',
-        body: JSON.stringify({ plan, locationCount: billableLocationCount }),
+        body: JSON.stringify({ plan, locationCount: billableLocationCount, commitmentAccepted: true }),
       });
       setPaymentLink(result.url);
       toast.success('Secure Stripe checkout link created for this client');
@@ -265,6 +268,14 @@ export function PlatformAdmin() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="font-semibold text-slate-950">Secure billing setup</p>
                 <p className="mt-1 text-sm text-slate-500">Premium is CAD $249.99/month for one location. Each additional location is CAD $100/month. There is no free trial.</p>
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
+                  <p className="font-semibold text-slate-950">Contract term disclosure</p>
+                  <p className="mt-1">Billed monthly with a 12-month initial commitment. The subscription renews for another 12-month term unless written non-renewal notice is received at least 90 days before term end.</p>
+                  <label className="mt-3 flex cursor-pointer items-start gap-2">
+                    <Checkbox checked={commitmentConfirmed} onCheckedChange={checked => setCommitmentConfirmed(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#0F172A]" />
+                    <span>I have confirmed these terms with this client before creating their checkout link.</span>
+                  </label>
+                </div>
                 <div className="mt-3 max-w-xs">
                   <Label htmlFor="client-location-count">Total billed locations</Label>
                   <Input
@@ -279,7 +290,7 @@ export function PlatformAdmin() {
                   <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 100).toFixed(2)}/month</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
+                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
                 </div>
                 {selectedClient.billing.customerCreated && <p className="mt-3 text-xs text-slate-500">This client already has Stripe billing. Use Stripe to manage its existing subscription rather than creating a duplicate.</p>}
                 {!selectedClient.billing.configured && <p className="mt-3 text-xs text-amber-700">Connect Stripe keys and price IDs before creating payment links.</p>}
