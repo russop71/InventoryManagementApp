@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router';
 import {
   LayoutDashboard, Package, ChefHat,
   Users, LogOut, CreditCard, HelpCircle, MessageSquare, Bell,
-  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Wine,
+  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Trash2,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useNavigate } from 'react-router';
@@ -54,6 +54,7 @@ export function Layout() {
         { label: 'Forecasting', path: '/app/forecasting' },
         { label: 'Cost Breakdown', path: '/app/costs' },
         { label: 'COGS Breakdown', path: '/app/cogs' },
+        { label: 'Waste Tracking', path: '/app/waste' },
       ],
     },
     {
@@ -160,6 +161,7 @@ export function Layout() {
                 <DropdownMenuItem onClick={() => navigate('/app/integrations')} className="rounded-lg mx-1"><Settings  className="w-4 h-4 mr-2.5 text-gray-400" />Integrations</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/app/notifications')}className="rounded-lg mx-1"><Bell      className="w-4 h-4 mr-2.5 text-gray-400" />Notifications</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/app/order-alarms')} className="rounded-lg mx-1"><AlarmClock className="w-4 h-4 mr-2.5 text-gray-400" />Order Alarms</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/app/waste')} className="rounded-lg mx-1"><Trash2 className="w-4 h-4 mr-2.5 text-gray-400" />Waste Tracking</DropdownMenuItem>
               </div>
               <DropdownMenuSeparator />
               <div className="py-1">
