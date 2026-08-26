@@ -4,7 +4,7 @@ import { ShieldAlert } from 'lucide-react';
 
 export function AuthLayout() {
   const location = useLocation();
-  const { isAuthenticated, user, productAccess, onboarding } = useAuth();
+  const { isAuthenticated, user, productAccess, onboarding, mfaRequired } = useAuth();
 
   // Loading state
   if (isAuthenticated === null) {
@@ -19,6 +19,8 @@ export function AuthLayout() {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  if (mfaRequired) return <Navigate to="/mfa" replace />;
 
   if (user?.role === 'Staff' && location.pathname.startsWith('/app')) {
     return <Navigate to="/employee" replace />;
