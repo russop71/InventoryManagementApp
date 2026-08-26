@@ -95,7 +95,9 @@ export function Login() {
 
       {/* ── Yellow hero ───────────────────────────────── */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
-        <img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-auto w-full max-w-[420px]" />
+        <div className="w-full max-w-[560px] rounded-[2rem] bg-white px-5 py-5 shadow-[0_12px_0_rgba(15,23,42,0.12)] sm:px-8 sm:py-6">
+          <img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-auto w-full drop-shadow-sm" />
+        </div>
         <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
           Smarter Kitchens. Better Business.
         </p>
