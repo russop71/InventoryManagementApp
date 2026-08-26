@@ -15,7 +15,7 @@ import {
   Check, AlertCircle, TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
+import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils';
 import { buildSupplierEmailDrafts } from '../utils/supplierEmailDraft.js';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 
@@ -86,7 +86,7 @@ interface OrderSuggestion {
 }
 
 export function Orders() {
-  const { orders, inventory, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
+  const { orders, inventory, forecasts, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
   const { salesData } = useToast();
   const { accountId, accountName, user } = useAuth();
   const navigate = useNavigate();
@@ -159,16 +159,11 @@ export function Orders() {
 
     inventory.forEach(item => {
       const stockPercentage = (item.currentStock / item.parLevel) * 100;
-      let estimatedDailyUsage = item.category === 'Produce'
-        ? item.parLevel * 0.2
-        : item.category === 'Proteins'
-          ? item.parLevel * 0.15
-          : item.category === 'Dairy'
-            ? item.parLevel * 0.12
-            : item.parLevel * 0.1;
-
-      if (salesTrend > 0.1) estimatedDailyUsage *= 1.2;
-      else if (salesTrend < -0.1) estimatedDailyUsage *= 0.85;
+      const forecastEntry = forecasts
+        .filter(forecast => forecast.items.some(entry => entry.itemId === item.id))
+        .sort((left, right) => left.date.localeCompare(right.date))
+        .find(forecast => forecast.date >= new Date().toISOString().slice(0, 10));
+      const estimatedDailyUsage = estimateDemandForTomorrow({ inventoryItem: item, forecastItems: forecasts, salesData });
 
       const suggestedQuantity = calculateForecastOrderQuantity({
         currentStock: item.currentStock,
@@ -184,10 +179,11 @@ export function Orders() {
       let reasoning = '';
       let confidence = 0;
 
+      const forecastNote = forecastEntry ? ` Forecast for ${forecastEntry.date}${forecastEntry.weatherSummary ? ` (${forecastEntry.weatherSummary})` : ''}.` : '';
       if (daysUntilStockout <= 2) {
-        shouldOrder = true; priority = 'critical'; reasoning = `Critical: only ${daysUntilStockout} days of stock left`; confidence = 0.95;
+        shouldOrder = true; priority = 'critical'; reasoning = `Critical: only ${daysUntilStockout} days of stock left.${forecastNote}`; confidence = forecastEntry ? 0.96 : 0.95;
       } else if (daysUntilStockout <= 4) {
-        shouldOrder = true; priority = 'high'; reasoning = `High priority: ${daysUntilStockout} days until stockout`; confidence = 0.88;
+        shouldOrder = true; priority = 'high'; reasoning = `High priority: ${daysUntilStockout} days until stockout.${forecastNote}`; confidence = forecastEntry ? 0.9 : 0.88;
       } else if (stockPercentage < 40) {
         shouldOrder = true; priority = 'medium'; reasoning = `Below 40% par level (${stockPercentage.toFixed(0)}%)`; confidence = 0.75;
       } else if (stockPercentage < 70) {
@@ -215,7 +211,7 @@ export function Orders() {
 
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     return suggestions.sort((a, b) => priorityOrder[a.priority] === priorityOrder[b.priority] ? b.confidence - a.confidence : priorityOrder[a.priority] - priorityOrder[b.priority]);
-  }, [inventory, salesData]);
+  }, [inventory, forecasts, salesData]);
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:4001');
