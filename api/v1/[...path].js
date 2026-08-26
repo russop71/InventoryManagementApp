@@ -558,6 +558,28 @@ function bearerToken(req) {
   return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
 }
 
+function jwtAssuranceLevel(token = '') {
+  try {
+    const payload = String(token).split('.')[1];
+    if (!payload) return 'aal1';
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(Buffer.from(normalized, 'base64').toString('utf8'))?.aal || 'aal1';
+  } catch {
+    return 'aal1';
+  }
+}
+
+function mfaRequiredFor(appUser, authUser) {
+  if (String(authUser?.email || '').trim().toLowerCase() === 'demo@zestiq.com') return false;
+  return isPlatformAdminEmail(authUser?.email) || ['Owner', 'Admin'].includes(appUser?.role);
+}
+
+function ensureMfa(auth) {
+  if (mfaRequiredFor(auth.appUser, auth.authUser) && jwtAssuranceLevel(auth.token) !== 'aal2') {
+    throw Object.assign(new Error('Two-step verification is required for this account'), { status: 401, code: 'MFA_REQUIRED' });
+  }
+}
+
 async function getAuthContext(req) {
   const token = bearerToken(req);
   if (!token) throw Object.assign(new Error('Sign in is required'), { status: 401 });
@@ -570,6 +592,7 @@ async function getAuthContext(req) {
 
 async function requireAccountAccess(req, accountIdentifier, { ownerOnly = false } = {}) {
   const auth = await getAuthContext(req);
+  ensureMfa(auth);
   const account = await getAccount(accountIdentifier);
   if (!account) throw Object.assign(new Error('account not found'), { status: 404 });
   if (auth.appUser.account_id !== account.id) throw Object.assign(new Error('You do not have access to this company account'), { status: 403 });
@@ -637,6 +660,7 @@ async function sessionPayload(tokenPayload) {
     account: mapAccount(account, authUser),
     locations: locations.map(mapLocation),
     activeLocationId: locations[0]?.id || null,
+    mfaRequired: mfaRequiredFor(appUser, authUser) && jwtAssuranceLevel(tokenPayload.access_token) !== 'aal2',
   };
 }
 
@@ -772,7 +796,43 @@ export default async function handler(req, res) {
         account: mapAccount(account, auth.authUser),
         locations: locations.map(mapLocation),
         activeLocationId: locations[0]?.id || null,
+        mfaRequired: mfaRequiredFor(auth.appUser, auth.authUser) && jwtAssuranceLevel(auth.token) !== 'aal2',
       });
+    }
+
+    if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'status' && method === 'GET') {
+      const auth = await getAuthContext(req);
+      const factors = await supabaseAuth('factors', { accessToken: auth.token });
+      return json(res, 200, {
+        required: mfaRequiredFor(auth.appUser, auth.authUser),
+        verified: jwtAssuranceLevel(auth.token) === 'aal2',
+        factors: Array.isArray(factors) ? factors.map(factor => ({ id: factor.id, type: factor.factor_type || factor.type, status: factor.status, friendlyName: factor.friendly_name || '' })) : [],
+      });
+    }
+
+    if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'enroll' && method === 'POST') {
+      const auth = await getAuthContext(req);
+      if (!mfaRequiredFor(auth.appUser, auth.authUser)) return json(res, 403, { error: 'Two-step verification is not required for this user' });
+      const enrolled = await supabaseAuth('factors', {
+        method: 'POST',
+        accessToken: auth.token,
+        body: { factor_type: 'totp', friendly_name: 'ZestIQ Authenticator' },
+      });
+      return json(res, 200, { id: enrolled.id, qrCode: enrolled?.totp?.qr_code || '', uri: enrolled?.totp?.uri || '' });
+    }
+
+    if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'verify' && method === 'POST') {
+      const auth = await getAuthContext(req);
+      const factorId = String(req.body?.factorId || '').trim();
+      const code = String(req.body?.code || '').replace(/\s/g, '');
+      if (!factorId || !/^\d{6}$/.test(code)) return json(res, 400, { error: 'Enter the six-digit code from your authenticator app' });
+      const factors = await supabaseAuth('factors', { accessToken: auth.token });
+      if (!Array.isArray(factors) || !factors.some(factor => factor.id === factorId)) {
+        return json(res, 403, { error: 'That authenticator is not available for this account' });
+      }
+      const challenge = await supabaseAuth(`factors/${encodeURIComponent(factorId)}/challenge`, { method: 'POST', accessToken: auth.token });
+      const verified = await supabaseAuth(`factors/${encodeURIComponent(factorId)}/verify`, { method: 'POST', accessToken: auth.token, body: { challenge_id: challenge.id, code } });
+      return json(res, 200, await sessionPayload(verified));
     }
 
     if (segments[0] === 'auth' && segments[1] === 'logout' && method === 'POST') {
@@ -803,6 +863,7 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'platform') {
       const auth = await getAuthContext(req);
+      ensureMfa(auth);
       if (!isPlatformAdmin(auth.authUser)) {
         return json(res, 403, { error: 'ZestIQ platform administrator access is required' });
       }
