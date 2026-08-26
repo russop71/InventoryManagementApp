@@ -2,13 +2,14 @@ import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { useLabor } from '../contexts/LaborContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useWaste } from '../contexts/WasteContext';
 import { Link, useNavigate } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound, Trash2 } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useState } from 'react';
 import {
@@ -26,6 +27,7 @@ export function Dashboard() {
   const { inventory, orders, recipes, inventoryCounts } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
   const { employees, targetLaborPercent, laborCostBreakdownForRange } = useLabor();
+  const { entries: wasteEntries } = useWaste();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [breakdownType, setBreakdownType] = useState<'items' | 'cost' | 'lowStock' | 'orders'>('items');
@@ -448,6 +450,8 @@ export function Dashboard() {
   const isFohManager = user?.role === 'FOH Manager';
   const firstName = String(user?.name || '').trim().split(/\s+/)[0] || 'there';
   const beverageCogs = cogsCategoryTotals.find(category => /beverage|wine|beer|cocktail|bar/i.test(category.name))?.totalCOGS || 0;
+  const todayKey = toLocalDateKey(new Date());
+  const todayWaste = wasteEntries.filter(entry => entry.occurredAt.slice(0, 10) === todayKey).reduce((sum, entry) => sum + entry.totalCost, 0);
   const briefTitle = isBohManager ? 'Kitchen brief' : isFohManager ? 'Service & bar brief' : 'Daily operations brief';
   const briefSummary = isBohManager
     ? `${lowStockItems.length ? `${lowStockItems.length} item${lowStockItems.length === 1 ? '' : 's'} need attention before service.` : 'Stock is set for service.'}`
@@ -474,7 +478,7 @@ export function Dashboard() {
           </div>
           <Badge className="border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-black text-white">{user?.role || 'Team member'}</Badge>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {isBohManager ? <>
             <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
             <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
@@ -488,6 +492,7 @@ export function Dashboard() {
             <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link>
             <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
           </>}
+          <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F5C10E]" /></div><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
         </div>
       </section>
 
