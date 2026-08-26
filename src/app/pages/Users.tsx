@@ -53,6 +53,7 @@ export function Users() {
   const navigate = useNavigate();
   const { user: currentUser, accountId, accountName } = useAuth();
   const isOwner = currentUser?.role === 'Owner';
+  const isSuperAdmin = Boolean(currentUser?.platformAdmin);
   const [users, setUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -174,6 +175,7 @@ export function Users() {
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Owner control center</p>
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Users & app usage</h2>
           <p className="mt-1 text-sm text-slate-600">{accountName} · isolated company workspace</p>
+          {isSuperAdmin && <Badge className="mt-2 bg-violet-100 text-violet-800"><Shield className="mr-1 h-3 w-3" />ZestIQ Super Admin</Badge>}
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="outline" onClick={() => navigate('/app/payment-method')}>
@@ -222,6 +224,7 @@ export function Users() {
                     <ul className="mt-1 space-y-1">
                       {accessLevels.map(level => <li key={level.role}><span className="font-semibold text-slate-700">{level.title}:</span> {level.detail}</li>)}
                     </ul>
+                    <p className="mt-2 border-t border-slate-200 pt-2"><span className="font-semibold text-violet-800">ZestIQ Super Admin:</span> platform-level access across client accounts. It is configured only by ZestIQ and cannot be assigned from a restaurant’s user list.</p>
                   </div>
                 </div>
                 {editingUserId && (
