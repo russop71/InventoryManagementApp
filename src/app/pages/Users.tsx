@@ -40,6 +40,15 @@ function roleBadgeClass(role: CompanyUser['role']) {
   return 'bg-slate-100 text-slate-700';
 }
 
+const accessLevels: Array<{ role: CompanyUser['role']; title: string; detail: string }> = [
+  { role: 'Owner', title: 'Owner', detail: 'Full company access, including users, billing, locations and all operational areas.' },
+  { role: 'Admin', title: 'Admin', detail: 'Runs day-to-day operations, setup and reporting, without subscription ownership.' },
+  { role: 'Manager', title: 'Manager', detail: 'Works across restaurant operations, including inventory, purchasing, reports and scheduling.' },
+  { role: 'BOH Manager', title: 'BOH management', detail: 'Chef-focused operational access for food inventory, recipes, ordering, invoices and kitchen labour.' },
+  { role: 'FOH Manager', title: 'FOH management', detail: 'Front-of-house access for beverage operations, sales reporting and labour scheduling.' },
+  { role: 'Staff', title: 'Employee', detail: 'ZestEmployee access only: personal schedule, shift swaps and time-off requests.' },
+];
+
 export function Users() {
   const navigate = useNavigate();
   const { user: currentUser, accountId, accountName } = useAuth();
@@ -204,15 +213,16 @@ export function Users() {
                   <Input id="team-email" name="email" type="email" required defaultValue={selectedUser?.email || ''} />
                 </div>
                 <div>
-                  <Label htmlFor="team-role">Role</Label>
+                  <Label htmlFor="team-role">Access level</Label>
                   <select id="team-role" name="role" defaultValue={selectedUser?.role || 'Staff'} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
-                    <option value="Staff">Staff</option>
-                    <option value="Manager">Manager</option>
-                    <option value="BOH Manager">BOH management</option>
-                    <option value="FOH Manager">FOH management</option>
-                    <option value="Admin">Admin</option>
-                    <option value="Owner">Owner</option>
+                    {accessLevels.map(level => <option key={level.role} value={level.role}>{level.title}</option>)}
                   </select>
+                  <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                    <p className="font-semibold text-slate-800">Choose the right access point</p>
+                    <ul className="mt-1 space-y-1">
+                      {accessLevels.map(level => <li key={level.role}><span className="font-semibold text-slate-700">{level.title}:</span> {level.detail}</li>)}
+                    </ul>
+                  </div>
                 </div>
                 {editingUserId && (
                   <div>
