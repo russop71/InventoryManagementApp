@@ -1,5 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ZestIQ">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ZestIQ lemon mark">
   <rect width="256" height="256" rx="60" fill="#F5C10E"/>
-  <path d="M62 72h132L83 184h111" fill="none" stroke="#0B1220" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M147 51c15-25 46-27 60-10-12 21-41 28-60 10Z" fill="#59A64A"/>
+  <path d="M45 161a83 83 0 0 1 166 0v12H45z" fill="#0B1220"/>
+  <path d="M57 159a71 71 0 0 1 142 0" fill="none" stroke="#F5C10E" stroke-width="9" stroke-linecap="round"/>
+  <path d="M128 91v72M78 111l50 52M178 111l-50 52" fill="none" stroke="#F5C10E" stroke-width="8" stroke-linecap="round"/>
+  <path d="M137 72c15-28 47-32 65-12-14 24-44 32-65 12Z" fill="#59A64A"/>
+  <path d="M142 75c15-4 30-10 45-20" fill="none" stroke="#0B1220" stroke-width="5" stroke-linecap="round"/>
 </svg>
