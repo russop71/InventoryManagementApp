@@ -3,6 +3,8 @@ import type { InventoryItem } from '../contexts/InventoryContext';
 export type InventoryCountStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
 
 export interface InventoryCountEntry {
+  /** A count line is unique per storage area; an item can appear on more than one line. */
+  entryId?: string;
   itemId: string;
   name: string;
   hypothetical: number;
@@ -53,6 +55,7 @@ export function buildCountEntries(items: InventoryItem[], previousCount?: Invent
     const unitCost = Number(item.unitCost) || 0;
     const previousEntry = previousEntries.get(item.id);
     return {
+      entryId: `${item.id}::${item.storageArea?.trim() || 'Unassigned'}`,
       itemId: item.id,
       name: item.name,
       hypothetical,
