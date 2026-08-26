@@ -314,10 +314,10 @@ export function Landing() {
           <ZestIQBrand compact />
           <nav className="hidden gap-7 text-sm font-bold md:flex">
             <a href="#platform">Platform</a>
-            <a href="#product-tour">Product tour</a>
-            <a href="#capabilities">Capabilities</a>
+            <Link to="/product-tour">Product tour</Link>
+            <Link to="/capabilities">Capabilities</Link>
             <a href="#how">How it works</a>
-            <a href="#pricing">Pricing</a>
+            <Link to="/pricing">Pricing</Link>
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link className="rounded-xl border border-[#0B1220]/15 bg-white px-3 py-2.5 text-sm font-black text-[#0B1220] shadow-sm transition hover:border-[#0B1220]/35 sm:px-5 sm:py-3" to="/login">Log in</Link>
@@ -343,7 +343,7 @@ export function Landing() {
                 <Link to={DEMO_URL} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-7 font-black text-[#0B1220]">
                   Book a demo <ArrowRight className="h-4 w-4" />
                 </Link>
-                <a href="#capabilities" className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-7 font-bold">See every capability</a>
+                <Link to="/capabilities" className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-7 font-bold">See every capability</Link>
               </div>
               <div className="mt-8 flex flex-wrap gap-2 text-xs font-semibold text-white/60">
                 {['AI invoice & recipe scanning', 'Company-isolated data', 'Live food costing', 'Owner controls'].map(item => (
@@ -544,10 +544,10 @@ export function Landing() {
         <div className="mx-auto max-w-7xl px-5 pb-8 pt-14 sm:px-8 sm:pt-20">
           <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><ZestIQBrand className="text-white" /><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
           <nav aria-label="Footer" className="grid gap-9 py-12 sm:grid-cols-2 lg:grid-cols-5">
-            <FooterGroup title="Product" links={[["Product tour", "/#product-tour"], ["Capabilities", "/#capabilities"], ["Pricing", "/#pricing"], ["Demo account", "/login"]]} />
-            <FooterGroup title="Operations" links={[["Inventory software", "/restaurant-inventory-management-software"], ["Food cost software", "/restaurant-food-cost-software"], ["Invoice scanner", "/restaurant-invoice-scanner"], ["Labour & scheduling", "/#capabilities"], ["Beverage costing", "/#capabilities"]]} />
-            <FooterGroup title="Platform" links={[["AI & data", "/ai-transparency"], ["Subprocessors", "/subprocessors"], ["Security & privacy", "/privacy"], ["Multi-location", "/#capabilities"], ["POS integrations", "/#capabilities"]]} />
-            <FooterGroup title="Company" links={[["Book a demo", "/book-demo"], ["Contact", "mailto:demo@zestiq.ca"], ["Canadian owned", "/#canadian-owned"], ["Legal centre", "/legal"]]} />
+            <FooterGroup title="Product" links={[["Product tour", "/product-tour"], ["Capabilities", "/capabilities"], ["Pricing", "/pricing"], ["Demo account", "/login"]]} />
+            <FooterGroup title="Operations" links={[["Inventory software", "/restaurant-inventory-management-software"], ["Food cost software", "/restaurant-food-cost-software"], ["Invoice scanner", "/restaurant-invoice-scanner"], ["Labour & scheduling", "/restaurant-labour-scheduling-software"], ["Beverage costing", "/restaurant-beverage-costing-software"]]} />
+            <FooterGroup title="Platform" links={[["AI & data", "/ai-transparency"], ["Subprocessors", "/subprocessors"], ["Security & privacy", "/privacy"], ["Multi-location", "/multi-location-restaurant-software"], ["POS integrations", "/restaurant-pos-integrations"]]} />
+            <FooterGroup title="Company" links={[["Book a demo", "/book-demo"], ["Contact", "/contact"], ["Canadian owned", "/canadian-owned"], ["Legal centre", "/legal"]]} />
             <FooterGroup title="Legal" links={[["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"], ["Cookie Policy", "/cookies"], ["AI Transparency", "/ai-transparency"]]} />
           </nav>
           <div id="canadian-owned" className="flex flex-col gap-4 border-t border-white/10 py-6 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 ZestIQ. All rights reserved.</p><p className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-bold text-white/70"><span aria-hidden="true">🇨🇦</span>Proudly Canadian owned &amp; operated</p></div>
