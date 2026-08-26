@@ -890,7 +890,7 @@ export default async function handler(req, res) {
       const enrolled = await supabaseAuth('factors', {
         method: 'POST',
         accessToken: auth.token,
-        body: { factor_type: 'totp', friendly_name: 'ZestIQ Authenticator' },
+        body: { factor_type: 'totp', friendly_name: `ZestIQ Authenticator ${Date.now()}` },
       });
       return json(res, 200, { id: enrolled.id, qrCode: enrolled?.totp?.qr_code || '', uri: enrolled?.totp?.uri || '' });
     }
