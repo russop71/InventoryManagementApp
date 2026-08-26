@@ -674,6 +674,9 @@ function jwtAssuranceLevel(token = '') {
 }
 
 function mfaRequiredFor(appUser, authUser) {
+  // MFA can be enabled once the authenticator rollout is complete. Keep it opt-in during setup
+  // so an owner is never locked out by an unfinished enrollment flow.
+  if (String(process.env.MFA_ENFORCEMENT || '').trim().toLowerCase() !== 'required') return false;
   if (String(authUser?.email || '').trim().toLowerCase() === 'demo@zestiq.com') return false;
   return isPlatformAdminEmail(authUser?.email) || ['Owner', 'Admin'].includes(appUser?.role);
 }
