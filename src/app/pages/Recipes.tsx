@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useInventory } from '../contexts/InventoryContext';
+import { useInventory, type InventoryItem } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { useLocation, useNavigate } from 'react-router';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
@@ -12,9 +12,49 @@ import { Badge } from '../components/ui/badge';
 import { Plus, ChefHat, Trash2, Edit, RefreshCw, Camera } from 'lucide-react';
 import { toast as showToast } from 'sonner';
 import { RecipeScan, type ScannedRecipeData } from '../components/RecipeScan';
-import { convertQuantity, formatUnitLabel, getCompatibleUnits, normalizeUnit } from '../utils/unitConversion';
+import { convertQuantity, formatUnitLabel, getCompatibleUnits, getUnitFamily, normalizeUnit } from '../utils/unitConversion';
 
 type IngredientSelection = { inventoryItemId: string; quantity: number; unit: string };
+
+function bottleCapacityInMl(item: InventoryItem) {
+  if (normalizeUnit(item.unit) !== 'bottle') return null;
+
+  const mainPurchaseOption = item.purchaseOptions?.find(option => option.isMain) || item.purchaseOptions?.[0];
+  const size = item.packSize ?? mainPurchaseOption?.packSize;
+  const unit = item.packUnit ?? mainPurchaseOption?.packUnit;
+  const configuredCapacity = size && unit && getUnitFamily(unit) === 'volume'
+    ? convertQuantity(size, unit, 'ml')
+    : null;
+  if (configuredCapacity && configuredCapacity > 0) return configuredCapacity;
+
+  const namedCapacity = item.name.match(/(\d+(?:\.\d+)?)\s*(ml|l)\b/i);
+  return namedCapacity ? convertQuantity(Number(namedCapacity[1]), namedCapacity[2], 'ml') : null;
+}
+
+function ingredientCompatibleUnits(item: InventoryItem) {
+  if (bottleCapacityInMl(item) === null) return getCompatibleUnits(item.unit);
+  return [
+    { value: 'bottle', label: 'bottle' },
+    ...getCompatibleUnits('ml'),
+  ];
+}
+
+function convertIngredientQuantity(item: InventoryItem, quantity: number, fromUnit: string, toUnit: string) {
+  const directConversion = convertQuantity(quantity, fromUnit, toUnit);
+  if (directConversion !== null) return directConversion;
+
+  const bottleCapacity = bottleCapacityInMl(item);
+  if (!bottleCapacity) return null;
+
+  if (normalizeUnit(fromUnit) === 'bottle' && getUnitFamily(toUnit) === 'volume') {
+    return convertQuantity(quantity * bottleCapacity, 'ml', toUnit);
+  }
+  if (getUnitFamily(fromUnit) === 'volume' && normalizeUnit(toUnit) === 'bottle') {
+    const millilitres = convertQuantity(quantity, fromUnit, 'ml');
+    return millilitres === null ? null : millilitres / bottleCapacity;
+  }
+  return null;
+}
 
 function IngredientAutocomplete({
   inventory,
@@ -184,7 +224,7 @@ export function Recipes() {
     if (!item) return 0;
 
     const sourceUnit = ingredient.unit || item.unit;
-    const quantityInInventoryUnit = convertQuantity(ingredient.quantity, sourceUnit, item.unit);
+    const quantityInInventoryUnit = convertIngredientQuantity(item, ingredient.quantity, sourceUnit, item.unit);
     if (quantityInInventoryUnit === null) return 0;
     return quantityInInventoryUnit * item.unitCost;
   };
@@ -252,7 +292,8 @@ export function Recipes() {
       if (ingredient.inventoryItemId !== itemId) return ingredient;
 
       const currentUnit = ingredient.unit;
-      const convertedQuantity = convertQuantity(ingredient.quantity, currentUnit, unit);
+      const item = inventory.find((inventoryItem) => inventoryItem.id === itemId);
+      const convertedQuantity = item ? convertIngredientQuantity(item, ingredient.quantity, currentUnit, unit) : null;
       return {
         ...ingredient,
         unit,
@@ -320,7 +361,7 @@ export function Recipes() {
           {ingredients.map((ingredient) => {
             const item = inventory.find((inventoryItem) => inventoryItem.id === ingredient.inventoryItemId);
             if (!item) return null;
-            const compatibleUnits = getCompatibleUnits(item.unit);
+            const compatibleUnits = ingredientCompatibleUnits(item);
             const normalizedIngredientUnit = normalizeUnit(ingredient.unit || item.unit);
             const availableUnits = compatibleUnits.some((unitOption) => unitOption.value === normalizedIngredientUnit)
               ? compatibleUnits
@@ -505,7 +546,7 @@ export function Recipes() {
     scannedData.ingredients.forEach((ingredient) => {
       const item = inventory.find(entry => entry.id === ingredient.matchedInventoryItemId);
       if (!item || ingredient.matchConfidence < 0.7 || ingredient.quantity <= 0) return;
-      const quantityInInventoryUnit = convertQuantity(ingredient.quantity, ingredient.unit, item.unit);
+      const quantityInInventoryUnit = convertIngredientQuantity(item, ingredient.quantity, ingredient.unit, item.unit);
       if (quantityInInventoryUnit === null) return;
       readyLineCount += 1;
       const existing = autoMappedIngredients.find(entry => entry.inventoryItemId === item.id);
@@ -562,7 +603,7 @@ export function Recipes() {
 
     const invalidIngredient = selectedPrepIngredients.find(ingredient => {
       const item = inventory.find(entry => entry.id === ingredient.inventoryItemId);
-      return !item || ingredient.quantity <= 0 || convertQuantity(ingredient.quantity, ingredient.unit, item.unit) === null;
+      return !item || ingredient.quantity <= 0 || convertIngredientQuantity(item, ingredient.quantity, ingredient.unit, item.unit) === null;
     });
     if (invalidIngredient) {
       showToast.error('Every ingredient needs a quantity and a compatible unit before the recipe can be costed.');
@@ -1048,7 +1089,7 @@ export function Recipes() {
                   <div className="mt-3 space-y-2">
                     {scannedRecipeData.ingredients.map((ingredient, index) => {
                       const item = inventory.find(entry => entry.id === ingredient.matchedInventoryItemId);
-                      const converted = item ? convertQuantity(ingredient.quantity, ingredient.unit, item.unit) : null;
+                      const converted = item ? convertIngredientQuantity(item, ingredient.quantity, ingredient.unit, item.unit) : null;
                       const isReady = Boolean(item && ingredient.matchConfidence >= 0.7 && ingredient.quantity > 0 && converted !== null);
                       return (
                         <div key={`${ingredient.rawText}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
