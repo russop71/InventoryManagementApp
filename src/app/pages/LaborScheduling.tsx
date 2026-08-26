@@ -1,13 +1,16 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Copy, DollarSign, Plus, Target, Trash2, UsersRound, X } from 'lucide-react';
+import { Fragment, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, CloudSun, Copy, DollarSign, Eye, EyeOff, Filter, Plus, Save, Search, SlidersHorizontal, Target, Trash2, UsersRound, X } from 'lucide-react';
 import { Navigate } from 'react-router';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
-import { useLabor, type LaborEmployee, type LaborShift } from '../contexts/LaborContext';
+import { useInventory } from '../contexts/InventoryContext';
+import { useLabor, type LaborEmployee, type LaborScheduleTemplate, type LaborShift } from '../contexts/LaborContext';
 import { useToast } from '../contexts/ToastContext';
 
 const SHIFT_TAGS = ['OPEN', 'CLOSE', 'ADMIN', 'TRAINING', 'ON-CALL', 'PREP', 'EXPO', 'BAR', 'HOST', 'DINNER'];
+
+type ScheduleView = 'employees' | 'positions' | 'daily';
 
 function localDateKey(date: Date) {
   const year = date.getFullYear();
@@ -84,7 +87,8 @@ function tagClass(tag = '') {
 
 export function LaborScheduling() {
   const { user } = useAuth();
-  const { employees, shifts, timeOffRequests, shiftSwapRequests, targetLaborPercent, addEmployee, inviteEmployee, updateEmployee, removeEmployee, addShift, updateShift, removeShift, updateTimeOffRequest, updateShiftSwapRequest, setTargetLaborPercent, scheduledHoursForRange, laborCostBreakdownForRange } = useLabor();
+  const { forecasts } = useInventory();
+  const { employees, shifts, timeOffRequests, shiftSwapRequests, targetLaborPercent, scheduleTemplates, scheduleEvents, publishedPositions, openShifts, addEmployee, inviteEmployee, updateEmployee, removeEmployee, addShift, updateShift, removeShift, updateTimeOffRequest, updateShiftSwapRequest, setTargetLaborPercent, updateSchedulerSettings, scheduledHoursForRange, laborCostBreakdownForRange } = useLabor();
   const { salesData } = useToast();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [view, setView] = useState<'schedule' | 'requests' | 'team'>('schedule');
@@ -112,6 +116,30 @@ export function LaborScheduling() {
   const [useAmPm, setUseAmPm] = useState(true);
   const [draggedShiftId, setDraggedShiftId] = useState<string | null>(null);
   const [copiedShiftId, setCopiedShiftId] = useState<string | null>(null);
+  const [scheduleView, setScheduleView] = useState<ScheduleView>('employees');
+  const [focusDay, setFocusDay] = useState(() => Math.max(0, (new Date().getDay() + 6) % 7));
+  const [showOptions, setShowOptions] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showCosts, setShowCosts] = useState(true);
+  const [showWeather, setShowWeather] = useState(true);
+  const [showEvents, setShowEvents] = useState(true);
+  const [showOpenShifts, setShowOpenShifts] = useState(true);
+  const [showAvailability, setShowAvailability] = useState(true);
+  const [compactRows, setCompactRows] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [positionFilter, setPositionFilter] = useState('all');
+  const [eventEditorOpen, setEventEditorOpen] = useState(false);
+  const [eventDate, setEventDate] = useState(() => localDateKey(new Date()));
+  const [eventName, setEventName] = useState('');
+  const [eventTime, setEventTime] = useState('18:00');
+  const [openShiftEditorOpen, setOpenShiftEditorOpen] = useState(false);
+  const [openShiftDate, setOpenShiftDate] = useState(() => localDateKey(new Date()));
+  const [openShiftRole, setOpenShiftRole] = useState('Support');
+  const [openShiftStart, setOpenShiftStart] = useState('16:00');
+  const [openShiftEnd, setOpenShiftEnd] = useState('22:00');
+  const [openShiftTag, setOpenShiftTag] = useState('ON-CALL');
+  const [openShiftBeingAssignedId, setOpenShiftBeingAssignedId] = useState<string | null>(null);
   const canManage = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
@@ -127,7 +155,17 @@ export function LaborScheduling() {
   const todayCost = laborCostBreakdownForRange(todayKey, todayKey);
   const weekSales = salesData.filter(day => day.date >= startKey && day.date <= endKey).reduce((sum, day) => sum + day.revenue, 0);
   const labourPercent = weekSales > 0 ? (weekCost.total / weekSales) * 100 : 0;
-  const activeEmployees = employees.filter(employee => employee.active).sort((left, right) => left.department.localeCompare(right.department) || left.name.localeCompare(right.name));
+  const allActiveEmployees = employees.filter(employee => employee.active);
+  const positions = useMemo(() => Array.from(new Set(employees.filter(employee => employee.active).map(employee => employee.role))).sort(), [employees]);
+  const departments = useMemo(() => Array.from(new Set(employees.filter(employee => employee.active).map(employee => employee.department))).sort(), [employees]);
+  const activeEmployees = allActiveEmployees
+    .filter(employee => departmentFilter === 'all' || employee.department === departmentFilter)
+    .filter(employee => positionFilter === 'all' || employee.role === positionFilter)
+    .filter(employee => !employeeSearch.trim() || `${employee.name} ${employee.role} ${employee.department}`.toLowerCase().includes(employeeSearch.trim().toLowerCase()))
+    .sort((left, right) => scheduleView === 'positions'
+      ? left.role.localeCompare(right.role) || left.name.localeCompare(right.name)
+      : left.department.localeCompare(right.department) || left.name.localeCompare(right.name));
+  const visibleDays = scheduleView === 'daily' ? [days[focusDay]] : days;
 
   if (!canManage) return <Navigate to="/employee" replace />;
 
@@ -176,9 +214,13 @@ export function LaborScheduling() {
 
   const submitShift = (event: FormEvent) => {
     event.preventDefault();
-    const employeeId = shiftEmployeeId || activeEmployees[0]?.id;
+    const employeeId = shiftEmployeeId || allActiveEmployees[0]?.id;
     if (!employeeId) return toast.error('Invite an employee first.');
     addShift({ employeeId, date: shiftDate, start: shiftStart, end: shiftEnd, breakMinutes: Number(shiftBreak) || 0, status: 'scheduled', tag: shiftTag.trim().toUpperCase(), notes: shiftNotes.trim() });
+    if (openShiftBeingAssignedId) {
+      updateSchedulerSettings({ openShifts: openShifts.filter(shift => shift.id !== openShiftBeingAssignedId) });
+      setOpenShiftBeingAssignedId(null);
+    }
     setShiftTag('');
     setShiftNotes('');
     setShiftEditorOpen(false);
@@ -231,6 +273,66 @@ export function LaborScheduling() {
     setDraggedShiftId(null);
   };
 
+  const saveWeekTemplate = () => {
+    const weekShifts = shifts.filter(shift => shift.date >= startKey && shift.date <= endKey && shift.status !== 'called-off');
+    if (weekShifts.length === 0) return toast.error('Add at least one shift before saving a template.');
+    const name = window.prompt('Template name', `Week of ${days[0].toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}`)?.trim();
+    if (!name) return;
+    const template: LaborScheduleTemplate = {
+      id: `template-${Date.now()}`,
+      name,
+      shifts: weekShifts.map(({ id: _id, date, ...shift }) => ({ ...shift, dayOffset: Math.round((new Date(`${date}T12:00:00`).getTime() - days[0].getTime()) / 86400000) })),
+    };
+    updateSchedulerSettings({ scheduleTemplates: [template, ...scheduleTemplates] });
+    toast.success(`Saved “${name}” as a schedule template.`);
+  };
+
+  const applyTemplate = (template: LaborScheduleTemplate) => {
+    template.shifts.forEach(({ dayOffset, ...shift }) => {
+      const date = new Date(days[0]);
+      date.setDate(date.getDate() + dayOffset);
+      addShift({ ...shift, date: localDateKey(date), status: 'scheduled' });
+    });
+    toast.success(`Applied “${template.name}” to this week.`);
+  };
+
+  const publishWeek = () => {
+    const allPositions = Array.from(new Set(activeEmployees.map(employee => employee.role)));
+    const weekKeys = allPositions.map(position => `${startKey}::${position}`);
+    const allPublished = weekKeys.every(key => publishedPositions.includes(key));
+    updateSchedulerSettings({ publishedPositions: allPublished ? publishedPositions.filter(key => !weekKeys.includes(key)) : Array.from(new Set([...publishedPositions, ...weekKeys])) });
+    toast.success(allPublished ? 'This week is back in draft.' : 'Schedule published to the team.');
+  };
+
+  const submitEvent = (event: FormEvent) => {
+    event.preventDefault();
+    if (!eventName.trim()) return toast.error('Enter an event name.');
+    updateSchedulerSettings({ scheduleEvents: [...scheduleEvents, { id: `event-${Date.now()}`, date: eventDate, name: eventName.trim(), time: eventTime }] });
+    setEventName(''); setEventEditorOpen(false);
+    toast.success('Event added to the schedule.');
+  };
+
+  const submitOpenShift = (event: FormEvent) => {
+    event.preventDefault();
+    if (!openShiftRole.trim()) return toast.error('Choose a position for the open shift.');
+    updateSchedulerSettings({ openShifts: [...openShifts, { id: `open-shift-${Date.now()}`, date: openShiftDate, role: openShiftRole.trim(), start: openShiftStart, end: openShiftEnd, breakMinutes: 0, tag: openShiftTag.trim().toUpperCase() }] });
+    setOpenShiftEditorOpen(false);
+    toast.success('Open shift added for managers to assign.');
+  };
+
+  const assignOpenShift = (openShiftId: string) => {
+    const openShift = openShifts.find(item => item.id === openShiftId);
+    const matchingEmployees = employees.filter(employee => employee.active && employee.role === openShift?.role);
+    if (!openShift || matchingEmployees.length === 0) return toast.error(`Add an active ${openShift?.role || 'matching'} employee before assigning this shift.`);
+    setOpenShiftBeingAssignedId(openShift.id);
+    setShiftEmployeeId(matchingEmployees[0].id);
+    setShiftDate(openShift.date); setShiftStart(openShift.start); setShiftEnd(openShift.end);
+    setShiftBreak(String(openShift.breakMinutes)); setShiftTag(openShift.tag || ''); setShiftNotes(openShift.notes || '');
+    setShiftEditorOpen(true);
+  };
+
+  const allVisiblePublished = activeEmployees.length > 0 && Array.from(new Set(activeEmployees.map(employee => employee.role))).every(position => publishedPositions.includes(`${startKey}::${position}`));
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
       <section className="overflow-hidden rounded-2xl bg-[#0B1220] p-3 text-white sm:p-4">
@@ -247,29 +349,49 @@ export function LaborScheduling() {
         <Metric icon={DollarSign} label="Projected labour" value={formatMoney(weekCost.total)} />
         <Metric icon={DollarSign} label="Salaried labour" value={formatMoney(weekCost.salaried)} />
         <Metric icon={Target} label="Total vs sales" value={weekSales > 0 ? `${labourPercent.toFixed(1)}%` : formatMoney(weekCost.total)} tone={weekSales > 0 && labourPercent > targetLaborPercent ? 'warning' : 'normal'} />
-        <Metric icon={UsersRound} label="Active team" value={String(activeEmployees.length)} />
+        <Metric icon={UsersRound} label="Active team" value={String(allActiveEmployees.length)} />
       </section>
 
       {view === 'schedule' && (
         <div className="grid gap-5">
           <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-              <div><p className="font-black text-slate-900">{days[0].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })} – {days[6].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}</p></div>
-              <div className="flex gap-2"><button aria-label="Previous week" onClick={() => moveWeek(-7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronLeft className="h-4 w-4" /></button><button onClick={() => setWeekStart(startOfWeek(new Date()))} className="rounded-xl border border-slate-200 px-3 text-sm font-bold">Today</button><button aria-label="Next week" onClick={() => moveWeek(7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronRight className="h-4 w-4" /></button></div>
+            <div className="border-b border-slate-100 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="font-black text-slate-900">{days[0].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })} – {days[6].toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}</p><p className="mt-1 text-xs font-bold text-slate-400">{allVisiblePublished ? 'Published to employees' : 'Draft schedule'}</p></div>
+                <div className="flex gap-2"><button aria-label="Previous week" onClick={() => moveWeek(-7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronLeft className="h-4 w-4" /></button><button onClick={() => setWeekStart(startOfWeek(new Date()))} className="rounded-xl border border-slate-200 px-3 text-sm font-bold">Today</button><button aria-label="Next week" onClick={() => moveWeek(7)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200"><ChevronRight className="h-4 w-4" /></button></div>
+              </div>
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                <label className="shrink-0"><span className="sr-only">Schedule view</span><select value={scheduleView} onChange={event => setScheduleView(event.target.value as ScheduleView)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black"><option value="employees">Employees</option><option value="positions">Positions</option><option value="daily">Daily</option></select></label>
+                {scheduleView === 'daily' && <label className="shrink-0"><span className="sr-only">Day</span><select value={focusDay} onChange={event => setFocusDay(Number(event.target.value))} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black">{days.map((day, index) => <option key={localDateKey(day)} value={index}>{day.toLocaleDateString('en-CA', { weekday: 'long' })}</option>)}</select></label>}
+                <ToolbarButton icon={SlidersHorizontal} label="Options" active={showOptions} onClick={() => setShowOptions(current => !current)} />
+                <ToolbarButton icon={DollarSign} label="Costs" active={showCosts} onClick={() => setShowCosts(current => !current)} />
+                <ToolbarButton icon={Filter} label="Filter" active={showFilters} onClick={() => setShowFilters(current => !current)} />
+                <ToolbarButton icon={Save} label="Save template" onClick={saveWeekTemplate} />
+                {scheduleTemplates.length > 0 && <label className="shrink-0"><span className="sr-only">Apply schedule template</span><select defaultValue="" onChange={event => { const template = scheduleTemplates.find(item => item.id === event.target.value); if (template) applyTemplate(template); event.target.value = ''; }} className="h-10 max-w-[190px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-black"><option value="">Apply template…</option>{scheduleTemplates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>}
+                <button type="button" onClick={publishWeek} className={`ml-auto inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-4 text-xs font-black ${allVisiblePublished ? 'border border-slate-200 bg-white text-slate-700' : 'bg-[#0B1220] text-white'}`}>{allVisiblePublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{allVisiblePublished ? 'Unpublish' : 'Publish week'}</button>
+              </div>
+              {showOptions && <div className="mt-3 grid gap-2 rounded-2xl bg-slate-50 p-3 sm:grid-cols-5"><OptionToggle label="Forecast" checked={showWeather} onChange={setShowWeather} /><OptionToggle label="Events" checked={showEvents} onChange={setShowEvents} /><OptionToggle label="Open shifts" checked={showOpenShifts} onChange={setShowOpenShifts} /><OptionToggle label="Availability" checked={showAvailability} onChange={setShowAvailability} /><OptionToggle label="Compact rows" checked={compactRows} onChange={setCompactRows} /></div>}
+              {showFilters && <div className="mt-3 grid gap-2 rounded-2xl bg-slate-50 p-3 sm:grid-cols-3"><label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={employeeSearch} onChange={event => setEmployeeSearch(event.target.value)} placeholder="Search employee…" className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm" /></label><select value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="all">All departments</option>{departments.map(department => <option key={department} value={department}>{department}</option>)}</select><select value={positionFilter} onChange={event => setPositionFilter(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="all">All positions</option>{positions.map(position => <option key={position} value={position}>{position}</option>)}</select></div>}
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] border-collapse text-left">
-                <thead><tr className="bg-slate-50"><th className="sticky left-0 z-20 w-[210px] min-w-[210px] border-b border-r border-slate-200 bg-slate-50 p-3 text-[10px] font-black uppercase tracking-wider text-slate-500">Employee</th>{days.map(day => <th key={localDateKey(day)} className="min-w-[138px] border-b border-r border-slate-200 p-3 last:border-r-0"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{day.toLocaleDateString('en-CA', { weekday: 'short' })}</p><p className="mt-1 font-black text-slate-900">{day.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}</p></th>)}</tr></thead>
-                <tbody>{activeEmployees.map(employee => {
+              <table className={`w-full border-collapse text-left ${scheduleView === 'daily' ? 'min-w-[520px]' : 'min-w-[1180px]'}`}>
+                <thead><tr className="bg-slate-50"><th className="sticky left-0 z-20 w-[210px] min-w-[210px] border-b border-r border-slate-200 bg-slate-50 p-3 text-[10px] font-black uppercase tracking-wider text-slate-500">{scheduleView === 'positions' ? 'Position / employee' : 'Employee'}</th>{visibleDays.map(day => { const dayKey = localDateKey(day); const dayCost = showCosts ? laborCostBreakdownForRange(dayKey, dayKey).total : 0; return <th key={dayKey} className="min-w-[138px] border-b border-r border-slate-200 p-3 last:border-r-0"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{day.toLocaleDateString('en-CA', { weekday: 'short' })}</p><p className="mt-1 font-black text-slate-900">{day.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}</p>{showCosts && <p className="mt-1 text-[10px] font-black text-emerald-700">{formatMoney(dayCost)}</p>}</th>; })}</tr></thead>
+                <tbody>
+                  {showWeather && <tr className="bg-sky-50/60"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-sky-50 p-3 text-xs font-black text-slate-700"><span className="inline-flex items-center gap-2"><CloudSun className="h-4 w-4 text-sky-600" />Forecast</span></th>{visibleDays.map(day => { const key = localDateKey(day); const forecast = forecasts.find(item => item.date === key); return <td key={key} className="border-b border-r border-slate-200 p-3 text-xs last:border-r-0"><p className="font-black text-slate-800">{forecast?.weatherSummary || 'No weather forecast'}</p>{forecast && <p className="mt-1 text-[10px] font-bold text-sky-700">{forecast.expectedCovers} expected covers</p>}</td>; })}</tr>}
+                  {showEvents && <tr className="bg-violet-50/40"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-violet-50 p-3 text-xs font-black text-slate-700"><span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-violet-600" />Events</span></th>{visibleDays.map(day => { const key = localDateKey(day); const dayEvents = scheduleEvents.filter(item => item.date === key); return <td key={key} className="border-b border-r border-slate-200 p-2 align-top last:border-r-0"><div className="space-y-1">{dayEvents.map(item => <button key={item.id} type="button" onClick={() => updateSchedulerSettings({ scheduleEvents: scheduleEvents.filter(event => event.id !== item.id) })} className="block w-full rounded-lg border border-violet-100 bg-white px-2 py-1.5 text-left text-[10px] font-bold text-violet-900" title="Click to remove"><span className="block truncate">{item.name}</span><span className="text-violet-500">{formatShiftTime(item.time, useAmPm)}</span></button>)}<button type="button" aria-label={`Add event on ${key}`} onClick={() => { setEventDate(key); setEventEditorOpen(true); }} className="grid h-7 w-full place-items-center rounded-lg border border-dashed border-violet-200 text-violet-400"><Plus className="h-3.5 w-3.5" /></button></div></td>; })}</tr>}
+                  {showOpenShifts && <tr className="bg-amber-50/30"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-amber-50 p-3 text-xs font-black text-slate-700">Open shifts</th>{visibleDays.map(day => { const key = localDateKey(day); const dayOpenShifts = openShifts.filter(item => item.date === key); return <td key={key} className="border-b border-r border-slate-200 p-2 align-top last:border-r-0"><div className="space-y-1">{dayOpenShifts.map(item => <button key={item.id} type="button" onClick={() => assignOpenShift(item.id)} className="block w-full rounded-lg border border-l-4 border-amber-200 border-l-orange-500 bg-white px-2 py-1.5 text-left text-[10px] text-slate-700" title="Click to assign"><span className="block font-black">{item.role}</span><span>{formatShiftTime(item.start, useAmPm)}–{formatShiftTime(item.end, useAmPm)}</span>{item.tag && <span className="mt-1 block text-[8px] font-black text-orange-700">{item.tag}</span>}</button>)}<button type="button" aria-label={`Add open shift on ${key}`} onClick={() => { setOpenShiftDate(key); setOpenShiftEditorOpen(true); }} className="grid h-7 w-full place-items-center rounded-lg border border-dashed border-amber-200 text-amber-500"><Plus className="h-3.5 w-3.5" /></button></div></td>; })}</tr>}
+                  {activeEmployees.map((employee, employeeIndex) => {
                   const employeeWeekShifts = shifts.filter(shift => shift.employeeId === employee.id && shift.date >= startKey && shift.date <= endKey && shift.status !== 'called-off');
                   const employeeHours = employeeWeekShifts.reduce((sum, shift) => sum + shiftHours(shift), 0);
-                  return <tr key={employee.id} className="align-top"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-3"><div className="flex items-start gap-2"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#FEF3C7] text-xs font-black text-[#0B1220]">{employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{employee.name}</p><p className="mt-0.5 break-words text-[10px] font-bold text-slate-500">{employee.role}</p><p className="mt-1 text-[10px] text-slate-400">{employeeWeekShifts.length} shifts · {employeeHours.toFixed(1)}h</p>{employee.payType === 'salary' && <span className="mt-1 inline-flex rounded-full bg-[#0B1220] px-2 py-0.5 text-[9px] font-black text-[#F5C10E]">SALARIED</span>}</div></div></th>{days.map(day => {
+                  const showPositionHeader = scheduleView === 'positions' && (employeeIndex === 0 || activeEmployees[employeeIndex - 1]?.role !== employee.role);
+                  return <Fragment key={employee.id}>{showPositionHeader && <tr className="bg-[#0B1220]"><th colSpan={visibleDays.length + 1} className="px-4 py-2 text-xs font-black text-white"><div className="flex items-center justify-between gap-3"><span>{employee.role}</span><button type="button" onClick={() => { const publishKey = `${startKey}::${employee.role}`; updateSchedulerSettings({ publishedPositions: publishedPositions.includes(publishKey) ? publishedPositions.filter(key => key !== publishKey) : [...publishedPositions, publishKey] }); }} className="rounded-lg bg-white/10 px-2.5 py-1 text-[10px] font-black text-[#F5C10E]">{publishedPositions.includes(`${startKey}::${employee.role}`) ? 'Unpublish position' : 'Publish position'}</button></div></th></tr>}<tr className="align-top"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-3"><div className="flex items-start gap-2"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#FEF3C7] text-xs font-black text-[#0B1220]">{employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><p className="break-words text-sm font-black text-slate-900">{employee.name}</p>{publishedPositions.includes(`${startKey}::${employee.role}`) && <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black text-emerald-700">PUBLISHED</span>}</div><p className="mt-0.5 break-words text-[10px] font-bold text-slate-500">{employee.role}</p><p className="mt-1 text-[10px] text-slate-400">{employeeWeekShifts.length} shifts · {employeeHours.toFixed(1)}h</p>{employee.payType === 'salary' && <span className="mt-1 inline-flex rounded-full bg-[#0B1220] px-2 py-0.5 text-[9px] font-black text-[#F5C10E]">SALARIED</span>}</div></div></th>{visibleDays.map(day => {
                     const key = localDateKey(day);
                     const dayShifts = employeeWeekShifts.filter(shift => shift.date === key);
+                    const unavailable = showAvailability && timeOffRequests.some(request => request.employeeId === employee.id && request.status === 'approved' && key >= request.startDate && key <= request.endDate);
                     const isCopyTarget = copiedShiftId && employees.find(item => item.id === shifts.find(item => item.id === copiedShiftId)?.employeeId)?.role === employee.role;
-                    return <td key={key} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); placeShift(employee.id, key); }} onClick={() => copiedShiftId && placeShift(employee.id, key)} className={`h-[116px] border-b border-r border-slate-200 p-2 last:border-r-0 ${isCopyTarget ? 'cursor-copy bg-amber-50/70' : ''}`}><div className="space-y-2">{dayShifts.map(shift => <div key={shift.id} draggable onDragStart={() => setDraggedShiftId(shift.id)} onDragEnd={() => setDraggedShiftId(null)} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); event.stopPropagation(); placeShift(employee.id, key); }} className={`group cursor-grab rounded-xl border border-l-4 p-2 shadow-sm active:cursor-grabbing ${shiftAccentClass(shift.tag)} ${isNightShift(shift) ? 'bg-slate-100' : 'bg-white'}`}><div className="flex items-start justify-between gap-1"><p className="text-[11px] font-black text-slate-900">{formatShiftTime(shift.start, useAmPm)}–{formatShiftTime(shift.end, useAmPm)}</p><div className="flex items-center gap-1"><button aria-label={`Copy ${employee.name} shift`} onClick={event => { event.stopPropagation(); setCopiedShiftId(shift.id); setDraggedShiftId(null); toast.message('Select a matching-position schedule cell to copy this shift.'); }} className="text-slate-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><Copy className="h-3 w-3" /></button><button aria-label={`Delete ${employee.name} shift`} onClick={event => { event.stopPropagation(); removeShift(shift.id); }} className="text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3 w-3" /></button></div></div>{shift.tag && <span className={`mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[8px] font-black tracking-wide ${tagClass(shift.tag)}`}>{shift.tag}</span>}{shift.notes && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{shift.notes}</p>}</div>)}<button type="button" aria-label={`Add shift for ${employee.name} on ${key}`} onClick={event => { event.stopPropagation(); openShiftEditor(employee.id, key); }} className="grid h-8 w-full place-items-center rounded-lg border border-dashed border-slate-200 text-slate-400 hover:border-[#F5C10E] hover:bg-amber-50 hover:text-[#B58B00]"><Plus className="h-4 w-4" /></button></div></td>;
-                  })}</tr>;
-                })}{activeEmployees.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-sm text-slate-500">Invite employees to start building the schedule.</td></tr>}</tbody>
+                    return <td key={key} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); placeShift(employee.id, key); }} onClick={() => copiedShiftId && placeShift(employee.id, key)} className={`${compactRows ? 'h-[88px]' : 'h-[116px]'} border-b border-r border-slate-200 p-2 last:border-r-0 ${isCopyTarget ? 'cursor-copy bg-amber-50/70' : unavailable ? 'bg-red-50/70' : ''}`}><div className="space-y-2">{unavailable && <div className="rounded-lg bg-red-100 px-2 py-1 text-[9px] font-black uppercase text-red-700">Unavailable</div>}{dayShifts.map(shift => <div key={shift.id} draggable onDragStart={() => setDraggedShiftId(shift.id)} onDragEnd={() => setDraggedShiftId(null)} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); event.stopPropagation(); placeShift(employee.id, key); }} className={`group cursor-grab rounded-xl border border-l-4 p-2 shadow-sm active:cursor-grabbing ${shiftAccentClass(shift.tag)} ${isNightShift(shift) ? 'bg-slate-100' : 'bg-white'}`}><div className="flex items-start justify-between gap-1"><p className="text-[11px] font-black text-slate-900">{formatShiftTime(shift.start, useAmPm)}–{formatShiftTime(shift.end, useAmPm)}</p><div className="flex items-center gap-1"><button aria-label={`Copy ${employee.name} shift`} onClick={event => { event.stopPropagation(); setCopiedShiftId(shift.id); setDraggedShiftId(null); toast.message('Select a matching-position schedule cell to copy this shift.'); }} className="text-slate-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><Copy className="h-3 w-3" /></button><button aria-label={`Delete ${employee.name} shift`} onClick={event => { event.stopPropagation(); removeShift(shift.id); }} className="text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3 w-3" /></button></div></div>{shift.tag && <span className={`mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[8px] font-black tracking-wide ${tagClass(shift.tag)}`}>{shift.tag}</span>}{shift.notes && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{shift.notes}</p>}</div>)}<button type="button" aria-label={`Add shift for ${employee.name} on ${key}`} onClick={event => { event.stopPropagation(); openShiftEditor(employee.id, key); }} className="grid h-8 w-full place-items-center rounded-lg border border-dashed border-slate-200 text-slate-400 hover:border-[#F5C10E] hover:bg-amber-50 hover:text-[#B58B00]"><Plus className="h-4 w-4" /></button></div></td>;
+                  })}</tr></Fragment>;
+                })}{activeEmployees.length === 0 && <tr><td colSpan={visibleDays.length + 1} className="p-10 text-center text-sm text-slate-500">No employees match these filters.</td></tr>}</tbody>
               </table>
             </div>
           </section>
@@ -284,9 +406,19 @@ export function LaborScheduling() {
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}><DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Add employee</DialogTitle><DialogDescription>Create an employee profile for schedules, pay and clock-in. App access is optional and can be sent now or later.</DialogDescription></DialogHeader><form onSubmit={submitEmployee} className="space-y-4"><div className="rounded-xl border border-amber-200 bg-amber-50 p-3"><label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={sendEmployeeInvite} onChange={event => setSendEmployeeInvite(event.target.checked)} className="mt-1 h-4 w-4 accent-[#F5C10E]" /><span><span className="block text-sm font-black text-slate-900">Give ZestEmployee app access</span><span className="mt-0.5 block text-xs leading-5 text-slate-600">When selected, the employee receives a secure email to activate their account. Leave this off for a scheduling-only employee.</span></span></label></div><div className="grid gap-3 sm:grid-cols-2"><FormInput label="Full name" value={employeeName} onChange={setEmployeeName} placeholder="Employee name" required /><FormInput label={sendEmployeeInvite ? "Work email" : "Work email (optional)"} type="email" value={employeeEmail} onChange={setEmployeeEmail} placeholder="employee@restaurant.ca" required={sendEmployeeInvite} /><FormInput label="Phone" type="tel" value={employeePhone} onChange={setEmployeePhone} placeholder="416-555-0123" /><FormInput label="Clock-in number" value={employeeClockInNumber} onChange={setEmployeeClockInNumber} placeholder="1006" /><FormInput label="Position" value={employeeRole} onChange={setEmployeeRole} placeholder="General Manager" /><FormSelect label="Department" value={employeeDepartment} onChange={setEmployeeDepartment} options={['Management', 'Front of house', 'Back of house', 'Bar', 'Support'].map(value => ({ value, label: value }))} /><FormSelect label="Pay type" value={employeePayType} onChange={value => setEmployeePayType(value as 'hourly' | 'salary')} options={[{ value: 'hourly', label: 'Hourly' }, { value: 'salary', label: 'Salaried' }]} /></div>{employeePayType === 'salary' ? <FormInput label="Annual salary (CAD)" type="number" value={employeeSalary} onChange={setEmployeeSalary} /> : <FormInput label="Hourly rate (CAD)" type="number" value={employeeRate} onChange={setEmployeeRate} />}<div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setInviteOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold text-slate-700">Cancel</button><button type="submit" disabled={isInviting} className="rounded-xl bg-[#F5C10E] px-4 py-2.5 font-black text-[#0B1220] disabled:opacity-50">{isInviting ? 'Saving…' : sendEmployeeInvite ? 'Save & send app access' : 'Add employee'}</button></div></form></DialogContent></Dialog>
       <Dialog open={Boolean(editingEmployeeId)} onOpenChange={open => { if (!open) setEditingEmployeeId(null); }}><DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Edit employee</DialogTitle><DialogDescription>Update the employee profile, role, pay details and clock-in number.</DialogDescription></DialogHeader><form onSubmit={saveEmployeeChanges} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><FormInput label="Full name" value={employeeName} onChange={setEmployeeName} required /><FormInput label="Work email" type="email" value={employeeEmail} onChange={setEmployeeEmail} /><FormInput label="Phone" type="tel" value={employeePhone} onChange={setEmployeePhone} /><FormInput label="Clock-in number" value={employeeClockInNumber} onChange={setEmployeeClockInNumber} /><FormInput label="Position" value={employeeRole} onChange={setEmployeeRole} /><FormSelect label="Department" value={employeeDepartment} onChange={setEmployeeDepartment} options={['Management', 'Front of house', 'Back of house', 'Bar', 'Support'].map(value => ({ value, label: value }))} /><FormSelect label="Pay type" value={employeePayType} onChange={value => setEmployeePayType(value as 'hourly' | 'salary')} options={[{ value: 'hourly', label: 'Hourly' }, { value: 'salary', label: 'Salaried' }]} /></div>{employeePayType === 'salary' ? <FormInput label="Annual salary (CAD)" type="number" value={employeeSalary} onChange={setEmployeeSalary} /> : <FormInput label="Hourly rate (CAD)" type="number" value={employeeRate} onChange={setEmployeeRate} />}<div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setEditingEmployeeId(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold text-slate-700">Cancel</button><button type="submit" className="rounded-xl bg-[#F5C10E] px-4 py-2.5 font-black text-[#0B1220]">Save changes</button></div></form></DialogContent></Dialog>
-      <Dialog open={shiftEditorOpen} onOpenChange={setShiftEditorOpen}><DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Add a shift</DialogTitle><DialogDescription>Choose the time, tag and any handoff notes for this employee.</DialogDescription></DialogHeader><form onSubmit={submitShift} className="space-y-4"><FormSelect label="Employee" value={shiftEmployeeId || activeEmployees[0]?.id || ''} onChange={setShiftEmployeeId} options={activeEmployees.map(employee => ({ value: employee.id, label: `${employee.name} · ${employee.role}` }))} /><FormInput label="Date" type="date" value={shiftDate} onChange={setShiftDate} /><div className="grid grid-cols-2 gap-3"><FormInput label="Starts" type="time" value={shiftStart} onChange={setShiftStart} /><FormInput label="Ends" type="time" value={shiftEnd} onChange={setShiftEnd} /></div><FormInput label="Unpaid break (min)" type="number" value={shiftBreak} onChange={setShiftBreak} /><FormInput label="Shift tag" value={shiftTag} onChange={setShiftTag} placeholder="CLOSE, EXPO, TRAINING…" list="shift-tags" /><datalist id="shift-tags">{SHIFT_TAGS.map(tag => <option key={tag} value={tag} />)}</datalist><FormInput label="Shift notes" value={shiftNotes} onChange={setShiftNotes} placeholder="Section, training or handoff note" /><div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShiftEditorOpen(false)} className="rounded-xl border border-slate-200 px-4 py-3 font-bold text-slate-700">Cancel</button><button type="submit" className="rounded-xl bg-[#F5C10E] px-4 py-3 font-black text-[#0B1220]">Add tagged shift</button></div></form></DialogContent></Dialog>
+      <Dialog open={shiftEditorOpen} onOpenChange={open => { setShiftEditorOpen(open); if (!open) setOpenShiftBeingAssignedId(null); }}><DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{openShiftBeingAssignedId ? 'Assign open shift' : 'Add a shift'}</DialogTitle><DialogDescription>Choose the time, tag and any handoff notes for this employee.</DialogDescription></DialogHeader><form onSubmit={submitShift} className="space-y-4"><FormSelect label="Employee" value={shiftEmployeeId || activeEmployees[0]?.id || ''} onChange={setShiftEmployeeId} options={activeEmployees.map(employee => ({ value: employee.id, label: `${employee.name} · ${employee.role}` }))} /><FormInput label="Date" type="date" value={shiftDate} onChange={setShiftDate} /><div className="grid grid-cols-2 gap-3"><FormInput label="Starts" type="time" value={shiftStart} onChange={setShiftStart} /><FormInput label="Ends" type="time" value={shiftEnd} onChange={setShiftEnd} /></div><FormInput label="Unpaid break (min)" type="number" value={shiftBreak} onChange={setShiftBreak} /><FormInput label="Shift tag" value={shiftTag} onChange={setShiftTag} placeholder="CLOSE, EXPO, TRAINING…" list="shift-tags" /><datalist id="shift-tags">{SHIFT_TAGS.map(tag => <option key={tag} value={tag} />)}</datalist><FormInput label="Shift notes" value={shiftNotes} onChange={setShiftNotes} placeholder="Section, training or handoff note" /><div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => { setShiftEditorOpen(false); setOpenShiftBeingAssignedId(null); }} className="rounded-xl border border-slate-200 px-4 py-3 font-bold text-slate-700">Cancel</button><button type="submit" className="rounded-xl bg-[#F5C10E] px-4 py-3 font-black text-[#0B1220]">{openShiftBeingAssignedId ? 'Assign shift' : 'Add tagged shift'}</button></div></form></DialogContent></Dialog>
+      <Dialog open={eventEditorOpen} onOpenChange={setEventEditorOpen}><DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md"><DialogHeader><DialogTitle>Add schedule event</DialogTitle><DialogDescription>Add a reservation, promotion or local event managers should plan around.</DialogDescription></DialogHeader><form onSubmit={submitEvent} className="space-y-4"><FormInput label="Event name" value={eventName} onChange={setEventName} placeholder="Private dining · 40 guests" required /><FormInput label="Date" type="date" value={eventDate} onChange={setEventDate} /><FormInput label="Time" type="time" value={eventTime} onChange={setEventTime} /><div className="flex justify-end gap-2"><button type="button" onClick={() => setEventEditorOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold">Cancel</button><button type="submit" className="rounded-xl bg-[#F5C10E] px-4 py-2.5 font-black text-[#0B1220]">Add event</button></div></form></DialogContent></Dialog>
+      <Dialog open={openShiftEditorOpen} onOpenChange={setOpenShiftEditorOpen}><DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md"><DialogHeader><DialogTitle>Add an open shift</DialogTitle><DialogDescription>Create an unassigned house shift that a manager can fill later.</DialogDescription></DialogHeader><form onSubmit={submitOpenShift} className="space-y-4"><FormSelect label="Position" value={openShiftRole} onChange={setOpenShiftRole} options={(positions.length > 0 ? positions : ['Support']).map(position => ({ value: position, label: position }))} /><FormInput label="Date" type="date" value={openShiftDate} onChange={setOpenShiftDate} /><div className="grid grid-cols-2 gap-3"><FormInput label="Starts" type="time" value={openShiftStart} onChange={setOpenShiftStart} /><FormInput label="Ends" type="time" value={openShiftEnd} onChange={setOpenShiftEnd} /></div><FormInput label="Shift tag" value={openShiftTag} onChange={setOpenShiftTag} list="shift-tags" /><div className="flex justify-end gap-2"><button type="button" onClick={() => setOpenShiftEditorOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold">Cancel</button><button type="submit" className="rounded-xl bg-[#F5C10E] px-4 py-2.5 font-black text-[#0B1220]">Add open shift</button></div></form></DialogContent></Dialog>
     </div>
   );
+}
+
+function ToolbarButton({ icon: Icon, label, active = false, onClick }: { icon: typeof CalendarDays; label: string; active?: boolean; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-black ${active ? 'border-[#F5C10E] bg-amber-50 text-[#7A5D00]' : 'border-slate-200 bg-white text-slate-700'}`}><Icon className="h-4 w-4" />{label}</button>;
+}
+
+function OptionToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700"><span>{label}</span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} className="h-4 w-4 accent-[#F5C10E]" /></label>;
 }
 
 function ViewButton({ label, active, count = 0, onClick }: { label: string; active: boolean; count?: number; onClick: () => void }) {
