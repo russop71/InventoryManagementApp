@@ -3,6 +3,7 @@ import { Beer, Calculator, ExternalLink, GlassWater, PackagePlus, Wine } from 'l
 import { Link } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 
 const BEVERAGE_WORDS = ['beverage', 'wine', 'beer', 'liquor', 'spirit', 'cocktail', 'bar'];
@@ -68,5 +69,5 @@ export function BeverageCosting() {
 }
 
 function Metric({ icon: Icon, label, value, warning = false }: { icon: typeof Wine; label: string; value: string; warning?: boolean }) { return <div className={`rounded-2xl border p-4 ${warning ? 'border-red-100 bg-red-50' : 'border-slate-100 bg-white'}`}><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon className="h-4 w-4" />{label}</div><p className={`mt-2 text-xl font-black ${warning ? 'text-red-700' : 'text-slate-900'}`}>{value}</p></div>; }
-function NumberField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (value: number) => void; step?: number }) { return <label><span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</span><input type="number" min="0" step={step} value={value} onChange={event => onChange(Number(event.target.value) || 0)} className="h-11 w-full rounded-xl border border-slate-200 px-3 font-bold" /></label>; }
+function NumberField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (value: number) => void; step?: number }) { return <label><span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</span><Input type="number" min="0" step={step} value={value} onChange={event => onChange(Number(event.target.value) || 0)} className="h-11 w-full rounded-xl border border-slate-200 px-3 font-bold" /></label>; }
 function Result({ label, value, tone = 'normal' }: { label: string; value: string; tone?: 'normal' | 'good' | 'warning' }) { return <div className={`rounded-2xl p-3 ${tone === 'warning' ? 'bg-red-50' : tone === 'good' ? 'bg-emerald-50' : 'bg-slate-50'}`}><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`mt-1 text-lg font-black ${tone === 'warning' ? 'text-red-700' : tone === 'good' ? 'text-emerald-700' : 'text-slate-900'}`}>{value}</p></div>; }
