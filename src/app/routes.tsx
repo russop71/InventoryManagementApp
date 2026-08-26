@@ -35,7 +35,8 @@ import { BeverageCosting } from "./pages/BeverageCosting";
 import { BookDemo } from "./pages/BookDemo";
 import { Onboarding } from "./pages/Onboarding";
 import { Waste } from "./pages/Waste";
-import { RestaurantBeverageSeo, RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo, RestaurantLabourSeo, RestaurantOrderingSeo } from "./pages/RestaurantSeoPages";
+import { MultiLocationSeo, PosIntegrationsSeo, RestaurantBeverageSeo, RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo, RestaurantLabourSeo, RestaurantOrderingSeo } from "./pages/RestaurantSeoPages";
+import { CanadianOwnedPage, CapabilitiesPage, PricingPage, ProductTourPage, PublicContactPage } from "./pages/PublicMarketingPages";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 
@@ -51,6 +52,26 @@ export const router = createBrowserRouter([
   {
     path: "/book-demo",
     Component: BookDemo,
+  },
+  {
+    path: "/product-tour",
+    Component: ProductTourPage,
+  },
+  {
+    path: "/capabilities",
+    Component: CapabilitiesPage,
+  },
+  {
+    path: "/pricing",
+    Component: PricingPage,
+  },
+  {
+    path: "/contact",
+    Component: PublicContactPage,
+  },
+  {
+    path: "/canadian-owned",
+    Component: CanadianOwnedPage,
   },
   {
     path: "/privacy",
@@ -99,6 +120,14 @@ export const router = createBrowserRouter([
   {
     path: "/restaurant-ordering-forecasting-software",
     Component: RestaurantOrderingSeo,
+  },
+  {
+    path: "/multi-location-restaurant-software",
+    Component: MultiLocationSeo,
+  },
+  {
+    path: "/restaurant-pos-integrations",
+    Component: PosIntegrationsSeo,
   },
   {
     path: "/reset-password",
@@ -155,3 +184,12 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+
+if (typeof window !== "undefined") {
+  let currentPath = window.location.pathname;
+  router.subscribe(({ location }) => {
+    if (location.pathname === currentPath) return;
+    currentPath = location.pathname;
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+  });
+}
