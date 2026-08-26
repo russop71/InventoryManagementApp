@@ -14,7 +14,12 @@ export function calculateForecastOrderQuantity({ currentStock, expectedUsage, pa
 }
 
 export function estimateDemandForTomorrow({ inventoryItem, forecastItems = [], salesData = [] }) {
-  const forecastEntry = forecastItems.find(entry => Array.isArray(entry.items) && entry.items.some(item => item.itemId === inventoryItem.id));
+  const today = new Date().toISOString().slice(0, 10);
+  const forecastEntry = forecastItems
+    .filter(entry => Array.isArray(entry.items) && entry.items.some(item => item.itemId === inventoryItem.id))
+    .sort((left, right) => String(left.date || today).localeCompare(String(right.date || today)))
+    .find(entry => String(entry.date || today) >= today)
+    || forecastItems.find(entry => Array.isArray(entry.items) && entry.items.some(item => item.itemId === inventoryItem.id));
   if (forecastEntry) {
     const matchingItem = forecastEntry.items.find(item => item.itemId === inventoryItem.id);
     if (matchingItem && Number(matchingItem.expectedUsage) > 0) {
