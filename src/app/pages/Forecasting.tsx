@@ -36,8 +36,17 @@ async function resolveWeatherContext(targetDate: string) {
   };
 
   try {
-    const latitude = 43.6532;
-    const longitude = -79.3832;
+    const coordinates = await new Promise<{ latitude: number; longitude: number } | null>(resolve => {
+      if (!navigator.geolocation) return resolve(null);
+      const timeout = window.setTimeout(() => resolve(null), 3500);
+      navigator.geolocation.getCurrentPosition(
+        position => { window.clearTimeout(timeout); resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }); },
+        () => { window.clearTimeout(timeout); resolve(null); },
+        { enableHighAccuracy: false, maximumAge: 30 * 60 * 1000, timeout: 3000 },
+      );
+    });
+    const latitude = coordinates?.latitude ?? 43.6532;
+    const longitude = coordinates?.longitude ?? -79.3832;
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_mean&timezone=auto&forecast_days=7`;
     const response = await fetch(weatherUrl);
     if (!response.ok) throw new Error('Weather lookup failed');
@@ -59,6 +68,7 @@ async function resolveWeatherContext(targetDate: string) {
       summary: precipitationChance > 0.6 ? 'Rain expected' : 'Dry weather expected',
       tempC: Math.round(temperature),
       precipitationChance,
+      source: coordinates ? 'Restaurant device location' : 'Toronto fallback',
     };
   } catch {
     return fallbackWeather;
@@ -112,6 +122,7 @@ export function Forecasting() {
   const [selectedDate, setSelectedDate] = useState('');
   const [expectedRevenue, setExpectedRevenue] = useState<number>(0);
   const [predictedMenuItems, setPredictedMenuItems] = useState<{ name: string; quantity: number }[]>([]);
+  const [forecastContext, setForecastContext] = useState<{ weatherSummary: string; confidence: number } | null>(null);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [draftEmails, setDraftEmails] = useState<SupplierEmail[]>([]);
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
@@ -170,6 +181,7 @@ export function Forecasting() {
           }));
       setPredictedMenuItems(menuForecast);
       setSelectedItems(predicted);
+      setForecastContext({ weatherSummary: `${weatherContext.summary} · ${weatherContext.tempC}°C`, confidence: result.confidence || 0.6 });
       toast.success(result.summary || `Forecast ready with ${predicted.length} ingredient predictions`);
     } catch (error) {
       console.error('AI forecast failed', error);
@@ -203,6 +215,7 @@ export function Forecasting() {
 
       setPredictedMenuItems(itemPredictions.map(p => ({ name: p.menuItem.name, quantity: p.predictedSold })));
       setSelectedItems(fallbackPredicted);
+      setForecastContext({ weatherSummary: 'Sales-history forecast', confidence: 0.45 });
       toast.success('Forecast generated with fallback rules');
     }
   };
@@ -213,6 +226,8 @@ export function Forecasting() {
     const newForecast = {
       date: selectedDate,
       expectedCovers: expectedRevenue, // Storing as expectedCovers for backwards compatibility
+      weatherSummary: forecastContext?.weatherSummary,
+      confidence: forecastContext?.confidence,
       items: selectedItems,
     };
 
@@ -222,6 +237,7 @@ export function Forecasting() {
     setSelectedDate('');
     setExpectedRevenue(0);
     setPredictedMenuItems([]);
+    setForecastContext(null);
     toast.success('Forecast added successfully');
   };
 
