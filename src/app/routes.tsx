@@ -27,6 +27,7 @@ import { Privacy } from "./pages/Privacy";
 import { AITransparency, CookiePolicy, LegalCenter, Subprocessors } from "./pages/LegalPages";
 import { Landing } from "./pages/Landing";
 import { ResetPassword } from "./pages/ResetPassword";
+import { Mfa } from "./pages/Mfa";
 import { PlatformAdmin } from "./pages/PlatformAdmin";
 import { LaborScheduling } from "./pages/LaborScheduling";
 import { EmployeeApp } from "./pages/EmployeeApp";
@@ -101,6 +102,10 @@ export const router = createBrowserRouter([
   {
     path: "/reset-password",
     Component: ResetPassword,
+  },
+  {
+    path: "/mfa",
+    Component: Mfa,
   },
   {
     path: "/employee",
