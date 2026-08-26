@@ -68,6 +68,8 @@ export interface InventoryItem {
     productCode: string;
     packSize: number;
     packUnit: string;
+    packNickname?: string;
+    packsPerCase?: number;
     unitPrice: number;
     orderingStatus?: 'Ready' | 'OK';
     isMain: boolean;
