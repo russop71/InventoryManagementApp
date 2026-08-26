@@ -109,3 +109,38 @@
 .animate-scale-pulse {
   animation: scale-pulse 2s ease-in-out infinite;
 }
+
+/* A small, warm moment of motion for the citrus brand mark. */
+@keyframes zestiq-citrus-idle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-1.5px) rotate(-1.25deg); }
+}
+
+@keyframes zestiq-citrus-pop {
+  0% { transform: translateY(0) rotate(0deg) scale(1); }
+  35% { transform: translateY(-3px) rotate(-8deg) scale(1.12); }
+  70% { transform: translateY(0) rotate(5deg) scale(.98); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+.zestiq-brand-mark {
+  animation: zestiq-citrus-idle 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 2px 2px rgb(15 23 42 / 0.16));
+  transform-origin: 50% 68%;
+}
+
+.zestiq-brand:hover .zestiq-brand-mark,
+.zestiq-brand:focus-within .zestiq-brand-mark {
+  animation: zestiq-citrus-pop .7s cubic-bezier(.22, .8, .25, 1) both;
+}
+
+.zestiq-brand:hover .zestiq-brand-word,
+.zestiq-brand:focus-within .zestiq-brand-word {
+  text-shadow: 2px 2px 0 rgb(245 193 14 / 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zestiq-brand-mark { animation: none; }
+  .zestiq-brand:hover .zestiq-brand-mark,
+  .zestiq-brand:focus-within .zestiq-brand-mark { animation: none; }
+}
