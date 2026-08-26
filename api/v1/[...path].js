@@ -869,7 +869,7 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'status' && method === 'GET') {
       const auth = await getAuthContext(req);
-      const factors = await supabaseUserData('auth/factors', { accessToken: auth.token });
+      const factors = await supabaseUserData('auth/factors?select=*', { accessToken: auth.token });
       const factorList = Array.isArray(factors)
         ? factors
         : (Array.isArray(factors?.factors)
@@ -900,7 +900,7 @@ export default async function handler(req, res) {
       const factorId = String(req.body?.factorId || '').trim();
       const code = String(req.body?.code || '').replace(/\s/g, '');
       if (!factorId || !/^\d{6}$/.test(code)) return json(res, 400, { error: 'Enter the six-digit code from your authenticator app' });
-      const factors = await supabaseUserData('auth/factors', { accessToken: auth.token });
+      const factors = await supabaseUserData('auth/factors?select=*', { accessToken: auth.token });
       if (!Array.isArray(factors) || !factors.some(factor => factor.id === factorId)) {
         return json(res, 403, { error: 'That authenticator is not available for this account' });
       }
