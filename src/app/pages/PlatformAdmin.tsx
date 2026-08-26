@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, CreditCard, ExternalLink, Loader2, MapPin, Plus, RefreshCw, ShieldCheck, Users } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, CheckCircle2, CreditCard, ExternalLink, Loader2, MapPin, Plus, RefreshCw, ShieldCheck, TrendingUp, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -67,6 +67,32 @@ function billingStatusClass(status: string) {
   return 'bg-slate-100 text-slate-700';
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(value);
+}
+
+function daysSince(value: string | null | undefined) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
+}
+
+function healthFor(client: ClientSummary) {
+  const inactiveDays = daysSince(client.lastActive);
+  let score = 0;
+  if (client.billing.status === 'active') score += 35;
+  if (client.activeUserCount > 0) score += 20;
+  if (client.actionCount30Days >= 10) score += 25;
+  else if (client.actionCount30Days > 0) score += 12;
+  if (inactiveDays <= 7) score += 20;
+  else if (inactiveDays <= 14) score += 8;
+  if (!client.owner) score = Math.min(score, 35);
+  const label = score >= 75 ? 'Healthy' : score >= 45 ? 'Needs attention' : 'At risk';
+  const tone = score >= 75 ? 'bg-emerald-100 text-emerald-800' : score >= 45 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
+  return { score, label, tone, inactiveDays };
+}
+
 export function PlatformAdmin() {
   const { user } = useAuth();
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -100,6 +126,31 @@ export function PlatformAdmin() {
     users: clients.reduce((total, client) => total + client.userCount, 0),
     actions: clients.reduce((total, client) => total + client.actionCount30Days, 0),
   }), [clients]);
+
+  const executive = useMemo(() => {
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 86_400_000;
+    const activeOrCollecting = clients.filter(client => ['active', 'past_due', 'unpaid'].includes(client.billing.status));
+    const estimatedMrr = activeOrCollecting.reduce((total, client) => total + 249.99 + Math.max(0, client.billing.additionalLocationQuantity) * 100, 0);
+    const health = clients.map(client => ({ client, ...healthFor(client) }));
+    const actionItems = [
+      ...clients.filter(client => ['past_due', 'unpaid'].includes(client.billing.status)).map(client => ({ client, title: 'Payment needs attention', detail: `${client.name} is ${client.billing.status.replace('_', ' ')}. Review the Stripe subscription and contact the owner.`, tone: 'text-red-700 bg-red-50 border-red-200' })),
+      ...clients.filter(client => client.billing.status === 'not_configured').map(client => ({ client, title: 'Billing is not configured', detail: `${client.name} has no active subscription. Create a checkout link when the client is ready.`, tone: 'text-amber-800 bg-amber-50 border-amber-200' })),
+      ...clients.filter(client => !client.owner).map(client => ({ client, title: 'Owner required', detail: `${client.name} does not have a company owner assigned.`, tone: 'text-red-700 bg-red-50 border-red-200' })),
+      ...health.filter(item => item.inactiveDays >= 14 && Number.isFinite(item.inactiveDays)).map(item => ({ client: item.client, title: 'Client may need outreach', detail: `${item.client.name} has not been active for ${item.inactiveDays} days.`, tone: 'text-amber-800 bg-amber-50 border-amber-200' })),
+    ].slice(0, 6);
+    const recentClients = clients.filter(client => {
+      const created = new Date(client.createdAt).getTime();
+      return !Number.isNaN(created) && created >= thirtyDaysAgo;
+    });
+    const readyForActivation = clients.filter(client => client.owner && client.locationCount > 0 && client.billing.status !== 'active').length;
+    const renewalsDue = clients.filter(client => {
+      if (!client.billing.currentPeriodEnd) return false;
+      const end = new Date(client.billing.currentPeriodEnd).getTime();
+      return end >= now && end <= now + 90 * 86_400_000;
+    }).length;
+    return { estimatedMrr, health, actionItems, recentClients: recentClients.length, readyForActivation, renewalsDue, atRisk: health.filter(item => item.label === 'At risk').length };
+  }, [clients]);
 
   const openClient = async (clientId: string) => {
     setIsLoading(true);
@@ -184,7 +235,7 @@ export function PlatformAdmin() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#A16207]">ZestIQ platform administration</p>
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Client companies & billing</h2>
-          <p className="mt-1 text-sm text-slate-600">CEO-only account overview. Client passwords and full card details are never exposed.</p>
+          <p className="mt-1 text-sm text-slate-600">Your operating view of growth, client health, revenue and platform risk. Client passwords and full card details are never exposed.</p>
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="outline" disabled={isLoading} onClick={() => void loadClients()}>
@@ -212,18 +263,61 @@ export function PlatformAdmin() {
         </div>
       </div>
 
+      <section className="overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#F5C10E]">CEO action centre</p>
+            <h3 className="mt-1 text-2xl font-extrabold">What needs your attention today</h3>
+            <p className="mt-1 max-w-2xl text-sm text-slate-300">Prioritized account, revenue and adoption signals—without opening a client’s operational workspace.</p>
+          </div>
+          <div className="rounded-2xl bg-white/10 px-4 py-3"><p className="text-xs uppercase tracking-wide text-slate-300">Accounts at risk</p><p className="mt-1 text-2xl font-extrabold text-[#F5C10E]">{executive.atRisk}</p></div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {executive.actionItems.length ? executive.actionItems.map(item => (
+            <button key={`${item.title}-${item.client.id}`} type="button" onClick={() => void openClient(item.client.id)} className="flex items-start gap-3 rounded-2xl bg-white/10 p-4 text-left transition hover:bg-white/15">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#F5C10E]" />
+              <span><span className="block font-bold">{item.title}</span><span className="mt-1 block text-sm text-slate-300">{item.detail}</span></span>
+            </button>
+          )) : <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/15 p-4 text-emerald-100"><CheckCircle2 className="h-5 w-5" />No urgent billing or client-health issues right now.</div>}
+        </div>
+      </section>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Client companies', value: metrics.companies, icon: Building2 },
-          { label: 'Active subscriptions', value: metrics.activeSubscriptions, icon: CreditCard },
-          { label: 'Client users', value: metrics.users, icon: Users },
-          { label: '30-day app actions', value: metrics.actions, icon: ShieldCheck },
+          { label: 'Estimated contracted MRR', value: formatCurrency(executive.estimatedMrr), icon: TrendingUp, note: 'Active + collection-risk accounts' },
+          { label: 'Active subscriptions', value: metrics.activeSubscriptions, icon: CreditCard, note: `${executive.renewalsDue} renewal${executive.renewalsDue === 1 ? '' : 's'} in 90 days` },
+          { label: 'Client companies', value: metrics.companies, icon: Building2, note: `${executive.recentClients} added in 30 days` },
+          { label: '30-day product activity', value: metrics.actions, icon: Activity, note: `${metrics.users} client users` },
         ].map(metric => (
           <Card key={metric.label}><CardContent className="flex items-center gap-3 py-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FEF9C3] text-[#0F172A]"><metric.icon className="h-5 w-5" /></div>
-            <div><p className="text-2xl font-bold text-slate-950">{metric.value}</p><p className="text-xs text-slate-500">{metric.label}</p></div>
+            <div><p className="text-2xl font-bold text-slate-950">{metric.value}</p><p className="text-xs text-slate-500">{metric.label}</p><p className="mt-1 text-[11px] text-slate-400">{metric.note}</p></div>
           </CardContent></Card>
         ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-2"><CardHeader><CardTitle>Client health & product adoption</CardTitle><p className="text-sm text-slate-500">A practical health signal based on subscription state, active users, recent use and last activity.</p></CardHeader><CardContent className="space-y-2">
+          {executive.health.length ? executive.health.sort((a, b) => a.score - b.score).map(item => (
+            <button type="button" key={item.client.id} onClick={() => void openClient(item.client.id)} className="grid w-full gap-3 rounded-2xl border border-slate-200 p-3 text-left transition hover:border-[#F5C10E] sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+              <div><p className="font-semibold text-slate-950">{item.client.name}</p><p className="mt-1 text-xs text-slate-500">{item.client.activeUserCount}/{item.client.userCount} active users · {item.client.actionCount30Days} actions in 30 days · {item.inactiveDays === Infinity ? 'No recent activity' : `active ${item.inactiveDays === 0 ? 'today' : `${item.inactiveDays}d ago`}`}</p></div>
+              <Badge className={item.tone}>{item.label}</Badge><span className="text-sm font-bold text-slate-700">{item.score}/100</span>
+            </button>
+          )) : <p className="py-6 text-sm text-slate-500">Client health will appear as soon as accounts are created.</p>}
+        </CardContent></Card>
+        <div className="space-y-4">
+          <Card><CardHeader><CardTitle className="text-base">Growth & activation</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between"><span className="text-slate-500">New client companies</span><span className="font-bold">{executive.recentClients} <span className="font-normal text-slate-400">last 30 days</span></span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Ready for activation</span><span className="font-bold">{executive.readyForActivation}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Paying subscriptions</span><span className="font-bold">{metrics.activeSubscriptions}</span></div>
+            <p className="rounded-xl bg-[#FEF9C3] p-3 text-xs text-slate-700">Use this area to see where clients are in the journey: created, checkout sent, paid and actively using ZestIQ.</p>
+          </CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-base">Security & platform safeguards</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-slate-600">
+            <p className="flex gap-2"><ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" /><span>Client workspaces are isolated by company account.</span></p>
+            <p className="flex gap-2"><CreditCard className="h-4 w-4 shrink-0 text-emerald-600" /><span>Card details stay in Stripe; ZestIQ only displays safe payment metadata.</span></p>
+            <p className="flex gap-2"><UserCheck className="h-4 w-4 shrink-0 text-emerald-600" /><span>CEO access is separate from restaurant manager access.</span></p>
+          </CardContent></Card>
+        </div>
       </div>
 
       <Card>
@@ -239,11 +333,12 @@ export function PlatformAdmin() {
                 <div><p className="font-bold text-slate-950">{client.name}</p><p className="mt-1 text-sm text-slate-500">{client.owner ? `${client.owner.name} · ${client.owner.email}` : 'No client owner assigned'}</p></div>
                 <Badge className={`capitalize ${billingStatusClass(client.billing.status)}`}>{client.billing.status.replaceAll('_', ' ')}</Badge>
               </div>
-              <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-4">
+              <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-5">
                 <span>{client.activeUserCount}/{client.userCount} active users</span>
                 <span>{client.locationCount} locations</span>
                 <span>{client.actionCount30Days} actions / 30 days</span>
                 <span>Last active: {formatDate(client.lastActive)}</span>
+                <span className="font-semibold">Health: {healthFor(client).score}/100</span>
               </div>
             </button>
           ))}
@@ -258,7 +353,6 @@ export function PlatformAdmin() {
                 <DialogTitle>{selectedClient.name}</DialogTitle>
                 <DialogDescription>Created {formatDate(selectedClient.createdAt)} · client ID {selectedClient.id}</DialogDescription>
               </DialogHeader>
-
               <div className="grid gap-3 sm:grid-cols-3">
                 <Card><CardContent className="py-4"><p className="text-xs text-slate-400">Billing status</p><Badge className={`mt-2 capitalize ${billingStatusClass(selectedClient.billing.status)}`}>{selectedClient.billing.status.replaceAll('_', ' ')}</Badge></CardContent></Card>
                 <Card><CardContent className="py-4"><p className="text-xs text-slate-400">Plan</p><p className="mt-2 font-semibold capitalize">{selectedClient.billing.plan || 'Not selected'}</p></CardContent></Card>
