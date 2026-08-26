@@ -33,12 +33,40 @@ export interface LaborShift {
   notes?: string;
 }
 
+export interface LaborScheduleTemplate {
+  id: string;
+  name: string;
+  shifts: Array<Omit<LaborShift, 'id' | 'date'> & { dayOffset: number }>;
+}
+
+export interface LaborScheduleEvent {
+  id: string;
+  date: string;
+  name: string;
+  time: string;
+}
+
+export interface LaborOpenShift {
+  id: string;
+  date: string;
+  role: string;
+  start: string;
+  end: string;
+  breakMinutes: number;
+  tag?: string;
+  notes?: string;
+}
+
 export interface LaborData {
   employees: LaborEmployee[];
   shifts: LaborShift[];
   timeOffRequests: TimeOffRequest[];
   shiftSwapRequests: ShiftSwapRequest[];
   targetLaborPercent: number;
+  scheduleTemplates: LaborScheduleTemplate[];
+  scheduleEvents: LaborScheduleEvent[];
+  publishedPositions: string[];
+  openShifts: LaborOpenShift[];
 }
 
 export interface TimeOffRequest {
@@ -75,12 +103,13 @@ interface LaborContextValue extends LaborData {
   requestShiftSwap: (request: Omit<ShiftSwapRequest, 'id' | 'status' | 'createdAt'>) => void;
   updateShiftSwapRequest: (id: string, status: ShiftSwapRequest['status']) => void;
   setTargetLaborPercent: (value: number) => void;
+  updateSchedulerSettings: (updates: Partial<Pick<LaborData, 'scheduleTemplates' | 'scheduleEvents' | 'publishedPositions' | 'openShifts'>>) => void;
   scheduledCostForRange: (startDate: string, endDate: string) => number;
   scheduledHoursForRange: (startDate: string, endDate: string) => number;
   laborCostBreakdownForRange: (startDate: string, endDate: string) => { hourly: number; salaried: number; total: number };
 }
 
-const EMPTY_LABOR: LaborData = { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30 };
+const EMPTY_LABOR: LaborData = { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [], publishedPositions: [], openShifts: [] };
 const LaborContext = createContext<LaborContextValue | undefined>(undefined);
 
 function shiftHours(shift: LaborShift) {
@@ -106,6 +135,10 @@ function normalizeLaborData(value: Partial<LaborData> | null | undefined): Labor
     timeOffRequests: Array.isArray(value?.timeOffRequests) ? value.timeOffRequests : [],
     shiftSwapRequests: Array.isArray(value?.shiftSwapRequests) ? value.shiftSwapRequests : [],
     targetLaborPercent: Number(value?.targetLaborPercent) || 30,
+    scheduleTemplates: Array.isArray(value?.scheduleTemplates) ? value.scheduleTemplates : [],
+    scheduleEvents: Array.isArray(value?.scheduleEvents) ? value.scheduleEvents : [],
+    publishedPositions: Array.isArray(value?.publishedPositions) ? value.publishedPositions : [],
+    openShifts: Array.isArray(value?.openShifts) ? value.openShifts : [],
   };
 }
 
@@ -136,7 +169,7 @@ function buildDemoLabor(): LaborData {
     tag,
   }))).flat();
   return {
-    employees, shifts, targetLaborPercent: 30,
+    employees, shifts, targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [], publishedPositions: [], openShifts: [],
     timeOffRequests: [{ id: 'demo-timeoff-1', employeeId: 'demo-labor-priya', startDate: date(10), endDate: date(11), reason: 'Family event', status: 'pending', createdAt: new Date().toISOString() }],
     shiftSwapRequests: [{ id: 'demo-swap-1', shiftId: 'demo-shift-5-3', requesterEmployeeId: 'demo-labor-noah', targetEmployeeId: 'demo-labor-priya', note: 'Can cover your next Friday shift in return.', status: 'pending', createdAt: new Date().toISOString() }],
   };
@@ -256,6 +289,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
       patchLaborRequest({ type: 'shift-swap', id, status });
     },
     setTargetLaborPercent: targetLaborPercent => commit(current => ({ ...current, targetLaborPercent: Math.min(100, Math.max(0, targetLaborPercent)) })),
+    updateSchedulerSettings: updates => commit(current => ({ ...current, ...updates })),
     scheduledHoursForRange: (startDate, endDate) => data.shifts.filter(shift => shift.date >= startDate && shift.date <= endDate && shift.status !== 'called-off').reduce((sum, shift) => sum + shiftHours(shift), 0),
     scheduledCostForRange: (startDate, endDate) => calculateLaborCostBreakdown(data, startDate, endDate).total,
     laborCostBreakdownForRange: (startDate, endDate) => calculateLaborCostBreakdown(data, startDate, endDate),
