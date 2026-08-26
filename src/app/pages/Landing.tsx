@@ -551,7 +551,10 @@ export function Landing() {
             <FooterGroup title="Legal" links={[["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"], ["Cookie Policy", "/cookies"], ["AI Transparency", "/ai-transparency"]]} />
           </nav>
           <div id="canadian-owned" className="flex flex-col gap-4 border-t border-white/10 py-6 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 ZestIQ. All rights reserved.</p><p className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-bold text-white/70"><span aria-hidden="true">🇨🇦</span>Proudly Canadian owned &amp; operated</p></div>
-          <p aria-hidden="true" className="pointer-events-none -mb-[.17em] mt-2 whitespace-nowrap text-[18vw] font-black leading-[.78] tracking-[-.08em] text-[#F5C10E] opacity-95">zestIQ</p>
+          <div aria-hidden="true" className="pointer-events-none -mb-[.17em] mt-2 flex items-end justify-between gap-5 overflow-hidden">
+            <p className="whitespace-nowrap text-[18vw] font-black leading-[.78] tracking-[-.08em] text-[#F5C10E] opacity-95">zestIQ</p>
+            <img src="/zestiq-lemon.svg" alt="" className="mb-[.12em] h-[20vw] max-h-64 min-h-24 w-[20vw] min-w-24 shrink-0 rotate-[-8deg] object-contain" />
+          </div>
         </div>
       </footer>
     </div>
