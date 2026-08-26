@@ -243,18 +243,23 @@ async function supabaseAuth(path, { method = 'GET', body, accessToken } = {}) {
   return parseResponse(response);
 }
 
-async function supabaseUserData(path, { method = 'GET', body, accessToken } = {}) {
-  if (!SUPABASE_SECRET_KEY) throw Object.assign(new Error('Supabase server credentials are not configured'), { status: 503 });
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    method,
-    headers: {
-      apikey: SUPABASE_SECRET_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
-  return parseResponse(response);
+function mfaQrImageSource(qrCode) {
+  const source = String(qrCode || '').trim();
+  if (!source) return '';
+  if (source.startsWith('<svg')) {
+    return `data:image/svg+xml;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+  }
+  if (!source.startsWith('data:image/svg+xml')) return source;
+
+  const comma = source.indexOf(',');
+  if (comma < 0 || /;base64,/i.test(source)) return source;
+
+  try {
+    const svg = decodeURIComponent(source.slice(comma + 1));
+    return `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`;
+  } catch {
+    return source;
+  }
 }
 
 async function stripe(path, form) {
@@ -869,18 +874,10 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'status' && method === 'GET') {
       const auth = await getAuthContext(req);
-      const factors = await supabaseUserData('auth/factors?select=*', { accessToken: auth.token });
-      const factorList = Array.isArray(factors)
-        ? factors
-        : (Array.isArray(factors?.factors)
-          ? factors.factors
-          : (Array.isArray(factors?.all)
-            ? factors.all
-            : [...(Array.isArray(factors?.totp) ? factors.totp : []), ...(Array.isArray(factors?.phone) ? factors.phone : [])]));
       return json(res, 200, {
         required: mfaRequiredFor(auth.appUser, auth.authUser),
         verified: jwtAssuranceLevel(auth.token) === 'aal2',
-        factors: factorList.map(factor => ({ id: factor.id, type: factor.factor_type || factor.type, status: factor.status, friendlyName: factor.friendly_name || '' })),
+        factors: [],
       });
     }
 
@@ -892,18 +889,14 @@ export default async function handler(req, res) {
         accessToken: auth.token,
         body: { factor_type: 'totp', friendly_name: `ZestIQ Authenticator ${Date.now()}` },
       });
-      return json(res, 200, { id: enrolled.id, qrCode: enrolled?.totp?.qr_code || '', uri: enrolled?.totp?.uri || '' });
+      return json(res, 200, { id: enrolled.id, qrCode: mfaQrImageSource(enrolled?.totp?.qr_code), uri: enrolled?.totp?.uri || '' });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'verify' && method === 'POST') {
       const auth = await getAuthContext(req);
       const factorId = String(req.body?.factorId || '').trim();
       const code = String(req.body?.code || '').replace(/\s/g, '');
-      if (!factorId || !/^\d{6}$/.test(code)) return json(res, 400, { error: 'Enter the six-digit code from your authenticator app' });
-      const factors = await supabaseUserData('auth/factors?select=*', { accessToken: auth.token });
-      if (!Array.isArray(factors) || !factors.some(factor => factor.id === factorId)) {
-        return json(res, 403, { error: 'That authenticator is not available for this account' });
-      }
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(factorId) || !/^\d{6}$/.test(code)) return json(res, 400, { error: 'Enter the six-digit code from your authenticator app' });
       const challenge = await supabaseAuth(`factors/${encodeURIComponent(factorId)}/challenge`, { method: 'POST', accessToken: auth.token });
       const verified = await supabaseAuth(`factors/${encodeURIComponent(factorId)}/verify`, { method: 'POST', accessToken: auth.token, body: { challenge_id: challenge.id, code } });
       return json(res, 200, await sessionPayload(verified));
