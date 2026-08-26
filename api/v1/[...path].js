@@ -117,6 +117,43 @@ function normalizeLabor(value) {
   };
 }
 
+const WASTE_REASONS = new Set(['Spoilage', 'Overproduction', 'Prep waste', 'Expired', 'Quality issue', 'Dropped/damaged', 'Comped/returned', 'Other']);
+const UNIT_FACTORS = {
+  weight: { mg: 0.001, g: 1, kg: 1000, oz: 28.349523125, lb: 453.59237 },
+  volume: { ml: 1, l: 1000, tsp: 4.92892159375, tbsp: 14.78676478125, 'fl oz': 29.5735295625, cup: 236.5882365, pt: 473.176473, qt: 946.352946, gal: 3785.411784 },
+  count: { each: 1, ea: 1, unit: 1, units: 1, piece: 1, pieces: 1 },
+};
+
+function normalizeUnit(value) {
+  const unit = String(value || '').trim().toLowerCase();
+  const aliases = { lbs: 'lb', pound: 'lb', pounds: 'lb', kgs: 'kg', kilogram: 'kg', kilograms: 'kg', grams: 'g', gram: 'g', ounces: 'oz', ounce: 'oz', litre: 'l', litres: 'l', liter: 'l', liters: 'l', millilitre: 'ml', millilitres: 'ml', milliliter: 'ml', milliliters: 'ml' };
+  return aliases[unit] || unit;
+}
+
+function convertWasteQuantity(quantity, fromUnit, toUnit) {
+  const from = normalizeUnit(fromUnit);
+  const to = normalizeUnit(toUnit);
+  if (from === to) return Number(quantity);
+  for (const group of Object.values(UNIT_FACTORS)) {
+    if (group[from] && group[to]) return Number(quantity) * group[from] / group[to];
+  }
+  return null;
+}
+
+function normalizeWaste(value) {
+  const entries = Array.isArray(value?.entries) ? value.entries.slice(0, 10000).map(entry => ({
+    id: String(entry?.id || '').slice(0, 120), itemId: String(entry?.itemId || '').slice(0, 120),
+    itemName: String(entry?.itemName || '').trim().slice(0, 160), category: String(entry?.category || 'Uncategorized').trim().slice(0, 120),
+    quantity: Math.max(0, Number(entry?.quantity) || 0), unit: String(entry?.unit || '').trim().slice(0, 30),
+    inventoryQuantity: Math.max(0, Number(entry?.inventoryQuantity) || 0), inventoryUnit: String(entry?.inventoryUnit || '').trim().slice(0, 30),
+    unitCost: Math.max(0, Number(entry?.unitCost) || 0), totalCost: Math.max(0, Number(entry?.totalCost) || 0),
+    reason: WASTE_REASONS.has(entry?.reason) ? entry.reason : 'Other', notes: String(entry?.notes || '').trim().slice(0, 500),
+    employeeName: String(entry?.employeeName || '').trim().slice(0, 120), loggedBy: String(entry?.loggedBy || '').trim().slice(0, 120),
+    occurredAt: String(entry?.occurredAt || '').slice(0, 40), createdAt: String(entry?.createdAt || '').slice(0, 40),
+  })).filter(entry => entry.id && entry.itemId && entry.quantity > 0) : [];
+  return { entries };
+}
+
 function defaultOnboardingState() {
   return {
     status: 'not_started',
@@ -1501,6 +1538,51 @@ export default async function handler(req, res) {
             body: { integrations: { ...integrations, labor }, updated_at: new Date().toISOString() },
           });
           return json(res, 200, labor);
+        }
+      }
+
+      if (segments[4] === 'waste') {
+        const rows = await supabase(`location_data?location_id=eq.${locationId}&select=*`);
+        const current = rows?.[0] || { location_id: locationId };
+        const integrations = current.integrations && typeof current.integrations === 'object' ? current.integrations : { toast: defaultToast() };
+        const waste = normalizeWaste(integrations.waste);
+        if (method === 'GET') return json(res, 200, waste);
+        if (method === 'POST') {
+          if (!canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to log waste' });
+          const incoming = req.body || {};
+          const inventory = Array.isArray(current.inventory) ? current.inventory : [];
+          const itemIndex = inventory.findIndex(item => String(item?.id) === String(incoming.itemId || ''));
+          if (itemIndex < 0) return json(res, 404, { error: 'Inventory item not found at this location' });
+          const item = inventory[itemIndex];
+          const quantity = Number(incoming.quantity);
+          if (!Number.isFinite(quantity) || quantity <= 0) return json(res, 400, { error: 'Waste quantity must be greater than zero' });
+          const inventoryQuantity = convertWasteQuantity(quantity, incoming.unit || item.unit, item.unit);
+          if (!Number.isFinite(inventoryQuantity) || inventoryQuantity <= 0) return json(res, 400, { error: `Cannot convert ${incoming.unit || ''} to ${item.unit || 'the inventory unit'}` });
+          const reason = WASTE_REASONS.has(incoming.reason) ? incoming.reason : 'Other';
+          const now = new Date().toISOString();
+          const occurredAt = /^\d{4}-\d{2}-\d{2}/.test(String(incoming.occurredAt || '')) ? String(incoming.occurredAt).slice(0, 40) : now;
+          const unitCost = Math.max(0, Number(item.unitCost) || 0);
+          const nextStock = Math.max(0, (Number(item.currentStock) || 0) - inventoryQuantity);
+          const actualDeduction = Math.max(0, (Number(item.currentStock) || 0) - nextStock);
+          const entry = {
+            id: `waste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            itemId: String(item.id), itemName: String(item.name || ''), category: String(item.category || 'Uncategorized'),
+            quantity, unit: String(incoming.unit || item.unit || ''), inventoryQuantity: actualDeduction,
+            inventoryUnit: String(item.unit || ''), unitCost, totalCost: actualDeduction * unitCost, reason,
+            notes: String(incoming.notes || '').trim().slice(0, 500),
+            employeeName: String(incoming.employeeName || access.appUser.name || '').trim().slice(0, 120),
+            loggedBy: String(access.appUser.name || access.appUser.email || '').trim().slice(0, 120), occurredAt, createdAt: now,
+          };
+          const nextInventory = inventory.map((inventoryItem, index) => index === itemIndex ? {
+            ...inventoryItem, currentStock: nextStock, lastUpdated: now,
+            history: [...(Array.isArray(inventoryItem.history) ? inventoryItem.history : []), { date: now, change: -actualDeduction, reason: `Waste: ${reason}`, newStock: nextStock }],
+          } : inventoryItem);
+          const nextWaste = normalizeWaste({ entries: [entry, ...waste.entries] });
+          await supabase(`location_data?location_id=eq.${locationId}`, {
+            method: 'PATCH', prefer: 'return=minimal',
+            body: { inventory: nextInventory, integrations: { ...integrations, waste: nextWaste }, updated_at: now },
+          });
+          return json(res, 201, { waste: nextWaste, entry, inventory: nextInventory, version: now });
         }
       }
 
