@@ -108,14 +108,31 @@ export function Orders() {
   const [manualItemQuery, setManualItemQuery] = useState('');
   const [manualQuantities, setManualQuantities] = useState<Record<string, number>>({});
   const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderSupplierFilter, setOrderSupplierFilter] = useState('');
 
   const open      = orders.filter(o => o.status === 'pending');
   const inTransit = orders.filter(o => o.status === 'ordered');
   const received  = orders.filter(o => o.status === 'received');
   const cancelled = orders.filter(o => o.status === 'cancelled');
 
-  const sorted   = [...orders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const filtered = activeTab === 'all' ? sorted : sorted.filter(o => o.status === activeTab);
+  const sorted = [...orders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const primarySupplierFor = (order: (typeof orders)[number]) => {
+    const counts: Record<string, number> = {};
+    order.items.forEach(line => {
+      const item = inventory.find(entry => entry.id === line.itemId);
+      if (item?.supplier) counts[item.supplier] = (counts[item.supplier] || 0) + 1;
+    });
+    return Object.entries(counts).sort((left, right) => right[1] - left[1])[0]?.[0] || 'Supplier';
+  };
+  const orderSuppliers = Array.from(new Set(orders.map(primarySupplierFor))).sort((left, right) => left.localeCompare(right));
+  const filtered = (activeTab === 'all' ? sorted : sorted.filter(order => order.status === activeTab)).filter(order => {
+    const supplier = primarySupplierFor(order);
+    const query = orderSearchQuery.trim().toLowerCase();
+    const matchesQuery = !query || [order.id, supplier, ...order.items.map(line => inventory.find(item => item.id === line.itemId)?.name || '')]
+      .some(value => value.toLowerCase().includes(query));
+    return matchesQuery && (!orderSupplierFilter || supplier === orderSupplierFilter);
+  });
 
   const restaurantName = useMemo(() => {
     if (accountId) {
@@ -594,6 +611,33 @@ export function Orders() {
               </p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black text-slate-900">Order workspace</p>
+              <p className="text-xs text-slate-500">Find a supplier, product or purchase order in seconds.</p>
+            </div>
+            <span className="rounded-full bg-[#F5C10E] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[#0F172A]">Fast order</span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <Input
+              value={orderSearchQuery}
+              onChange={event => setOrderSearchQuery(event.target.value)}
+              placeholder="Search orders, suppliers or items…"
+              className="h-11 rounded-xl border-slate-200 bg-white"
+            />
+            <select
+              value={orderSupplierFilter}
+              onChange={event => setOrderSupplierFilter(event.target.value)}
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+            >
+              <option value="">All suppliers</option>
+              {orderSuppliers.map(supplier => <option key={supplier} value={supplier}>{supplier}</option>)}
+            </select>
+          </div>
+          {(orderSearchQuery || orderSupplierFilter) && <button type="button" onClick={() => { setOrderSearchQuery(''); setOrderSupplierFilter(''); }} className="mt-2 text-xs font-bold text-slate-500 underline underline-offset-2">Clear order search</button>}
         </div>
       </div>
 
