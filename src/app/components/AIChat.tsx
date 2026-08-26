@@ -18,8 +18,64 @@ const QUICK_PROMPTS = [
   'Help me understand my recipe costs.',
 ];
 
+const weatherDescription = (code: number) => {
+  if ([0, 1].includes(code)) return 'Clear';
+  if ([2, 3].includes(code)) return 'Cloudy';
+  if ([45, 48].includes(code)) return 'Foggy';
+  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'Rain';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'Snow';
+  if ([95, 96, 99].includes(code)) return 'Thunderstorms';
+  return 'Current conditions unavailable';
+};
+
+async function getLiveContext(locationName?: string) {
+  const now = new Date();
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto';
+  const context: Record<string, unknown> = {
+    locationName: locationName || 'Selected restaurant location',
+    timeZone,
+    localDate: new Intl.DateTimeFormat('en-CA', { dateStyle: 'full', timeZone }).format(now),
+    localTime: new Intl.DateTimeFormat('en-CA', { timeStyle: 'short', timeZone }).format(now),
+    capturedAt: now.toISOString(),
+  };
+
+  if (!navigator.geolocation) return context;
+  const coordinates = await new Promise<GeolocationCoordinates | null>(resolve => {
+    const timeout = window.setTimeout(() => resolve(null), 3200);
+    navigator.geolocation.getCurrentPosition(
+      position => { window.clearTimeout(timeout); resolve(position.coords); },
+      () => { window.clearTimeout(timeout); resolve(null); },
+      { enableHighAccuracy: false, maximumAge: 30 * 60 * 1000, timeout: 3000 },
+    );
+  });
+  if (!coordinates) return { ...context, weatherStatus: 'Location permission was not granted, so live weather is unavailable.' };
+
+  try {
+    const url = new URL('https://api.open-meteo.com/v1/forecast');
+    url.searchParams.set('latitude', String(coordinates.latitude));
+    url.searchParams.set('longitude', String(coordinates.longitude));
+    url.searchParams.set('current', 'temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m');
+    url.searchParams.set('timezone', 'auto');
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Weather lookup unavailable');
+    const current = (await response.json()).current || {};
+    context.weather = {
+      conditions: weatherDescription(Number(current.weather_code)),
+      temperatureC: Number(current.temperature_2m),
+      feelsLikeC: Number(current.apparent_temperature),
+      precipitationMm: Number(current.precipitation),
+      windKmh: Number(current.wind_speed_10m),
+      observedAt: current.time,
+    };
+  } catch {
+    context.weatherStatus = 'Live weather lookup is temporarily unavailable.';
+  }
+  return context;
+}
+
 export function AIChat() {
-  const { accountId, accountName, activeLocationId } = useAuth();
+  const { accountId, accountName, activeLocationId, locations } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -45,12 +101,15 @@ export function AIChat() {
     setInput('');
     setIsSending(true);
     try {
+      const activeLocation = locations.find(location => location.id === activeLocationId);
+      const liveContext = await getLiveContext(activeLocation?.name);
       const result = await apiRequest<{ answer: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/assistant`, {
         method: 'POST',
         body: JSON.stringify({
           message,
           locationId: activeLocationId,
           history,
+          liveContext,
         }),
       });
       setMessages(current => [...current, { id: crypto.randomUUID(), role: 'assistant', content: result.answer }]);
