@@ -5,7 +5,6 @@ import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAcco
 import { enforceRateLimit } from '../_request-guard.js';
 import { launchReadiness } from '../_launch-readiness.js';
 import { reportServerError } from '../_observability.js';
-import QRCode from 'qrcode';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -244,17 +243,18 @@ async function supabaseAuth(path, { method = 'GET', body, accessToken } = {}) {
   return parseResponse(response);
 }
 
-async function createMfaQrImage(uri) {
-  const enrollmentUri = String(uri || '').trim();
-  if (!enrollmentUri.startsWith('otpauth://')) {
-    throw Object.assign(new Error('Authenticator setup could not create a secure QR code. Please try again.'), { status: 502 });
-  }
-  return QRCode.toDataURL(enrollmentUri, {
-    errorCorrectionLevel: 'M',
-    margin: 1,
-    width: 384,
-    color: { dark: '#0B1220', light: '#FFFFFF' },
-  });
+function mfaQrImageSource(qrCode) {
+  const source = String(qrCode || '').trim();
+  if (!source) throw Object.assign(new Error('Authenticator setup did not return a QR code. Please try again.'), { status: 502 });
+
+  const rawSvg = source.startsWith('<svg') ? source : (() => {
+    const comma = source.indexOf(',');
+    if (!source.startsWith('data:image/svg+xml') || comma < 0) return '';
+    const payload = source.slice(comma + 1);
+    return /;base64,/i.test(source) ? Buffer.from(payload, 'base64').toString('utf8') : decodeURIComponent(payload);
+  })();
+
+  return rawSvg ? `data:image/svg+xml;base64,${Buffer.from(rawSvg, 'utf8').toString('base64')}` : source;
 }
 
 async function stripe(path, form) {
@@ -885,7 +885,7 @@ export default async function handler(req, res) {
         body: { factor_type: 'totp', friendly_name: `ZestIQ Authenticator ${Date.now()}` },
       });
       const uri = enrolled?.totp?.uri || '';
-      return json(res, 200, { id: enrolled.id, qrCode: await createMfaQrImage(uri), uri });
+      return json(res, 200, { id: enrolled.id, qrCode: mfaQrImageSource(enrolled?.totp?.qr_code), uri });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'verify' && method === 'POST') {
