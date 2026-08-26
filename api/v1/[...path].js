@@ -913,9 +913,12 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'status' && method === 'GET') {
       const auth = await getAuthContext(req);
-      const enrolled = await supabaseAuth('factors', { accessToken: auth.token });
+      const required = mfaRequiredFor(auth.appUser, auth.authUser);
+      // During the optional rollout, avoid blocking the MFA screen on a factor
+      // lookup. Setup itself still performs the authoritative Supabase call.
+      const enrolled = required ? await supabaseAuth('factors', { accessToken: auth.token }) : null;
       return json(res, 200, {
-        required: mfaRequiredFor(auth.appUser, auth.authUser),
+        required,
         verified: jwtAssuranceLevel(auth.token) === 'aal2',
         canEnroll: canEnrollMfa(auth.appUser, auth.authUser),
         factors: Array.isArray(enrolled?.factors) ? enrolled.factors.map(factor => ({
