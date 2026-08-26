@@ -25,6 +25,8 @@ type PurchaseOptionDraft = {
   productCode: string;
   packSize: number;
   packUnit: string;
+  packNickname: string;
+  packsPerCase: number;
   unitPrice: number;
   orderingStatus: 'Ready' | 'OK';
   isMain: boolean;
@@ -39,6 +41,8 @@ function createFallbackPurchaseOption(itemName: string, itemSupplier: string, ma
     productCode: marketmanSku,
     packSize: itemPackSize || 1,
     packUnit: itemPackUnit || itemUnit || 'UNIT',
+    packNickname: 'case',
+    packsPerCase: 1,
     unitPrice: itemCost || 0,
     orderingStatus: ((itemParLevel || 0) - (itemCurrentStock || 0)) > 0 ? 'Ready' : 'OK',
     isMain: true,
@@ -150,6 +154,8 @@ export function InventoryDetail() {
         productCode: option.productCode || item.vendorItemCode || item.sku || '',
         packSize: Number(option.packSize ?? item.packSize ?? 1),
         packUnit: (option.packUnit || item.packUnit || item.unit || 'oz').toLowerCase(),
+        packNickname: option.packNickname || 'case',
+        packsPerCase: Number(option.packsPerCase ?? item.unitsPerPack ?? 1),
         unitPrice: Number(option.unitPrice ?? item.unitCost ?? 0),
         orderingStatus: option.orderingStatus === 'Ready' ? 'Ready' : 'OK',
         isMain: index === 0 ? true : Boolean(option.isMain),
@@ -372,6 +378,8 @@ export function InventoryDetail() {
         productCode: '',
         packSize: 1,
         packUnit: item.packUnit || item.unit || 'UNIT',
+        packNickname: 'case',
+        packsPerCase: 1,
         unitPrice: item.unitCost || 0,
         orderingStatus: 'OK',
         isMain: prev.length === 0,
@@ -404,6 +412,8 @@ export function InventoryDetail() {
       productCode: option.productCode.trim(),
       packUnit: (option.packUnit || 'oz').trim().toLowerCase(),
       packSize: Number(option.packSize) > 0 ? Number(option.packSize) : 1,
+      packNickname: option.packNickname.trim() || 'case',
+      packsPerCase: Number(option.packsPerCase) > 0 ? Number(option.packsPerCase) : 1,
       unitPrice: Number(option.unitPrice) >= 0 ? Number(option.unitPrice) : 0,
       orderingStatus: option.orderingStatus,
       isMain: option.isMain,
@@ -418,6 +428,7 @@ export function InventoryDetail() {
       vendorItemCode: mainOption.productCode,
       packSize: mainOption.packSize,
       packUnit: mainOption.packUnit,
+      unitsPerPack: mainOption.packsPerCase,
       unitCost: mainOption.unitPrice,
       purchaseOptions: normalized,
       lastUpdated: new Date().toISOString().split('T')[0],
@@ -435,6 +446,8 @@ export function InventoryDetail() {
       productCode: activePurchaseOption.productCode.trim(),
       packUnit: (activePurchaseOption.packUnit || 'oz').trim().toLowerCase(),
       packSize: Number(activePurchaseOption.packSize) > 0 ? Number(activePurchaseOption.packSize) : 1,
+      packNickname: activePurchaseOption.packNickname.trim() || 'case',
+      packsPerCase: Number(activePurchaseOption.packsPerCase) > 0 ? Number(activePurchaseOption.packsPerCase) : 1,
       unitPrice: Number(activePurchaseOption.unitPrice) >= 0 ? Number(activePurchaseOption.unitPrice) : 0,
     };
 
@@ -451,6 +464,7 @@ export function InventoryDetail() {
       vendorItemCode: mainOption.productCode,
       packSize: mainOption.packSize,
       packUnit: mainOption.packUnit,
+      unitsPerPack: mainOption.packsPerCase,
       unitCost: mainOption.unitPrice,
       purchaseOptions: nextOptions,
       lastUpdated: new Date().toISOString().split('T')[0],
@@ -863,7 +877,7 @@ export function InventoryDetail() {
 
                   <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-500">Purchasing case</p>
-                    <p className="text-xs text-gray-500">Ordering unit description: {activePurchaseOption.packSize} {activePurchaseOption.packUnit}</p>
+                    <p className="text-xs text-gray-500">Ordering unit description: {activePurchaseOption.packsPerCase} {activePurchaseOption.packNickname} · {activePurchaseOption.packSize} {activePurchaseOption.packUnit} each</p>
                     <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr]">
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Inner pack quantity *</Label>
@@ -876,11 +890,11 @@ export function InventoryDetail() {
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Pack nickname</Label>
-                        <Input value={activePurchaseOption.packUnit} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packUnit: event.target.value })} className="mt-1 h-9" />
+                        <Input value={activePurchaseOption.packNickname} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packNickname: event.target.value })} className="mt-1 h-9" placeholder="Bottle, bag, case" />
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Packs per case</Label>
-                        <Input type="number" min={0} step="0.01" value={activePurchaseOption.packSize} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packSize: Number(event.target.value) })} className="mt-1 h-9" />
+                        <Input type="number" min={1} step="1" value={activePurchaseOption.packsPerCase} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packsPerCase: Number(event.target.value) })} className="mt-1 h-9" />
                       </div>
                     </div>
                   </div>
