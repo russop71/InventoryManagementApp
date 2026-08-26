@@ -12,6 +12,7 @@ import { groupBySupplier } from '../utils/invoiceWorkflow';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { resolveSuggestionQuantity } from '../utils/orderSuggestionUtils.js';
 import { getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
+import { estimateDemandForTomorrow } from '../utils/forecastOrderUtils.js';
 
 interface OrderSuggestion {
   itemId: string;
@@ -110,7 +111,7 @@ function openMailtoDraft(to: string, subject: string, body: string) {
 }
 
 export function AIOrders() {
-  const { inventory, suppliers, placeOrder } = useInventory();
+  const { inventory, suppliers, forecasts, placeOrder } = useInventory();
   const { salesData } = useToast();
   const { accountId, accountName, user } = useAuth();
   const createOrderRef = useRef<HTMLDivElement | null>(null);
@@ -197,24 +198,11 @@ export function AIOrders() {
     inventory.forEach(item => {
       const stockPercentage = (item.currentStock / item.parLevel) * 100;
       
-      // Estimate daily usage based on stock level and category
-      let estimatedDailyUsage = 0;
-      if (item.category === 'Proteins') {
-        estimatedDailyUsage = item.parLevel * 0.15; // 15% of par per day
-      } else if (item.category === 'Produce') {
-        estimatedDailyUsage = item.parLevel * 0.20; // 20% of par per day (higher turnover)
-      } else if (item.category === 'Dairy') {
-        estimatedDailyUsage = item.parLevel * 0.12;
-      } else {
-        estimatedDailyUsage = item.parLevel * 0.10;
-      }
-
-      // Adjust for sales trends
-      if (salesTrend > 0.1) {
-        estimatedDailyUsage *= 1.2; // 20% increase if sales are trending up
-      } else if (salesTrend < -0.1) {
-        estimatedDailyUsage *= 0.85; // 15% decrease if sales are trending down
-      }
+      const forecastEntry = forecasts
+        .filter(forecast => forecast.items.some(entry => entry.itemId === item.id))
+        .sort((left, right) => left.date.localeCompare(right.date))
+        .find(forecast => forecast.date >= new Date().toISOString().slice(0, 10));
+      const estimatedDailyUsage = estimateDemandForTomorrow({ inventoryItem: item, forecastItems: forecasts, salesData });
 
       const daysUntilStockout = estimatedDailyUsage > 0 
         ? Math.floor(item.currentStock / estimatedDailyUsage)
@@ -229,12 +217,12 @@ export function AIOrders() {
       if (daysUntilStockout <= 2) {
         shouldOrder = true;
         priority = 'critical';
-        reasoning = `Critical: Only ${daysUntilStockout} days of stock remaining`;
+        reasoning = `Critical: Only ${daysUntilStockout} days of stock remaining${forecastEntry ? ` for the ${forecastEntry.date} forecast` : ''}`;
         confidence = 0.95;
       } else if (daysUntilStockout <= 4) {
         shouldOrder = true;
         priority = 'high';
-        reasoning = `High priority: ${daysUntilStockout} days until stockout`;
+        reasoning = `High priority: ${daysUntilStockout} days until stockout${forecastEntry ? ` for the ${forecastEntry.date} forecast` : ''}`;
         confidence = 0.88;
       } else if (stockPercentage < 40) {
         shouldOrder = true;
@@ -296,7 +284,7 @@ export function AIOrders() {
       }
       return b.confidence - a.confidence;
     });
-  }, [inventory, salesData]);
+  }, [inventory, forecasts, salesData]);
 
   const displayedSuggestions = showAllSuggestions 
     ? (aiSuggestions || orderSuggestions) 
