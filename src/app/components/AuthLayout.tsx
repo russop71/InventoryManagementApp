@@ -42,7 +42,7 @@ export function AuthLayout() {
     }
   }
 
-  const onboardingNeeded = ['Owner', 'Admin'].includes(user?.role || '') && ['not_started', 'in_progress'].includes(onboarding.status);
+  const onboardingNeeded = !user?.platformAdmin && ['Owner', 'Admin'].includes(user?.role || '') && ['not_started', 'in_progress'].includes(onboarding.status);
   const onboardingExempt = ['/app/onboarding', '/app/payment-method', '/app/account'].includes(location.pathname);
   if (productAccess && onboardingNeeded && !onboardingExempt) return <Navigate to="/app/onboarding" replace />;
 
