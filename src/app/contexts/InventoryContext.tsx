@@ -104,6 +104,8 @@ export interface ForecastData {
   id: string;
   date: string;
   expectedCovers: number;
+  weatherSummary?: string;
+  confidence?: number;
   items: {
     itemId: string;
     expectedUsage: number;
