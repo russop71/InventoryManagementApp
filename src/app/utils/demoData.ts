@@ -29,7 +29,7 @@ export interface DemoLocationData {
   invoices: Array<Record<string, unknown>>;
 }
 
-export const DEMO_DATA_VERSION = '2026-08-22-restaurant-v4';
+export const DEMO_DATA_VERSION = '2026-08-26-bottle-volume-v5';
 
 export function buildDemoLocationData(): DemoLocationData {
   const inventory = [
@@ -85,9 +85,9 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-arugula', name: 'Baby Arugula', category: 'Produce', storageArea: 'Walk-In Cooler', currentStock: 5, unit: 'lb', unitCost: 7.2, parLevel: 8, supplier: 'Northern Produce Co.' },
       { id: 'demo-potatoes', name: 'Russet Potatoes', category: 'Produce', storageArea: 'Dry Storage', currentStock: 36, unit: 'lb', unitCost: 1.35, parLevel: 30, supplier: 'Northern Produce Co.' },
       { id: 'demo-brioche', name: 'Brioche Buns', category: 'Bakery', storageArea: 'Freezer', currentStock: 38, unit: 'each', unitCost: 0.82, parLevel: 50, supplier: 'Maple Foodservice' },
-      { id: 'demo-wine', name: 'House Pinot Grigio', category: 'Beverage', storageArea: 'Wine Cellar', currentStock: 16, unit: 'bottle', unitCost: 13.9, parLevel: 24, supplier: 'Cellar Door Imports' },
-      { id: 'demo-vodka', name: 'Premium Vodka 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 9, unit: 'bottle', unitCost: 29.5, parLevel: 12, supplier: 'Ontario Beverage Retail' },
-      { id: 'demo-gin', name: 'London Dry Gin 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 7, unit: 'bottle', unitCost: 33.25, parLevel: 10, supplier: 'Ontario Beverage Retail' },
+      { id: 'demo-wine', name: 'House Pinot Grigio', category: 'Beverage', storageArea: 'Wine Cellar', currentStock: 16, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 13.9, parLevel: 24, supplier: 'Cellar Door Imports' },
+      { id: 'demo-vodka', name: 'Premium Vodka 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 9, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 29.5, parLevel: 12, supplier: 'Ontario Beverage Retail' },
+      { id: 'demo-gin', name: 'London Dry Gin 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 7, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 33.25, parLevel: 10, supplier: 'Ontario Beverage Retail' },
       { id: 'demo-lager', name: 'Local Lager 24-pack', category: 'Beer', storageArea: 'Bar', currentStock: 5, unit: 'case', unitCost: 54, parLevel: 8, supplier: 'Ontario Beer Supply' },
       { id: 'demo-eggs', name: 'Large Eggs', category: 'Dairy', storageArea: 'Walk-In Cooler', currentStock: 96, unit: 'each', unitCost: 0.38, parLevel: 144, supplier: 'Maple Foodservice' },
       { id: 'demo-bacon', name: 'Smoked Bacon', category: 'Proteins', storageArea: 'Walk-In Cooler', currentStock: 12, unit: 'lb', unitCost: 7.9, parLevel: 18, supplier: 'Lakeside Meats' },
@@ -99,12 +99,12 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-garlic', name: 'Peeled Garlic', category: 'Produce', storageArea: 'Walk-In Cooler', currentStock: 3, unit: 'lb', unitCost: 5.4, parLevel: 5, supplier: 'Northern Produce Co.' },
       { id: 'demo-espresso', name: 'Espresso Beans', category: 'Beverage', storageArea: 'Dry Storage', currentStock: 8, unit: 'kg', unitCost: 27, parLevel: 12, supplier: 'Northline Coffee Roasters' },
       { id: 'demo-milk', name: 'Whole Milk', category: 'Dairy', storageArea: 'Walk-In Cooler', currentStock: 18, unit: 'L', unitCost: 2.2, parLevel: 28, supplier: 'Maple Foodservice' },
-      { id: 'demo-tonic', name: 'Premium Tonic Water', category: 'Beverage', storageArea: 'Bar', currentStock: 42, unit: 'bottle', unitCost: 1.35, parLevel: 72, supplier: 'Maple Foodservice' },
-      { id: 'demo-prosecco', name: 'House Prosecco', category: 'Wine', storageArea: 'Wine Cellar', currentStock: 18, unit: 'bottle', unitCost: 14.6, parLevel: 30, supplier: 'Cellar Door Imports' },
+      { id: 'demo-tonic', name: 'Premium Tonic Water', category: 'Beverage', storageArea: 'Bar', currentStock: 42, unit: 'bottle', packSize: 200, packUnit: 'ml', unitCost: 1.35, parLevel: 72, supplier: 'Maple Foodservice' },
+      { id: 'demo-prosecco', name: 'House Prosecco', category: 'Wine', storageArea: 'Wine Cellar', currentStock: 18, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 14.6, parLevel: 30, supplier: 'Cellar Door Imports' },
       { id: 'demo-orange-juice', name: 'Orange Juice', category: 'Beverage', storageArea: 'Walk-In Cooler', currentStock: 10, unit: 'L', unitCost: 3.85, parLevel: 16, supplier: 'Maple Foodservice' },
-      { id: 'demo-tequila', name: 'Blanco Tequila 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 8, unit: 'bottle', unitCost: 38.5, parLevel: 12, supplier: 'Ontario Beverage Retail' },
-      { id: 'demo-triple-sec', name: 'Orange Liqueur 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 5, unit: 'bottle', unitCost: 27.8, parLevel: 8, supplier: 'Ontario Beverage Retail' },
-      { id: 'demo-cabernet', name: 'House Cabernet', category: 'Wine', storageArea: 'Wine Cellar', currentStock: 15, unit: 'bottle', unitCost: 16.25, parLevel: 24, supplier: 'Cellar Door Imports' },
+      { id: 'demo-tequila', name: 'Blanco Tequila 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 8, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 38.5, parLevel: 12, supplier: 'Ontario Beverage Retail' },
+      { id: 'demo-triple-sec', name: 'Orange Liqueur 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 5, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 27.8, parLevel: 8, supplier: 'Ontario Beverage Retail' },
+      { id: 'demo-cabernet', name: 'House Cabernet', category: 'Wine', storageArea: 'Wine Cellar', currentStock: 15, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 16.25, parLevel: 24, supplier: 'Cellar Door Imports' },
       { id: 'demo-mayo', name: 'Real Mayonnaise', category: 'Condiments', storageArea: 'Walk-In Cooler', currentStock: 8, unit: 'L', unitCost: 6.8, parLevel: 12, supplier: 'Maple Foodservice' },
       { id: 'demo-ketchup', name: 'Tomato Ketchup', category: 'Condiments', storageArea: 'Dry Storage', currentStock: 6, unit: 'L', unitCost: 4.6, parLevel: 10, supplier: 'Maple Foodservice' },
       { id: 'demo-pickles', name: 'Dill Pickles', category: 'Condiments', storageArea: 'Walk-In Cooler', currentStock: 4, unit: 'L', unitCost: 7.4, parLevel: 7, supplier: 'Harbour Specialty Foods' },
