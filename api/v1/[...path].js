@@ -856,10 +856,17 @@ export default async function handler(req, res) {
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'status' && method === 'GET') {
       const auth = await getAuthContext(req);
       const factors = await supabaseAuth('factors', { accessToken: auth.token });
+      const factorList = Array.isArray(factors)
+        ? factors
+        : (Array.isArray(factors?.factors)
+          ? factors.factors
+          : (Array.isArray(factors?.all)
+            ? factors.all
+            : [...(Array.isArray(factors?.totp) ? factors.totp : []), ...(Array.isArray(factors?.phone) ? factors.phone : [])]));
       return json(res, 200, {
         required: mfaRequiredFor(auth.appUser, auth.authUser),
         verified: jwtAssuranceLevel(auth.token) === 'aal2',
-        factors: Array.isArray(factors) ? factors.map(factor => ({ id: factor.id, type: factor.factor_type || factor.type, status: factor.status, friendlyName: factor.friendly_name || '' })) : [],
+        factors: factorList.map(factor => ({ id: factor.id, type: factor.factor_type || factor.type, status: factor.status, friendlyName: factor.friendly_name || '' })),
       });
     }
 
