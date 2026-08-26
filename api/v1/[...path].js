@@ -681,6 +681,10 @@ function mfaRequiredFor(appUser, authUser) {
   return isPlatformAdminEmail(authUser?.email) || ['Owner', 'Admin'].includes(appUser?.role);
 }
 
+function canEnrollMfa(appUser, authUser) {
+  return isPlatformAdmin(authUser) || ['Owner', 'Admin'].includes(appUser?.role);
+}
+
 function ensureMfa(auth) {
   if (mfaRequiredFor(auth.appUser, auth.authUser) && jwtAssuranceLevel(auth.token) !== 'aal2') {
     throw Object.assign(new Error('Two-step verification is required for this account'), { status: 401, code: 'MFA_REQUIRED' });
@@ -909,23 +913,31 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'status' && method === 'GET') {
       const auth = await getAuthContext(req);
+      const enrolled = await supabaseAuth('factors', { accessToken: auth.token });
       return json(res, 200, {
         required: mfaRequiredFor(auth.appUser, auth.authUser),
         verified: jwtAssuranceLevel(auth.token) === 'aal2',
-        factors: [],
+        canEnroll: canEnrollMfa(auth.appUser, auth.authUser),
+        factors: Array.isArray(enrolled?.factors) ? enrolled.factors.map(factor => ({
+          id: factor.id,
+          type: factor.factor_type,
+          status: factor.status,
+        })) : [],
       });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'enroll' && method === 'POST') {
       const auth = await getAuthContext(req);
-      if (!mfaRequiredFor(auth.appUser, auth.authUser)) return json(res, 403, { error: 'Two-step verification is not required for this user' });
+      if (!canEnrollMfa(auth.appUser, auth.authUser)) return json(res, 403, { error: 'Two-step verification is available to account owners and administrators' });
       const enrolled = await supabaseAuth('factors', {
         method: 'POST',
         accessToken: auth.token,
         body: { factor_type: 'totp', friendly_name: `ZestIQ Authenticator ${Date.now()}` },
       });
       const uri = enrolled?.totp?.uri || '';
-      return json(res, 200, { id: enrolled.id, qrCode: mfaQrImageSource(enrolled?.totp?.qr_code), uri });
+      const qrCode = String(enrolled?.totp?.qr_code || '').trim();
+      if (!qrCode || !uri) return json(res, 502, { error: 'Authenticator setup did not return a QR code. Please try again.' });
+      return json(res, 200, { id: enrolled.id, qrCode, uri });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'verify' && method === 'POST') {
