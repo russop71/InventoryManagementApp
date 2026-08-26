@@ -509,8 +509,8 @@ export function Dashboard() {
         </Link>
       )}
 
-      {/* ── Compact 3-stat strip ─────────────────────── */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {/* The daily brief above is the single operational summary. The sales panel below supplies the supporting detail. */}
+      {false && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {/* Food Cost % */}
         <Card
           className={`border-0 shadow-sm overflow-hidden transition-all duration-200 ${totalRevenue > 0 ? 'cursor-pointer hover:shadow-md' : ''} ${
@@ -580,7 +580,7 @@ export function Dashboard() {
             <p className="mt-1.5 text-[9px] font-semibold leading-tight text-gray-400">Target {targetLaborPercent}% · view schedule</p>
           </CardContent>
         </Card>}
-      </div>
+      </div>}
 
       <Card className="border-0 shadow-sm overflow-hidden bg-white">
         <div className="h-[3px] bg-[#F5C10E]" />
