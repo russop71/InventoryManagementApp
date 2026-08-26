@@ -1041,6 +1041,7 @@ export default async function handler(req, res) {
         const companyName = String(req.body?.companyName || '').trim();
         const ownerName = String(req.body?.ownerName || '').trim();
         const ownerEmail = String(req.body?.ownerEmail || '').trim().toLowerCase();
+        const onboardingDetails = req.body?.onboardingDetails && typeof req.body.onboardingDetails === 'object' ? req.body.onboardingDetails : {};
         if (!companyName || !ownerName || !ownerEmail) {
           return json(res, 400, { error: 'Company name, owner name, and owner email are required' });
         }
@@ -1055,6 +1056,21 @@ export default async function handler(req, res) {
             body: { email: ownerEmail, data: { name: ownerName, platform_invited: true } },
           });
           const { account } = await ensureAccountForEmail(ownerEmail, companyName);
+          const onboardingState = {
+            status: 'in_progress',
+            currentStep: 'restaurant',
+            completedSteps: [],
+            skippedSteps: [],
+            startedAt: new Date().toISOString(),
+            completedAt: null,
+            updatedAt: new Date().toISOString(),
+            clientProfile: onboardingDetails,
+          };
+          await supabase(`accounts?id=eq.${account.id}`, {
+            method: 'PATCH',
+            prefer: 'return=minimal',
+            body: { onboarding_state: onboardingState, updated_at: new Date().toISOString() },
+          });
           await supabase('app_users', {
             method: 'POST',
             prefer: 'return=minimal',
@@ -1098,6 +1114,7 @@ export default async function handler(req, res) {
               name: clientAccount.name,
               slug: clientAccount.slug,
               createdAt: clientAccount.created_at,
+              onboarding: clientAccount.onboarding_state || {},
               users: users.map(mapUser),
               locations: locations.map(mapLocation),
               billing: mapBilling(clientAccount, billingDetails),
