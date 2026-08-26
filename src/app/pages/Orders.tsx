@@ -105,6 +105,7 @@ export function Orders() {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false);
   const [manualSupplier, setManualSupplier] = useState<string>('');
+  const [manualItemQuery, setManualItemQuery] = useState('');
   const [manualQuantities, setManualQuantities] = useState<Record<string, number>>({});
   const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
 
@@ -248,6 +249,13 @@ export function Orders() {
     const normalizedSupplier = manualSupplier.trim().toLowerCase();
     return inventory.filter(item => item.supplier.trim().toLowerCase() === normalizedSupplier);
   }, [inventory, manualSupplier]);
+  const filteredManualSupplierItems = useMemo(() => {
+    const query = manualItemQuery.trim().toLowerCase();
+    if (!query) return manualSupplierItems;
+    return manualSupplierItems.filter(item => [item.name, item.sku, item.vendorItemCode]
+      .filter(Boolean)
+      .some(value => value.toLowerCase().includes(query)));
+  }, [manualItemQuery, manualSupplierItems]);
   const manualOrderLineCount = manualSupplierItems.filter(item => (manualQuantities[item.id] || 0) > 0).length;
   const manualOrderTotal = manualSupplierItems.reduce((sum, item) => {
     const quantity = manualQuantities[item.id] || 0;
@@ -271,6 +279,7 @@ export function Orders() {
 
   const openManualOrderDialog = () => {
     setManualSupplier('');
+    setManualItemQuery('');
     setManualQuantities({});
     setShowManualOrderDialog(true);
   };
@@ -796,6 +805,7 @@ export function Orders() {
                 value={manualSupplier}
                 onChange={(event) => {
                   setManualSupplier(event.target.value);
+                  setManualItemQuery('');
                   setManualQuantities({});
                 }}
                 className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
@@ -821,6 +831,18 @@ export function Orders() {
 
             {manualSupplierItems.length > 0 && (
               <div className="space-y-3">
+                <div>
+                  <label htmlFor="manual-order-item-search" className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Search supplier items
+                  </label>
+                  <Input
+                    id="manual-order-item-search"
+                    value={manualItemQuery}
+                    onChange={(event) => setManualItemQuery(event.target.value)}
+                    placeholder="Search by item name or product code"
+                    className="mt-1"
+                  />
+                </div>
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
@@ -832,7 +854,7 @@ export function Orders() {
                       </tr>
                     </thead>
                     <tbody>
-                      {manualSupplierItems.map(item => (
+                      {filteredManualSupplierItems.map(item => (
                         <tr key={item.id} className="border-t border-gray-100">
                           <td className="px-3 py-2 font-medium text-gray-900">{item.name}</td>
                           <td className="px-3 py-2 text-gray-700">{item.currentStock} {item.unit}</td>
@@ -849,6 +871,13 @@ export function Orders() {
                           </td>
                         </tr>
                       ))}
+                      {filteredManualSupplierItems.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-500">
+                            No items match that search.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
