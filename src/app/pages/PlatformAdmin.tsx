@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Building2, CheckCircle2, CreditCard, ExternalLink, Loader2, MapPin, Plus, RefreshCw, ShieldCheck, TrendingUp, UserCheck, Users } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, CheckCircle2, ClipboardCheck, CreditCard, ExternalLink, Loader2, MapPin, Plus, RefreshCw, ShieldCheck, TrendingUp, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -40,6 +40,7 @@ interface ClientDetail {
   name: string;
   slug: string;
   createdAt: string;
+  onboarding: { clientProfile?: ClientOnboardingDetails; status?: string };
   users: Array<{ id: string; name: string; email: string; role: string; status: string; lastLogin: string }>;
   locations: Array<{ id: string; name: string }>;
   billing: ClientSummary['billing'] & {
@@ -49,6 +50,25 @@ interface ClientDetail {
     paymentMethods: Array<{ id: string; brand: string; last4: string; expMonth: number | null; expYear: number | null }>;
     payments: Array<{ id: string; number: string | null; date: string | null; amount: number; currency: string; status: string; hostedInvoiceUrl: string | null }>;
   };
+}
+
+interface ClientOnboardingDetails {
+  legalName?: string;
+  billingEmail?: string;
+  billingAddress?: string;
+  primaryManager?: string;
+  primaryManagerEmail?: string;
+  locationCount?: string;
+  posSystem?: string;
+  supplierAccounts?: string;
+  taxSettings?: string;
+  currency?: string;
+  foodCostTarget?: string;
+  labourTarget?: string;
+  orderingDays?: string;
+  importStatus?: string;
+  privacyAccepted?: boolean;
+  termsAccepted?: boolean;
 }
 
 const PLANS: Array<{ id: BillingPlan; label: string }> = [
@@ -178,6 +198,24 @@ export function PlatformAdmin() {
           companyName: String(formData.get('companyName') || '').trim(),
           ownerName: String(formData.get('ownerName') || '').trim(),
           ownerEmail: String(formData.get('ownerEmail') || '').trim(),
+          onboardingDetails: {
+            legalName: String(formData.get('legalName') || '').trim(),
+            billingEmail: String(formData.get('billingEmail') || '').trim(),
+            billingAddress: String(formData.get('billingAddress') || '').trim(),
+            primaryManager: String(formData.get('primaryManager') || '').trim(),
+            primaryManagerEmail: String(formData.get('primaryManagerEmail') || '').trim(),
+            locationCount: String(formData.get('locationCount') || '1'),
+            posSystem: String(formData.get('posSystem') || '').trim(),
+            supplierAccounts: String(formData.get('supplierAccounts') || '').trim(),
+            taxSettings: String(formData.get('taxSettings') || '').trim(),
+            currency: String(formData.get('currency') || 'CAD'),
+            foodCostTarget: String(formData.get('foodCostTarget') || '30'),
+            labourTarget: String(formData.get('labourTarget') || '30'),
+            orderingDays: String(formData.get('orderingDays') || '').trim(),
+            importStatus: String(formData.get('importStatus') || '').trim(),
+            privacyAccepted: formData.get('privacyAccepted') === 'on',
+            termsAccepted: formData.get('termsAccepted') === 'on',
+          },
         }),
       });
       toast.success('Client company created and its owner invitation was sent');
@@ -245,15 +283,35 @@ export function PlatformAdmin() {
             <DialogTrigger asChild>
               <Button type="button" className="bg-[#0F172A] text-white hover:bg-[#1E293B]"><Plus className="mr-2 h-4 w-4" /> New client</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+            <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Create a client company</DialogTitle>
                 <DialogDescription>This creates an isolated workspace and emails the client owner a secure invitation.</DialogDescription>
               </DialogHeader>
               <form onSubmit={inviteClient} className="space-y-4">
-                <div><Label htmlFor="client-company">Company name</Label><Input id="client-company" name="companyName" required /></div>
-                <div><Label htmlFor="client-owner">Owner name</Label><Input id="client-owner" name="ownerName" required /></div>
-                <div><Label htmlFor="client-email">Owner email</Label><Input id="client-email" name="ownerEmail" type="email" required /></div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div><Label htmlFor="client-company">Restaurant name</Label><Input id="client-company" name="companyName" required /></div>
+                  <div><Label htmlFor="client-legal">Legal business name</Label><Input id="client-legal" name="legalName" /></div>
+                  <div><Label htmlFor="client-owner">Owner name</Label><Input id="client-owner" name="ownerName" required /></div>
+                  <div><Label htmlFor="client-email">Owner email</Label><Input id="client-email" name="ownerEmail" type="email" required /></div>
+                  <div><Label htmlFor="client-manager">Primary manager</Label><Input id="client-manager" name="primaryManager" /></div>
+                  <div><Label htmlFor="client-manager-email">Manager email</Label><Input id="client-manager-email" name="primaryManagerEmail" type="email" /></div>
+                  <div><Label htmlFor="client-billing">Billing email</Label><Input id="client-billing" name="billingEmail" type="email" /></div>
+                  <div><Label htmlFor="client-locations">Locations</Label><Input id="client-locations" name="locationCount" type="number" min="1" defaultValue="1" /></div>
+                </div>
+                <div><Label htmlFor="client-address">Billing address</Label><Input id="client-address" name="billingAddress" /></div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div><Label htmlFor="client-pos">POS system</Label><Input id="client-pos" name="posSystem" placeholder="Toast, TouchBistro, Lightspeed…" /></div>
+                  <div><Label htmlFor="client-suppliers">Suppliers / account numbers</Label><Input id="client-suppliers" name="supplierAccounts" placeholder="Supplier names or account numbers" /></div>
+                  <div><Label htmlFor="client-tax">Tax settings</Label><Input id="client-tax" name="taxSettings" placeholder="e.g. HST 13%" /></div>
+                  <div><Label htmlFor="client-currency">Currency</Label><select id="client-currency" name="currency" defaultValue="CAD" className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm"><option>CAD</option><option>USD</option></select></div>
+                  <div><Label htmlFor="client-food-target">Food cost target %</Label><Input id="client-food-target" name="foodCostTarget" type="number" min="0" max="100" defaultValue="30" /></div>
+                  <div><Label htmlFor="client-labour-target">Labour target %</Label><Input id="client-labour-target" name="labourTarget" type="number" min="0" max="100" defaultValue="30" /></div>
+                </div>
+                <div><Label htmlFor="client-ordering">Ordering days</Label><Input id="client-ordering" name="orderingDays" placeholder="e.g. Monday, Thursday" /></div>
+                <div><Label htmlFor="client-imports">Data import status</Label><Input id="client-imports" name="importStatus" placeholder="Inventory, recipes, menu, sales history…" /></div>
+                <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="privacyAccepted" /> Privacy acknowledgement received</label>
+                <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="termsAccepted" /> Agreement and 12-month billing terms discussed</label>
                 <Button type="submit" disabled={isLoading} className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]">
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Create & invite owner
                 </Button>
@@ -405,6 +463,26 @@ export function PlatformAdmin() {
                   <p className="flex items-center gap-2 font-semibold"><MapPin className="h-4 w-4" /> Locations</p>
                   <div className="mt-3 space-y-2">{selectedClient.locations.map(location => <div key={location.id} className="rounded-xl bg-slate-50 p-3 text-sm font-medium">{location.name}</div>)}</div>
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <p className="flex items-center gap-2 font-semibold text-slate-950"><ClipboardCheck className="h-4 w-4" /> Client onboarding record</p>
+                {(() => {
+                  const details = selectedClient.onboarding?.clientProfile || {};
+                  const checks = [
+                    ['Owner invited', Boolean(selectedClient.users.some(member => member.role === 'Owner'))],
+                    ['Location plan confirmed', Boolean(details.locationCount || selectedClient.locations.length)],
+                    ['POS selected', Boolean(details.posSystem)],
+                    ['Suppliers collected', Boolean(details.supplierAccounts)],
+                    ['Operational targets set', Boolean(details.foodCostTarget && details.labourTarget)],
+                    ['Data imports scoped', Boolean(details.importStatus)],
+                    ['Privacy acknowledged', details.privacyAccepted === true],
+                    ['Agreement discussed', details.termsAccepted === true],
+                    ['Billing active', selectedClient.billing.status === 'active'],
+                  ];
+                  const complete = checks.filter(([, done]) => done).length;
+                  return <><p className="mt-1 text-sm text-slate-500">{complete}/{checks.length} onboarding checks complete</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{checks.map(([label, done]) => <div key={label} className={`rounded-xl p-3 text-sm ${done ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{done ? '✓' : '○'} {label}</div>)}</div><div className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-slate-500">Legal name:</span> {details.legalName || 'Not added'}</p><p><span className="text-slate-500">Billing:</span> {details.billingEmail || 'Not added'}</p><p><span className="text-slate-500">POS:</span> {details.posSystem || 'Not selected'}</p><p><span className="text-slate-500">Targets:</span> food {details.foodCostTarget || '—'}% · labour {details.labourTarget || '—'}%</p><p><span className="text-slate-500">Ordering:</span> {details.orderingDays || 'Not set'}</p><p><span className="text-slate-500">Imports:</span> {details.importStatus || 'Not scoped'}</p></div></>;
+                })()}
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
