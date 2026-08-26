@@ -1288,7 +1288,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       })),
       value: count.entries.reduce((sum, entry) => sum + entry.counted * entry.unitCost, 0),
     };
-    const countedByItem = new Map(finalizedCount.entries.map(entry => [entry.itemId, entry]));
+    // A product can be counted in several storage areas. Inventory on hand is the
+    // sum of those lines, not whichever line happens to be saved last.
+    const countedByItem = new Map<string, { counted: number; shelfOrder?: number }>();
+    finalizedCount.entries.forEach(entry => {
+      const current = countedByItem.get(entry.itemId) || { counted: 0, shelfOrder: entry.shelfOrder };
+      current.counted += Number(entry.counted) || 0;
+      if (entry.shelfOrder !== undefined) current.shelfOrder = entry.shelfOrder;
+      countedByItem.set(entry.itemId, current);
+    });
     const now = new Date().toISOString();
     const nextInventory = inventory.map(item => {
       const countedEntry = countedByItem.get(item.id);
