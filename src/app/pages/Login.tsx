@@ -5,7 +5,6 @@ import { Building, Lock, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
-import { ZestIQBrand } from '../components/ZestIQBrand';
 
 export function Login() {
   const navigate = useNavigate();
@@ -96,11 +95,7 @@ export function Login() {
 
       {/* ── Yellow hero ───────────────────────────────── */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
-        <ZestIQBrand
-          className="rounded-3xl bg-[#FBFAF6] px-5 py-4 shadow-sm ring-1 ring-black/5"
-          markClassName="h-[72px] w-[72px] rounded-[18px]"
-          wordmarkClassName="text-[40px] text-[#0F172A]"
-        />
+        <img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-auto w-full max-w-[420px]" />
         <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
           Smarter Kitchens. Better Business.
         </p>
