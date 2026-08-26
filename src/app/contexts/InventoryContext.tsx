@@ -1204,6 +1204,13 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const deleteInvoice = (invoiceId: string) => {
     setInvoices(prev => {
       const nextInvoices = prev.filter(invoice => invoice.id !== invoiceId);
+      // saveLocationData protects against accidental empty snapshots while the app
+      // is loading. A user deliberately deleting the last invoice is different:
+      // clear the scoped cache first so that empty list is persisted to the API.
+      if (nextInvoices.length === 0) {
+        const invoicesKey = localKey('invoices');
+        if (invoicesKey) localStorage.setItem(invoicesKey, JSON.stringify([]));
+      }
       saveLocationData(inventory, recipes, storageAreas, orders, nextInvoices, suppliers, preppedRecipes);
       return nextInvoices;
     });
