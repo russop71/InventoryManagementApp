@@ -1168,8 +1168,8 @@ export function Dashboard() {
         </Card>
       )}
 
-      {/* Quick Actions */}
-      <Card className="border-0 shadow-sm overflow-hidden">
+      {/* Feature shortcuts are available from the main navigation, not repeated on the dashboard. */}
+      {false && <><Card className="border-0 shadow-sm overflow-hidden">
         <div className="h-[3px] bg-[#F5C10E]" />
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
@@ -1231,7 +1231,7 @@ export function Dashboard() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card></>}
 
       {/* Charts */}
       <div className="space-y-4">
