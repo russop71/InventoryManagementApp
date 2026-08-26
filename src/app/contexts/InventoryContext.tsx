@@ -203,6 +203,7 @@ interface InventoryContextType {
   suppliers: Supplier[];
   inventoryCounts: InventoryCount[];
   isLocationLoaded: boolean;
+  refreshLocationData: () => Promise<void>;
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => InventoryItem;
   addStorageArea: (storageArea: string) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
@@ -1335,6 +1336,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         suppliers,
         inventoryCounts,
         isLocationLoaded,
+        refreshLocationData: () => loadLocationData(true),
         addInventoryItem,
         addStorageArea,
         updateInventoryItem,
