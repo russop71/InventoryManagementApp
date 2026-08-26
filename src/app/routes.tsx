@@ -34,6 +34,7 @@ import { EmployeeApp } from "./pages/EmployeeApp";
 import { BeverageCosting } from "./pages/BeverageCosting";
 import { BookDemo } from "./pages/BookDemo";
 import { Onboarding } from "./pages/Onboarding";
+import { Waste } from "./pages/Waste";
 import { RestaurantBeverageSeo, RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo, RestaurantLabourSeo, RestaurantOrderingSeo } from "./pages/RestaurantSeoPages";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
@@ -123,6 +124,7 @@ export const router = createBrowserRouter([
           { path: "dashboard", Component: Dashboard },
           { path: "onboarding", Component: Onboarding },
           { path: "labor", Component: LaborScheduling },
+          { path: "waste", Component: Waste },
           { path: "beverages", Component: BeverageCosting },
           { path: "inventory", Component: Inventory },
           { path: "inventory/counts/:countId", Component: InventoryCountEditor },
