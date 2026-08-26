@@ -104,7 +104,7 @@ export function Users() {
         method: editingUserId ? 'PUT' : 'POST',
         body: JSON.stringify(payload),
       });
-      toast.success(editingUserId ? 'User access updated' : 'Invitation email sent');
+      toast.success(editingUserId ? 'User access updated' : 'User added and secure setup email sent');
       setIsDialogOpen(false);
       setEditingUserId(null);
       await loadUsers(true);
@@ -184,14 +184,14 @@ export function Users() {
                 className="bg-[#0F172A] text-white hover:bg-[#1E293B]"
                 onClick={() => setEditingUserId(null)}
               >
-                <Plus className="mr-2 h-4 w-4" /> Invite user
+                <Plus className="mr-2 h-4 w-4" /> Add user
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>{editingUserId ? 'Edit company access' : 'Invite a company user'}</DialogTitle>
+                <DialogTitle>{editingUserId ? 'Edit company access' : 'Add a company user'}</DialogTitle>
                 <DialogDescription>
-                  {editingUserId ? 'Update this person’s role or access status.' : 'They will receive a secure email link to create their password.'}
+                  {editingUserId ? 'Update this person’s role or access status.' : 'Add their details and role. They will receive a secure email to create their password.'}
                 </DialogDescription>
               </DialogHeader>
               <form key={editingUserId || 'new'} onSubmit={handleSubmit} className="space-y-4">
@@ -226,7 +226,7 @@ export function Users() {
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                   <Button type="submit" disabled={isLoading} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">
-                    {editingUserId ? 'Save access' : 'Send invitation'}
+                    {editingUserId ? 'Save access' : 'Add user'}
                   </Button>
                 </div>
               </form>
