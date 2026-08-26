@@ -42,6 +42,7 @@ interface AuthContextType {
   locations: AccountLocation[];
   activeLocationId: string | null;
   token: string | null;
+  mfaRequired: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginDemo: () => Promise<void>;
   register: (name: string, companyName: string, email: string, password: string) => Promise<void>;
@@ -54,6 +55,7 @@ interface AuthContextType {
   updateAccountProfile: (accountName: string) => Promise<void>;
   updateOnboarding: (updates: Partial<OnboardingProgress>) => Promise<OnboardingProgress>;
   refreshSession: () => Promise<void>;
+  completeMfa: (factorId: string, code: string) => Promise<void>;
   updateLocalAccountProfile: (updates: { name?: string; accountName?: string }) => void;
 }
 
@@ -79,6 +81,7 @@ interface AuthApiResponse {
   };
   locations: AccountLocation[];
   activeLocationId: string;
+  mfaRequired?: boolean;
 }
 
 interface AuthState {
@@ -92,6 +95,7 @@ interface AuthState {
   locations: AccountLocation[];
   activeLocationId: string | null;
   token: string | null;
+  mfaRequired: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -136,6 +140,7 @@ function signedOutState(): AuthState {
     locations: [],
     activeLocationId: null,
     token: null,
+    mfaRequired: false,
   };
 }
 
@@ -166,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       locations: payload.locations,
       activeLocationId,
       token: payload.token,
+      mfaRequired: payload.mfaRequired === true,
     });
   };
 
@@ -231,6 +237,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!stored?.token) throw new Error('Sign in is required');
     const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/session');
     applySession(payload, stored);
+  };
+
+  const completeMfa = async (factorId: string, code: string) => {
+    const previous = readStoredSession();
+    const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/mfa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ factorId, code }),
+    });
+    applySession(payload, previous);
   };
 
   const logout = () => {
@@ -342,6 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       locations: authState.locations,
       activeLocationId: authState.activeLocationId,
       token: authState.token,
+      mfaRequired: authState.mfaRequired,
       login,
       loginDemo,
       register,
@@ -354,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateAccountProfile,
       updateOnboarding,
       refreshSession,
+      completeMfa,
       updateLocalAccountProfile,
     }),
     [authState],
