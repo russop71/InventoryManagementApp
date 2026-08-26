@@ -237,6 +237,7 @@ export function Login() {
           >
             {isLoading ? (isSignup ? 'Creating account…' : 'Signing in…') : (isSignup ? 'Create Account' : 'Sign In')}
           </button>
+          {!isSignup && <button type="button" onClick={() => setIsSignup(true)} className="mt-3 h-12 w-full rounded-xl border-2 border-[#0F172A] bg-white text-sm font-black text-[#0F172A] transition active:scale-[0.98]">Create your ZestIQ account</button>}
         </form>
 
         <div className="relative my-6">
@@ -259,14 +260,14 @@ export function Login() {
         </button>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          {isSignup ? 'Already have an account? ' : "Don't have an account? "}
+          {isSignup ? 'Already have an account? ' : 'Need help signing in? '}
           <button
             type="button"
-            onClick={() => setIsSignup(value => !value)}
+            onClick={() => isSignup ? setIsSignup(false) : window.location.assign('mailto:demo@zestiq.ca?subject=ZestIQ%20sign-in%20help')}
             className="font-bold"
             style={{ color: '#0F172A' }}
           >
-            {isSignup ? 'Sign In' : 'Create one'}
+            {isSignup ? 'Sign In' : 'Contact support'}
           </button>
         </p>
       </div>
