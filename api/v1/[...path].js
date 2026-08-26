@@ -56,7 +56,7 @@ function defaultLocationData() {
 }
 
 function defaultLabor() {
-  return { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30 };
+  return { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [], publishedPositions: [], openShifts: [] };
 }
 
 function normalizeLabor(value) {
@@ -69,6 +69,7 @@ function normalizeLabor(value) {
     role: String(employee?.role || '').trim().slice(0, 120),
     department: String(employee?.department || 'Restaurant team').trim().slice(0, 120),
     phone: String(employee?.phone || '').trim().slice(0, 40),
+    clockInNumber: String(employee?.clockInNumber || '').trim().slice(0, 20),
     payType: validPayTypes.has(employee?.payType) ? employee.payType : 'hourly',
     hourlyRate: Math.max(0, Math.min(1000, Number(employee?.hourlyRate) || 0)),
     annualSalary: Math.max(0, Math.min(1000000, Number(employee?.annualSalary) || 0)),
@@ -108,12 +109,48 @@ function normalizeLabor(value) {
     status: validSwapStatus.has(request?.status) ? request.status : 'pending',
     createdAt: String(request?.createdAt || new Date().toISOString()).slice(0, 40),
   })).filter(request => request.id && shiftIds.has(request.shiftId) && employeeIds.has(request.requesterEmployeeId)) : [];
+  const normalizeTemplateShift = shift => ({
+    employeeId: String(shift?.employeeId || '').slice(0, 120),
+    dayOffset: Math.max(0, Math.min(6, Number(shift?.dayOffset) || 0)),
+    start: /^\d{2}:\d{2}$/.test(String(shift?.start || '')) ? String(shift.start) : '09:00',
+    end: /^\d{2}:\d{2}$/.test(String(shift?.end || '')) ? String(shift.end) : '17:00',
+    breakMinutes: Math.max(0, Math.min(480, Number(shift?.breakMinutes) || 0)),
+    status: validStatus.has(shift?.status) ? shift.status : 'scheduled',
+    tag: String(shift?.tag || '').trim().toUpperCase().slice(0, 40),
+    notes: String(shift?.notes || '').slice(0, 500),
+  });
+  const scheduleTemplates = Array.isArray(value.scheduleTemplates) ? value.scheduleTemplates.slice(0, 100).map(template => ({
+    id: String(template?.id || '').slice(0, 120),
+    name: String(template?.name || '').trim().slice(0, 120),
+    shifts: Array.isArray(template?.shifts) ? template.shifts.slice(0, 1000).map(normalizeTemplateShift).filter(shift => employeeIds.has(shift.employeeId)) : [],
+  })).filter(template => template.id && template.name) : [];
+  const scheduleEvents = Array.isArray(value.scheduleEvents) ? value.scheduleEvents.slice(0, 2000).map(event => ({
+    id: String(event?.id || '').slice(0, 120),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(event?.date || '')) ? String(event.date) : '',
+    name: String(event?.name || '').trim().slice(0, 160),
+    time: /^\d{2}:\d{2}$/.test(String(event?.time || '')) ? String(event.time) : '18:00',
+  })).filter(event => event.id && event.date && event.name) : [];
+  const publishedPositions = Array.isArray(value.publishedPositions) ? Array.from(new Set(value.publishedPositions.map(position => String(position || '').trim().slice(0, 120)).filter(Boolean))).slice(0, 200) : [];
+  const openShifts = Array.isArray(value.openShifts) ? value.openShifts.slice(0, 5000).map(shift => ({
+    id: String(shift?.id || '').slice(0, 120),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(shift?.date || '')) ? String(shift.date) : '',
+    role: String(shift?.role || '').trim().slice(0, 120),
+    start: /^\d{2}:\d{2}$/.test(String(shift?.start || '')) ? String(shift.start) : '09:00',
+    end: /^\d{2}:\d{2}$/.test(String(shift?.end || '')) ? String(shift.end) : '17:00',
+    breakMinutes: Math.max(0, Math.min(480, Number(shift?.breakMinutes) || 0)),
+    tag: String(shift?.tag || '').trim().toUpperCase().slice(0, 40),
+    notes: String(shift?.notes || '').slice(0, 500),
+  })).filter(shift => shift.id && shift.date && shift.role) : [];
   return {
     employees,
     shifts,
     timeOffRequests,
     shiftSwapRequests,
     targetLaborPercent: Math.max(0, Math.min(100, Number(value.targetLaborPercent) || 30)),
+    scheduleTemplates,
+    scheduleEvents,
+    publishedPositions,
+    openShifts,
   };
 }
 
