@@ -940,7 +940,7 @@ export default async function handler(req, res) {
       const uri = enrolled?.totp?.uri || '';
       const qrCode = String(enrolled?.totp?.qr_code || '').trim();
       if (!qrCode || !uri) return json(res, 502, { error: 'Authenticator setup did not return a QR code. Please try again.' });
-      return json(res, 200, { id: enrolled.id, qrCode, uri });
+      return json(res, 200, { id: enrolled.id, qrCode: mfaQrImageSource(qrCode), uri });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'verify' && method === 'POST') {
