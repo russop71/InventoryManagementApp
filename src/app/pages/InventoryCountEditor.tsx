@@ -35,6 +35,10 @@ function entryStorageArea(entry: InventoryCountEntry) {
   return entry.storageArea?.trim() || 'Unassigned';
 }
 
+function entryKey(entry: InventoryCountEntry) {
+  return entry.entryId || `${entry.itemId}::${entryStorageArea(entry)}`;
+}
+
 export function InventoryCountEditor() {
   const navigate = useNavigate();
   const { countId } = useParams();
@@ -61,6 +65,8 @@ export function InventoryCountEditor() {
   const [saveState, setSaveState] = useState('Not saved yet');
   const [countUnits, setCountUnits] = useState<Record<string, string>>({});
   const [countInputs, setCountInputs] = useState<Record<string, string>>({});
+  const [extraItemId, setExtraItemId] = useState('');
+  const [extraStorageArea, setExtraStorageArea] = useState('');
 
   const canFinalize = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const isFinalized = isInventoryCountFinalized(draft);
@@ -77,7 +83,7 @@ export function InventoryCountEditor() {
     let nextCount: InventoryCount;
     if (countId && countId !== 'new' && existing) {
       const existingFinalized = isInventoryCountFinalized(existing);
-      const previousEntries = new Map(previousCount?.entries?.map((entry: InventoryCountEntry) => [entry.itemId, entry]) || []);
+      const previousEntries = new Map(previousCount?.entries?.map((entry: InventoryCountEntry) => [entryKey(entry), entry]) || []);
       nextCount = {
         ...existing,
         status: existingFinalized ? 'finalized' : 'draft',
@@ -91,11 +97,12 @@ export function InventoryCountEditor() {
           const item = inventoryById.get(entry.itemId);
           return {
             ...entry,
+            entryId: entryKey(entry),
             storageArea: entry.storageArea || item?.storageArea || 'Unassigned',
             category: entry.category || item?.category || 'Other',
             supplier: entry.supplier || item?.supplier || 'Unknown',
             shelfOrder: entry.shelfOrder ?? item?.countOrder ?? index,
-            previousCounted: entry.previousCounted ?? previousEntries.get(entry.itemId)?.counted ?? entry.hypothetical,
+            previousCounted: entry.previousCounted ?? previousEntries.get(entryKey(entry))?.counted ?? entry.hypothetical,
             isCounted: entry.isCounted ?? existingFinalized,
           };
         }),
@@ -175,29 +182,29 @@ export function InventoryCountEditor() {
     }));
   }, [draft, groupFilter, itemMeta, search, storageFilter, supplierFilter]);
 
-  const countUnitFor = (entry: InventoryCountEntry) => countUnits[entry.itemId] || entry.unit;
+  const countUnitFor = (entry: InventoryCountEntry) => countUnits[entryKey(entry)] || entry.unit;
   const countInputFor = (entry: InventoryCountEntry, complete: boolean) => {
-    if (countInputs[entry.itemId] !== undefined) return countInputs[entry.itemId];
+    if (countInputs[entryKey(entry)] !== undefined) return countInputs[entryKey(entry)];
     if (!complete) return '';
     const converted = convertQuantity(entry.counted, entry.unit, countUnitFor(entry));
     return converted === null ? String(entry.counted) : String(Number(converted.toFixed(4)));
   };
   const changeCountUnit = (entry: InventoryCountEntry, unit: string) => {
-    setCountUnits(current => ({ ...current, [entry.itemId]: unit }));
-    if (countInputs[entry.itemId] !== undefined || !draft || !isInventoryCountEntryComplete(entry, draft)) return;
+    setCountUnits(current => ({ ...current, [entryKey(entry)]: unit }));
+    if (countInputs[entryKey(entry)] !== undefined || !draft || !isInventoryCountEntryComplete(entry, draft)) return;
     const converted = convertQuantity(entry.counted, entry.unit, unit);
-    setCountInputs(current => ({ ...current, [entry.itemId]: converted === null ? String(entry.counted) : String(Number(converted.toFixed(4))) }));
+    setCountInputs(current => ({ ...current, [entryKey(entry)]: converted === null ? String(entry.counted) : String(Number(converted.toFixed(4))) }));
   };
-  const updateEntry = (itemId: string, rawValue: string, inputUnit?: string) => {
+  const updateEntry = (lineId: string, rawValue: string, inputUnit?: string) => {
     if (isFinalized) return;
-    setCountInputs(current => ({ ...current, [itemId]: rawValue }));
+    setCountInputs(current => ({ ...current, [lineId]: rawValue }));
     setDraft(current => {
       if (!current) return current;
       const isCounted = rawValue.trim() !== '';
       return {
         ...current,
         entries: current.entries.map(entry => {
-          if (entry.itemId !== itemId) return entry;
+          if (entryKey(entry) !== lineId) return entry;
           const entered = Math.max(0, Number(rawValue) || 0);
           const converted = inputUnit ? convertQuantity(entered, inputUnit, entry.unit) : entered;
           const counted = isCounted ? Math.max(0, converted ?? entered) : 0;
@@ -208,12 +215,12 @@ export function InventoryCountEditor() {
     setSaveState('Unsaved changes');
   };
 
-  const moveEntry = (area: string, itemId: string, direction: -1 | 1) => {
+  const moveEntry = (area: string, lineId: string, direction: -1 | 1) => {
     if (!draft || isFinalized) return;
     const areaEntries = draft.entries
       .filter(entry => entryStorageArea(entry) === area)
       .sort((left, right) => (left.shelfOrder ?? 999) - (right.shelfOrder ?? 999) || left.name.localeCompare(right.name));
-    const currentIndex = areaEntries.findIndex(entry => entry.itemId === itemId);
+    const currentIndex = areaEntries.findIndex(entry => entryKey(entry) === lineId);
     const targetIndex = currentIndex + direction;
     if (currentIndex < 0 || targetIndex < 0 || targetIndex >= areaEntries.length) return;
     const currentItem = areaEntries[currentIndex];
@@ -222,13 +229,25 @@ export function InventoryCountEditor() {
     const targetOrder = targetItem.shelfOrder ?? targetIndex;
     setDraft(current => current ? {
       ...current,
-      entries: current.entries.map(entry => entry.itemId === currentItem.itemId
+      entries: current.entries.map(entry => entryKey(entry) === entryKey(currentItem)
         ? { ...entry, shelfOrder: targetOrder }
-        : entry.itemId === targetItem.itemId
+        : entryKey(entry) === entryKey(targetItem)
           ? { ...entry, shelfOrder: currentOrder }
           : entry),
     } : current);
     setSaveState('Unsaved changes');
+  };
+
+  const addStorageAreaLine = () => {
+    if (!draft || isFinalized || !extraItemId || !extraStorageArea) return;
+    const source = draft.entries.find(entry => entry.itemId === extraItemId);
+    const lineId = `${extraItemId}::${extraStorageArea}`;
+    if (!source || draft.entries.some(entry => entryKey(entry) === lineId)) return toast.error('That item already has a count line in this storage area.');
+    setDraft(current => current ? { ...current, storageAreaOrder: Array.from(new Set([...(current.storageAreaOrder || []), extraStorageArea])), entries: [...current.entries, { ...source, entryId: lineId, storageArea: extraStorageArea, hypothetical: 0, previousCounted: 0, counted: 0, value: 0, isCounted: false, shelfOrder: 999 }] } : current);
+    setExtraItemId('');
+    setExtraStorageArea('');
+    setSaveState('Unsaved changes');
+    toast.success(`Added a separate ${extraStorageArea} count line.`);
   };
 
   const moveArea = (area: string, direction: -1 | 1) => {
@@ -373,6 +392,7 @@ export function InventoryCountEditor() {
             <FilterSelect value={groupFilter} onChange={setGroupFilter} options={groupOptions} allLabel="All categories" />
             <FilterSelect value={supplierFilter} onChange={setSupplierFilter} options={supplierOptions} allLabel="All suppliers" />
           </div>
+          {!isFinalized && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3"><p className="text-xs font-black text-amber-950">Count the same item in another storage area</p><p className="mt-1 text-[11px] leading-4 text-amber-800">Add a second line for a cooler, bar, station, or cellar. ZestIQ totals the lines when you finalize.</p><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><select value={extraItemId} onChange={event => setExtraItemId(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose an item…</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={extraStorageArea} onChange={event => setExtraStorageArea(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose a storage area…</option>{storageAreas.map(area => <option key={area} value={area}>{area}</option>)}</select><button type="button" onClick={addStorageAreaLine} disabled={!extraItemId || !extraStorageArea} className="h-10 rounded-xl bg-[#0B1220] px-4 text-sm font-black text-white disabled:opacity-40">Add count line</button></div></div>}
         </section>
 
         {areaGroups.map(({ area, entries }, areaIndex) => {
@@ -395,17 +415,17 @@ export function InventoryCountEditor() {
               <div className="divide-y divide-slate-100 md:hidden">
                 {entries.map((entry, index) => (
                   <MobileCountRow
-                    key={entry.itemId}
+                    key={entryKey(entry)}
                     entry={entry}
                     count={draft}
                     readOnly={isFinalized}
-                    onChange={value => updateEntry(entry.itemId, value, countUnitFor(entry))}
+                    onChange={value => updateEntry(entryKey(entry), value, countUnitFor(entry))}
                     unit={countUnitFor(entry)}
                     units={getCompatibleUnits(entry.unit)}
                     value={countInputFor(entry, isInventoryCountEntryComplete(entry, draft))}
                     onUnitChange={unit => changeCountUnit(entry, unit)}
-                    onMoveUp={() => moveEntry(area, entry.itemId, -1)}
-                    onMoveDown={() => moveEntry(area, entry.itemId, 1)}
+                    onMoveUp={() => moveEntry(area, entryKey(entry), -1)}
+                    onMoveDown={() => moveEntry(area, entryKey(entry), 1)}
                     disableMoveUp={index === 0}
                     disableMoveDown={index === entries.length - 1}
                   />
@@ -422,15 +442,15 @@ export function InventoryCountEditor() {
                     const quantityVariance = complete ? entry.counted - entry.hypothetical : 0;
                     const dollarVariance = quantityVariance * entry.unitCost;
                     return (
-                      <div key={entry.itemId} className={`grid grid-cols-[minmax(220px,1.7fr)_0.8fr_0.8fr_0.9fr_0.9fr_72px] items-center gap-3 px-4 py-3 ${complete ? '' : 'bg-amber-50/20'}`}>
+                      <div key={entryKey(entry)} className={`grid grid-cols-[minmax(220px,1.7fr)_0.8fr_0.8fr_0.9fr_0.9fr_72px] items-center gap-3 px-4 py-3 ${complete ? '' : 'bg-amber-50/20'}`}>
                         <div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{entry.name}</p><p className="mt-1 break-words text-[11px] text-slate-500">{entry.category || 'Other'} · {entry.supplier || 'Unknown'} · {entry.unit}</p></div>
                         <div className="text-right text-sm font-semibold text-slate-500">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)}</div>
                         <div className="text-right text-sm font-semibold text-slate-700">{entry.hypothetical.toFixed(2)}</div>
                         <div className="text-right">
-                          {isFinalized ? <span className="text-sm font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</span> : <div className="flex min-w-[150px] gap-1"><input aria-label={`Count ${entry.name}`} type="number" min="0" step="0.01" value={countInputFor(entry, complete)} onChange={event => updateEntry(entry.itemId, event.target.value, countUnitFor(entry))} className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={countUnitFor(entry)} onChange={event => changeCountUnit(entry, event.target.value)} className="h-10 max-w-[72px] rounded-xl border border-slate-200 bg-white px-1 text-xs font-bold">{getCompatibleUnits(entry.unit).map(unit => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></div>}
+                          {isFinalized ? <span className="text-sm font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</span> : <div className="flex min-w-[150px] gap-1"><input aria-label={`Count ${entry.name}`} type="number" min="0" step="0.01" value={countInputFor(entry, complete)} onChange={event => updateEntry(entryKey(entry), event.target.value, countUnitFor(entry))} className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={countUnitFor(entry)} onChange={event => changeCountUnit(entry, event.target.value)} className="h-10 max-w-[72px] rounded-xl border border-slate-200 bg-white px-1 text-xs font-bold">{getCompatibleUnits(entry.unit).map(unit => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></div>}
                         </div>
                         <div className={`text-right text-sm font-black ${!complete ? 'text-slate-300' : dollarVariance < 0 ? 'text-rose-600' : dollarVariance > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>{complete ? <><span className="block">{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit}</span><span className="text-[10px]">{dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span></> : 'Not counted'}</div>
-                        <div className="flex justify-end gap-1">{!isFinalized && <><OrderButton label={`Move ${entry.name} up`} disabled={index === 0} onClick={() => moveEntry(area, entry.itemId, -1)} icon="up" /><OrderButton label={`Move ${entry.name} down`} disabled={index === entries.length - 1} onClick={() => moveEntry(area, entry.itemId, 1)} icon="down" /></>}</div>
+                        <div className="flex justify-end gap-1">{!isFinalized && <><OrderButton label={`Move ${entry.name} up`} disabled={index === 0} onClick={() => moveEntry(area, entryKey(entry), -1)} icon="up" /><OrderButton label={`Move ${entry.name} down`} disabled={index === entries.length - 1} onClick={() => moveEntry(area, entryKey(entry), 1)} icon="down" /></>}</div>
                       </div>
                     );
                   })}
