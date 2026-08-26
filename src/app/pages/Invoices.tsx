@@ -35,6 +35,7 @@ export function Invoices() {
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'current-month' | 'last-30-days'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [invoicePendingDeletion, setInvoicePendingDeletion] = useState<InvoiceRecord | null>(null);
 
   const sortedInvoices = useMemo(() => {
     return [...invoices].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
@@ -326,7 +327,7 @@ export function Invoices() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
                           </Button>
-                          <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={event => { event.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                          <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={event => { event.stopPropagation(); setInvoicePendingDeletion(invoice); }}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </Button>
@@ -547,6 +548,19 @@ export function Invoices() {
         </div>
       )}
 
+      {invoicePendingDeletion && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-invoice-title">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600">Confirm deletion</p>
+            <h2 id="delete-invoice-title" className="mt-2 text-xl font-black text-slate-950">Delete this invoice?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{invoicePendingDeletion.invoiceNumber} from {invoicePendingDeletion.supplier} will be removed from this location. This cannot be undone.</p>
+            <div className="mt-6 flex gap-3">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setInvoicePendingDeletion(null)}>Cancel</Button>
+              <Button type="button" className="flex-1 bg-red-600 text-white hover:bg-red-700" onClick={() => { handleDeleteInvoice(invoicePendingDeletion); setInvoicePendingDeletion(null); }}>Delete invoice</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
