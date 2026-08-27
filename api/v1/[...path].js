@@ -1122,6 +1122,27 @@ export default async function handler(req, res) {
           });
         }
 
+        if (segments.length === 3 && method === 'PATCH') {
+          const companyName = String(req.body?.companyName || clientAccount.name || '').trim();
+          const ownerName = String(req.body?.ownerName || '').trim();
+          const ownerEmail = String(req.body?.ownerEmail || '').trim().toLowerCase();
+          const onboardingDetails = req.body?.onboardingDetails && typeof req.body.onboardingDetails === 'object' ? req.body.onboardingDetails : {};
+          if (companyName.length < 2 || companyName.length > 120) return json(res, 400, { error: 'Restaurant name must be between 2 and 120 characters' });
+          const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&select=*&order=created_at.asc&limit=1`);
+          const owner = owners[0] || null;
+          if (ownerEmail && !/^\S+@\S+\.\S+$/.test(ownerEmail)) return json(res, 400, { error: 'Enter a valid owner email' });
+          if (ownerEmail && owner && ownerEmail !== String(owner.email || '').toLowerCase()) {
+            const existing = await supabase(`app_users?email=eq.${encodeURIComponent(ownerEmail)}&id=neq.${owner.id}&select=id&limit=1`);
+            if (existing.length) return json(res, 409, { error: 'That email already belongs to another ZestIQ user' });
+            if (owner.auth_user_id) await supabaseAuth(`admin/users/${encodeURIComponent(owner.auth_user_id)}`, { method: 'PUT', body: { email: ownerEmail, email_confirm: true } });
+          }
+          const now = new Date().toISOString();
+          const currentOnboarding = clientAccount.onboarding_state && typeof clientAccount.onboarding_state === 'object' ? clientAccount.onboarding_state : {};
+          await supabase(`accounts?id=eq.${clientAccount.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { name: companyName, onboarding_state: { ...currentOnboarding, clientProfile: onboardingDetails, updatedAt: now }, updated_at: now } });
+          if (owner && (ownerName || ownerEmail)) await supabase(`app_users?id=eq.${owner.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { ...(ownerName ? { name: ownerName } : {}), ...(ownerEmail ? { email: ownerEmail } : {}) } });
+          return json(res, 200, { success: true });
+        }
+
         if (segments[3] === 'billing' && segments[4] === 'checkout' && method === 'POST') {
           if (clientAccount.stripe_subscription_id) {
             return json(res, 409, { error: 'This client already has a Stripe subscription. Manage it in Stripe instead of creating a duplicate.' });
