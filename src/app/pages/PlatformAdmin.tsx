@@ -55,6 +55,9 @@ interface ClientDetail {
 interface ClientOnboardingDetails {
   legalName?: string;
   billingEmail?: string;
+  phone?: string;
+  billingPhone?: string;
+  businessAddress?: string;
   billingAddress?: string;
   primaryManager?: string;
   primaryManagerEmail?: string;
@@ -122,6 +125,7 @@ export function PlatformAdmin() {
   const [paymentLink, setPaymentLink] = useState('');
   const [billableLocationCount, setBillableLocationCount] = useState(1);
   const [commitmentConfirmed, setCommitmentConfirmed] = useState(false);
+  const [isEditingClient, setIsEditingClient] = useState(false);
 
   const loadClients = useCallback(async () => {
     if (!user?.platformAdmin) return;
@@ -201,6 +205,9 @@ export function PlatformAdmin() {
           onboardingDetails: {
             legalName: String(formData.get('legalName') || '').trim(),
             billingEmail: String(formData.get('billingEmail') || '').trim(),
+            phone: String(formData.get('phone') || '').trim(),
+            billingPhone: String(formData.get('billingPhone') || '').trim(),
+            businessAddress: String(formData.get('businessAddress') || '').trim(),
             billingAddress: String(formData.get('billingAddress') || '').trim(),
             primaryManager: String(formData.get('primaryManager') || '').trim(),
             primaryManagerEmail: String(formData.get('primaryManagerEmail') || '').trim(),
@@ -226,6 +233,32 @@ export function PlatformAdmin() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const saveClientProfile = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedClient) return;
+    const formData = new FormData(event.currentTarget);
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          companyName: String(formData.get('companyName') || '').trim(),
+          ownerName: String(formData.get('ownerName') || '').trim(),
+          ownerEmail: String(formData.get('ownerEmail') || '').trim(),
+          onboardingDetails: {
+            legalName: String(formData.get('legalName') || '').trim(), billingEmail: String(formData.get('billingEmail') || '').trim(), phone: String(formData.get('phone') || '').trim(), billingPhone: String(formData.get('billingPhone') || '').trim(), businessAddress: String(formData.get('businessAddress') || '').trim(), billingAddress: String(formData.get('billingAddress') || '').trim(), primaryManager: String(formData.get('primaryManager') || '').trim(), primaryManagerEmail: String(formData.get('primaryManagerEmail') || '').trim(), locationCount: String(formData.get('locationCount') || '1'), posSystem: String(formData.get('posSystem') || '').trim(), supplierAccounts: String(formData.get('supplierAccounts') || '').trim(), taxSettings: String(formData.get('taxSettings') || '').trim(), currency: String(formData.get('currency') || 'CAD'), foodCostTarget: String(formData.get('foodCostTarget') || ''), labourTarget: String(formData.get('labourTarget') || ''), orderingDays: String(formData.get('orderingDays') || '').trim(), importStatus: String(formData.get('importStatus') || '').trim(), privacyAccepted: formData.get('privacyAccepted') === 'on', termsAccepted: formData.get('termsAccepted') === 'on',
+          },
+        }),
+      });
+      toast.success('Client account details saved');
+      setIsEditingClient(false);
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save client account');
+    } finally { setIsLoading(false); }
   };
 
   const createPaymentLink = async (plan: BillingPlan) => {
@@ -298,8 +331,10 @@ export function PlatformAdmin() {
                   <div><Label htmlFor="client-manager-email">Manager email</Label><Input id="client-manager-email" name="primaryManagerEmail" type="email" /></div>
                   <div><Label htmlFor="client-billing">Billing email</Label><Input id="client-billing" name="billingEmail" type="email" /></div>
                   <div><Label htmlFor="client-locations">Locations</Label><Input id="client-locations" name="locationCount" type="number" min="1" defaultValue="1" /></div>
+                  <div><Label htmlFor="client-phone">Business phone</Label><Input id="client-phone" name="phone" type="tel" /></div>
+                  <div><Label htmlFor="client-billing-phone">Billing phone</Label><Input id="client-billing-phone" name="billingPhone" type="tel" /></div>
                 </div>
-                <div><Label htmlFor="client-address">Billing address</Label><Input id="client-address" name="billingAddress" /></div>
+                <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="client-business-address">Business address</Label><Input id="client-business-address" name="businessAddress" /></div><div><Label htmlFor="client-address">Billing address</Label><Input id="client-address" name="billingAddress" /></div></div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div><Label htmlFor="client-pos">POS system</Label><Input id="client-pos" name="posSystem" placeholder="Toast, TouchBistro, Lightspeed…" /></div>
                   <div><Label htmlFor="client-suppliers">Suppliers / account numbers</Label><Input id="client-suppliers" name="supplierAccounts" placeholder="Supplier names or account numbers" /></div>
@@ -466,7 +501,7 @@ export function PlatformAdmin() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="flex items-center gap-2 font-semibold text-slate-950"><ClipboardCheck className="h-4 w-4" /> Client onboarding record</p>
+                <div className="flex flex-wrap items-center justify-between gap-2"><p className="flex items-center gap-2 font-semibold text-slate-950"><ClipboardCheck className="h-4 w-4" /> Client onboarding record</p><Button type="button" size="sm" variant="outline" onClick={() => setIsEditingClient(value => !value)}>{isEditingClient ? 'Close edit' : 'Edit client details'}</Button></div>
                 {(() => {
                   const details = selectedClient.onboarding?.clientProfile || {};
                   const checks = [
@@ -481,7 +516,7 @@ export function PlatformAdmin() {
                     ['Billing active', selectedClient.billing.status === 'active'],
                   ];
                   const complete = checks.filter(([, done]) => done).length;
-                  return <><p className="mt-1 text-sm text-slate-500">{complete}/{checks.length} onboarding checks complete</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{checks.map(([label, done]) => <div key={label} className={`rounded-xl p-3 text-sm ${done ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{done ? '✓' : '○'} {label}</div>)}</div><div className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-slate-500">Legal name:</span> {details.legalName || 'Not added'}</p><p><span className="text-slate-500">Billing:</span> {details.billingEmail || 'Not added'}</p><p><span className="text-slate-500">POS:</span> {details.posSystem || 'Not selected'}</p><p><span className="text-slate-500">Targets:</span> food {details.foodCostTarget || '—'}% · labour {details.labourTarget || '—'}%</p><p><span className="text-slate-500">Ordering:</span> {details.orderingDays || 'Not set'}</p><p><span className="text-slate-500">Imports:</span> {details.importStatus || 'Not scoped'}</p></div></>;
+                  return <><p className="mt-1 text-sm text-slate-500">{complete}/{checks.length} onboarding checks complete</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{checks.map(([label, done]) => <div key={label} className={`rounded-xl p-3 text-sm ${done ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{done ? '✓' : '○'} {label}</div>)}</div><div className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-slate-500">Legal name:</span> {details.legalName || 'Not added'}</p><p><span className="text-slate-500">Business phone:</span> {details.phone || 'Not added'}</p><p><span className="text-slate-500">Business address:</span> {details.businessAddress || 'Not added'}</p><p><span className="text-slate-500">Billing:</span> {details.billingEmail || 'Not added'}</p><p><span className="text-slate-500">POS:</span> {details.posSystem || 'Not selected'}</p><p><span className="text-slate-500">Targets:</span> food {details.foodCostTarget || '—'}% · labour {details.labourTarget || '—'}%</p></div>{isEditingClient && <form onSubmit={saveClientProfile} className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-2"><div><Label>Restaurant name</Label><Input name="companyName" defaultValue={selectedClient.name} required /></div><div><Label>Legal name</Label><Input name="legalName" defaultValue={details.legalName || ''} /></div><div><Label>Owner name</Label><Input name="ownerName" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.name || ''} /></div><div><Label>Owner sign-in email</Label><Input name="ownerEmail" type="email" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.email || ''} /></div><div><Label>Business phone</Label><Input name="phone" type="tel" defaultValue={details.phone || ''} /></div><div><Label>Billing phone</Label><Input name="billingPhone" type="tel" defaultValue={details.billingPhone || ''} /></div><div><Label>Business address</Label><Input name="businessAddress" defaultValue={details.businessAddress || ''} /></div><div><Label>Billing address</Label><Input name="billingAddress" defaultValue={details.billingAddress || ''} /></div><div><Label>Billing email</Label><Input name="billingEmail" type="email" defaultValue={details.billingEmail || ''} /></div><div><Label>Primary manager</Label><Input name="primaryManager" defaultValue={details.primaryManager || ''} /></div><div><Label>Manager email</Label><Input name="primaryManagerEmail" type="email" defaultValue={details.primaryManagerEmail || ''} /></div><div><Label>Locations</Label><Input name="locationCount" type="number" min="1" defaultValue={details.locationCount || selectedClient.locations.length || 1} /></div><div><Label>POS</Label><Input name="posSystem" defaultValue={details.posSystem || ''} /></div><div><Label>Supplier accounts</Label><Input name="supplierAccounts" defaultValue={details.supplierAccounts || ''} /></div><div><Label>Tax settings</Label><Input name="taxSettings" defaultValue={details.taxSettings || ''} /></div><div><Label>Currency</Label><Input name="currency" defaultValue={details.currency || 'CAD'} /></div><div><Label>Food cost target %</Label><Input name="foodCostTarget" type="number" defaultValue={details.foodCostTarget || ''} /></div><div><Label>Labour target %</Label><Input name="labourTarget" type="number" defaultValue={details.labourTarget || ''} /></div><div><Label>Ordering days</Label><Input name="orderingDays" defaultValue={details.orderingDays || ''} /></div><div><Label>Import status</Label><Input name="importStatus" defaultValue={details.importStatus || ''} /></div><label className="flex items-center gap-2 text-sm"><Checkbox name="privacyAccepted" defaultChecked={details.privacyAccepted === true} /> Privacy acknowledgement</label><label className="flex items-center gap-2 text-sm"><Checkbox name="termsAccepted" defaultChecked={details.termsAccepted === true} /> Agreement discussed</label><Button type="submit" disabled={isLoading} className="sm:col-span-2 bg-[#0F172A] text-white">Save client details</Button></form>}</>;
                 })()}
               </div>
 
