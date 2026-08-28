@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, CloudSun, Copy, DollarSign, Eye, EyeOff, Filter, Plus, Save, Search, SlidersHorizontal, Target, Trash2, UsersRound, X } from 'lucide-react';
+import { ArrowLeftRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, CloudSun, Copy, DollarSign, Eye, EyeOff, FileText, Filter, Plus, Save, Search, SlidersHorizontal, Target, Trash2, UsersRound, X } from 'lucide-react';
 import { Navigate } from 'react-router';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -11,6 +11,7 @@ import { useToast } from '../contexts/ToastContext';
 const SHIFT_TAGS = ['OPEN', 'CLOSE', 'ADMIN', 'TRAINING', 'ON-CALL', 'PREP', 'EXPO', 'BAR', 'HOST', 'DINNER'];
 
 type ScheduleView = 'employees' | 'positions' | 'daily';
+type LaborWorkspaceView = 'schedule' | 'requests' | 'team' | 'report';
 
 function localDateKey(date: Date) {
   const year = date.getFullYear();
@@ -36,6 +37,13 @@ function shiftHours(shift: LaborShift) {
   let minutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
   if (minutes < 0) minutes += 24 * 60;
   return Math.max(0, minutes - shift.breakMinutes) / 60;
+}
+
+function daysInRange(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) return 0;
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
 }
 
 function formatShiftTime(value: string, useAmPm: boolean) {
@@ -91,7 +99,9 @@ export function LaborScheduling() {
   const { employees, shifts, timeOffRequests, shiftSwapRequests, targetLaborPercent, scheduleTemplates, scheduleEvents, publishedPositions, openShifts, addEmployee, inviteEmployee, updateEmployee, removeEmployee, addShift, updateShift, removeShift, updateTimeOffRequest, updateShiftSwapRequest, setTargetLaborPercent, updateSchedulerSettings, scheduledHoursForRange, laborCostBreakdownForRange } = useLabor();
   const { salesData } = useToast();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [view, setView] = useState<'schedule' | 'requests' | 'team'>('schedule');
+  const [view, setView] = useState<LaborWorkspaceView>('schedule');
+  const [reportStartDate, setReportStartDate] = useState(() => localDateKey(startOfWeek(new Date())));
+  const [reportEndDate, setReportEndDate] = useState(() => localDateKey(new Date()));
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState(false);
@@ -166,6 +176,55 @@ export function LaborScheduling() {
       ? left.role.localeCompare(right.role) || left.name.localeCompare(right.name)
       : left.department.localeCompare(right.department) || left.name.localeCompare(right.name));
   const visibleDays = scheduleView === 'daily' ? [days[focusDay]] : days;
+  const reportRangeValid = reportStartDate <= reportEndDate;
+  const reportDayCount = reportRangeValid ? daysInRange(reportStartDate, reportEndDate) : 0;
+  const reportSales = reportRangeValid ? salesData.filter(day => day.date >= reportStartDate && day.date <= reportEndDate).reduce((sum, day) => sum + day.revenue, 0) : 0;
+  const reportCovers = reportRangeValid ? salesData.filter(day => day.date >= reportStartDate && day.date <= reportEndDate).reduce((sum, day) => sum + day.covers, 0) : 0;
+  const reportShifts = reportRangeValid ? shifts.filter(shift => shift.date >= reportStartDate && shift.date <= reportEndDate && shift.status !== 'called-off') : [];
+  const reportCost = reportRangeValid ? laborCostBreakdownForRange(reportStartDate, reportEndDate) : { hourly: 0, salaried: 0, total: 0 };
+  const reportHours = reportShifts.reduce((sum, shift) => sum + shiftHours(shift), 0);
+  const reportActualHours = reportShifts.reduce((sum, shift) => sum + (typeof shift.actualMinutes === 'number' ? shift.actualMinutes / 60 : shiftHours(shift)), 0);
+  const laborPercentOfSales = reportSales > 0 ? (reportCost.total / reportSales) * 100 : 0;
+  const categoryReport = useMemo(() => {
+    if (!reportRangeValid) return [] as Array<{ label: string; amount: number; hours: number; percent: number; scheduled: number; actual: number }>;
+    const rows = new Map<string, { amount: number; scheduled: number; actual: number }>();
+    const add = (label: string, amount: number, scheduled = 0, actual = scheduled) => {
+      const row = rows.get(label) || { amount: 0, scheduled: 0, actual: 0 };
+      row.amount += amount; row.scheduled += scheduled; row.actual += actual;
+      rows.set(label, row);
+    };
+    reportShifts.forEach(shift => {
+      const employee = employees.find(item => item.id === shift.employeeId);
+      if (!employee || employee.payType === 'salary') return;
+      const scheduled = shiftHours(shift);
+      const actual = typeof shift.actualMinutes === 'number' ? shift.actualMinutes / 60 : scheduled;
+      add(employee.department || 'Unassigned', scheduled * (Number(employee.hourlyRate) || 0), scheduled, actual);
+    });
+    employees.filter(employee => employee.active && employee.payType === 'salary').forEach(employee => {
+      add(employee.department || 'Unassigned', ((Number(employee.annualSalary) || 0) / 365) * reportDayCount, 0, 0);
+    });
+    return Array.from(rows.entries()).map(([label, value]) => ({ label, amount: value.amount, hours: value.scheduled, percent: reportSales > 0 ? (value.amount / reportSales) * 100 : 0, scheduled: value.scheduled, actual: value.actual })).sort((left, right) => right.amount - left.amount);
+  }, [employees, reportDayCount, reportRangeValid, reportSales, reportShifts]);
+  const positionReport = useMemo(() => {
+    if (!reportRangeValid) return [] as Array<{ label: string; amount: number; hours: number; percent: number; scheduled: number; actual: number }>;
+    const rows = new Map<string, { amount: number; scheduled: number; actual: number }>();
+    const add = (label: string, amount: number, scheduled = 0, actual = scheduled) => {
+      const row = rows.get(label) || { amount: 0, scheduled: 0, actual: 0 };
+      row.amount += amount; row.scheduled += scheduled; row.actual += actual;
+      rows.set(label, row);
+    };
+    reportShifts.forEach(shift => {
+      const employee = employees.find(item => item.id === shift.employeeId);
+      if (!employee || employee.payType === 'salary') return;
+      const scheduled = shiftHours(shift);
+      const actual = typeof shift.actualMinutes === 'number' ? shift.actualMinutes / 60 : scheduled;
+      add(employee.role || 'Unassigned', scheduled * (Number(employee.hourlyRate) || 0), scheduled, actual);
+    });
+    employees.filter(employee => employee.active && employee.payType === 'salary').forEach(employee => {
+      add(employee.role || 'Unassigned', ((Number(employee.annualSalary) || 0) / 365) * reportDayCount, 0, 0);
+    });
+    return Array.from(rows.entries()).map(([label, value]) => ({ label, amount: value.amount, hours: value.scheduled, percent: reportSales > 0 ? (value.amount / reportSales) * 100 : 0, scheduled: value.scheduled, actual: value.actual })).sort((left, right) => right.amount - left.amount);
+  }, [employees, reportDayCount, reportRangeValid, reportSales, reportShifts]);
 
   if (!canManage) return <Navigate to="/employee" replace />;
 
@@ -337,7 +396,7 @@ export function LaborScheduling() {
     <div className="mx-auto max-w-[1500px] space-y-5">
       <section className="overflow-hidden rounded-2xl bg-[#0B1220] p-3 text-white sm:p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-0 flex-1 rounded-xl bg-white/10 p-1 sm:flex-none"><ViewButton label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} /><ViewButton label="Requests" active={view === 'requests'} count={timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length} onClick={() => setView('requests')} /><ViewButton label="Employees" active={view === 'team'} onClick={() => setView('team')} /></div>
+          <div className="flex min-w-0 flex-1 overflow-x-auto rounded-xl bg-white/10 p-1 sm:flex-none"><ViewButton label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} /><ViewButton label="Requests" active={view === 'requests'} count={timeOffRequests.filter(request => request.status === 'pending').length + shiftSwapRequests.filter(request => request.status === 'pending').length} onClick={() => setView('requests')} /><ViewButton label="Employees" active={view === 'team'} onClick={() => setView('team')} /><ViewButton label="Reports" active={view === 'report'} onClick={() => setView('report')} /></div>
           <button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C10E] px-3 py-2.5 text-xs font-black text-[#0B1220]"><Plus className="h-3.5 w-3.5" />Add employee</button>
           <button type="button" onClick={() => setUseAmPm(current => !current)} className="rounded-xl border border-white/20 px-3 py-2.5 text-xs font-black text-white">{useAmPm ? '12-hour time' : '24-hour time'}</button>
         </div>
@@ -402,6 +461,16 @@ export function LaborScheduling() {
 
       {view === 'team' && <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5"><h2 className="font-black text-slate-900">Employees</h2><button type="button" onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#0B1220] px-4 py-3 text-sm font-black text-white"><Plus className="h-4 w-4 text-[#F5C10E]" />Add employee</button></div><div className="divide-y divide-slate-100">{employees.map(employee => <EmployeeRow key={employee.id} employee={employee} onOpen={() => openEmployeeEditor(employee)} onRemove={() => { if (window.confirm(`Remove ${employee.name} and all of their shifts from this location?`)) removeEmployee(employee.id); }} />)}{employees.length === 0 && <div className="p-10 text-center text-sm text-slate-500">Add your first employee to create the employee list.</div>}</div></section>}
 
+      {view === 'report' && <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#B58B00]" /><h2 className="font-black text-slate-900">Labour report</h2></div><p className="mt-1 text-sm text-slate-500">Accounting-ready labour costs, hours and percentage of sales for the selected date range.</p></div><div className="grid grid-cols-2 gap-2"><label className="text-[10px] font-black uppercase tracking-wider text-slate-500">From<input aria-label="Report start date" type="date" value={reportStartDate} onChange={event => setReportStartDate(event.target.value)} className="mt-1 block h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-900" /></label><label className="text-[10px] font-black uppercase tracking-wider text-slate-500">To<input aria-label="Report end date" type="date" value={reportEndDate} onChange={event => setReportEndDate(event.target.value)} className="mt-1 block h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-900" /></label></div></div></div>
+        {!reportRangeValid ? <p className="p-8 text-center text-sm font-bold text-red-600">Choose an end date that is on or after the start date.</p> : <div className="space-y-6 p-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><ReportMetric label="Sales" value={formatMoney(reportSales)} detail={`${reportCovers.toLocaleString('en-CA')} covers`} /><ReportMetric label="Total labour" value={formatMoney(reportCost.total)} detail={`${reportDayCount} days selected`} /><ReportMetric label="Labour %" value={reportSales > 0 ? `${laborPercentOfSales.toFixed(1)}%` : '—'} detail={reportSales > 0 ? `Target ${targetLaborPercent}%` : 'Import sales to calculate'} warning={reportSales > 0 && laborPercentOfSales > targetLaborPercent} /><ReportMetric label="Scheduled hours" value={`${reportHours.toFixed(1)}h`} detail={`${reportShifts.length} shifts`} /><ReportMetric label="Actual hours" value={`${reportActualHours.toFixed(1)}h`} detail="Uses clocked time when available" /></div>
+          <div className="grid gap-4 lg:grid-cols-2"><ReportTable title="By department" rows={categoryReport} salesAvailable={reportSales > 0} /><ReportTable title="By position" rows={positionReport} salesAvailable={reportSales > 0} /></div>
+          <div className="grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-3"><ReportMetric label="Hourly labour" value={formatMoney(reportCost.hourly)} detail={reportCost.total > 0 ? `${((reportCost.hourly / reportCost.total) * 100).toFixed(1)}% of labour` : 'No hourly cost'} /><ReportMetric label="Salaried labour" value={formatMoney(reportCost.salaried)} detail={reportCost.total > 0 ? `${((reportCost.salaried / reportCost.total) * 100).toFixed(1)}% of labour` : 'No salary cost'} /><ReportMetric label="Cost per cover" value={reportCovers > 0 ? formatMoney(reportCost.total / reportCovers, 2) : '—'} detail={reportCovers > 0 ? 'Total labour ÷ covers' : 'Import sales to calculate'} /></div>
+          <p className="text-xs leading-5 text-slate-500">Hourly amounts are calculated from scheduled shifts and hourly pay rates. Salaried labour is prorated daily across active salaried employees. Actual hours use clocked time when it has been recorded; otherwise scheduled hours are shown.</p>
+        </div>}
+      </section>}
+
       <section className="flex flex-col gap-3 rounded-3xl border border-amber-100 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-amber-950">Target labour percentage</p><p className="mt-1 text-sm text-amber-800">Hourly scheduled labour plus prorated active salaries are measured against sales.</p></div><label className="flex items-center gap-2 font-black text-amber-950"><input aria-label="Target labour percentage" type="number" min="0" max="100" step="0.5" value={targetLaborPercent} onChange={event => setTargetLaborPercent(Number(event.target.value) || 0)} className="h-11 w-24 rounded-xl border border-amber-200 bg-white px-3 text-right" />%</label></section>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}><DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Add employee</DialogTitle><DialogDescription>Create an employee profile for schedules, pay and clock-in. App access is optional and can be sent now or later.</DialogDescription></DialogHeader><form onSubmit={submitEmployee} className="space-y-4"><div className="rounded-xl border border-amber-200 bg-amber-50 p-3"><label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={sendEmployeeInvite} onChange={event => setSendEmployeeInvite(event.target.checked)} className="mt-1 h-4 w-4 accent-[#F5C10E]" /><span><span className="block text-sm font-black text-slate-900">Give ZestEmployee app access</span><span className="mt-0.5 block text-xs leading-5 text-slate-600">When selected, the employee receives a secure email to activate their account. Leave this off for a scheduling-only employee.</span></span></label></div><div className="grid gap-3 sm:grid-cols-2"><FormInput label="Full name" value={employeeName} onChange={setEmployeeName} placeholder="Employee name" required /><FormInput label={sendEmployeeInvite ? "Work email" : "Work email (optional)"} type="email" value={employeeEmail} onChange={setEmployeeEmail} placeholder="employee@restaurant.ca" required={sendEmployeeInvite} /><FormInput label="Phone" type="tel" value={employeePhone} onChange={setEmployeePhone} placeholder="416-555-0123" /><FormInput label="Clock-in number" value={employeeClockInNumber} onChange={setEmployeeClockInNumber} placeholder="1006" /><FormInput label="Position" value={employeeRole} onChange={setEmployeeRole} placeholder="General Manager" /><FormSelect label="Department" value={employeeDepartment} onChange={setEmployeeDepartment} options={['Management', 'Front of house', 'Back of house', 'Bar', 'Support'].map(value => ({ value, label: value }))} /><FormSelect label="Pay type" value={employeePayType} onChange={value => setEmployeePayType(value as 'hourly' | 'salary')} options={[{ value: 'hourly', label: 'Hourly' }, { value: 'salary', label: 'Salaried' }]} /></div>{employeePayType === 'salary' ? <FormInput label="Annual salary (CAD)" type="number" value={employeeSalary} onChange={setEmployeeSalary} /> : <FormInput label="Hourly rate (CAD)" type="number" value={employeeRate} onChange={setEmployeeRate} />}<div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setInviteOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold text-slate-700">Cancel</button><button type="submit" disabled={isInviting} className="rounded-xl bg-[#F5C10E] px-4 py-2.5 font-black text-[#0B1220] disabled:opacity-50">{isInviting ? 'Saving…' : sendEmployeeInvite ? 'Save & send app access' : 'Add employee'}</button></div></form></DialogContent></Dialog>
@@ -432,6 +501,14 @@ function EmployeeRow({ employee, onOpen, onRemove }: { employee: LaborEmployee; 
 
 function Metric({ icon: Icon, label, value, tone = 'normal' }: { icon: typeof CalendarDays; label: string; value: string; tone?: 'normal' | 'warning' }) {
   return <div className={`rounded-2xl border p-4 ${tone === 'warning' ? 'border-red-100 bg-red-50' : 'border-slate-100 bg-white'}`}><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon className="h-4 w-4" />{label}</div><p className={`mt-2 break-words text-xl font-black ${tone === 'warning' ? 'text-red-700' : 'text-slate-900'}`}>{value}</p></div>;
+}
+
+function ReportMetric({ label, value, detail, warning = false }: { label: string; value: string; detail: string; warning?: boolean }) {
+  return <div className={`rounded-2xl border p-4 ${warning ? 'border-red-100 bg-red-50' : 'border-slate-100 bg-white'}`}><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</p><p className={`mt-2 text-2xl font-black tabular-nums ${warning ? 'text-red-700' : 'text-slate-900'}`}>{value}</p><p className="mt-1 text-xs font-semibold text-slate-500">{detail}</p></div>;
+}
+
+function ReportTable({ title, rows, salesAvailable }: { title: string; rows: Array<{ label: string; amount: number; hours: number; percent: number; scheduled: number; actual: number }>; salesAvailable: boolean }) {
+  return <section className="overflow-hidden rounded-2xl border border-slate-100"><div className="border-b border-slate-100 bg-slate-50 px-4 py-3"><h3 className="font-black text-slate-900">{title}</h3></div><div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead className="border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Category</th><th className="px-4 py-3 text-right">Scheduled</th><th className="px-4 py-3 text-right">Actual</th><th className="px-4 py-3 text-right">Labour cost</th><th className="px-4 py-3 text-right">Labour %</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.label}><td className="px-4 py-3 font-bold text-slate-900">{row.label}</td><td className="px-4 py-3 text-right tabular-nums text-slate-600">{row.scheduled.toFixed(1)}h</td><td className="px-4 py-3 text-right tabular-nums text-slate-600">{row.actual.toFixed(1)}h</td><td className="px-4 py-3 text-right font-black tabular-nums text-slate-900">{formatMoney(row.amount)}</td><td className="px-4 py-3 text-right font-black tabular-nums text-slate-900">{salesAvailable ? `${row.percent.toFixed(1)}%` : '—'}</td></tr>)}{rows.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">No labour has been recorded for this period.</td></tr>}</tbody></table></div></section>;
 }
 
 function FormInput({ label, value, onChange, type = 'text', placeholder, list, required = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; list?: string; required?: boolean }) {
