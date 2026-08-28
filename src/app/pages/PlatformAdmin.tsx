@@ -27,6 +27,8 @@ interface ClientSummary {
   billing: {
     configured: boolean;
     additionalLocationPriceConfigured: boolean;
+    schedulingPriceConfigured: boolean;
+    schedulingEnabled: boolean;
     customerCreated: boolean;
     plan: BillingPlan | null;
     status: string;
@@ -70,6 +72,7 @@ interface ClientOnboardingDetails {
   labourTarget?: string;
   orderingDays?: string;
   importStatus?: string;
+  schedulingEnabled?: boolean;
   privacyAccepted?: boolean;
   termsAccepted?: boolean;
 }
@@ -155,7 +158,7 @@ export function PlatformAdmin() {
     const now = Date.now();
     const thirtyDaysAgo = now - 30 * 86_400_000;
     const activeOrCollecting = clients.filter(client => ['active', 'past_due', 'unpaid'].includes(client.billing.status));
-    const estimatedMrr = activeOrCollecting.reduce((total, client) => total + 249.99 + Math.max(0, client.billing.additionalLocationQuantity) * 100, 0);
+    const estimatedMrr = activeOrCollecting.reduce((total, client) => total + 249.99 + Math.max(0, client.billing.additionalLocationQuantity) * 100 + (client.billing.schedulingEnabled ? 49.99 : 0), 0);
     const health = clients.map(client => ({ client, ...healthFor(client) }));
     const actionItems = [
       ...clients.filter(client => ['past_due', 'unpaid'].includes(client.billing.status)).map(client => ({ client, title: 'Payment needs attention', detail: `${client.name} is ${client.billing.status.replace('_', ' ')}. Review the Stripe subscription and contact the owner.`, tone: 'text-red-700 bg-red-50 border-red-200' })),
@@ -220,6 +223,7 @@ export function PlatformAdmin() {
             labourTarget: String(formData.get('labourTarget') || '30'),
             orderingDays: String(formData.get('orderingDays') || '').trim(),
             importStatus: String(formData.get('importStatus') || '').trim(),
+            schedulingEnabled: formData.get('schedulingEnabled') === 'on',
             privacyAccepted: formData.get('privacyAccepted') === 'on',
             termsAccepted: formData.get('termsAccepted') === 'on',
           },
@@ -248,7 +252,7 @@ export function PlatformAdmin() {
           ownerName: String(formData.get('ownerName') || '').trim(),
           ownerEmail: String(formData.get('ownerEmail') || '').trim(),
           onboardingDetails: {
-            legalName: String(formData.get('legalName') || '').trim(), billingEmail: String(formData.get('billingEmail') || '').trim(), phone: String(formData.get('phone') || '').trim(), billingPhone: String(formData.get('billingPhone') || '').trim(), businessAddress: String(formData.get('businessAddress') || '').trim(), billingAddress: String(formData.get('billingAddress') || '').trim(), primaryManager: String(formData.get('primaryManager') || '').trim(), primaryManagerEmail: String(formData.get('primaryManagerEmail') || '').trim(), locationCount: String(formData.get('locationCount') || '1'), posSystem: String(formData.get('posSystem') || '').trim(), supplierAccounts: String(formData.get('supplierAccounts') || '').trim(), taxSettings: String(formData.get('taxSettings') || '').trim(), currency: String(formData.get('currency') || 'CAD'), foodCostTarget: String(formData.get('foodCostTarget') || ''), labourTarget: String(formData.get('labourTarget') || ''), orderingDays: String(formData.get('orderingDays') || '').trim(), importStatus: String(formData.get('importStatus') || '').trim(), privacyAccepted: formData.get('privacyAccepted') === 'on', termsAccepted: formData.get('termsAccepted') === 'on',
+            legalName: String(formData.get('legalName') || '').trim(), billingEmail: String(formData.get('billingEmail') || '').trim(), phone: String(formData.get('phone') || '').trim(), billingPhone: String(formData.get('billingPhone') || '').trim(), businessAddress: String(formData.get('businessAddress') || '').trim(), billingAddress: String(formData.get('billingAddress') || '').trim(), primaryManager: String(formData.get('primaryManager') || '').trim(), primaryManagerEmail: String(formData.get('primaryManagerEmail') || '').trim(), locationCount: String(formData.get('locationCount') || '1'), posSystem: String(formData.get('posSystem') || '').trim(), supplierAccounts: String(formData.get('supplierAccounts') || '').trim(), taxSettings: String(formData.get('taxSettings') || '').trim(), currency: String(formData.get('currency') || 'CAD'), foodCostTarget: String(formData.get('foodCostTarget') || ''), labourTarget: String(formData.get('labourTarget') || ''), orderingDays: String(formData.get('orderingDays') || '').trim(), importStatus: String(formData.get('importStatus') || '').trim(), schedulingEnabled: formData.get('schedulingEnabled') === 'on', privacyAccepted: formData.get('privacyAccepted') === 'on', termsAccepted: formData.get('termsAccepted') === 'on',
           },
         }),
       });
@@ -267,7 +271,7 @@ export function PlatformAdmin() {
     try {
       const result = await apiRequest<{ url: string }>(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/billing/checkout`, {
         method: 'POST',
-        body: JSON.stringify({ plan, locationCount: billableLocationCount, commitmentAccepted: true }),
+        body: JSON.stringify({ plan, locationCount: billableLocationCount, schedulingEnabled: selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false, commitmentAccepted: true }),
       });
       setPaymentLink(result.url);
       toast.success('Secure Stripe checkout link created for this client');
@@ -276,6 +280,22 @@ export function PlatformAdmin() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const saveSchedulingModule = async (enabled: boolean) => {
+    if (!selectedClient) return;
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ onboardingDetails: { schedulingEnabled: enabled } }),
+      });
+      toast.success(enabled ? 'Labour & Scheduling enabled for this client' : 'Labour & Scheduling turned off for this client');
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update the Scheduling module');
+    } finally { setIsLoading(false); }
   };
 
   const copyPaymentLink = async () => {
@@ -343,8 +363,9 @@ export function PlatformAdmin() {
                   <div><Label htmlFor="client-food-target">Food cost target %</Label><Input id="client-food-target" name="foodCostTarget" type="number" min="0" max="100" defaultValue="30" /></div>
                   <div><Label htmlFor="client-labour-target">Labour target %</Label><Input id="client-labour-target" name="labourTarget" type="number" min="0" max="100" defaultValue="30" /></div>
                 </div>
-                <div><Label htmlFor="client-ordering">Ordering days</Label><Input id="client-ordering" name="orderingDays" placeholder="e.g. Monday, Thursday" /></div>
-                <div><Label htmlFor="client-imports">Data import status</Label><Input id="client-imports" name="importStatus" placeholder="Inventory, recipes, menu, sales history…" /></div>
+                  <div><Label htmlFor="client-ordering">Ordering days</Label><Input id="client-ordering" name="orderingDays" placeholder="e.g. Monday, Thursday" /></div>
+                  <div><Label htmlFor="client-imports">Data import status</Label><Input id="client-imports" name="importStatus" placeholder="Inventory, recipes, menu, sales history…" /></div>
+                  <label className="flex items-start gap-3 rounded-xl border border-[#F5C10E] bg-[#FEF9C3] p-3 text-sm sm:col-span-2"><Checkbox name="schedulingEnabled" className="mt-0.5" /><span><span className="block font-bold text-slate-950">Add Labour & Scheduling — CAD $49.99/month</span><span className="mt-1 block text-slate-600">Optional module. Leave it off for ZestIQ Basic; it can be enabled later from this client account.</span></span></label>
                 <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="privacyAccepted" /> Privacy acknowledgement received</label>
                 <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="termsAccepted" /> Agreement and 12-month billing terms discussed</label>
                 <Button type="submit" disabled={isLoading} className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]">
@@ -452,9 +473,21 @@ export function PlatformAdmin() {
                 <Card><CardContent className="py-4"><p className="text-xs text-slate-400">Next renewal</p><p className="mt-2 font-semibold">{formatDate(selectedClient.billing.currentPeriodEnd)}</p></CardContent></Card>
               </div>
 
+              <div className="rounded-2xl border border-[#F5C10E] bg-[#FFFCED] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><p className="font-semibold text-slate-950">Labour &amp; Scheduling module</p><p className="mt-1 text-sm text-slate-600">Optional add-on: CAD $49.99/month. When off, Labour tools are hidden and unavailable to this client.</p></div>
+                  <Badge className={selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}>{selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'Enabled' : 'Not included'}</Badge>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false} onClick={() => void saveSchedulingModule(true)} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Enable Scheduling +$49.99</Button>
+                  <Button type="button" size="sm" variant="outline" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled === false} onClick={() => void saveSchedulingModule(false)}>Turn off Scheduling</Button>
+                </div>
+                <p className="mt-3 text-xs text-slate-500">If a Stripe subscription already exists, update its add-on in Stripe before changing the amount billed.</p>
+              </div>
+
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="font-semibold text-slate-950">Secure billing setup</p>
-                <p className="mt-1 text-sm text-slate-500">Premium is CAD $249.99/month for one location. Each additional location is CAD $100/month. There is no free trial.</p>
+                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for one location. Each additional location is CAD $100/month. Labour & Scheduling is an optional CAD $49.99/month add-on. There is no free trial.</p>
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
                   <p className="font-semibold text-slate-950">Contract term disclosure</p>
                   <p className="mt-1">Billed monthly with a 12-month initial commitment. The subscription renews for another 12-month term unless written non-renewal notice is received at least 90 days before term end.</p>
@@ -474,13 +507,15 @@ export function PlatformAdmin() {
                     value={billableLocationCount}
                     onChange={event => setBillableLocationCount(Math.max(Math.max(1, selectedClient.locations.length), Math.min(100, Number(event.target.value) || 1)))}
                   />
-                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 100).toFixed(2)}/month</p>
+                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 100 + (selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 49.99 : 0)).toFixed(2)}/month</p>
+                  <p className="mt-1 text-xs text-slate-500">Scheduling: {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'included at CAD $49.99/month' : 'not included'}</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
+                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured) || (selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
                 </div>
                 {selectedClient.billing.customerCreated && <p className="mt-3 text-xs text-slate-500">This client already has Stripe billing. Use Stripe to manage its existing subscription rather than creating a duplicate.</p>}
                 {!selectedClient.billing.configured && <p className="mt-3 text-xs text-amber-700">Connect Stripe keys and price IDs before creating payment links.</p>}
+                {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured && <p className="mt-3 text-xs text-amber-700">Add the CAD $49.99 monthly Scheduling price ID in Stripe/Vercel before creating this checkout link.</p>}
                 {paymentLink && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button type="button" size="sm" onClick={() => void copyPaymentLink()} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Copy client payment link</Button>
@@ -516,6 +551,7 @@ export function PlatformAdmin() {
                     ['Billing active', selectedClient.billing.status === 'active'],
                   ];
                   const complete = checks.filter(([, done]) => done).length;
+                  const schedulingIncluded = details.schedulingEnabled !== false;
                   return <><p className="mt-1 text-sm text-slate-500">{complete}/{checks.length} onboarding checks complete</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{checks.map(([label, done]) => <div key={label} className={`rounded-xl p-3 text-sm ${done ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{done ? '✓' : '○'} {label}</div>)}</div><div className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-slate-500">Legal name:</span> {details.legalName || 'Not added'}</p><p><span className="text-slate-500">Business phone:</span> {details.phone || 'Not added'}</p><p><span className="text-slate-500">Business address:</span> {details.businessAddress || 'Not added'}</p><p><span className="text-slate-500">Billing:</span> {details.billingEmail || 'Not added'}</p><p><span className="text-slate-500">POS:</span> {details.posSystem || 'Not selected'}</p><p><span className="text-slate-500">Targets:</span> food {details.foodCostTarget || '—'}% · labour {details.labourTarget || '—'}%</p></div>{isEditingClient && <form onSubmit={saveClientProfile} className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-2"><div><Label>Restaurant name</Label><Input name="companyName" defaultValue={selectedClient.name} required /></div><div><Label>Legal name</Label><Input name="legalName" defaultValue={details.legalName || ''} /></div><div><Label>Owner name</Label><Input name="ownerName" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.name || ''} /></div><div><Label>Owner sign-in email</Label><Input name="ownerEmail" type="email" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.email || ''} /></div><div><Label>Business phone</Label><Input name="phone" type="tel" defaultValue={details.phone || ''} /></div><div><Label>Billing phone</Label><Input name="billingPhone" type="tel" defaultValue={details.billingPhone || ''} /></div><div><Label>Business address</Label><Input name="businessAddress" defaultValue={details.businessAddress || ''} /></div><div><Label>Billing address</Label><Input name="billingAddress" defaultValue={details.billingAddress || ''} /></div><div><Label>Billing email</Label><Input name="billingEmail" type="email" defaultValue={details.billingEmail || ''} /></div><div><Label>Primary manager</Label><Input name="primaryManager" defaultValue={details.primaryManager || ''} /></div><div><Label>Manager email</Label><Input name="primaryManagerEmail" type="email" defaultValue={details.primaryManagerEmail || ''} /></div><div><Label>Locations</Label><Input name="locationCount" type="number" min="1" defaultValue={details.locationCount || selectedClient.locations.length || 1} /></div><div><Label>POS</Label><Input name="posSystem" defaultValue={details.posSystem || ''} /></div><div><Label>Supplier accounts</Label><Input name="supplierAccounts" defaultValue={details.supplierAccounts || ''} /></div><div><Label>Tax settings</Label><Input name="taxSettings" defaultValue={details.taxSettings || ''} /></div><div><Label>Currency</Label><Input name="currency" defaultValue={details.currency || 'CAD'} /></div><div><Label>Food cost target %</Label><Input name="foodCostTarget" type="number" defaultValue={details.foodCostTarget || ''} /></div><div><Label>Labour target %</Label><Input name="labourTarget" type="number" defaultValue={details.labourTarget || ''} /></div><div><Label>Ordering days</Label><Input name="orderingDays" defaultValue={details.orderingDays || ''} /></div><div><Label>Import status</Label><Input name="importStatus" defaultValue={details.importStatus || ''} /></div><label className="flex items-center gap-2 text-sm"><Checkbox name="privacyAccepted" defaultChecked={details.privacyAccepted === true} /> Privacy acknowledgement</label><label className="flex items-center gap-2 text-sm"><Checkbox name="termsAccepted" defaultChecked={details.termsAccepted === true} /> Agreement discussed</label><Button type="submit" disabled={isLoading} className="sm:col-span-2 bg-[#0F172A] text-white">Save client details</Button></form>}</>;
                 })()}
               </div>
