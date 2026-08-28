@@ -38,6 +38,7 @@ interface AuthContextType {
   accountName: string;
   billingStatus: string;
   productAccess: boolean;
+  features: { scheduling: boolean };
   onboarding: OnboardingProgress;
   locations: AccountLocation[];
   activeLocationId: string | null;
@@ -78,6 +79,7 @@ interface AuthApiResponse {
     onboarding?: OnboardingProgress;
     billingStatus?: string;
     productAccess?: boolean;
+    features?: { scheduling?: boolean };
   };
   locations: AccountLocation[];
   activeLocationId: string;
@@ -91,6 +93,7 @@ interface AuthState {
   accountName: string;
   billingStatus: string;
   productAccess: boolean;
+  features: { scheduling: boolean };
   onboarding: OnboardingProgress;
   locations: AccountLocation[];
   activeLocationId: string | null;
@@ -136,6 +139,7 @@ function signedOutState(): AuthState {
     accountName: '',
     billingStatus: 'not_configured',
     productAccess: false,
+    features: { scheduling: false },
     onboarding: DEFAULT_ONBOARDING,
     locations: [],
     activeLocationId: null,
@@ -167,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accountName: payload.account.name,
       billingStatus: payload.account.billingStatus || 'not_configured',
       productAccess: payload.account.productAccess === true,
+      features: { scheduling: payload.account.features?.scheduling !== false },
       onboarding: payload.account.onboarding || DEFAULT_ONBOARDING,
       locations: payload.locations,
       activeLocationId,
