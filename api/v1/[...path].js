@@ -1190,6 +1190,50 @@ export default async function handler(req, res) {
           return json(res, 200, { success: true });
         }
 
+        if (segments[3] === 'users') {
+          const userId = segments[4];
+          if (!userId) return json(res, 400, { error: 'A client user is required' });
+          const rows = await supabase(`app_users?id=eq.${encodeURIComponent(userId)}&account_id=eq.${clientAccount.id}&select=*`);
+          const target = rows?.[0];
+          if (!target) return json(res, 404, { error: 'Client user not found' });
+
+          if (segments[5] === 'password-reset' && method === 'POST') {
+            await supabaseAuth(`recover?redirect_to=${encodeURIComponent(`${appOrigin(req)}/reset-password`)}`, {
+              method: 'POST', body: { email: target.email },
+            });
+            return json(res, 200, { sent: true });
+          }
+
+          if (method === 'PUT') {
+            const name = req.body?.name === undefined ? target.name : String(req.body.name).trim();
+            const email = req.body?.email === undefined ? target.email : String(req.body.email).trim().toLowerCase();
+            const role = req.body?.role === undefined ? target.role : String(req.body.role);
+            const status = req.body?.status === undefined ? target.status : String(req.body.status);
+            if (!name || !email || !/^\S+@\S+\.\S+$/.test(email) || !VALID_ROLES.has(role) || !VALID_STATUSES.has(status)) return json(res, 400, { error: 'Enter a valid name, email, role and status' });
+            if (target.role === 'Owner' && (role !== 'Owner' || status !== 'Active')) {
+              const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=id`);
+              if (owners.length <= 1) return json(res, 409, { error: 'Every client account must keep at least one active owner' });
+            }
+            if (email !== String(target.email || '').toLowerCase()) {
+              const duplicate = await supabase(`app_users?email=eq.${encodeURIComponent(email)}&id=neq.${target.id}&select=id&limit=1`);
+              if (duplicate.length) return json(res, 409, { error: 'That email already belongs to another ZestIQ user' });
+            }
+            await supabase(`app_users?id=eq.${encodeURIComponent(userId)}&account_id=eq.${clientAccount.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { name, email, role, status, updated_at: new Date().toISOString() } });
+            if (target.auth_user_id && email !== target.email) await supabaseAuth(`admin/users/${encodeURIComponent(target.auth_user_id)}`, { method: 'PUT', body: { email } });
+            return json(res, 200, { success: true });
+          }
+
+          if (method === 'DELETE') {
+            if (target.role === 'Owner') {
+              const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=id`);
+              if (owners.length <= 1) return json(res, 409, { error: 'Every client account must keep at least one active owner' });
+            }
+            if (target.auth_user_id) await supabaseAuth(`admin/users/${encodeURIComponent(target.auth_user_id)}`, { method: 'DELETE' });
+            else await supabase(`app_users?id=eq.${encodeURIComponent(userId)}&account_id=eq.${clientAccount.id}`, { method: 'DELETE', prefer: 'return=minimal' });
+            return json(res, 200, { success: true });
+          }
+        }
+
         if (segments[3] === 'billing' && segments[4] === 'checkout' && method === 'POST') {
           if (clientAccount.stripe_subscription_id) {
             return json(res, 409, { error: 'This client already has a Stripe subscription. Manage it in Stripe instead of creating a duplicate.' });
