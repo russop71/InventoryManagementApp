@@ -16,10 +16,10 @@ import { ZestIQBrand } from './ZestIQBrand';
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, accountId, accountName, locations, activeLocationId, switchLocation } = useAuth();
+  const { user, logout, accountId, accountName, locations, activeLocationId, switchLocation, features } = useAuth();
   const [openTopMenu, setOpenTopMenu] = useState<string | null>(null);
   const closeTopMenuTimer = useRef<number | null>(null);
-  const canManageLabor = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
+  const canManageLabor = features.scheduling && ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
 
   const navItems = [
     { path: '/app', label: 'Dashboard', icon: LayoutDashboard },
