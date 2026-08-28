@@ -10,6 +10,11 @@ export interface LaborEmployee {
   role: string;
   department: string;
   phone?: string;
+  alternatePhone?: string;
+  preferredName?: string;
+  birthDate?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   clockInNumber?: string;
   payType: 'hourly' | 'salary';
   hourlyRate: number;
@@ -18,6 +23,14 @@ export interface LaborEmployee {
   email?: string;
   inviteStatus: 'not-invited' | 'pending' | 'active';
   invitedAt?: string;
+  notificationPreferences?: EmployeeNotificationPreferences;
+}
+
+export interface EmployeeNotificationPreferences {
+  schedulePublished: boolean;
+  scheduleChanged: boolean;
+  requestUpdates: boolean;
+  reminders: boolean;
 }
 
 export interface LaborShift {
@@ -93,6 +106,7 @@ interface LaborContextValue extends LaborData {
   isLaborLoaded: boolean;
   addEmployee: (employee: Omit<LaborEmployee, 'id'>) => void;
   inviteEmployee: (employee: Omit<LaborEmployee, 'id' | 'inviteStatus' | 'invitedAt'>) => Promise<LaborEmployee>;
+  updateMyProfile: (updates: { phone?: string; notificationPreferences?: EmployeeNotificationPreferences }) => Promise<LaborEmployee>;
   updateEmployee: (id: string, updates: Partial<LaborEmployee>) => void;
   removeEmployee: (id: string) => void;
   addShift: (shift: Omit<LaborShift, 'id'>) => void;
@@ -120,6 +134,12 @@ function shiftHours(shift: LaborShift) {
   return Math.max(0, minutes - (Number(shift.breakMinutes) || 0)) / 60;
 }
 
+function weekPositionKey(date: string, role: string) {
+  const value = new Date(`${date}T12:00:00`);
+  value.setDate(value.getDate() - ((value.getDay() + 6) % 7));
+  return `${value.toISOString().slice(0, 10)}::${role}`;
+}
+
 function normalizeLaborData(value: Partial<LaborData> | null | undefined): LaborData {
   return {
     employees: Array.isArray(value?.employees) ? value.employees.map((employee, index) => ({
@@ -130,6 +150,12 @@ function normalizeLaborData(value: Partial<LaborData> | null | undefined): Labor
       annualSalary: Number(employee.annualSalary) || 0,
       inviteStatus: employee.inviteStatus || (employee.email ? 'active' : 'not-invited'),
       clockInNumber: employee.clockInNumber || String(index + 1).padStart(4, '0'),
+      notificationPreferences: {
+        schedulePublished: employee.notificationPreferences?.schedulePublished !== false,
+        scheduleChanged: employee.notificationPreferences?.scheduleChanged !== false,
+        requestUpdates: employee.notificationPreferences?.requestUpdates !== false,
+        reminders: employee.notificationPreferences?.reminders !== false,
+      },
     })) : [],
     shifts: Array.isArray(value?.shifts) ? value.shifts : [],
     timeOffRequests: Array.isArray(value?.timeOffRequests) ? value.timeOffRequests : [],
@@ -169,7 +195,8 @@ function buildDemoLabor(): LaborData {
     tag,
   }))).flat();
   return {
-    employees, shifts, targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [], publishedPositions: [], openShifts: [],
+    employees, shifts, targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [],
+    publishedPositions: Array.from(new Set(employees.map(employee => `${date(0)}::${employee.role}`))), openShifts: [],
     timeOffRequests: [{ id: 'demo-timeoff-1', employeeId: 'demo-labor-priya', startDate: date(10), endDate: date(11), reason: 'Family event', status: 'pending', createdAt: new Date().toISOString() }],
     shiftSwapRequests: [{ id: 'demo-swap-1', shiftId: 'demo-shift-5-3', requesterEmployeeId: 'demo-labor-noah', targetEmployeeId: 'demo-labor-priya', note: 'Can cover your next Friday shift in return.', status: 'pending', createdAt: new Date().toISOString() }],
   };
@@ -234,6 +261,15 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     return invited;
   };
 
+  const updateMyProfile = async (updates: { phone?: string; notificationPreferences?: EmployeeNotificationPreferences }) => {
+    if (!token || !accountId || !activeLocationId) throw new Error('Sign in is required');
+    const response = await apiRequest<{ employee: LaborEmployee }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/profile`, {
+      method: 'PATCH', body: JSON.stringify(updates),
+    });
+    saveLocalOnly(current => ({ ...current, employees: current.employees.map(employee => employee.id === response.employee.id ? { ...employee, ...response.employee } : employee) }));
+    return response.employee;
+  };
+
   useEffect(() => {
     if (!accountId || !activeLocationId) {
       setData(EMPTY_LABOR);
@@ -251,7 +287,10 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     void apiRequest<LaborData>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor`)
       .then(remote => {
         const normalizedRemote = normalizeLaborData(remote);
-        const next = normalizedRemote.employees.length > 0 ? normalizedRemote : (local.employees.length > 0 ? local : demo);
+        const remoteWithDemoPublication = user?.email === 'demo@zestiq.com' && normalizedRemote.employees.length > 0 && normalizedRemote.publishedPositions.length === 0
+          ? { ...normalizedRemote, publishedPositions: Array.from(new Set(normalizedRemote.shifts.map(shift => weekPositionKey(shift.date, normalizedRemote.employees.find(employee => employee.id === shift.employeeId)?.role || '')).filter(key => !key.endsWith('::')))) }
+          : normalizedRemote;
+        const next = remoteWithDemoPublication.employees.length > 0 ? remoteWithDemoPublication : (local.employees.length > 0 ? local : demo);
         setData(next);
         if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
         if (normalizedRemote.employees.length === 0 && next.employees.length > 0) persist(next);
@@ -265,6 +304,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     isLaborLoaded,
     addEmployee: employee => commit(current => ({ ...current, employees: [...current.employees, { ...employee, id: `employee-${Date.now()}` }] })),
     inviteEmployee,
+    updateMyProfile,
     updateEmployee: (id, updates) => commit(current => ({ ...current, employees: current.employees.map(employee => employee.id === id ? { ...employee, ...updates } : employee) })),
     removeEmployee: id => commit(current => ({ ...current, employees: current.employees.filter(employee => employee.id !== id), shifts: current.shifts.filter(shift => shift.employeeId !== id) })),
     addShift: shift => commit(current => ({ ...current, shifts: [...current.shifts, { ...shift, id: `shift-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }] })),
