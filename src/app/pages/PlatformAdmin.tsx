@@ -129,6 +129,7 @@ export function PlatformAdmin() {
   const [billableLocationCount, setBillableLocationCount] = useState(1);
   const [commitmentConfirmed, setCommitmentConfirmed] = useState(false);
   const [isEditingClient, setIsEditingClient] = useState(false);
+  const [selectedClientUser, setSelectedClientUser] = useState<ClientDetail['users'][number] | null>(null);
 
   const loadClients = useCallback(async () => {
     if (!user?.platformAdmin) return;
@@ -262,6 +263,50 @@ export function PlatformAdmin() {
       await loadClients();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to save client account');
+    } finally { setIsLoading(false); }
+  };
+
+  const saveClientUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedClient || !selectedClientUser) return;
+    const formData = new FormData(event.currentTarget);
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/users/${encodeURIComponent(selectedClientUser.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: String(formData.get('name') || '').trim(), email: String(formData.get('email') || '').trim(), role: String(formData.get('role') || ''), status: String(formData.get('status') || '') }),
+      });
+      toast.success('Client user permissions updated');
+      setSelectedClientUser(null);
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update this client user');
+    } finally { setIsLoading(false); }
+  };
+
+  const resetClientUserPassword = async () => {
+    if (!selectedClient || !selectedClientUser) return;
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/users/${encodeURIComponent(selectedClientUser.id)}/password-reset`, { method: 'POST' });
+      toast.success(`Password reset email sent to ${selectedClientUser.email}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to send a password reset');
+    } finally { setIsLoading(false); }
+  };
+
+  const deleteClientUser = async () => {
+    if (!selectedClient || !selectedClientUser || !window.confirm(`Remove ${selectedClientUser.name} from ${selectedClient.name}? They will no longer be able to sign in.`)) return;
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/users/${encodeURIComponent(selectedClientUser.id)}`, { method: 'DELETE' });
+      toast.success('Client user removed');
+      setSelectedClientUser(null);
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to remove this client user');
     } finally { setIsLoading(false); }
   };
 
@@ -527,7 +572,8 @@ export function PlatformAdmin() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 p-4">
                   <p className="flex items-center gap-2 font-semibold"><Users className="h-4 w-4" /> Client users</p>
-                  <div className="mt-3 space-y-2">{selectedClient.users.map(member => <div key={member.id} className="rounded-xl bg-slate-50 p-3"><p className="text-sm font-medium">{member.name} · {member.role}</p><p className="text-xs text-slate-500">{member.email} · {member.status}</p></div>)}</div>
+                  <div className="mt-3 space-y-2">{selectedClient.users.map(member => <button key={member.id} type="button" onClick={() => setSelectedClientUser(member)} className="w-full rounded-xl bg-slate-50 p-3 text-left transition hover:bg-amber-50"><p className="text-sm font-medium">{member.name} · {member.role}</p><p className="text-xs text-slate-500">{member.email} · {member.status}</p></button>)}</div>
+                  <p className="mt-3 text-xs text-slate-500">Click a user to manage access, permissions, or sign-in help.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 p-4">
                   <p className="flex items-center gap-2 font-semibold"><MapPin className="h-4 w-4" /> Locations</p>
@@ -565,6 +611,11 @@ export function PlatformAdmin() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(selectedClientUser)} onOpenChange={open => { if (!open) setSelectedClientUser(null); }}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+          {selectedClientUser && <><DialogHeader><DialogTitle>Manage client user</DialogTitle><DialogDescription>Platform-only access support for {selectedClient?.name}. Changes take effect on the user’s next request.</DialogDescription></DialogHeader><form onSubmit={saveClientUser} className="space-y-4"><div className="rounded-2xl bg-slate-50 p-3 text-sm"><p className="font-semibold text-slate-900">Last sign-in</p><p className="mt-1 text-slate-500">{formatDate(selectedClientUser.lastLogin)}</p></div><div><Label htmlFor="client-user-name">Full name</Label><Input id="client-user-name" name="name" className="mt-2" defaultValue={selectedClientUser.name} required /></div><div><Label htmlFor="client-user-email">Sign-in email</Label><Input id="client-user-email" name="email" type="email" className="mt-2" defaultValue={selectedClientUser.email} required /></div><div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="client-user-role">Permissions</Label><select id="client-user-role" name="role" defaultValue={selectedClientUser.role} className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option>Owner</option><option>Admin</option><option>Manager</option><option>BOH Manager</option><option>FOH Manager</option><option>Staff</option></select></div><div><Label htmlFor="client-user-status">Account access</Label><select id="client-user-status" name="status" defaultValue={selectedClientUser.status} className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option>Active</option><option>Inactive</option></select></div></div><div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><p className="font-semibold">Support tools</p><p className="mt-1">Send a password reset if the client cannot sign in. Set an account to Inactive to pause access without deleting their record.</p></div><div className="flex flex-wrap justify-between gap-2 border-t pt-4"><Button type="button" variant="outline" disabled={isLoading} onClick={() => void resetClientUserPassword()}>Send password reset</Button><Button type="button" variant="destructive" disabled={isLoading} onClick={() => void deleteClientUser()}>Delete user</Button><div className="ml-auto flex gap-2"><Button type="button" variant="outline" onClick={() => setSelectedClientUser(null)}>Cancel</Button><Button type="submit" disabled={isLoading} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Save permissions</Button></div></div></form></>}
         </DialogContent>
       </Dialog>
     </div>
