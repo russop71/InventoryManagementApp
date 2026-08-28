@@ -358,6 +358,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accountName: authState.accountName,
       billingStatus: authState.billingStatus,
       productAccess: authState.productAccess,
+      features: authState.features,
       onboarding: authState.onboarding,
       locations: authState.locations,
       activeLocationId: authState.activeLocationId,
