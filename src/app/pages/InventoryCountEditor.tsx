@@ -433,7 +433,7 @@ export function InventoryCountEditor() {
               </div>
 
               <div className="hidden md:block">
-                <div className="grid grid-cols-[minmax(220px,1.7fr)_0.8fr_0.8fr_0.9fr_0.9fr_72px] gap-3 bg-white px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                <div className="grid grid-cols-[minmax(220px,1.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(150px,0.9fr)_minmax(0,0.9fr)_72px] gap-3 bg-white px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
                   <div>Inventory item</div><div className="text-right">Previous</div><div className="text-right">Expected</div><div className="text-right">Actual count</div><div className="text-right">Variance</div><div className="text-right">Order</div>
                 </div>
                 <div className="divide-y divide-slate-100">
@@ -442,7 +442,7 @@ export function InventoryCountEditor() {
                     const quantityVariance = complete ? entry.counted - entry.hypothetical : 0;
                     const dollarVariance = quantityVariance * entry.unitCost;
                     return (
-                      <div key={entryKey(entry)} className={`grid grid-cols-[minmax(220px,1.7fr)_0.8fr_0.8fr_0.9fr_0.9fr_72px] items-center gap-3 px-4 py-3 ${complete ? '' : 'bg-amber-50/20'}`}>
+                      <div key={entryKey(entry)} className={`grid grid-cols-[minmax(220px,1.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(150px,0.9fr)_minmax(0,0.9fr)_72px] items-center gap-3 px-4 py-3 ${complete ? '' : 'bg-amber-50/20'}`}>
                         <div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{entry.name}</p><p className="mt-1 break-words text-[11px] text-slate-500">{entry.category || 'Other'} · {entry.supplier || 'Unknown'} · {entry.unit}</p></div>
                         <div className="text-right text-sm font-semibold text-slate-500">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)}</div>
                         <div className="text-right text-sm font-semibold text-slate-700">{entry.hypothetical.toFixed(2)}</div>
