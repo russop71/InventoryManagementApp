@@ -19,9 +19,11 @@ const BILLING_PRICE_IDS = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
 };
 const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION;
+const STRIPE_PRICE_SCHEDULING = process.env.STRIPE_PRICE_SCHEDULING;
 const STRIPE_BILLING_PORTAL_CONFIGURATION_ID = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID;
 const PREMIUM_MONTHLY_CAD_CENTS = 24999;
 const ADDITIONAL_LOCATION_CAD_CENTS = 10000;
+const SCHEDULING_CAD_CENTS = 4999;
 const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
 
 function json(res, status, body) {
@@ -59,6 +61,27 @@ function defaultLabor() {
   return { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [], publishedPositions: [], openShifts: [] };
 }
 
+function normalizeNotificationPreferences(value) {
+  return {
+    schedulePublished: value?.schedulePublished !== false,
+    scheduleChanged: value?.scheduleChanged !== false,
+    requestUpdates: value?.requestUpdates !== false,
+    reminders: value?.reminders !== false,
+  };
+}
+
+export function scheduleWeekKey(date, role) {
+  const value = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(value.getTime())) return '';
+  const day = value.getUTCDay();
+  value.setUTCDate(value.getUTCDate() - ((day + 6) % 7));
+  return `${value.toISOString().slice(0, 10)}::${role}`;
+}
+
+export function canSwapPositions(requester, target) {
+  return Boolean(requester && target?.active && requester.role?.trim().toLowerCase() === target.role?.trim().toLowerCase());
+}
+
 function normalizeLabor(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaultLabor();
   const validPayTypes = new Set(['hourly', 'salary']);
@@ -77,6 +100,7 @@ function normalizeLabor(value) {
     email: String(employee?.email || '').trim().toLowerCase().slice(0, 254),
     inviteStatus: validInviteStatuses.has(employee?.inviteStatus) ? employee.inviteStatus : (employee?.email ? 'active' : 'not-invited'),
     invitedAt: String(employee?.invitedAt || '').slice(0, 40),
+    notificationPreferences: normalizeNotificationPreferences(employee?.notificationPreferences),
   })).filter(employee => employee.id && employee.name) : [];
   const employeeIds = new Set(employees.map(employee => employee.id));
   const validStatus = new Set(['scheduled', 'confirmed', 'completed', 'called-off']);
@@ -200,6 +224,7 @@ function defaultOnboardingState() {
     startedAt: null,
     completedAt: null,
     updatedAt: null,
+    clientProfile: { schedulingEnabled: false },
   };
 }
 
@@ -220,7 +245,13 @@ function normalizeOnboardingState(value) {
     startedAt: typeof value.startedAt === 'string' ? value.startedAt : null,
     completedAt: typeof value.completedAt === 'string' ? value.completedAt : null,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
+    clientProfile: value.clientProfile && typeof value.clientProfile === 'object' && !Array.isArray(value.clientProfile) ? value.clientProfile : base.clientProfile,
   };
+}
+
+function schedulingEnabled(account) {
+  // Existing accounts retain the module until the CEO explicitly switches it off.
+  return account?.onboarding_state?.clientProfile?.schedulingEnabled !== false;
 }
 
 function mapAccount(row, authUser) {
@@ -228,6 +259,7 @@ function mapAccount(row, authUser) {
     id: row.id,
     name: row.name,
     onboarding: normalizeOnboardingState(row.onboarding_state),
+    features: { scheduling: schedulingEnabled(row) },
     billingStatus: row.billing_status || 'not_configured',
     productAccess: hasProductAccess({ account: row, authUser }),
   };
@@ -336,7 +368,7 @@ function requestedLocationCount(body) {
   return count;
 }
 
-async function validateCheckoutPricing(locationCount) {
+async function validateCheckoutPricing(locationCount, includeScheduling = false) {
   const basePriceId = BILLING_PRICE_IDS.monthly;
   if (!basePriceId) throw Object.assign(new Error('The Stripe Premium monthly price is not configured'), { status: 503 });
   await validateStripePrice(basePriceId, PREMIUM_MONTHLY_CAD_CENTS, 'ZestIQ Premium');
@@ -345,6 +377,10 @@ async function validateCheckoutPricing(locationCount) {
       throw Object.assign(new Error('The Stripe additional-location price is not configured'), { status: 503 });
     }
     await validateStripePrice(STRIPE_PRICE_ADDITIONAL_LOCATION, ADDITIONAL_LOCATION_CAD_CENTS, 'The additional-location add-on');
+  }
+  if (includeScheduling) {
+    if (!STRIPE_PRICE_SCHEDULING) throw Object.assign(new Error('The Stripe Scheduling add-on price is not configured'), { status: 503 });
+    await validateStripePrice(STRIPE_PRICE_SCHEDULING, SCHEDULING_CAD_CENTS, 'The Scheduling add-on');
   }
 }
 
@@ -499,6 +535,8 @@ function mapBilling(account, details = {}) {
   return {
     configured: Boolean(STRIPE_SECRET_KEY && BILLING_PRICE_IDS.monthly),
     additionalLocationPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION),
+    schedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_SCHEDULING),
+    schedulingEnabled: schedulingEnabled(account),
     customerCreated: Boolean(account.stripe_customer_id),
     plan: account.billing_plan || null,
     status: account.billing_status || 'not_configured',
@@ -529,6 +567,7 @@ async function getStripeBillingDetails(account) {
     || null;
   const recurring = subscription?.items?.data?.[0]?.price?.recurring || null;
   const additionalLocationItem = subscription?.items?.data?.find(item => item.price?.id === STRIPE_PRICE_ADDITIONAL_LOCATION);
+  const schedulingItem = subscription?.items?.data?.find(item => item.price?.id === STRIPE_PRICE_SCHEDULING);
   const currentPeriodEnd = subscription?.current_period_end
     || subscription?.items?.data?.[0]?.current_period_end
     || null;
@@ -537,6 +576,7 @@ async function getStripeBillingDetails(account) {
     status: subscription?.status || account.billing_status || 'not_configured',
     plan: subscription?.metadata?.plan || account.billing_plan || null,
     additionalLocationQuantity: Number(additionalLocationItem?.quantity || account.additional_location_quantity || 0),
+    schedulingEnabled: Boolean(schedulingItem) || schedulingEnabled(account),
     subscriptionStartedAt: stripeDate(subscription?.start_date || subscription?.created),
     currentPeriodEnd: stripeDate(currentPeriodEnd) || account.current_period_end || null,
     billingFrequency: recurring ? {
@@ -1026,6 +1066,8 @@ export default async function handler(req, res) {
             billing: {
               configured: Boolean(STRIPE_SECRET_KEY && BILLING_PRICE_IDS.monthly),
               additionalLocationPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION),
+              schedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_SCHEDULING),
+              schedulingEnabled: schedulingEnabled(account),
               customerCreated: Boolean(account.stripe_customer_id),
               plan: account.billing_plan || null,
               status: account.billing_status || 'not_configured',
@@ -1138,7 +1180,7 @@ export default async function handler(req, res) {
           }
           const now = new Date().toISOString();
           const currentOnboarding = clientAccount.onboarding_state && typeof clientAccount.onboarding_state === 'object' ? clientAccount.onboarding_state : {};
-          await supabase(`accounts?id=eq.${clientAccount.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { name: companyName, onboarding_state: { ...currentOnboarding, clientProfile: onboardingDetails, updatedAt: now }, updated_at: now } });
+          await supabase(`accounts?id=eq.${clientAccount.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { name: companyName, onboarding_state: { ...currentOnboarding, clientProfile: { ...(currentOnboarding.clientProfile || {}), ...onboardingDetails }, updatedAt: now }, updated_at: now } });
           if (owner && (ownerName || ownerEmail)) await supabase(`app_users?id=eq.${owner.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { ...(ownerName ? { name: ownerName } : {}), ...(ownerEmail ? { email: ownerEmail } : {}) } });
           return json(res, 200, { success: true });
         }
@@ -1152,7 +1194,8 @@ export default async function handler(req, res) {
           const priceId = BILLING_PRICE_IDS[plan];
           if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
           const locationCount = requestedLocationCount(req.body);
-          await validateCheckoutPricing(locationCount);
+          const includeScheduling = req.body?.schedulingEnabled === true;
+          await validateCheckoutPricing(locationCount, includeScheduling);
           const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=email&order=created_at.asc&limit=1`);
           if (!owners[0]?.email) return json(res, 409, { error: 'Add an active client owner before creating checkout' });
           const form = {
@@ -1163,12 +1206,14 @@ export default async function handler(req, res) {
             'metadata[account_id]': clientAccount.id,
             'metadata[plan]': plan,
             'metadata[location_count]': String(locationCount),
+            'metadata[scheduling_enabled]': String(includeScheduling),
             'metadata[commitment_accepted]': 'true',
             'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
             'metadata[agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
             'subscription_data[metadata][account_id]': clientAccount.id,
             'subscription_data[metadata][plan]': plan,
             'subscription_data[metadata][location_count]': String(locationCount),
+            'subscription_data[metadata][scheduling_enabled]': String(includeScheduling),
             'subscription_data[metadata][commitment_accepted]': 'true',
             'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
             'subscription_data[metadata][agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
@@ -1181,6 +1226,11 @@ export default async function handler(req, res) {
           if (locationCount > 1) {
             form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
             form['line_items[1][quantity]'] = String(locationCount - 1);
+          }
+          if (includeScheduling) {
+            const lineIndex = locationCount > 1 ? 2 : 1;
+            form[`line_items[${lineIndex}][price]`] = STRIPE_PRICE_SCHEDULING;
+            form[`line_items[${lineIndex}][quantity]`] = '1';
           }
           if (clientAccount.stripe_customer_id) form.customer = clientAccount.stripe_customer_id;
           else form.customer_email = owners[0].email;
@@ -1544,6 +1594,9 @@ export default async function handler(req, res) {
       }
 
       if (segments[4] === 'labor') {
+        if (!schedulingEnabled(account)) {
+          return json(res, 403, { error: 'Labour & Scheduling is not enabled for this company. Ask the account owner to add the Scheduling module.' });
+        }
         const rows = await supabase(`location_data?location_id=eq.${locationId}&select=*`);
         const current = rows?.[0] || { location_id: locationId };
         const integrations = current.integrations && typeof current.integrations === 'object' ? current.integrations : { toast: defaultToast() };
@@ -1593,6 +1646,40 @@ export default async function handler(req, res) {
           });
           return json(res, 201, { labor: normalized, employee, inviteSent: inviteStatus === 'pending' });
         }
+        if (segments[5] === 'profile' && method === 'PATCH') {
+          const labor = normalizeLabor(integrations.labor);
+          const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
+          if (!linkedEmployee) return json(res, 403, { error: 'Your login is not linked to an employee profile' });
+          const phone = req.body?.phone === undefined ? linkedEmployee.phone : String(req.body.phone || '').trim().slice(0, 40);
+          const notificationPreferences = req.body?.notificationPreferences === undefined
+            ? linkedEmployee.notificationPreferences
+            : normalizeNotificationPreferences(req.body.notificationPreferences);
+          labor.employees = labor.employees.map(employee => employee.id === linkedEmployee.id ? { ...employee, phone, notificationPreferences } : employee);
+          const normalized = normalizeLabor(labor);
+          await supabase(`location_data?location_id=eq.${locationId}`, {
+            method: 'PATCH', prefer: 'return=minimal',
+            body: { integrations: { ...integrations, labor: normalized }, updated_at: new Date().toISOString() },
+          });
+          const employee = normalized.employees.find(item => item.id === linkedEmployee.id);
+          return json(res, 200, { employee: { ...employee, hourlyRate: 0, annualSalary: 0 } });
+        }
+        if (segments[5] === 'notifications' && segments[6] === 'register' && method === 'POST') {
+          const labor = normalizeLabor(integrations.labor);
+          const email = String(access.appUser.email || '').trim().toLowerCase();
+          const linkedEmployee = labor.employees.find(employee => employee.email === email);
+          if (!linkedEmployee) return json(res, 403, { error: 'Your login is not linked to an employee profile' });
+          const token = String(req.body?.token || '').trim().slice(0, 4096);
+          const platform = String(req.body?.platform || '').trim().toLowerCase();
+          if (!token || !['ios', 'android'].includes(platform)) return json(res, 400, { error: 'A valid iOS or Android push token is required' });
+          const existingDevices = Array.isArray(integrations.employeePushDevices) ? integrations.employeePushDevices : [];
+          const nextDevice = { token, platform, employeeId: linkedEmployee.id, email, app: 'ZestEmployee', updatedAt: new Date().toISOString() };
+          const employeePushDevices = [...existingDevices.filter(device => String(device?.token || '') !== token), nextDevice].slice(-2000);
+          await supabase(`location_data?location_id=eq.${locationId}`, {
+            method: 'PATCH', prefer: 'return=minimal',
+            body: { integrations: { ...integrations, employeePushDevices }, updated_at: new Date().toISOString() },
+          });
+          return json(res, 201, { registered: true });
+        }
         if (segments[5] === 'requests' && method === 'POST') {
           const labor = normalizeLabor(integrations.labor);
           const requestType = req.body?.type;
@@ -1607,6 +1694,13 @@ export default async function handler(req, res) {
           else if (requestType === 'shift-swap') {
             const shift = labor.shifts.find(item => item.id === incoming.shiftId);
             if (!shift || (!canManageLabor && shift.employeeId !== linkedEmployee.id)) return json(res, 403, { error: 'You can only swap one of your own upcoming shifts' });
+            if (incoming.targetEmployeeId) {
+              const requester = labor.employees.find(employee => employee.id === incoming.requesterEmployeeId);
+              const target = labor.employees.find(employee => employee.id === incoming.targetEmployeeId && employee.active);
+              if (!canSwapPositions(requester, target)) {
+                return json(res, 400, { error: 'Shift swaps can only be requested with an active employee in the same position' });
+              }
+            }
             labor.shiftSwapRequests = [incoming, ...labor.shiftSwapRequests];
           } else return json(res, 400, { error: 'Unsupported labour request type' });
           const normalized = normalizeLabor(labor);
@@ -1614,16 +1708,32 @@ export default async function handler(req, res) {
           return json(res, 201, normalized);
         }
         if (segments[5] === 'requests' && method === 'PATCH') {
-          if (!['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role)) return json(res, 403, { error: 'Manager access is required to approve requests' });
           const labor = normalizeLabor(integrations.labor);
+          const canManageLabor = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role);
+          const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
           const id = String(req.body?.id || '');
           const status = String(req.body?.status || '');
           if (!['approved', 'declined', 'cancelled'].includes(status)) return json(res, 400, { error: 'Unsupported request status' });
-          if (req.body?.type === 'time-off') labor.timeOffRequests = labor.timeOffRequests.map(request => request.id === id ? { ...request, status } : request);
+          if (!canManageLabor && status !== 'cancelled') return json(res, 403, { error: 'Only managers can approve or decline requests' });
+          if (req.body?.type === 'time-off') {
+            const request = labor.timeOffRequests.find(item => item.id === id);
+            if (!request) return json(res, 404, { error: 'Time-off request not found' });
+            if (!canManageLabor && request.employeeId !== linkedEmployee?.id) return json(res, 403, { error: 'You can only cancel your own request' });
+            labor.timeOffRequests = labor.timeOffRequests.map(item => item.id === id ? { ...item, status } : item);
+          }
           else if (req.body?.type === 'shift-swap') {
-            labor.shiftSwapRequests = labor.shiftSwapRequests.map(request => request.id === id ? { ...request, status } : request);
+            const request = labor.shiftSwapRequests.find(item => item.id === id);
+            if (!request) return json(res, 404, { error: 'Shift-swap request not found' });
+            if (!canManageLabor && request.requesterEmployeeId !== linkedEmployee?.id) return json(res, 403, { error: 'You can only cancel your own request' });
+            labor.shiftSwapRequests = labor.shiftSwapRequests.map(item => item.id === id ? { ...item, status } : item);
             const approved = labor.shiftSwapRequests.find(request => request.id === id && status === 'approved');
-            if (approved?.targetEmployeeId) labor.shifts = labor.shifts.map(shift => shift.id === approved.shiftId ? { ...shift, employeeId: approved.targetEmployeeId } : shift);
+            if (approved?.targetEmployeeId) {
+              const shift = labor.shifts.find(item => item.id === approved.shiftId);
+              const source = labor.employees.find(employee => employee.id === shift?.employeeId);
+              const target = labor.employees.find(employee => employee.id === approved.targetEmployeeId && employee.active);
+              if (!canSwapPositions(source, target)) return json(res, 400, { error: 'The selected employees no longer have matching positions' });
+              labor.shifts = labor.shifts.map(item => item.id === approved.shiftId ? { ...item, employeeId: approved.targetEmployeeId } : item);
+            }
           } else return json(res, 400, { error: 'Unsupported labour request type' });
           const normalized = normalizeLabor(labor);
           await supabase(`location_data?location_id=eq.${locationId}`, { method: 'PATCH', prefer: 'return=minimal', body: { integrations: { ...integrations, labor: normalized }, updated_at: new Date().toISOString() } });
@@ -1633,6 +1743,7 @@ export default async function handler(req, res) {
           const labor = normalizeLabor(integrations.labor);
           if (!['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(access.appUser.role)) {
             const linkedEmployee = labor.employees.find(employee => employee.email && employee.email === String(access.appUser.email || '').trim().toLowerCase());
+            if (!linkedEmployee) return json(res, 403, { error: 'Your login is not linked to an employee profile' });
             labor.employees = labor.employees.map(employee => ({
               ...employee,
               hourlyRate: 0,
@@ -1642,7 +1753,7 @@ export default async function handler(req, res) {
               inviteStatus: employee.id === linkedEmployee?.id ? employee.inviteStatus : 'active',
               invitedAt: '',
             }));
-            labor.shifts = labor.shifts.filter(shift => shift.employeeId === linkedEmployee?.id);
+            labor.shifts = labor.shifts.filter(shift => shift.employeeId === linkedEmployee.id && labor.publishedPositions.includes(scheduleWeekKey(shift.date, linkedEmployee.role)));
             labor.timeOffRequests = labor.timeOffRequests.filter(request => request.employeeId === linkedEmployee?.id);
             labor.shiftSwapRequests = labor.shiftSwapRequests.filter(request => request.requesterEmployeeId === linkedEmployee?.id || request.targetEmployeeId === linkedEmployee?.id);
           }
