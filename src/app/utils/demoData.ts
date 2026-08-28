@@ -29,7 +29,7 @@ export interface DemoLocationData {
   invoices: Array<Record<string, unknown>>;
 }
 
-export const DEMO_DATA_VERSION = '2026-08-26-bottle-volume-v5';
+export const DEMO_DATA_VERSION = '2026-08-28-received-order-invoice-v6';
 
 export function buildDemoLocationData(): DemoLocationData {
   const inventory = [
@@ -184,10 +184,17 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-order-1', date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), items: [{ itemId: 'demo-salmon', quantity: 12, cost: 177.6 }, { itemId: 'demo-parmigiano', quantity: 6, cost: 189 }], totalCost: 366.6, status: 'pending' },
       { id: 'demo-order-2', date: new Date(Date.now() - 86400000 * 2).toISOString().slice(0, 10), items: [{ itemId: 'demo-potatoes', quantity: 30, cost: 40.5 }], totalCost: 40.5, status: 'received' },
     ],
-    invoices: [],
-    /*
-      { id: 'demo-invoice-1', date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), invoiceNumber: 'GLS-10482', supplier: 'Great Lakes Seafood', items: [{ itemId: 'demo-salmon', quantity: 20, cost: 296 }], totalAmount: 296, status: 'received' },
-      { id: 'demo-invoice-2', date: new Date(Date.now() - 86400000 * 3).toISOString().slice(0, 10), invoiceNumber: 'NPC-88217', supplier: 'Northern Produce Co.', items: [{ itemId: 'demo-arugula', quantity: 8, cost: 57.6 }, { itemId: 'demo-potatoes', quantity: 40, cost: 54 }], totalAmount: 111.6, status: 'received' },
-    ],*/
+    invoices: [
+      {
+        id: 'demo-invoice-order-2',
+        orderId: 'demo-order-2',
+        date: new Date(Date.now() - 86400000 * 2).toISOString().slice(0, 10),
+        invoiceNumber: 'PO-DEMO-0002',
+        supplier: 'Northern Produce Co.',
+        items: [{ itemId: 'demo-potatoes', quantity: 30, cost: 40.5 }],
+        totalAmount: 40.5,
+        status: 'received',
+      },
+    ],
   };
 }
