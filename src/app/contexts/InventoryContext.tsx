@@ -9,6 +9,7 @@ import { markDemoSessionReset, shouldResetDemoSession } from '../utils/demoSessi
 import { mergeLocationData } from '../utils/locationDataMerge.js';
 import { hasDuplicateInvoiceNumber, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
 import { findBestSupplierMatch, mergeDuplicateSuppliers, normalizeSupplierName } from '../utils/supplierMatching.js';
+import { convertQuantity, normalizeUnit } from '../utils/unitConversion';
 import type { InventoryCount } from '../utils/inventoryCounts';
 
 const DEFAULT_STORAGE_AREAS = ['Walk-In Cooler', 'Dry Storage', 'Freezer', 'Bar', 'Wine Cellar', 'Unassigned'] as const;
@@ -173,6 +174,8 @@ export interface ScannedInvoiceItem {
   name: string;
   quantity: number;
   unit: string;
+  packSize?: number;
+  packCount?: number;
   unitCost: number;
   totalCost: number;
   category: string;
@@ -208,6 +211,8 @@ interface InventoryContextType {
   addStorageArea: (storageArea: string) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
+  deleteInventoryItems: (ids: string[]) => void;
+  mergeInventoryItems: (ids: string[], primaryId: string) => { success: boolean; error?: string };
   adjustInventory: (id: string, change: number, reason: string) => void;
   addRecipe: (recipe: Omit<Recipe, 'id'>) => void;
   updateRecipe: (id: string, recipe: Partial<Recipe>) => void;
@@ -754,6 +759,74 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     saveLocationData(nextInventory, recipes, storageAreas);
   };
 
+  const deleteInventoryItems = (ids: string[]) => {
+    const idSet = new Set(ids);
+    if (idSet.size === 0) return;
+    const nextInventory = inventory.filter(item => !idSet.has(item.id));
+    setInventory(nextInventory);
+    saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts);
+  };
+
+  const mergeInventoryItems = (ids: string[], primaryId: string) => {
+    const idSet = new Set(ids);
+    const primary = inventory.find(item => item.id === primaryId);
+    const sources = inventory.filter(item => idSet.has(item.id) && item.id !== primaryId);
+    if (!primary || sources.length === 0) return { success: false, error: 'Select at least two inventory items to merge.' };
+    if (sources.some(item => normalizeInventoryItemName(item.name) !== normalizeInventoryItemName(primary.name))) {
+      return { success: false, error: 'Only items with the same name can be merged. Rename them first if they are truly the same item.' };
+    }
+
+    let mergedStock = primary.currentStock;
+    let mergedValue = primary.currentStock * primary.unitCost;
+    const mergedHistory = [...(primary.history || [])];
+    const mergedPriceHistory = [...(primary.priceHistory || [])];
+    const mergedOptions = [...(primary.purchaseOptions || [])];
+    const conversions = new Map<string, number>();
+    for (const item of sources) {
+      const converted = convertQuantity(item.currentStock, item.unit, primary.unit);
+      if (converted === null) {
+        return { success: false, error: `${item.name} uses ${item.unit}, which cannot be merged into ${primary.unit}. Change the unit first.` };
+      }
+      const oneUnit = convertQuantity(1, item.unit, primary.unit) || 1;
+      conversions.set(item.id, oneUnit);
+      mergedStock += converted;
+      mergedValue += item.currentStock * item.unitCost;
+      mergedHistory.push(...(item.history || []));
+      mergedPriceHistory.push(...(item.priceHistory || []));
+      for (const option of item.purchaseOptions || []) {
+        if (!mergedOptions.some(existing => normalizeSupplierName(existing.supplier) === normalizeSupplierName(option.supplier) && existing.productCode === option.productCode)) {
+          mergedOptions.push({ ...option, id: `${primary.id}-${option.id}` });
+        }
+      }
+    }
+    const now = new Date().toISOString();
+    const nextPrimary: InventoryItem = {
+      ...primary,
+      currentStock: mergedStock,
+      unitCost: mergedStock > 0 ? mergedValue / mergedStock : primary.unitCost,
+      purchaseOptions: mergedOptions,
+      history: [...mergedHistory, { date: now, change: 0, reason: `Merged ${sources.length} duplicate inventory item${sources.length === 1 ? '' : 's'}`, newStock: mergedStock }],
+      priceHistory: mergedPriceHistory,
+      lastUpdated: now,
+    };
+    const nextInventory = inventory.filter(item => !idSet.has(item.id)).concat(nextPrimary);
+    const nextRecipes = recipes.map(recipe => ({
+      ...recipe,
+      ingredients: recipe.ingredients.map(ingredient => {
+        if (!idSet.has(ingredient.inventoryItemId) || ingredient.inventoryItemId === primaryId) return ingredient;
+        const source = inventory.find(item => item.id === ingredient.inventoryItemId);
+        const converted = source ? convertQuantity(ingredient.quantity, ingredient.unit, primary.unit) : null;
+        return { ...ingredient, inventoryItemId: primaryId, quantity: converted ?? ingredient.quantity, unit: primary.unit };
+      }),
+    }));
+    const nextInvoices = invoices.map(invoice => ({ ...invoice, items: invoice.items.map(line => idSet.has(line.itemId) ? { ...line, itemId: primaryId } : line) }));
+    setInventory(nextInventory);
+    setRecipes(nextRecipes);
+    setInvoices(nextInvoices);
+    saveLocationData(nextInventory, nextRecipes, storageAreas, orders, nextInvoices, suppliers, preppedRecipes, inventoryCounts);
+    return { success: true };
+  };
+
   const adjustInventory = (id: string, change: number, reason: string) => {
     const nextInventory = inventory.map(item => {
       if (item.id !== id) return item;
@@ -1046,17 +1119,25 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }));
     const invoiceItems: OrderItem[] = [];
 
-    invoiceInput.items.forEach((scannedItem, index) => {
+    for (const [index, scannedItem] of invoiceInput.items.entries()) {
       const normalizedName = normalizeInventoryItemName(scannedItem.name);
-      const itemIndex = nextInventory.findIndex(item => (
+      const matchingIndexes = nextInventory.map((item, itemIndex) => ({ item, itemIndex })).filter(({ item }) => (
         normalizedName.length > 0 && normalizeInventoryItemName(item.name) === normalizedName
       ));
-      const quantity = Math.max(0, Number(scannedItem.quantity) || 0);
-      const unitCost = Math.max(0, Number(scannedItem.unitCost) || 0);
-      const totalCost = Math.max(0, Number(scannedItem.totalCost) || quantity * unitCost);
+      const itemIndex = matchingIndexes.find(({ item }) => normalizeSupplierName(item.supplier) === normalizedSupplier || item.purchaseOptions?.some(option => normalizeSupplierName(option.supplier) === normalizedSupplier))?.itemIndex ?? matchingIndexes[0]?.itemIndex ?? -1;
+      const scannedUnit = normalizeUnit(scannedItem.unit.trim() || 'ea');
+      const rawQuantity = Math.max(0, Number(scannedItem.quantity) || 0);
+      const packSize = Math.max(0, Number(scannedItem.packSize) || rawQuantity || 1);
+      const packCount = Math.max(1, Number(scannedItem.packCount) || 1);
+      const totalCost = Math.max(0, Number(scannedItem.totalCost) || rawQuantity * Math.max(0, Number(scannedItem.unitCost) || 0));
 
       if (itemIndex >= 0) {
         const existingItem = nextInventory[itemIndex];
+        const quantity = convertQuantity(rawQuantity, scannedUnit, existingItem.unit);
+        if (quantity === null) {
+          return { success: false, error: `${scannedItem.name} is already stocked in ${existingItem.unit}. Change the scanned unit to a compatible unit before saving so ZestIQ does not create a duplicate.` };
+        }
+        const unitCost = quantity > 0 ? totalCost / quantity : Math.max(0, Number(scannedItem.unitCost) || 0);
         const shouldBecomePrimary = !existingItem.supplier || existingItem.supplier.toLowerCase() === 'unknown';
         const existingOptions = existingItem.purchaseOptions?.length
           ? existingItem.purchaseOptions
@@ -1078,9 +1159,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           productName: scannedItem.name.trim() || existingItem.name,
           supplier: supplierName,
           productCode: matchingOption?.productCode || '',
-          packSize: matchingOption?.packSize || 1,
-          packUnit: scannedItem.unit.trim() || matchingOption?.packUnit || existingItem.unit,
-          unitPrice: unitCost,
+          packSize,
+          packUnit: scannedUnit,
+          packsPerCase: packCount,
+          unitPrice: totalCost / packCount,
           orderingStatus: matchingOption?.orderingStatus,
           isMain: isPrimarySupplier,
           isLocal: matchingOption?.isLocal ?? true,
@@ -1123,17 +1205,22 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           ],
         };
         invoiceItems.push({ itemId: existingItem.id, quantity, cost: totalCost });
-        return;
+        continue;
       }
 
       const itemId = `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 9)}`;
+      const quantity = rawQuantity;
+      const unitCost = quantity > 0 ? totalCost / quantity : Math.max(0, Number(scannedItem.unitCost) || 0);
       nextInventory.push({
         id: itemId,
         name: scannedItem.name.trim() || 'Unknown item',
         category: scannedItem.category.trim() || 'Uncategorized',
         storageArea: 'Unassigned',
         currentStock: quantity,
-        unit: scannedItem.unit.trim() || 'ea',
+        unit: scannedUnit,
+        packSize,
+        packUnit: scannedUnit,
+        unitsPerPack: packCount,
         unitCost,
         parLevel: quantity * 2,
         supplier: supplierName,
@@ -1152,15 +1239,16 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           productName: scannedItem.name.trim() || 'Unknown item',
           supplier: supplierName,
           productCode: '',
-          packSize: 1,
-          packUnit: scannedItem.unit.trim() || 'ea',
-          unitPrice: unitCost,
+          packSize,
+          packUnit: scannedUnit,
+          packsPerCase: packCount,
+          unitPrice: totalCost / packCount,
           isMain: true,
           isLocal: true,
         }],
       });
       invoiceItems.push({ itemId, quantity, cost: totalCost });
-    });
+    }
 
     const nextSuppliers = consolidatedSuppliers.some(supplier => normalizeSupplierName(supplier.name) === normalizedSupplier)
       ? consolidatedSuppliers
@@ -1348,6 +1436,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         addStorageArea,
         updateInventoryItem,
         deleteInventoryItem,
+        deleteInventoryItems,
+        mergeInventoryItems,
         adjustInventory,
         addRecipe,
         updateRecipe,
