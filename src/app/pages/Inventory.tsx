@@ -12,11 +12,13 @@ import {
   DollarSign,
   Download,
   Filter,
+  GitMerge,
   Package,
   Plus,
   Search,
   ShoppingBag,
   SlidersHorizontal,
+  Trash2,
   TrendingUp,
   Upload,
 } from 'lucide-react';
@@ -48,7 +50,7 @@ const STATUS: Record<Status, { label: string; bg: string; color: string }> = {
 export function Inventory() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { inventory, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount } = useInventory();
+  const { inventory, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount, deleteInventoryItems, mergeInventoryItems } = useInventory();
   const canManageCounts = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock'>('all');
@@ -60,6 +62,8 @@ export function Inventory() {
   const [customStart, setCustomStart] = useState('2026-06-01');
   const [customEnd, setCustomEnd] = useState('2026-06-28');
   const [selectedCountId, setSelectedCountId] = useState('');
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [mergeTargetId, setMergeTargetId] = useState('');
 
   const handleAddItem = () => {
     const trimmedName = newItem.name.trim();
@@ -120,6 +124,39 @@ export function Inventory() {
       return matchesQuery && matchesTab;
     });
   }, [activeTab, inventory, search]);
+  const selectedInventoryItems = inventory.filter(item => selectedItemIds.includes(item.id));
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItemIds.includes(item.id));
+
+  const toggleInventorySelection = (id: string, checked: boolean) => {
+    setSelectedItemIds(current => checked ? Array.from(new Set([...current, id])) : current.filter(itemId => itemId !== id));
+    if (checked && !mergeTargetId) setMergeTargetId(id);
+    if (!checked && mergeTargetId === id) setMergeTargetId('');
+  };
+
+  const toggleAllInventorySelection = (checked: boolean) => {
+    setSelectedItemIds(current => checked
+      ? Array.from(new Set([...current, ...filteredItems.map(item => item.id)]))
+      : current.filter(id => !filteredItems.some(item => item.id === id)));
+    if (checked && !mergeTargetId) setMergeTargetId(filteredItems[0]?.id || '');
+  };
+
+  const handleBulkDelete = () => {
+    if (!selectedItemIds.length || !window.confirm(`Delete ${selectedItemIds.length} selected inventory item${selectedItemIds.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    deleteInventoryItems(selectedItemIds);
+    setSelectedItemIds([]);
+    setMergeTargetId('');
+  };
+
+  const handleMergeSelected = () => {
+    const primaryId = mergeTargetId || selectedItemIds[0];
+    if (selectedItemIds.length < 2 || !primaryId) return;
+    const primary = inventory.find(item => item.id === primaryId);
+    if (!window.confirm(`Merge ${selectedItemIds.length} selected items into “${primary?.name || 'the selected item'}”? On-hand stock, supplier options and history will be kept together.`)) return;
+    const result = mergeInventoryItems(selectedItemIds, primaryId);
+    if (!result.success) { window.alert(result.error || 'Those items could not be merged.'); return; }
+    setSelectedItemIds([]);
+    setMergeTargetId('');
+  };
 
   const totalValue = inventory.reduce((sum, item) => sum + item.currentStock * item.unitCost, 0);
   const lowStockItems = inventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'low-stock').length;
@@ -445,8 +482,26 @@ export function Inventory() {
         </button>
       </div>
 
+      {selectedItemIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-3">
+          <p className="mr-auto text-sm font-black text-slate-900">{selectedItemIds.length} selected</p>
+          {selectedItemIds.length > 1 && (
+            <>
+              <label className="text-xs font-bold text-slate-600">Keep
+                <select value={mergeTargetId || selectedItemIds[0]} onChange={event => setMergeTargetId(event.target.value)} className="ml-2 rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-900">
+                  {selectedInventoryItems.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={handleMergeSelected} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900"><GitMerge className="h-3.5 w-3.5" />Merge items</button>
+            </>
+          )}
+          <button type="button" onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white"><Trash2 className="h-3.5 w-3.5" />Delete selected</button>
+          <button type="button" onClick={() => { setSelectedItemIds([]); setMergeTargetId(''); }} className="px-2 py-2 text-xs font-bold text-slate-600 underline">Clear</button>
+        </div>
+      )}
+
       <div className="hidden grid-cols-[28px_minmax(180px,1fr)_64px_64px_80px_58px_18px] border-b border-gray-100 bg-gray-50 px-4 py-2 md:grid">
-        <span />
+        <label className="flex items-center justify-center"><input aria-label="Select all visible inventory items" type="checkbox" checked={allFilteredSelected} onChange={event => toggleAllInventorySelection(event.target.checked)} className="h-4 w-4" /></label>
         {(['ITEM', 'PAR LEVEL', 'ON HAND', 'STATUS', 'UNIT COST', ''] as const).map((header, index) => (
           <p key={header} className="text-[9px] font-black uppercase tracking-widest text-gray-400" style={{ textAlign: index === 0 ? 'left' : 'right' }}>
             {header}
@@ -483,6 +538,9 @@ export function Inventory() {
                 <div className="flex items-center justify-center">
                   <input
                     type="checkbox"
+                    aria-label={`Select ${item.name}`}
+                    checked={selectedItemIds.includes(item.id)}
+                    onChange={event => toggleInventorySelection(item.id, event.target.checked)}
                     className="h-4 w-4"
                     onClick={(event) => event.stopPropagation()}
                   />
