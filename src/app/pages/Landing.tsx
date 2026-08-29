@@ -15,6 +15,7 @@ import {
   FileScan,
   KeyRound,
   LockKeyhole,
+  Menu,
   MessageCircle,
   PackageSearch,
   ReceiptText,
@@ -27,6 +28,7 @@ import {
   UsersRound,
   Warehouse,
   Wine,
+  X,
   Zap,
 } from 'lucide-react';
 import { usePageSeo } from '../utils/seo';
@@ -302,6 +304,7 @@ function PhoneNav({ items }: { items: Array<[typeof Smartphone, string]> }) {
 }
 
 export function Landing() {
+  const [menuOpen, setMenuOpen] = useState(false);
   usePageSeo({
     title: 'Restaurant Inventory Management Software | ZestIQ',
     description: 'ZestIQ is restaurant inventory management software for counts, food and beverage cost, invoice scanning, purchasing, labour and multi-location operations.',
@@ -310,20 +313,31 @@ export function Landing() {
   return (
     <div className="min-h-screen bg-[#FBFAF6] text-[#0B1220]">
       <header className="sticky top-0 z-40 border-b border-black/5 bg-[#FBFAF6]/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
-          <ZestIQBrand compact />
-          <nav className="hidden gap-7 text-sm font-bold md:flex">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
+          <ZestIQBrand compact className="shrink-0" />
+          <nav className="hidden items-center gap-6 whitespace-nowrap text-sm font-bold xl:flex">
             <a href="#platform">Platform</a>
             <Link to="/product-tour">Product tour</Link>
             <Link to="/capabilities">Capabilities</Link>
             <a href="#how">How it works</a>
             <Link to="/pricing">Pricing</Link>
           </nav>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link className="rounded-xl border border-[#0B1220]/15 bg-white px-3 py-2.5 text-sm font-black text-[#0B1220] shadow-sm transition hover:border-[#0B1220]/35 sm:px-5 sm:py-3" to="/login">Log in</Link>
-            <Link className="rounded-xl bg-[#0B1220] px-3 py-2.5 text-sm font-black text-white sm:px-5 sm:py-3" to={DEMO_URL}>Book a demo</Link>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <Link className="hidden whitespace-nowrap rounded-xl border border-[#0B1220]/15 bg-white px-3 py-2.5 text-sm font-black text-[#0B1220] shadow-sm transition hover:border-[#0B1220]/35 sm:inline-flex sm:px-5 sm:py-3" to="/login">Log in</Link>
+            <Link className="whitespace-nowrap rounded-xl bg-[#0B1220] px-3 py-2.5 text-sm font-black text-white sm:px-5 sm:py-3" to={DEMO_URL}>Book a demo</Link>
+            <button type="button" onClick={() => setMenuOpen(open => !open)} aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#0B1220]/15 bg-white text-[#0B1220] shadow-sm xl:hidden">
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
+        {menuOpen && <nav className="absolute inset-x-0 top-full grid gap-1 border-b border-black/10 bg-[#FBFAF6] px-5 py-4 text-sm font-bold shadow-lg xl:hidden">
+          <a href="#platform" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Platform</a>
+          <Link to="/product-tour" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Product tour</Link>
+          <Link to="/capabilities" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Capabilities</Link>
+          <a href="#how" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">How it works</a>
+          <Link to="/pricing" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Pricing</Link>
+          <Link to="/login" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5 sm:hidden">Log in</Link>
+        </nav>}
       </header>
 
       <main>
