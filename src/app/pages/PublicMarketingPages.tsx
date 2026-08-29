@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { ArrowRight, BarChart3, Building2, Check, FileScan, Flag, Layers3, Mail, PackageSearch, ReceiptText, ShieldCheck, Sparkles, UsersRound, Wine } from 'lucide-react';
+import { ArrowRight, BarChart3, Building2, CalendarClock, Check, FileScan, Flag, Layers3, Mail, PackageSearch, ReceiptText, ShieldCheck, Sparkles, UsersRound, Wine } from 'lucide-react';
 import { ZestIQBrand } from '../components/ZestIQBrand';
 import { usePageSeo } from '../utils/seo';
 
@@ -43,12 +43,13 @@ const pages = {
   pricing: {
     path: '/pricing',
     title: 'ZestIQ Pricing | CAD $249.99 per Month',
-    description: 'ZestIQ Premium costs CAD $249.99 per month for one location, with additional locations at CAD $100 per month each.',
+    description: 'ZestIQ Basic costs CAD $249.99 per month for one location. Add Scheduling for CAD $49.99 per month or additional locations for CAD $100 per month each.',
     eyebrow: 'Clear Canadian pricing',
-    heading: 'Full restaurant control for CAD $249.99 per month.',
-    intro: 'Premium includes one restaurant location. Add more locations for CAD $100 per month each, with company-level owner visibility included.',
+    heading: 'Start with ZestIQ Basic for CAD $249.99 per month.',
+    intro: 'Basic includes one restaurant location and the core inventory, costing, purchasing and AI platform. Add Scheduling for CAD $49.99 per month, and add more locations for CAD $100 per month each.',
     sections: [
-      [Check, 'Premium platform', 'Inventory, recipes, food and beverage costing, invoices, purchasing, forecasts, waste, labour, users and AI tools.'],
+      [Check, 'ZestIQ Basic — CAD $249.99/month', 'Inventory, recipes, food and beverage costing, invoices, purchasing, forecasts, waste, users and AI tools for one location.'],
+      [CalendarClock, 'Scheduling — add CAD $49.99/month', 'Optional labour scheduling with employees, shifts, requests, projected labour and sales comparison.'],
       [Building2, 'Multi-location', 'One location is included. Each additional active location adds CAD $100 per month.'],
       [ShieldCheck, 'Subscription terms', 'A 12-month commitment applies. Non-renewal notice is due at least 90 days before the renewal date.'],
       [ReceiptText, 'Acceptance record', 'Checkout records the agreement version, acceptance date and time, and the authorized customer acceptance.'],
