@@ -476,10 +476,7 @@ export function Inventory() {
 
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-50">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}</p>
-        <button className="flex items-center gap-1 text-[11px] font-bold text-gray-500">
-          <SlidersHorizontal className="h-3 w-3" />
-          Sort: A–Z
-        </button>
+        <div className="flex items-center gap-3"><button type="button" onClick={() => toggleAllInventorySelection(!allFilteredSelected)} className="text-[11px] font-black text-slate-700 underline underline-offset-2">{allFilteredSelected ? 'Clear visible' : 'Select all visible'}</button><button className="flex items-center gap-1 text-[11px] font-bold text-gray-500"><SlidersHorizontal className="h-3 w-3" />Sort: A–Z</button></div>
       </div>
 
       {selectedItemIds.length > 0 && (
