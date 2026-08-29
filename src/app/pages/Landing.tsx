@@ -511,7 +511,7 @@ export function Landing() {
               <h2 className="mt-3 text-4xl font-black sm:text-5xl">ZestIQ Basic</h2>
               <p className="mt-5 max-w-xl text-lg leading-8 text-black/60">Inventory, purchasing, recipe costing, AI scanning, forecasting, owner controls, users and billing in one subscription. Add labour scheduling only when your team needs it.</p>
               <div className="mt-6 space-y-3 text-sm font-semibold text-black/70">
-                {['First location: CAD $249.99/month', 'Additional locations: CAD $199/month each', 'Scheduling included with additional locations', 'No free trial', 'Stripe-secured monthly billing'].map(item => (
+                {['First location: CAD $249.99/month', 'Additional locations: CAD $199/month each', 'Scheduling: add CAD $49.99/month for all locations', 'No free trial', 'Stripe-secured monthly billing'].map(item => (
                   <p key={item} className="flex items-center gap-2"><Check className="h-4 w-4 text-[#A16207]" />{item}</p>
                 ))}
               </div>
@@ -524,7 +524,7 @@ export function Landing() {
                 <p className="flex items-center gap-2 font-black text-white"><CalendarClock className="h-5 w-5 text-[#F5C10E]" />Add Scheduling</p>
                 <p className="mt-1 text-2xl font-black text-[#F5C10E]">+$49.99 <span className="text-sm text-white/55">CAD/month</span></p>
               </div>
-              <p className="mt-4 text-sm leading-6 text-white/55">Each additional location is CAD $199/month and includes Scheduling. Single-location accounts can add Scheduling for CAD $49.99/month. A 12-month commitment applies.</p>
+              <p className="mt-4 text-sm leading-6 text-white/55">Each additional location is CAD $199/month. Scheduling is not automatic: add it to the first-location plan for CAD $49.99/month and it will cover every location on the account. A 12-month commitment applies.</p>
               <Link to={DEMO_URL} className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">
                 Book a demo <ArrowRight className="h-4 w-4" />
               </Link>

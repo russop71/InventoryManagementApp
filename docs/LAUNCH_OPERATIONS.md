@@ -6,7 +6,7 @@ Set these in Vercel Production and redeploy: `APP_URL`, `SUPABASE_URL`, `SUPABAS
 
 Optional controls: `ZESTIQ_AI_DAILY_USER_LIMIT` (default 60), `ZESTIQ_AI_DAILY_ACCOUNT_LIMIT` (default 600), `ZESTIQ_ALERT_WEBHOOK_URL`, and `ZESTIQ_BILLING_BYPASS_ACCOUNT_IDS`. Billing bypass IDs should only be used for explicitly approved internal accounts.
 
-The Basic Stripe Price must be CAD $249.99 monthly for the first location. The additional-location Stripe Price must be CAD $199 monthly and includes Scheduling for multi-location accounts. Single-location Scheduling remains an optional CAD $49.99 monthly add-on. Trials are not used. Register the webhook at `https://zestiq.ca/api/stripe-webhook`.
+The Basic Stripe Price must be CAD $249.99 monthly for the first location. The additional-location Stripe Price must be CAD $199 monthly. Scheduling is a separate CAD $49.99 monthly account add-on; when purchased for the first location, it covers every location on that account. Trials are not used. Register the webhook at `https://zestiq.ca/api/stripe-webhook`.
 
 ## Go-live checks
 

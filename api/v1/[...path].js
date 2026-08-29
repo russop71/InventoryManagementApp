@@ -255,8 +255,7 @@ function normalizeOnboardingState(value) {
 }
 
 function schedulingEnabled(account) {
-  // Existing accounts retain the module until the CEO explicitly switches it off.
-  return account?.onboarding_state?.clientProfile?.schedulingEnabled !== false;
+  return account?.onboarding_state?.clientProfile?.schedulingEnabled === true;
 }
 
 function mapAccount(row, authUser) {
@@ -383,7 +382,7 @@ async function validateCheckoutPricing(locationCount, includeScheduling = false)
     }
     await validateStripePrice(STRIPE_PRICE_ADDITIONAL_LOCATION, ADDITIONAL_LOCATION_CAD_CENTS, 'The additional-location add-on');
   }
-  if (includeScheduling && locationCount === 1) {
+  if (includeScheduling) {
     if (!STRIPE_PRICE_SCHEDULING) throw Object.assign(new Error('The Stripe Scheduling add-on price is not configured'), { status: 503 });
     await validateStripePrice(STRIPE_PRICE_SCHEDULING, SCHEDULING_CAD_CENTS, 'The Scheduling add-on');
   }
@@ -1243,7 +1242,7 @@ export default async function handler(req, res) {
           const priceId = BILLING_PRICE_IDS[plan];
           if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
           const locationCount = requestedLocationCount(req.body);
-          const includeScheduling = req.body?.schedulingEnabled === true || locationCount > 1;
+          const includeScheduling = req.body?.schedulingEnabled === true;
           await validateCheckoutPricing(locationCount, includeScheduling);
           const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=email&order=created_at.asc&limit=1`);
           if (!owners[0]?.email) return json(res, 409, { error: 'Add an active client owner before creating checkout' });
@@ -1276,8 +1275,8 @@ export default async function handler(req, res) {
             form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
             form['line_items[1][quantity]'] = String(locationCount - 1);
           }
-          if (includeScheduling && locationCount === 1) {
-            const lineIndex = 1;
+          if (includeScheduling) {
+            const lineIndex = locationCount > 1 ? 2 : 1;
             form[`line_items[${lineIndex}][price]`] = STRIPE_PRICE_SCHEDULING;
             form[`line_items[${lineIndex}][quantity]`] = '1';
           }
@@ -1528,7 +1527,7 @@ export default async function handler(req, res) {
         const priceId = BILLING_PRICE_IDS[plan];
         if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
         const locationCount = requestedLocationCount(req.body);
-        const includeScheduling = locationCount > 1;
+        const includeScheduling = req.body?.schedulingEnabled === true;
         await validateCheckoutPricing(locationCount, includeScheduling);
         const origin = appOrigin(req);
         const form = {
@@ -1559,6 +1558,11 @@ export default async function handler(req, res) {
         if (locationCount > 1) {
           form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
           form['line_items[1][quantity]'] = String(locationCount - 1);
+        }
+        if (includeScheduling) {
+          const lineIndex = locationCount > 1 ? 2 : 1;
+          form[`line_items[${lineIndex}][price]`] = STRIPE_PRICE_SCHEDULING;
+          form[`line_items[${lineIndex}][quantity]`] = '1';
         }
         if (account.stripe_customer_id) form.customer = account.stripe_customer_id;
         else form.customer_email = access.appUser.email;

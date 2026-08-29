@@ -43,14 +43,14 @@ const pages = {
   pricing: {
     path: '/pricing',
     title: 'ZestIQ Pricing | CAD $249.99 per Month',
-    description: 'ZestIQ Basic costs CAD $249.99 per month for the first location. Additional locations are CAD $199 per month each with Scheduling included.',
+    description: 'ZestIQ Basic costs CAD $249.99 per month for the first location. Additional locations are CAD $199 per month each. Scheduling is a separate CAD $49.99 account add-on.',
     eyebrow: 'Clear Canadian pricing',
     heading: 'Start with ZestIQ Basic for CAD $249.99 per month.',
-    intro: 'Basic is CAD $249.99 per month for the first restaurant location and includes the core inventory, costing, purchasing and AI platform. Each additional location is CAD $199 per month with Scheduling included.',
+    intro: 'Basic is CAD $249.99 per month for the first restaurant location and includes the core inventory, costing, purchasing and AI platform. Each additional location is CAD $199 per month. Add Scheduling to the first-location plan for CAD $49.99 per month to cover every location.',
     sections: [
       [Check, 'ZestIQ Basic — CAD $249.99/month', 'Inventory, recipes, food and beverage costing, invoices, purchasing, forecasts, waste, users and AI tools for one location.'],
-      [CalendarClock, 'Scheduling — add CAD $49.99/month', 'Optional labour scheduling with employees, shifts, requests, projected labour and sales comparison.'],
-      [Building2, 'Additional locations — CAD $199/month', 'Each additional restaurant location includes Scheduling at no separate add-on charge.'],
+      [CalendarClock, 'Scheduling — add CAD $49.99/month', 'Optional account add-on covering employees, shifts, requests, projected labour and sales comparison across every location.'],
+      [Building2, 'Additional locations — CAD $199/month', 'Each additional restaurant location uses the same account. Scheduling is available only when the $49.99 account add-on is selected.'],
       [ShieldCheck, 'Subscription terms', 'A 12-month commitment applies. Non-renewal notice is due at least 90 days before the renewal date.'],
       [ReceiptText, 'Acceptance record', 'Checkout records the agreement version, acceptance date and time, and the authorized customer acceptance.'],
     ],
