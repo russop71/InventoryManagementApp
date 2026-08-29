@@ -18,11 +18,13 @@ const invoiceSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'quantity', 'unit', 'unitCost', 'totalCost', 'category'],
+        required: ['name', 'quantity', 'unit', 'packSize', 'packCount', 'unitCost', 'totalCost', 'category'],
         properties: {
           name: { type: 'string' },
           quantity: { type: 'number' },
           unit: { type: 'string' },
+          packSize: { type: 'number', description: 'Amount in one purchased package, expressed in unit.' },
+          packCount: { type: 'number', description: 'Number of purchased packages on this line.' },
           unitCost: { type: 'number' },
           totalCost: { type: 'number' },
           category: { type: 'string' },
@@ -64,10 +66,14 @@ export function normalizeInvoice(payload) {
         const totalCost = Number(item?.totalCost);
         const safeQuantity = Number.isFinite(quantity) && quantity >= 0 ? quantity : 0;
         const safeUnitCost = Number.isFinite(unitCost) && unitCost >= 0 ? unitCost : 0;
+        const packSize = Number(item?.packSize);
+        const packCount = Number(item?.packCount);
         return {
           name: String(item?.name || 'Unknown item').trim() || 'Unknown item',
           quantity: safeQuantity,
           unit: String(item?.unit || 'ea').trim() || 'ea',
+          packSize: Number.isFinite(packSize) && packSize > 0 ? packSize : safeQuantity,
+          packCount: Number.isFinite(packCount) && packCount > 0 ? packCount : 1,
           unitCost: safeUnitCost,
           totalCost: Number.isFinite(totalCost) && totalCost >= 0 ? totalCost : safeQuantity * safeUnitCost,
           category: String(item?.category || 'Uncategorized').trim() || 'Uncategorized',
@@ -111,7 +117,9 @@ async function extractInvoice(imageData, apiKey) {
               'Extract this restaurant supplier invoice.',
               'Copy printed values; do not invent missing line items.',
               'Use an empty string when invoice number or date is unreadable.',
-              'Normalize units to concise labels such as ea, case, kg, lb, L, or mL.',
+              'Normalize units to concise labels such as ea, kg, g, lb, L, or mL.',
+              'Quantity is the TOTAL physical stock amount being received in that unit, not the number of packages. For example, one 300 g bag must be quantity 300, unit g, packSize 300 and packCount 1. Two 300 g bags must be quantity 600, unit g, packSize 300 and packCount 2.',
+              'UnitCost must be the cost PER physical stock unit. Divide the line total by quantity. TotalCost remains the full line total.',
               'Choose a practical restaurant inventory category for each item.',
             ].join('\n'),
           },
