@@ -307,9 +307,9 @@ export function PaymentMethod() {
                     onChange={event => setLocationCount(Math.max(Math.max(1, locations.length), Math.min(100, Number(event.target.value) || 1)))}
                     disabled={current}
                   />
-                  <p className="mt-2 text-xs text-slate-500">Each location after the first adds CAD $100/month.</p>
+                  <p className="mt-2 text-xs text-slate-500">The first location is CAD $249.99/month. Each additional location is CAD $199/month and includes Scheduling.</p>
                   <p className="mt-2 text-lg font-extrabold text-slate-950">
-                    CAD ${(249.99 + Math.max(0, locationCount - 1) * 100).toFixed(2)}/month
+                    CAD ${(249.99 + Math.max(0, locationCount - 1) * 199).toFixed(2)}/month
                   </p>
                 </div>
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
@@ -327,7 +327,7 @@ export function PaymentMethod() {
                   disabled={isLoading || current || !commitmentAccepted || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured)}
                   onClick={() => void openCheckout(plan.id)}
                 >
-                  {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${(249.99 + Math.max(0, locationCount - 1) * 100).toFixed(2)}/month`}
+                  {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${(249.99 + Math.max(0, locationCount - 1) * 199).toFixed(2)}/month`}
                 </Button>
               </div>
             );

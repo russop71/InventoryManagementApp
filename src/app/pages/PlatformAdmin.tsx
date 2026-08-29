@@ -159,7 +159,11 @@ export function PlatformAdmin() {
     const now = Date.now();
     const thirtyDaysAgo = now - 30 * 86_400_000;
     const activeOrCollecting = clients.filter(client => ['active', 'past_due', 'unpaid'].includes(client.billing.status));
-    const estimatedMrr = activeOrCollecting.reduce((total, client) => total + 249.99 + Math.max(0, client.billing.additionalLocationQuantity) * 100 + (client.billing.schedulingEnabled ? 49.99 : 0), 0);
+    const estimatedMrr = activeOrCollecting.reduce((total, client) => {
+      const locationCount = Math.max(1, client.locationCount);
+      const schedulingCharge = locationCount === 1 && client.billing.schedulingEnabled ? 49.99 : 0;
+      return total + 249.99 + Math.max(0, locationCount - 1) * 199 + schedulingCharge;
+    }, 0);
     const health = clients.map(client => ({ client, ...healthFor(client) }));
     const actionItems = [
       ...clients.filter(client => ['past_due', 'unpaid'].includes(client.billing.status)).map(client => ({ client, title: 'Payment needs attention', detail: `${client.name} is ${client.billing.status.replace('_', ' ')}. Review the Stripe subscription and contact the owner.`, tone: 'text-red-700 bg-red-50 border-red-200' })),
@@ -532,7 +536,7 @@ export function PlatformAdmin() {
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="font-semibold text-slate-950">Secure billing setup</p>
-                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for one location. Each additional location is CAD $100/month. Labour & Scheduling is an optional CAD $49.99/month add-on. There is no free trial.</p>
+                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for the first location. Each additional location is CAD $199/month and includes Scheduling. Single-location Scheduling is an optional CAD $49.99/month add-on. There is no free trial.</p>
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
                   <p className="font-semibold text-slate-950">Contract term disclosure</p>
                   <p className="mt-1">Billed monthly with a 12-month initial commitment. The subscription renews for another 12-month term unless written non-renewal notice is received at least 90 days before term end.</p>
@@ -552,11 +556,11 @@ export function PlatformAdmin() {
                     value={billableLocationCount}
                     onChange={event => setBillableLocationCount(Math.max(Math.max(1, selectedClient.locations.length), Math.min(100, Number(event.target.value) || 1)))}
                   />
-                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 100 + (selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 49.99 : 0)).toFixed(2)}/month</p>
-                  <p className="mt-1 text-xs text-slate-500">Scheduling: {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'included at CAD $49.99/month' : 'not included'}</p>
+                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 199 + (billableLocationCount === 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 49.99 : 0)).toFixed(2)}/month</p>
+                  <p className="mt-1 text-xs text-slate-500">{billableLocationCount > 1 ? 'Scheduling is included with the additional-location price.' : `Scheduling: ${selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'included at CAD $49.99/month' : 'not included'}`}</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured) || (selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
+                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured) || (billableLocationCount === 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
                 </div>
                 {selectedClient.billing.customerCreated && <p className="mt-3 text-xs text-slate-500">This client already has Stripe billing. Use Stripe to manage its existing subscription rather than creating a duplicate.</p>}
                 {!selectedClient.billing.configured && <p className="mt-3 text-xs text-amber-700">Connect Stripe keys and price IDs before creating payment links.</p>}

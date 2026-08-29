@@ -5,7 +5,7 @@ const pages = [
   ['/book-demo', 'Book a ZestIQ Restaurant Software Demo', 'Book a tailored ZestIQ demo for restaurant inventory, food cost, invoice scanning, purchasing, beverage and labour workflows.'],
   ['/product-tour', 'ZestIQ Product Tour | Restaurant Operations Software', 'Tour ZestIQ restaurant inventory, costing, purchasing, labour, forecasting and AI workflows.'],
   ['/capabilities', 'ZestIQ Capabilities | Full Restaurant Operations Platform', 'Explore ZestIQ capabilities for inventory, food and beverage cost, invoices, ordering, forecasting, waste, labour, users and AI.'],
-  ['/pricing', 'ZestIQ Pricing | CAD $249.99 per Month', 'ZestIQ Premium costs CAD $249.99 per month for one location, with additional locations at CAD $100 per month each.'],
+  ['/pricing', 'ZestIQ Pricing | CAD $249.99 per Month', 'ZestIQ Basic costs CAD $249.99 per month for the first location. Additional locations are CAD $199 per month each with Scheduling included.'],
   ['/contact', 'Contact ZestIQ | Restaurant Software Canada', 'Contact ZestIQ about restaurant inventory, food and beverage cost, labour, integrations, security, billing or a demonstration.'],
   ['/canadian-owned', 'Canadian-Owned Restaurant Software | ZestIQ', 'ZestIQ is a Canadian-owned restaurant operations software company building inventory, cost, labour and AI tools.'],
   ['/restaurant-inventory-management-software', 'Restaurant Inventory Management Software | ZestIQ', 'Restaurant inventory software for counts, pars, purchasing, recipe costs, supplier pricing and multi-location visibility.'],

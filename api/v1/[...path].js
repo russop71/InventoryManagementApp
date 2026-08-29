@@ -22,7 +22,7 @@ const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOC
 const STRIPE_PRICE_SCHEDULING = process.env.STRIPE_PRICE_SCHEDULING;
 const STRIPE_BILLING_PORTAL_CONFIGURATION_ID = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID;
 const PREMIUM_MONTHLY_CAD_CENTS = 24999;
-const ADDITIONAL_LOCATION_CAD_CENTS = 10000;
+const ADDITIONAL_LOCATION_CAD_CENTS = 19900;
 const SCHEDULING_CAD_CENTS = 4999;
 const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
 
@@ -383,7 +383,7 @@ async function validateCheckoutPricing(locationCount, includeScheduling = false)
     }
     await validateStripePrice(STRIPE_PRICE_ADDITIONAL_LOCATION, ADDITIONAL_LOCATION_CAD_CENTS, 'The additional-location add-on');
   }
-  if (includeScheduling) {
+  if (includeScheduling && locationCount === 1) {
     if (!STRIPE_PRICE_SCHEDULING) throw Object.assign(new Error('The Stripe Scheduling add-on price is not configured'), { status: 503 });
     await validateStripePrice(STRIPE_PRICE_SCHEDULING, SCHEDULING_CAD_CENTS, 'The Scheduling add-on');
   }
@@ -1243,7 +1243,7 @@ export default async function handler(req, res) {
           const priceId = BILLING_PRICE_IDS[plan];
           if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
           const locationCount = requestedLocationCount(req.body);
-          const includeScheduling = req.body?.schedulingEnabled === true;
+          const includeScheduling = req.body?.schedulingEnabled === true || locationCount > 1;
           await validateCheckoutPricing(locationCount, includeScheduling);
           const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=email&order=created_at.asc&limit=1`);
           if (!owners[0]?.email) return json(res, 409, { error: 'Add an active client owner before creating checkout' });
@@ -1276,8 +1276,8 @@ export default async function handler(req, res) {
             form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
             form['line_items[1][quantity]'] = String(locationCount - 1);
           }
-          if (includeScheduling) {
-            const lineIndex = locationCount > 1 ? 2 : 1;
+          if (includeScheduling && locationCount === 1) {
+            const lineIndex = 1;
             form[`line_items[${lineIndex}][price]`] = STRIPE_PRICE_SCHEDULING;
             form[`line_items[${lineIndex}][quantity]`] = '1';
           }
@@ -1528,7 +1528,8 @@ export default async function handler(req, res) {
         const priceId = BILLING_PRICE_IDS[plan];
         if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
         const locationCount = requestedLocationCount(req.body);
-        await validateCheckoutPricing(locationCount);
+        const includeScheduling = locationCount > 1;
+        await validateCheckoutPricing(locationCount, includeScheduling);
         const origin = appOrigin(req);
         const form = {
           mode: 'subscription',
@@ -1538,12 +1539,14 @@ export default async function handler(req, res) {
           'metadata[account_id]': accountId,
           'metadata[plan]': plan,
           'metadata[location_count]': String(locationCount),
+          'metadata[scheduling_enabled]': String(includeScheduling),
           'metadata[commitment_accepted]': 'true',
           'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
           'metadata[agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
           'subscription_data[metadata][account_id]': accountId,
           'subscription_data[metadata][plan]': plan,
           'subscription_data[metadata][location_count]': String(locationCount),
+          'subscription_data[metadata][scheduling_enabled]': String(includeScheduling),
           'subscription_data[metadata][commitment_accepted]': 'true',
           'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
           'subscription_data[metadata][agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,

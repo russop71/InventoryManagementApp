@@ -53,6 +53,18 @@ async function updateAccount(accountId, patch) {
   if (!response.ok) throw new Error(`Unable to update billing state (${response.status})`);
 }
 
+async function getAccountOnboardingState(accountId) {
+  if (!SUPABASE_SECRET_KEY || !accountId) return {};
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/accounts?id=eq.${encodeURIComponent(accountId)}&select=onboarding_state&limit=1`, {
+    headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` },
+  });
+  if (!response.ok) return {};
+  const rows = await response.json();
+  return rows?.[0]?.onboarding_state && typeof rows[0].onboarding_state === 'object'
+    ? rows[0].onboarding_state
+    : {};
+}
+
 async function recordSubscriptionAgreement(accountId, checkoutSession, acceptedAt) {
   if (!SUPABASE_SECRET_KEY || !accountId) return;
   const customerAccepted = checkoutSession?.consent?.terms_of_service === 'accepted';
@@ -108,7 +120,7 @@ function checkoutPaymentSucceeded(session) {
 
 async function activateAccountFromCheckout(accountId, session) {
   const startedAt = unixDate(session.created) || new Date().toISOString();
-  await updateAccount(accountId, {
+  const patch = {
     stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
     stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
     billing_plan: session.metadata?.plan || null,
@@ -118,7 +130,18 @@ async function activateAccountFromCheckout(accountId, session) {
     commitment_ends_at: commitmentEnd(startedAt),
     non_renewal_requested_at: null,
     non_renewal_effective_at: null,
-  });
+  };
+  if (checkoutPaymentSucceeded(session) && session.metadata?.scheduling_enabled === 'true') {
+    const onboardingState = await getAccountOnboardingState(accountId);
+    patch.onboarding_state = {
+      ...onboardingState,
+      clientProfile: {
+        ...(onboardingState.clientProfile || {}),
+        schedulingEnabled: true,
+      },
+    };
+  }
+  await updateAccount(accountId, patch);
 }
 
 export default async function handler(req, res) {

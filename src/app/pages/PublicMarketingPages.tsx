@@ -43,14 +43,14 @@ const pages = {
   pricing: {
     path: '/pricing',
     title: 'ZestIQ Pricing | CAD $249.99 per Month',
-    description: 'ZestIQ Basic costs CAD $249.99 per month for one location. Add Scheduling for CAD $49.99 per month or additional locations for CAD $100 per month each.',
+    description: 'ZestIQ Basic costs CAD $249.99 per month for the first location. Additional locations are CAD $199 per month each with Scheduling included.',
     eyebrow: 'Clear Canadian pricing',
     heading: 'Start with ZestIQ Basic for CAD $249.99 per month.',
-    intro: 'Basic includes one restaurant location and the core inventory, costing, purchasing and AI platform. Add Scheduling for CAD $49.99 per month, and add more locations for CAD $100 per month each.',
+    intro: 'Basic is CAD $249.99 per month for the first restaurant location and includes the core inventory, costing, purchasing and AI platform. Each additional location is CAD $199 per month with Scheduling included.',
     sections: [
       [Check, 'ZestIQ Basic — CAD $249.99/month', 'Inventory, recipes, food and beverage costing, invoices, purchasing, forecasts, waste, users and AI tools for one location.'],
       [CalendarClock, 'Scheduling — add CAD $49.99/month', 'Optional labour scheduling with employees, shifts, requests, projected labour and sales comparison.'],
-      [Building2, 'Multi-location', 'One location is included. Each additional active location adds CAD $100 per month.'],
+      [Building2, 'Additional locations — CAD $199/month', 'Each additional restaurant location includes Scheduling at no separate add-on charge.'],
       [ShieldCheck, 'Subscription terms', 'A 12-month commitment applies. Non-renewal notice is due at least 90 days before the renewal date.'],
       [ReceiptText, 'Acceptance record', 'Checkout records the agreement version, acceptance date and time, and the authorized customer acceptance.'],
     ],
