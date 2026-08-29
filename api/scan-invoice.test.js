@@ -25,6 +25,21 @@ test('normalizeInvoice sanitizes numbers and calculates missing line totals', ()
   assert.equal(invoice.aiUsed, true);
 });
 
+test('normalizeInvoice retains package detail for stock updates', () => {
+  const invoice = normalizeInvoice({
+    vendor: 'Example Produce',
+    invoiceNumber: 'INV-300G',
+    date: '2026-08-28',
+    items: [{ name: 'Black Garlic', quantity: 300, unit: 'g', packSize: 300, packCount: 1, unitCost: 0.04, totalCost: 12, category: 'Produce' }],
+  });
+
+  assert.equal(invoice.items[0].quantity, 300);
+  assert.equal(invoice.items[0].unit, 'g');
+  assert.equal(invoice.items[0].packSize, 300);
+  assert.equal(invoice.items[0].packCount, 1);
+  assert.equal(invoice.items[0].totalCost, 12);
+});
+
 test('mapInvoiceExtractionError distinguishes exhausted quota from a temporary rate limit', () => {
   assert.deepEqual(
     mapInvoiceExtractionError({ status: 429, code: 'insufficient_quota' }),
