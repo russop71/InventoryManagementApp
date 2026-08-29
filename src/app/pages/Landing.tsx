@@ -508,19 +508,23 @@ export function Landing() {
           <div className="mx-auto grid max-w-5xl gap-8 rounded-[36px] border border-black/10 bg-[#FBFAF6] p-7 shadow-sm md:grid-cols-[1fr_.8fr] md:items-center md:p-12">
             <div>
               <p className="text-sm font-black uppercase tracking-[.2em] text-black/45">Simple pricing</p>
-              <h2 className="mt-3 text-4xl font-black sm:text-5xl">ZestIQ Premium</h2>
-              <p className="mt-5 max-w-xl text-lg leading-8 text-black/60">Inventory, labour scheduling, purchasing, recipe costing, AI scanning, forecasting, owner controls, users and billing in one subscription.</p>
+              <h2 className="mt-3 text-4xl font-black sm:text-5xl">ZestIQ Basic</h2>
+              <p className="mt-5 max-w-xl text-lg leading-8 text-black/60">Inventory, purchasing, recipe costing, AI scanning, forecasting, owner controls, users and billing in one subscription. Add labour scheduling only when your team needs it.</p>
               <div className="mt-6 space-y-3 text-sm font-semibold text-black/70">
-                {['One location included', 'CAD $100/month for each additional location', 'No free trial', 'Stripe-secured monthly billing'].map(item => (
+                {['One location included', 'Optional Scheduling add-on: CAD $49.99/month', 'CAD $100/month for each additional location', 'No free trial', 'Stripe-secured monthly billing'].map(item => (
                   <p key={item} className="flex items-center gap-2"><Check className="h-4 w-4 text-[#A16207]" />{item}</p>
                 ))}
               </div>
             </div>
             <div className="rounded-3xl bg-[#0B1220] p-7 text-white">
-              <p className="text-sm font-bold uppercase tracking-[.18em] text-white/45">Premium</p>
+              <p className="text-sm font-bold uppercase tracking-[.18em] text-white/45">ZestIQ Basic</p>
               <p className="mt-5 text-5xl font-black text-[#F5C10E]">$249.99</p>
               <p className="mt-2 font-bold">CAD per month</p>
-              <p className="mt-4 text-sm leading-6 text-white/55">Includes one location. Every location after the first adds CAD $100/month.</p>
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="flex items-center gap-2 font-black text-white"><CalendarClock className="h-5 w-5 text-[#F5C10E]" />Add Scheduling</p>
+                <p className="mt-1 text-2xl font-black text-[#F5C10E]">+$49.99 <span className="text-sm text-white/55">CAD/month</span></p>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-white/55">Includes one location. Every location after the first adds CAD $100/month. A 12-month commitment applies.</p>
               <Link to={DEMO_URL} className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">
                 Book a demo <ArrowRight className="h-4 w-4" />
               </Link>
