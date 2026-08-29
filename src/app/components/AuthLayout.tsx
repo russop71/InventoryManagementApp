@@ -1,10 +1,10 @@
-import { Navigate, Outlet, useLocation } from 'react-router';
+import { Link, Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { ShieldAlert } from 'lucide-react';
 
 export function AuthLayout() {
   const location = useLocation();
-  const { isAuthenticated, user, productAccess, onboarding, mfaRequired } = useAuth();
+  const { isAuthenticated, user, productAccess, onboarding, mfaRequired, features, logout } = useAuth();
 
   // Loading state
   if (isAuthenticated === null) {
@@ -21,6 +21,25 @@ export function AuthLayout() {
   }
 
   if (mfaRequired) return <Navigate to="/mfa" replace />;
+
+  const schedulingRoute = location.pathname === '/employee' || location.pathname.startsWith('/app/labor');
+  if (schedulingRoute && features.scheduling !== true) {
+    const isEmployeeRoute = location.pathname === '/employee';
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC] p-6">
+        <section className="w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/50">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-2xl">📅</span>
+          <h1 className="mt-5 text-2xl font-black text-[#0B1220]">Scheduling is not included</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">This company has ZestIQ Basic, so labour tracking, employee schedules, shift swaps and time-off tools are unavailable. Inventory, recipes, purchasing, invoices, reporting and AI remain available.</p>
+          {isEmployeeRoute ? (
+            <button type="button" onClick={logout} className="mt-6 rounded-xl bg-[#0B1220] px-5 py-3 font-bold text-white">Sign out</button>
+          ) : (
+            <Link to="/app" className="mt-6 inline-flex rounded-xl bg-[#0B1220] px-5 py-3 font-bold text-white">Return to dashboard</Link>
+          )}
+        </section>
+      </main>
+    );
+  }
 
   if (user?.role === 'Staff' && location.pathname.startsWith('/app')) {
     return <Navigate to="/employee" replace />;

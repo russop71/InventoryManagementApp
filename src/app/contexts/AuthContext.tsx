@@ -171,7 +171,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accountName: payload.account.name,
       billingStatus: payload.account.billingStatus || 'not_configured',
       productAccess: payload.account.productAccess === true,
-      features: { scheduling: payload.account.features?.scheduling !== false },
+      // Optional modules are deny-by-default. An older or partially migrated
+      // account must never receive Scheduling unless the server explicitly
+      // grants it.
+      features: { scheduling: payload.account.features?.scheduling === true },
       onboarding: payload.account.onboarding || DEFAULT_ONBOARDING,
       locations: payload.locations,
       activeLocationId,

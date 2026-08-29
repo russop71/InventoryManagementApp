@@ -1209,6 +1209,7 @@ export default async function handler(req, res) {
             const role = req.body?.role === undefined ? target.role : String(req.body.role);
             const status = req.body?.status === undefined ? target.status : String(req.body.status);
             if (!name || !email || !/^\S+@\S+\.\S+$/.test(email) || !VALID_ROLES.has(role) || !VALID_STATUSES.has(status)) return json(res, 400, { error: 'Enter a valid name, email, role and status' });
+            if (role === 'Staff' && target.role !== 'Staff' && !schedulingEnabled(clientAccount)) return json(res, 409, { error: 'Employee-only accounts require the Labour & Scheduling module' });
             if (target.role === 'Owner' && (role !== 'Owner' || status !== 'Active')) {
               const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=id`);
               if (owners.length <= 1) return json(res, 409, { error: 'Every client account must keep at least one active owner' });
@@ -1438,6 +1439,7 @@ export default async function handler(req, res) {
         const email = String(req.body?.email || '').trim().toLowerCase();
         const role = String(req.body?.role || 'Staff');
         if (!name || !email || !VALID_ROLES.has(role)) return json(res, 400, { error: 'valid name, email and role are required' });
+        if (role === 'Staff' && !schedulingEnabled(account)) return json(res, 409, { error: 'Employee-only accounts require the Labour & Scheduling module' });
         const existing = await supabase(`app_users?email=eq.${encodeURIComponent(email)}&select=id`);
         if (existing.length) return json(res, 409, { error: 'That email already belongs to a user' });
         const redirectTo = `${appOrigin(req)}/reset-password`;
@@ -1476,6 +1478,7 @@ export default async function handler(req, res) {
         const role = req.body?.role === undefined ? target.role : String(req.body.role);
         const status = req.body?.status === undefined ? target.status : String(req.body.status);
         if (!name || !email || !VALID_ROLES.has(role) || !VALID_STATUSES.has(status)) return json(res, 400, { error: 'valid name, email, role and status are required' });
+        if (role === 'Staff' && target.role !== 'Staff' && !schedulingEnabled(account)) return json(res, 409, { error: 'Employee-only accounts require the Labour & Scheduling module' });
         if (target.role === 'Owner' && role !== 'Owner') {
           const owners = await supabase(`app_users?account_id=eq.${accountId}&role=eq.Owner&status=eq.Active&select=id`);
           if (owners.length <= 1) return json(res, 409, { error: 'Every company account must keep at least one active owner' });

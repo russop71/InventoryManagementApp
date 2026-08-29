@@ -40,18 +40,22 @@ function roleBadgeClass(role: CompanyUser['role']) {
   return 'bg-slate-100 text-slate-700';
 }
 
-const accessLevels: Array<{ role: CompanyUser['role']; title: string; detail: string }> = [
+const baseAccessLevels: Array<{ role: CompanyUser['role']; title: string; detail: string; schedulingDetail?: string }> = [
   { role: 'Owner', title: 'Owner', detail: 'Full company access, including users, billing, locations and all operational areas.' },
   { role: 'Admin', title: 'Admin', detail: 'Runs day-to-day operations, setup and reporting, without subscription ownership.' },
-  { role: 'Manager', title: 'Manager', detail: 'Works across restaurant operations, including inventory, purchasing, reports and scheduling.' },
-  { role: 'BOH Manager', title: 'BOH management', detail: 'Chef-focused operational access for food inventory, recipes, ordering, invoices and kitchen labour.' },
-  { role: 'FOH Manager', title: 'FOH management', detail: 'Front-of-house access for beverage operations, sales reporting and labour scheduling.' },
+  { role: 'Manager', title: 'Manager', detail: 'Works across inventory, recipes, purchasing, invoices and reports.', schedulingDetail: ' Also manages labour and schedules.' },
+  { role: 'BOH Manager', title: 'BOH management', detail: 'Chef-focused access for food inventory, recipes, ordering and invoices.', schedulingDetail: ' Also manages kitchen labour and schedules.' },
+  { role: 'FOH Manager', title: 'FOH management', detail: 'Front-of-house access for beverage operations and sales reporting.', schedulingDetail: ' Also manages front-of-house labour and schedules.' },
   { role: 'Staff', title: 'Employee', detail: 'ZestEmployee access only: personal schedule, shift swaps and time-off requests.' },
 ];
 
 export function Users() {
   const navigate = useNavigate();
-  const { user: currentUser, accountId, accountName } = useAuth();
+  const { user: currentUser, accountId, accountName, features } = useAuth();
+  const schedulingAvailable = features.scheduling === true;
+  const accessLevels = baseAccessLevels
+    .filter(level => schedulingAvailable || level.role !== 'Staff')
+    .map(level => ({ ...level, detail: `${level.detail}${schedulingAvailable ? level.schedulingDetail || '' : ''}` }));
   const isOwner = currentUser?.role === 'Owner';
   const isSuperAdmin = Boolean(currentUser?.platformAdmin);
   const [users, setUsers] = useState<CompanyUser[]>([]);
@@ -216,7 +220,8 @@ export function Users() {
                 </div>
                 <div>
                   <Label htmlFor="team-role">Access level</Label>
-                  <select id="team-role" name="role" defaultValue={selectedUser?.role || 'Staff'} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
+                  <select id="team-role" name="role" defaultValue={selectedUser?.role || (schedulingAvailable ? 'Staff' : 'Manager')} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
+                    {!schedulingAvailable && selectedUser?.role === 'Staff' && <option value="Staff">Employee · Scheduling unavailable</option>}
                     {accessLevels.map(level => <option key={level.role} value={level.role}>{level.title}</option>)}
                   </select>
                   <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs leading-5 text-slate-600">

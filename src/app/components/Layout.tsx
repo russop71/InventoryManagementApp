@@ -62,11 +62,11 @@ export function Layout() {
     {
       label: 'Team',
       items: [
-        ...(canManageLabor ? [{ label: 'Labour & Scheduling', path: '/app/labor' }] : [{ label: 'My schedule', path: '/employee' }]),
+        ...(canManageLabor ? [{ label: 'Labour & Scheduling', path: '/app/labor' }] : []),
         ...(user?.role === 'Owner' ? [{ label: 'Users & Usage', path: '/app/users' }] : []),
       ],
     },
-  ];
+  ].filter(group => group.items.length > 0);
 
   const handleLogout = () => {
     logout();

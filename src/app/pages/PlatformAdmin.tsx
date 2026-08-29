@@ -524,14 +524,14 @@ export function PlatformAdmin() {
 
               <div className="rounded-2xl border border-[#F5C10E] bg-[#FFFCED] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><p className="font-semibold text-slate-950">Labour &amp; Scheduling module</p><p className="mt-1 text-sm text-slate-600">Optional add-on: CAD $49.99/month. When off, Labour tools are hidden and unavailable to this client.</p></div>
+                  <div><p className="font-semibold text-slate-950">Client app access</p><p className="mt-1 text-sm text-slate-600">ZestIQ Basic keeps inventory, recipes, purchasing, invoices, reporting and AI. The CAD $49.99/month add-on unlocks labour tracking, manager scheduling and ZestEmployee across every location.</p></div>
                   <Badge className={selectedClient.onboarding?.clientProfile?.schedulingEnabled === true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}>{selectedClient.onboarding?.clientProfile?.schedulingEnabled === true ? 'Enabled' : 'Not included'}</Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" size="sm" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled === true} onClick={() => void saveSchedulingModule(true)} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Enable Scheduling +$49.99</Button>
-                  <Button type="button" size="sm" variant="outline" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled === false} onClick={() => void saveSchedulingModule(false)}>Turn off Scheduling</Button>
+                  <Button type="button" size="sm" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled === true} onClick={() => void saveSchedulingModule(true)} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Enable add-on +$49.99</Button>
+                  <Button type="button" size="sm" variant="outline" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled !== true} onClick={() => void saveSchedulingModule(false)}>Remove add-on</Button>
                 </div>
-                <p className="mt-3 text-xs text-slate-500">If a Stripe subscription already exists, update its add-on in Stripe before changing the amount billed.</p>
+                <p className="mt-3 text-xs text-slate-500">Access changes immediately for the client. If a Stripe subscription already exists, update its Scheduling line item in Stripe so billing matches access.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">

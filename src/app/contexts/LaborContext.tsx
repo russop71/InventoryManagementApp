@@ -203,12 +203,14 @@ function buildDemoLabor(): LaborData {
 }
 
 export function LaborProvider({ children }: { children: ReactNode }) {
-  const { accountId, activeLocationId, token, user } = useAuth();
+  const { accountId, activeLocationId, token, user, features } = useAuth();
+  const schedulingAvailable = features.scheduling === true;
   const [data, setData] = useState<LaborData>(EMPTY_LABOR);
   const [isLaborLoaded, setIsLaborLoaded] = useState(false);
   const storageKey = accountId && activeLocationId ? locationScopedStorageKey(accountId, activeLocationId, 'labor-v1') : null;
 
   const persist = (next: LaborData) => {
+    if (!schedulingAvailable) return;
     if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
     if (!token || !accountId || !activeLocationId) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor`, {
@@ -233,6 +235,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
   };
 
   const postLaborRequest = (payload: Record<string, unknown>) => {
+    if (!schedulingAvailable) return;
     if (!token || !accountId || !activeLocationId) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/requests`, {
       method: 'POST', body: JSON.stringify(payload),
@@ -240,6 +243,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
   };
 
   const patchLaborRequest = (payload: Record<string, unknown>) => {
+    if (!schedulingAvailable) return;
     if (!token || !accountId || !activeLocationId) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/requests`, {
       method: 'PATCH', body: JSON.stringify(payload),
@@ -271,7 +275,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (!accountId || !activeLocationId) {
+    if (!accountId || !activeLocationId || !schedulingAvailable) {
       setData(EMPTY_LABOR);
       setIsLaborLoaded(true);
       return;
@@ -297,7 +301,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => setData(local.employees.length > 0 ? local : demo))
       .finally(() => setIsLaborLoaded(true));
-  }, [accountId, activeLocationId, token, user?.email]);
+  }, [accountId, activeLocationId, token, user?.email, schedulingAvailable]);
 
   const value = useMemo<LaborContextValue>(() => ({
     ...data,
