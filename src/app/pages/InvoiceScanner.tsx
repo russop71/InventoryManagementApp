@@ -14,6 +14,8 @@ interface InvoiceItem {
   name: string;
   quantity: number;
   unit: string;
+  packSize?: number;
+  packCount?: number;
   unitCost: number;
   totalCost: number;
   category: string;
@@ -82,6 +84,8 @@ export function InvoiceScanner() {
               name: it.name || it.item || 'Item',
               quantity: Number(it.quantity) || 1,
               unit: it.unit || it.unit || 'ea',
+              packSize: Number(it.packSize) || Number(it.quantity) || 1,
+              packCount: Number(it.packCount) || 1,
               unitCost: Number(it.unitCost) || Number(it.price) || 0,
               totalCost: Number(it.totalCost) || (Number(it.quantity) || 1) * (Number(it.unitCost) || 0),
               category: it.category || 'Uncategorized'
@@ -315,7 +319,7 @@ export function InvoiceScanner() {
             <CardHeader>
               <CardTitle className="text-base">Review & Edit Items</CardTitle>
               <p className="text-xs text-gray-500 mt-1">
-                Verify extracted data before saving to inventory
+                Verify the package size, unit and total amount before saving. “Quantity added” is the total stock that will be added to inventory.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -356,6 +360,17 @@ export function InvoiceScanner() {
                         onChange={(e) => handleItemEdit(index, 'unit', e.target.value)}
                         className="mt-1"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-gray-600">Pack size</Label>
+                      <Input type="number" min="0" step="0.01" value={item.packSize ?? item.quantity} onChange={(e) => handleItemEdit(index, 'packSize', parseFloat(e.target.value) || 0)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600">Packages on invoice</Label>
+                      <Input type="number" min="1" step="1" value={item.packCount ?? 1} onChange={(e) => handleItemEdit(index, 'packCount', parseFloat(e.target.value) || 1)} className="mt-1" />
                     </div>
                   </div>
 
