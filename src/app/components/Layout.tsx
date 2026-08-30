@@ -151,7 +151,7 @@ export function Layout() {
       </aside>
 
       {/* ── White header ───────────────────────────────── */}
-      <header className="zestiq-app-topbar sticky top-0 z-40 border-b border-gray-100 bg-white shadow-sm lg:ml-[228px]">
+      <header className="zestiq-app-topbar sticky top-0 z-40 border-b border-gray-100 bg-white shadow-sm lg:ml-[204px]">
         <div className="flex items-center justify-between px-4 py-3">
 
           {/* LEFT — hamburger (3 dark lines) */}
@@ -306,7 +306,7 @@ export function Layout() {
       </header>
 
       {/* ── Content ──────────────────────────────────────── */}
-      <main className="zestiq-app-main min-w-0 overflow-x-clip px-3 py-4 sm:px-4 lg:ml-[228px] lg:px-6 lg:py-6">
+      <main className="zestiq-app-main min-w-0 overflow-x-clip px-3 py-4 sm:px-4 lg:ml-[204px] lg:px-5 lg:py-5">
         <Outlet />
       </main>
 

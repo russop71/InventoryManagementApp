@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound, Trash2 } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, Package, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound, Trash2 } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useState } from 'react';
 import {
@@ -468,31 +468,52 @@ export function Dashboard() {
         </div>
       </div>
 
-      <section className="dashboard-brief overflow-hidden rounded-3xl p-5 shadow-lg shadow-slate-900/10">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F5C10E]">Today at a glance</p>
-            <h1 className="mt-2 text-2xl font-black tracking-tight">Good morning, {firstName}.</h1>
-            <p className="mt-1 text-sm font-bold text-slate-900">{briefTitle}</p>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{briefSummary}</p>
+      <section className="dashboard-command-center">
+        <div className="dashboard-command-head">
+          <div>
+            <p className="dashboard-eyebrow">{briefTitle}</p>
+            <h1>Good morning, {firstName}.</h1>
+            <p>{briefSummary}</p>
           </div>
-          <Badge className="border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700">{user?.role || 'Team member'}</Badge>
+          <Badge className="dashboard-role-badge">{user?.role || 'Team member'}</Badge>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {isBohManager ? <>
-            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
-            <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
-            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} waiting to be received</p></Link>
-          </> : isFohManager ? <>
-            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Sales</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todaysRevenue.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">{todaysCovers} covers · ${todaysAvgCheck.toFixed(0)} average check</p></Link>
-            {canManageLabor ? <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · view schedule</p></Link> : <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? 'Items need attention' : 'No critical items'}</p></Link>}
-            <Link to="/app/beverages" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Bar & beverage</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${beverageCogs.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">Beverage COGS in the selected period</p></Link>
-          </> : <>
-            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
-            {canManageLabor ? <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link> : <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? 'Items need attention' : 'No critical items'}</p></Link>}
-            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
-          </>}
-          <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F5C10E]" /></div><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
+
+        <div className="dashboard-kpi-grid">
+          <Link to="/app/cogs" className="dashboard-kpi-card">
+            <span>Live food cost</span><strong>{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</strong><small>Target 30% · {cogsPercent > 30 ? 'above target' : 'on track'}</small>
+          </Link>
+          <Link to="/app/inventory" className="dashboard-kpi-card">
+            <span>Inventory value</span><strong>${totalInventoryValue.toLocaleString('en-CA', { maximumFractionDigits: 0 })}</strong><small>{totalInventoryCount} active items</small>
+          </Link>
+          <Link to="/app/inventory" className="dashboard-kpi-card">
+            <span>Low stock alerts</span><strong>{lowStockItems.length}</strong><small>{lowStockItems.length ? 'Needs attention today' : 'All stock is healthy'}</small>
+          </Link>
+          <Link to="/app/waste" className="dashboard-kpi-card">
+            <span>Waste today</span><strong>${todayWaste.toFixed(2)}</strong><small>Track loss and variance</small>
+          </Link>
+        </div>
+
+        <div className="dashboard-command-grid">
+          <div className="dashboard-cost-chart">
+            <div className="dashboard-section-title"><div><span>Food cost vs target</span><small>{salesRangeLabel} performance</small></div><Link to="/app/cogs">Open report <ChevronRight className="h-4 w-4" /></Link></div>
+            <div className="h-[230px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={salesChartData} margin={{ top: 18, right: 12, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="4 5" stroke="#E3E7EC" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#7B8797' }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={(value) => `$${Math.round(value)}`} tick={{ fontSize: 10, fill: '#7B8797' }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(value: number) => [`$${value.toLocaleString('en-CA')}`, 'Revenue']} />
+                  <Line type="monotone" dataKey="revenue" stroke="#C89B2C" strokeWidth={3} dot={{ r: 3, fill: '#C89B2C', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <aside className="dashboard-attention">
+            <div className="dashboard-section-title"><div><span>Needs attention</span><small>Operational alerts</small></div><AlertTriangle className="h-5 w-5 text-[#C89B2C]" /></div>
+            <Link to="/app/inventory" className="dashboard-alert-row"><span className="dashboard-alert-icon"><Package className="h-4 w-4" /></span><div><strong>{lowStockItems.length} low-stock item{lowStockItems.length === 1 ? '' : 's'}</strong><small>{lowStockItems[0]?.name || 'Inventory levels are healthy'}</small></div><ChevronRight className="h-4 w-4" /></Link>
+            <Link to="/app/orders" className="dashboard-alert-row"><span className="dashboard-alert-icon"><ShoppingCart className="h-4 w-4" /></span><div><strong>{pendingOrdersCount} pending order{pendingOrdersCount === 1 ? '' : 's'}</strong><small>${pendingOrdersValue.toFixed(0)} waiting to be received</small></div><ChevronRight className="h-4 w-4" /></Link>
+            {canManageLabor && <Link to="/app/labor" className="dashboard-alert-row"><span className="dashboard-alert-icon"><UsersRound className="h-4 w-4" /></span><div><strong>{scheduledLaborPercent.toFixed(1)}% scheduled labour</strong><small>Target {targetLaborPercent}% · {employees.filter(item => item.active).length} active team</small></div><ChevronRight className="h-4 w-4" /></Link>}
+          </aside>
         </div>
       </section>
 

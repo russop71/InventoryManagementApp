@@ -218,20 +218,20 @@
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 50;
-  width: 228px;
+  width: 204px;
   flex-direction: column;
-  padding: 22px 16px 18px;
+  padding: 18px 13px 16px;
   color: #fff;
   background: linear-gradient(165deg, rgba(216, 184, 91, .12), transparent 34%), #202a3b;
   border-right: 1px solid rgba(255,255,255,.08);
   box-shadow: 12px 0 38px rgba(29, 35, 42, .12);
 }
 .zestiq-sidebar-brand { display: inline-flex; align-items: center; min-height: 42px; padding: 0 6px; }
-.zestiq-sidebar-account { display: flex; align-items: center; gap: 10px; margin: 24px 0 18px; padding: 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: rgba(255,255,255,.055); }
+.zestiq-sidebar-account { display: flex; align-items: center; gap: 9px; margin: 18px 0 16px; padding: 10px; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: rgba(255,255,255,.055); }
 .zestiq-sidebar-avatar { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: #d8b85b; color: #202a3b; font-size: 13px; font-weight: 900; }
 .zestiq-sidebar-nav { flex: 1; }
 .zestiq-sidebar-label { margin: 0 10px 7px; color: rgba(255,255,255,.34); font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
-.zestiq-sidebar-link { display: flex; align-items: center; gap: 10px; min-height: 38px; margin: 2px 0; padding: 0 11px; border-radius: 10px; color: rgba(255,255,255,.66); font-size: 12px; font-weight: 650; text-align: left; transition: .18s ease; }
+.zestiq-sidebar-link { display: flex; align-items: center; gap: 9px; min-height: 35px; margin: 2px 0; padding: 0 10px; border-radius: 9px; color: rgba(255,255,255,.66); font-size: 11px; font-weight: 650; text-align: left; transition: .18s ease; }
 .zestiq-sidebar-link:hover { color: #fff; background: rgba(255,255,255,.07); }
 .zestiq-sidebar-link.is-active { color: #fff; background: linear-gradient(90deg, #3a5269, #32465c); box-shadow: inset 3px 0 #d8b85b, 0 6px 14px rgba(0,0,0,.12); }
 .zestiq-app-topbar { min-height: 62px; }
@@ -243,6 +243,33 @@
 .zestiq-dashboard .dashboard-brief a.rounded-2xl .text-slate-300 { color: #64748b !important; }
 .zestiq-dashboard .dashboard-panel { border: 1px solid rgba(53, 65, 80, .1) !important; box-shadow: 0 10px 28px rgba(37, 43, 46, .065) !important; }
 
+.dashboard-command-center { padding: 22px; border: 1px solid #dfe4e9; border-radius: 18px; background: #fff; box-shadow: 0 14px 38px rgba(31, 41, 55, .07); }
+.dashboard-command-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.dashboard-command-head h1 { margin-top: 4px; color: #142033; font-size: clamp(23px, 2vw, 31px); font-weight: 850; letter-spacing: -.035em; }
+.dashboard-command-head > div > p:last-child { margin-top: 4px; color: #728095; font-size: 12px; }
+.dashboard-eyebrow { color: #af8421; font-size: 9px; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }
+.dashboard-role-badge { border: 1px solid #dde3e8 !important; background: #f7f8f9 !important; color: #506075 !important; }
+.dashboard-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-top: 20px; }
+.dashboard-kpi-card { min-width: 0; padding: 15px 16px; border: 1px solid #e4e8ec; border-radius: 13px; background: #fbfbf9; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.dashboard-kpi-card:hover { transform: translateY(-2px); border-color: #d1b464; box-shadow: 0 10px 22px rgba(32,42,59,.07); }
+.dashboard-kpi-card span { display: block; color: #718095; font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.dashboard-kpi-card strong { display: block; margin-top: 7px; color: #172236; font-size: 25px; font-weight: 850; line-height: 1; }
+.dashboard-kpi-card small { display: block; margin-top: 7px; overflow: hidden; color: #8a95a4; font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-command-grid { display: grid; grid-template-columns: minmax(0,1.75fr) minmax(290px,.75fr); gap: 14px; margin-top: 14px; }
+.dashboard-cost-chart, .dashboard-attention { min-width: 0; overflow: hidden; border: 1px solid #e4e8ec; border-radius: 14px; background: #fbfbfa; }
+.dashboard-cost-chart { padding: 16px 15px 6px; }
+.dashboard-attention { padding: 16px; }
+.dashboard-section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dashboard-section-title > div > span { display: block; color: #172236; font-size: 13px; font-weight: 800; }
+.dashboard-section-title small { display: block; margin-top: 2px; color: #8a95a4; font-size: 10px; }
+.dashboard-section-title > a { display: inline-flex; align-items: center; color: #9b7420; font-size: 10px; font-weight: 800; }
+.dashboard-alert-row { display: grid; grid-template-columns: 34px minmax(0,1fr) 16px; align-items: center; gap: 10px; margin-top: 10px; padding: 11px; border: 1px solid #e5e8eb; border-radius: 11px; background: #fff; }
+.dashboard-alert-row:hover { border-color: #d6ba6b; }
+.dashboard-alert-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; background: #f5ead0; color: #98731f; }
+.dashboard-alert-row strong { display: block; color: #1a2639; font-size: 11px; }
+.dashboard-alert-row small { display: block; margin-top: 2px; overflow: hidden; color: #8a95a4; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-alert-row > svg { color: #9ba5b2; }
+
 @media (min-width: 1024px) {
   .zestiq-app-shell { padding-bottom: 0 !important; }
   .zestiq-app-main { min-height: calc(100vh - 62px); }
@@ -251,6 +278,20 @@
   .zestiq-app-shell main > div { max-width: 1380px; margin-inline: auto; }
   .zestiq-dashboard { max-width: 1380px; }
   .zestiq-dashboard > * + * { margin-top: 16px; }
+}
+
+@media (max-width: 900px) {
+  .dashboard-kpi-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .dashboard-command-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .dashboard-command-center { padding: 16px; }
+  .dashboard-command-head { display: block; }
+  .dashboard-role-badge { margin-top: 12px; }
+  .dashboard-kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dashboard-kpi-card { padding: 12px; }
+  .dashboard-kpi-card strong { font-size: 21px; }
 }
 
 .zestiq-employee-shell {
