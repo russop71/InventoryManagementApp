@@ -10,7 +10,11 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const requestedReturnTo = new URLSearchParams(location.search).get('returnTo');
-  const returnTo = requestedReturnTo === '/employee' ? '/employee' : '/app';
+  const returnTo = requestedReturnTo === '/employee'
+    ? '/employee'
+    : requestedReturnTo === '/orders'
+      ? '/orders'
+      : '/app';
   const [name, setName]           = useState('');
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail]         = useState('');

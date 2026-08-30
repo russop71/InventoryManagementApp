@@ -22,6 +22,22 @@ export function AuthLayout() {
 
   if (mfaRequired) return <Navigate to="/mfa" replace />;
 
+  if (user?.role === 'Staff' && location.pathname.startsWith('/app')) {
+    return <Navigate to="/employee" replace />;
+  }
+
+  if (user?.role === 'Staff' && location.pathname.startsWith('/orders')) {
+    return <Navigate to="/employee" replace />;
+  }
+
+  if (user?.role === 'Ordering' && !location.pathname.startsWith('/orders')) {
+    return <Navigate to="/orders" replace />;
+  }
+
+  if (user?.role !== 'Ordering' && location.pathname.startsWith('/orders')) {
+    return <Navigate to="/app/orders" replace />;
+  }
+
   const schedulingRoute = location.pathname === '/employee' || location.pathname.startsWith('/app/labor');
   if (schedulingRoute && features.scheduling !== true) {
     const isEmployeeRoute = location.pathname === '/employee';
@@ -39,10 +55,6 @@ export function AuthLayout() {
         </section>
       </main>
     );
-  }
-
-  if (user?.role === 'Staff' && location.pathname.startsWith('/app')) {
-    return <Navigate to="/employee" replace />;
   }
 
   if (!productAccess) {

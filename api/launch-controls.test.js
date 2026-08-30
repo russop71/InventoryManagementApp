@@ -13,6 +13,7 @@ test('manager permissions do not give staff access to company operations', () =>
   assert.equal(canManageOperations('Manager'), true);
   assert.equal(canManageOperations('BOH Manager'), true);
   assert.equal(canManageOperations('FOH Manager'), true);
+  assert.equal(canManageOperations('Ordering'), false);
   assert.equal(canManageOperations('Staff'), false);
   assert.equal(canAdministerAccount('Admin'), true);
   assert.equal(canAdministerAccount('Manager'), false);

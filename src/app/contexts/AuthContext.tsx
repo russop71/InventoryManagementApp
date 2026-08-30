@@ -3,7 +3,7 @@ import { apiRequest } from '../utils/api';
 import { clearAllAccountScopedData } from '../utils/storageScope';
 import { clearDemoSessionReset } from '../utils/demoSession.js';
 
-export type UserRole = 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Staff';
+export type UserRole = 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Ordering' | 'Staff';
 
 export interface AccountLocation {
   id: string;

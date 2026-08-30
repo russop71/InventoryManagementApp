@@ -89,6 +89,7 @@ export function Orders() {
   const { orders, inventory, forecasts, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
   const { salesData } = useToast();
   const { accountId, accountName, user } = useAuth();
+  const orderingOnly = user?.role === 'Ordering';
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
   // Keep the selected order itself. Some imported/demo orders can be refreshed
@@ -564,14 +565,14 @@ export function Orders() {
           </div>
           <div className="flex items-center gap-2 mt-1">
             <button
-              onClick={() => navigate('/app/forecasting')}
+              onClick={() => navigate(orderingOnly ? '/orders/ai' : '/app/forecasting')}
               className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"
             >
               <TrendingUp className="w-4 h-4" />
               Forecasting
             </button>
             <button
-              onClick={() => navigate('/app/ai-orders')}
+              onClick={() => navigate(orderingOnly ? '/orders/ai' : '/app/ai-orders')}
               className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"
             >
               <Sparkles className="w-4 h-4" />

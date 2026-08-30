@@ -21,7 +21,7 @@ interface CompanyUser {
   id: string;
   name: string;
   email: string;
-  role: 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Staff';
+  role: 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Ordering' | 'Staff';
   status: 'Active' | 'Inactive';
   lastLogin: string;
   usage?: UserUsage;
@@ -36,6 +36,7 @@ function formatDate(value: string | null | undefined) {
 function roleBadgeClass(role: CompanyUser['role']) {
   if (role === 'Owner') return 'bg-[#0F172A] text-white';
   if (role === 'Admin') return 'bg-red-100 text-red-800';
+  if (role === 'Ordering') return 'bg-sky-100 text-sky-800';
   if (role === 'Manager' || role === 'BOH Manager' || role === 'FOH Manager') return 'bg-[#FEF9C3] text-[#1E3A5F]';
   return 'bg-slate-100 text-slate-700';
 }
@@ -46,6 +47,7 @@ const baseAccessLevels: Array<{ role: CompanyUser['role']; title: string; detail
   { role: 'Manager', title: 'Manager', detail: 'Works across inventory, recipes, purchasing, invoices and reports.', schedulingDetail: ' Also manages labour and schedules.' },
   { role: 'BOH Manager', title: 'BOH management', detail: 'Chef-focused access for food inventory, recipes, ordering and invoices.', schedulingDetail: ' Also manages kitchen labour and schedules.' },
   { role: 'FOH Manager', title: 'FOH management', detail: 'Front-of-house access for beverage operations and sales reporting.', schedulingDetail: ' Also manages front-of-house labour and schedules.' },
+  { role: 'Ordering', title: 'Ordering only', detail: 'ZestOrders access only: review stock, create supplier orders, track deliveries and receive orders into shared inventory.' },
   { role: 'Staff', title: 'Employee', detail: 'ZestEmployee access only: personal schedule, shift swaps and time-off requests.' },
 ];
 

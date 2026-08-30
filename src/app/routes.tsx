@@ -39,6 +39,7 @@ import { MultiLocationSeo, PosIntegrationsSeo, RestaurantBeverageSeo, Restaurant
 import { CanadianOwnedPage, CapabilitiesPage, PricingPage, ProductTourPage, PublicContactPage } from "./pages/PublicMarketingPages";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
+import { OrdersAppLayout } from "./components/OrdersAppLayout";
 
 export const router = createBrowserRouter([
   {
@@ -141,6 +142,19 @@ export const router = createBrowserRouter([
     path: "/employee",
     Component: AuthLayout,
     children: [{ index: true, Component: EmployeeApp }],
+  },
+  {
+    path: "/orders",
+    Component: AuthLayout,
+    children: [
+      {
+        Component: OrdersAppLayout,
+        children: [
+          { index: true, Component: Orders },
+          { path: "ai", Component: AIOrders },
+        ],
+      },
+    ],
   },
   {
     path: "/app",

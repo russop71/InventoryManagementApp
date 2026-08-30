@@ -11,7 +11,7 @@ const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPAB
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const VALID_ROLES = new Set(['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager', 'Staff']);
+const VALID_ROLES = new Set(['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager', 'Ordering', 'Staff']);
 const VALID_STATUSES = new Set(['Active', 'Inactive']);
 const ONBOARDING_STEPS = ['restaurant', 'location', 'suppliers', 'inventory', 'recipes', 'count'];
 const ONBOARDING_STATUSES = new Set(['not_started', 'in_progress', 'completed', 'dismissed']);
@@ -511,6 +511,27 @@ function mapLocationData(row) {
     integrations: row?.integrations || base.integrations,
     version: row?.updated_at || null,
   };
+}
+
+function mapOrderingData(row) {
+  const data = mapLocationData(row);
+  return {
+    ...defaultLocationData(),
+    inventory: data.inventory,
+    orders: data.orders,
+    invoices: data.invoices,
+    suppliers: data.suppliers,
+    forecasts: data.forecasts,
+    integrations: { toast: data.integrations?.toast || defaultToast() },
+    version: data.version,
+  };
+}
+
+export function orderingOnlyRouteAllowed(segments, method) {
+  return (segments[2] === 'usage' && method === 'POST')
+    || (segments[2] === 'locations' && segments.length === 3 && method === 'GET')
+    || (segments[2] === 'locations' && segments[4] === 'data' && segments.length === 5 && ['GET', 'PUT'].includes(method))
+    || (segments[2] === 'locations' && segments[4] === 'integrations' && segments[5] === 'toast' && segments.length === 6 && method === 'GET');
 }
 
 function stripeDate(value) {
@@ -1313,6 +1334,10 @@ export default async function handler(req, res) {
       });
     }
 
+    if (access.appUser.role === 'Ordering' && !orderingOnlyRouteAllowed(segments, method)) {
+      return json(res, 403, { error: 'ZestOrders users can only access ordering, receiving and the shared stock required for those workflows.' });
+    }
+
     if (segments.length === 2 && method === 'DELETE') {
       const members = await supabase(`app_users?account_id=eq.${accountId}&select=auth_user_id`);
       for (const member of members) {
@@ -1879,9 +1904,10 @@ export default async function handler(req, res) {
       if (segments[4] === 'data') {
         const rows = await supabase(`location_data?location_id=eq.${locationId}&select=*`);
         const current = rows?.[0] || { location_id: locationId };
-        if (method === 'GET') return json(res, 200, mapLocationData(current));
+        const orderingOnly = access.appUser.role === 'Ordering';
+        if (method === 'GET') return json(res, 200, orderingOnly ? mapOrderingData(current) : mapLocationData(current));
         if (method === 'PUT') {
-          if (!canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to change restaurant data' });
+          if (!orderingOnly && !canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to change restaurant data' });
           const body = req.body || {};
           const expectedVersion = typeof body.version === 'string' ? body.version : '';
           const currentVersion = String(current.updated_at || '');
@@ -1896,14 +1922,14 @@ export default async function handler(req, res) {
           const updatedAt = new Date().toISOString();
           const next = {
             inventory: Array.isArray(body.inventory) ? body.inventory : (current.inventory || []),
-            recipes: Array.isArray(body.recipes) ? body.recipes : (current.recipes || []),
-            storage_areas: Array.isArray(body.storageAreas) ? body.storageAreas : (current.storage_areas || []),
+            recipes: orderingOnly ? (current.recipes || []) : (Array.isArray(body.recipes) ? body.recipes : (current.recipes || [])),
+            storage_areas: orderingOnly ? (current.storage_areas || []) : (Array.isArray(body.storageAreas) ? body.storageAreas : (current.storage_areas || [])),
             orders: Array.isArray(body.orders) ? body.orders : (current.orders || []),
             invoices: nextInvoices,
-            suppliers: Array.isArray(body.suppliers) ? body.suppliers : (current.suppliers || []),
-            prepped_recipes: Array.isArray(body.preppedRecipes) ? body.preppedRecipes : (current.prepped_recipes || []),
-            forecasts: Array.isArray(body.forecasts) ? body.forecasts : (current.forecasts || []),
-            inventory_counts: nextCounts,
+            suppliers: orderingOnly ? (current.suppliers || []) : (Array.isArray(body.suppliers) ? body.suppliers : (current.suppliers || [])),
+            prepped_recipes: orderingOnly ? (current.prepped_recipes || []) : (Array.isArray(body.preppedRecipes) ? body.preppedRecipes : (current.prepped_recipes || [])),
+            forecasts: orderingOnly ? (current.forecasts || []) : (Array.isArray(body.forecasts) ? body.forecasts : (current.forecasts || [])),
+            inventory_counts: orderingOnly ? (current.inventory_counts || []) : nextCounts,
             integrations: {
               ...(current.integrations || { toast: defaultToast() }),
               ...(isDemoAccount(account) && typeof body.demoDataVersion === 'string'
@@ -1915,7 +1941,7 @@ export default async function handler(req, res) {
           const saved = await supabase(`location_data?location_id=eq.${locationId}&updated_at=eq.${encodeURIComponent(expectedVersion)}&select=*`, { method: 'PATCH', prefer: 'return=representation', body: next });
           if (!saved?.length) return json(res, 409, { error: 'Another user saved changes first. Reload and review the latest data.', code: 'VERSION_CONFLICT' });
           await supabase('app_usage_events', { method: 'POST', prefer: 'return=minimal', body: { account_id: accountId, user_id: access.appUser.id, event_name: 'location_data_saved', path: '/app', metadata: { location_id: locationId, from_version: expectedVersion, to_version: updatedAt } } }).catch(() => {});
-          return json(res, 200, mapLocationData(saved[0]));
+          return json(res, 200, orderingOnly ? mapOrderingData(saved[0]) : mapLocationData(saved[0]));
         }
       }
 

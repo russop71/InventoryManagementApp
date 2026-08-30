@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { accountSlugFromEmail, findDuplicateInvoiceNumber, identifierFilter, isPlatformAdmin, summarizeUsage } from './[...path].js';
+import { accountSlugFromEmail, findDuplicateInvoiceNumber, identifierFilter, isPlatformAdmin, orderingOnlyRouteAllowed, summarizeUsage } from './[...path].js';
 
 test('identifierFilter uses UUID columns for canonical database IDs', () => {
   const accountId = 'b74c80db-0c0b-4fc0-8a89-b5d2cbd808f5';
@@ -53,4 +53,16 @@ test('summarizeUsage reports activity and the most-used app area per user', () =
     topArea: 'inventory',
   });
   assert.deepEqual(usage.staff, { eventCount: 0, lastActive: null, topArea: null });
+});
+
+test('ordering-only users can reach order workflows but not account administration', () => {
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations'], 'GET'), true);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations', 'main', 'data'], 'GET'), true);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations', 'main', 'data'], 'PUT'), true);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations', 'main', 'integrations', 'toast'], 'GET'), true);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'usage'], 'POST'), true);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'users'], 'GET'), false);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'billing'], 'GET'), false);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations', 'main', 'labor'], 'GET'), false);
+  assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations', 'main', 'integrations', 'toast'], 'PUT'), false);
 });
