@@ -67,7 +67,7 @@ export function EmployeeApp() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] pb-24 text-[#0B1220]">
+    <div className="zestiq-employee-shell min-h-screen bg-[#F4F5F7] pb-24 text-[#0B1220]">
       <header className="bg-[#0B1220] px-5 pb-7 pt-5 text-white">
         <div className="mx-auto max-w-3xl">
           <div className="flex items-center justify-between"><Link to="/employee" className="flex items-center gap-2 text-xl font-black"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#F5C10E] text-[#0B1220]">Z</span>Zest<span className="text-[#F5C10E]">Employee</span></Link><button aria-label="Sign out" onClick={signOut} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><LogOut className="h-4 w-4" /></button></div>

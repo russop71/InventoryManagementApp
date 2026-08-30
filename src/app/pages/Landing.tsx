@@ -311,8 +311,8 @@ export function Landing() {
     path: '/',
   });
   return (
-    <div className="min-h-screen bg-[#FBFAF6] text-[#0B1220]">
-      <header className="sticky top-0 z-40 border-b border-black/5 bg-[#FBFAF6]/90 backdrop-blur-xl">
+    <div className="zestiq-public min-h-screen bg-[#FBFAF6] text-[#0B1220]">
+      <header className="public-header sticky top-0 z-40 border-b border-black/5 bg-[#FBFAF6]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
           <ZestIQBrand compact className="shrink-0" />
           <nav className="hidden items-center gap-6 whitespace-nowrap text-sm font-bold xl:flex">
@@ -341,7 +341,7 @@ export function Landing() {
       </header>
 
       <main>
-        <section className="bg-[#0B1220] text-white">
+        <section className="public-hero bg-[#0B1220] text-white">
           <div className="mx-auto grid max-w-7xl gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:py-28">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[.18em] text-white/70">
@@ -354,7 +354,7 @@ export function Landing() {
                 ZestIQ is AI-powered restaurant inventory management software for food and beverage cost, labour, purchasing and forecasting—so operators can protect margin without living in spreadsheets.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link to={DEMO_URL} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-7 font-black text-[#0B1220]">
+                <Link to={DEMO_URL} className="public-button-gold inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-7 font-black text-[#0B1220]">
                   Book a demo <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link to="/capabilities" className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-7 font-bold">See every capability</Link>
@@ -369,7 +369,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="border-y border-black/10 bg-[#F5C10E]">
+        <section className="public-highlight-strip border-y border-black/10 bg-[#F5C10E]">
           <div className="mx-auto grid max-w-7xl gap-px bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
             {[
               [FileScan, 'Capture faster', 'Invoices, PDFs and handwritten recipes'],
@@ -377,7 +377,7 @@ export function Landing() {
               [TrendingDown, 'Protect margin', 'Current costs, variance and forecasting'],
               [LockKeyhole, 'Stay separated', 'One protected workspace per company'],
             ].map(([Icon, title, text]: any) => (
-              <div key={title} className="flex gap-3 bg-[#F5C10E] px-6 py-6">
+              <div key={title} className="flex gap-3 bg-transparent px-6 py-6">
                 <Icon className="mt-0.5 h-6 w-6 shrink-0" />
                 <div>
                   <p className="font-black">{title}</p>
@@ -392,13 +392,13 @@ export function Landing() {
         <LiveProductTour />
         <PhoneShowcase />
 
-        <section id="platform" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+        <section id="platform" className="public-cream-section mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
           <p className="text-sm font-black uppercase tracking-[.2em] text-[#9A7600]">The platform</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-black tracking-[-.035em] sm:text-5xl">Restaurant control without the operational clutter.</h2>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60">Every feature answers a practical question: What do we have? What did it cost? What changed? What should we buy next?</p>
           <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {features.map(([Icon, title, text]: any) => (
-              <article key={title} className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+              <article key={title} className="public-card rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#FFF2B5]"><Icon className="h-5 w-5" /></div>
                 <h3 className="mt-5 text-xl font-black">{title}</h3>
                 <p className="mt-2 leading-7 text-black/55">{text}</p>
@@ -407,7 +407,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="overflow-hidden bg-[#0B1220] text-white">
+        <section className="public-dark-section overflow-hidden bg-[#0B1220] text-white">
           <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2 lg:items-center lg:py-28">
             <div>
               <p className="text-sm font-black uppercase tracking-[.2em] text-[#F5C10E]">Built-in AI</p>
@@ -455,7 +455,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section id="capabilities" className="bg-white">
+        <section id="capabilities" className="public-paper-section bg-white">
           <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
             <div className="max-w-3xl">
               <p className="text-sm font-black uppercase tracking-[.2em] text-[#9A7600]">Capabilities</p>
@@ -466,7 +466,7 @@ export function Landing() {
               {capabilityGroups.map(group => {
                 const Icon = group.icon;
                 return (
-                  <article key={group.title} className="rounded-3xl border border-black/10 bg-[#FBFAF6] p-7">
+                  <article key={group.title} className="public-card rounded-3xl border border-black/10 bg-[#FBFAF6] p-7">
                     <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#0B1220] text-[#F5C10E]"><Icon className="h-6 w-6" /></div>
                     <h3 className="mt-5 text-2xl font-black">{group.title}</h3>
                     <p className="mt-2 leading-7 text-black/55">{group.description}</p>
@@ -498,7 +498,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section id="how" className="bg-[#F5C10E]">
+        <section id="how" className="public-gold-section bg-[#F5C10E]">
           <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8">
             <p className="text-sm font-black uppercase tracking-[.2em] text-black/45">How it works</p>
             <h2 className="mt-3 max-w-3xl text-4xl font-black sm:text-5xl">From count to decision, without the spreadsheet relay race.</h2>
@@ -518,8 +518,8 @@ export function Landing() {
           </div>
         </section>
 
-        <section id="pricing" className="bg-white px-5 py-20 sm:px-8">
-          <div className="mx-auto grid max-w-5xl gap-8 rounded-[36px] border border-black/10 bg-[#FBFAF6] p-7 shadow-sm md:grid-cols-[1fr_.8fr] md:items-center md:p-12">
+        <section id="pricing" className="public-paper-section bg-white px-5 py-20 sm:px-8">
+          <div className="public-card mx-auto grid max-w-5xl gap-8 rounded-[36px] border border-black/10 bg-[#FBFAF6] p-7 shadow-sm md:grid-cols-[1fr_.8fr] md:items-center md:p-12">
             <div>
               <p className="text-sm font-black uppercase tracking-[.2em] text-black/45">Simple pricing</p>
               <h2 className="mt-3 text-4xl font-black sm:text-5xl">ZestIQ Basic</h2>
@@ -558,7 +558,7 @@ export function Landing() {
         </section>
       </main>
 
-      <footer className="overflow-hidden bg-[#0B1220] text-white">
+      <footer className="public-footer overflow-hidden bg-[#0B1220] text-white">
         <div className="mx-auto max-w-7xl px-5 pb-8 pt-14 sm:px-8 sm:pt-20">
           <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><ZestIQBrand className="text-white" /><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
           <nav aria-label="Footer" className="grid gap-9 py-12 sm:grid-cols-2 lg:grid-cols-5">

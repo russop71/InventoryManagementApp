@@ -28,9 +28,9 @@ export function BookDemo() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F4F1E9] px-4 py-4 text-[#0B1220] sm:px-7 sm:py-7">
+    <main className="zestiq-public min-h-screen bg-[#F4F1E9] px-4 py-4 text-[#0B1220] sm:px-7 sm:py-7">
       <div className="mx-auto grid max-w-[1440px] gap-3 lg:min-h-[calc(100vh-3.5rem)] lg:grid-cols-[0.98fr_1.02fr]">
-        <section className="rounded-[28px] bg-white p-6 shadow-sm sm:p-10 lg:p-12">
+        <section className="public-card rounded-[28px] bg-white p-6 shadow-sm sm:p-10 lg:p-12">
           <Link to="/" className="inline-flex items-center gap-2 text-sm font-black underline decoration-1 underline-offset-4"><ArrowLeft className="h-4 w-4" />Back to the website</Link>
           <div className="mt-10 flex items-center gap-2 text-2xl font-black tracking-tight"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#F5C10E]">Z</span><span>zest<span className="text-[#D9A900]">IQ</span></span></div>
           <h1 className="mt-7 text-4xl font-black leading-[0.98] tracking-[-0.04em] sm:text-5xl">See ZestIQ in action.</h1>
@@ -51,7 +51,7 @@ export function BookDemo() {
         </section>
 
         <section className="flex flex-col gap-3">
-          <div className="relative flex min-h-[520px] flex-1 overflow-hidden rounded-[28px] bg-[#F5C10E] p-7 sm:p-10 lg:p-12">
+          <div className="public-gold-section relative flex min-h-[520px] flex-1 overflow-hidden rounded-[28px] bg-[#D8B85B] p-7 sm:p-10 lg:p-12">
             <div className="relative z-10 flex w-full flex-col">
               <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white/50 px-3 py-2 text-xs font-black uppercase tracking-[0.16em]"><Sparkles className="h-4 w-4" />Built for restaurant operators</div>
               <h2 className="mt-7 max-w-2xl text-4xl font-black leading-[0.98] tracking-[-0.04em] sm:text-5xl xl:text-6xl">A clearer operation starts with one useful conversation.</h2>
@@ -82,4 +82,4 @@ export function BookDemo() {
 
 function Field({ label, name, type = 'text', autoComplete }: { label: string; name: string; type?: string; autoComplete: string }) { return <label className="block"><span className="text-xs font-black text-slate-700">{label} <span className="text-red-500">*</span></span><input required className={fieldClass} name={name} type={type} autoComplete={autoComplete} /></label>; }
 function SelectField({ label, name, options }: { label: string; name: string; options: string[] }) { return <label className="block"><span className="text-xs font-black text-slate-700">{label} <span className="text-red-500">*</span></span><select required className={fieldClass} name={name} defaultValue=""><option value="" disabled>Please select</option>{options.map(option => <option value={option} key={option}>{option}</option>)}</select></label>; }
-function DemoBenefit({ icon: Icon, title, text }: { icon: typeof Check; title: string; text: string }) { return <div className="rounded-[22px] bg-white p-5 shadow-sm"><Icon className="h-5 w-5 text-[#B58B00]" /><p className="mt-3 font-black">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></div>; }
+function DemoBenefit({ icon: Icon, title, text }: { icon: typeof Check; title: string; text: string }) { return <div className="public-card rounded-[22px] bg-white p-5 shadow-sm"><Icon className="h-5 w-5 text-[#B58B00]" /><p className="mt-3 font-black">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></div>; }

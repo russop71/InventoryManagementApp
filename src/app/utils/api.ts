@@ -9,7 +9,7 @@ interface StoredSession {
   activeLocationId?: string;
 }
 
-function buildUrl(path: string) {
+export function buildApiUrl(path: string) {
   if (!API_BASE) return path;
   return `${API_BASE}${path}`;
 }
@@ -40,7 +40,7 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit | undefined, allowRefresh: boolean): Promise<T> {
   const session = readSession();
-  const response = await fetch(buildUrl(path), {
+  const response = await fetch(buildApiUrl(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ async function request<T>(path: string, init: RequestInit | undefined, allowRefr
   });
 
   if (response.status === 401 && allowRefresh && session?.refreshToken && path !== '/api/v1/auth/refresh') {
-    const refreshResponse = await fetch(buildUrl('/api/v1/auth/refresh'), {
+    const refreshResponse = await fetch(buildApiUrl('/api/v1/auth/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: session.refreshToken }),

@@ -9,6 +9,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
+import { Capacitor } from '@capacitor/core';
 
 type BillingPlan = 'monthly';
 
@@ -86,6 +87,7 @@ function billingAttentionMessage(status: string) {
 }
 
 export function PaymentMethod() {
+  const isNativeApp = Capacitor.isNativePlatform();
   const { user, accountId, accountName, locations, productAccess, refreshSession } = useAuth();
   const isOwner = user?.role === 'Owner';
   const [billing, setBilling] = useState<BillingDetails | null>(null);
@@ -281,7 +283,15 @@ export function PaymentMethod() {
         </Card>
       )}
 
-      <Card>
+      {isNativeApp && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-4 text-sm leading-6 text-amber-950">
+            ZestIQ subscriptions are arranged directly with your restaurant. This app is for existing ZestIQ business customers; contact support if your account or plan needs attention.
+          </CardContent>
+        </Card>
+      )}
+
+      {!isNativeApp && <Card>
         <CardHeader>
           <CardTitle>Subscription plan</CardTitle>
         </CardHeader>
@@ -338,7 +348,7 @@ export function PaymentMethod() {
             );
           })}
         </CardContent>
-      </Card>
+      </Card>}
 
       <Card>
         <CardHeader>

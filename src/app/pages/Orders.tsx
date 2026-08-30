@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils';
 import { buildSupplierEmailDrafts } from '../utils/supplierEmailDraft.js';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
+import { buildApiUrl } from '../utils/api';
 
 const Y = '#F5C10E';
 const D = '#0F172A';
@@ -166,7 +167,7 @@ export function Orders() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/send-supplier-email')
+    void fetch(buildApiUrl('/api/send-supplier-email'))
       .then(response => response.json())
       .then(payload => {
         if (cancelled) return;

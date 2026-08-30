@@ -1,0 +1,13 @@
+{
+  "appId": "ca.zestiq.app",
+  "appName": "ZestIQ",
+  "webDir": "dist",
+  "server": {
+    "iosScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

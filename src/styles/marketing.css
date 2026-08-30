@@ -1,0 +1,216 @@
+.zestiq-public {
+  --z-public-ink: #282e2b;
+  --z-public-ink-deep: #1d2321;
+  --z-public-cream: #f4efe3;
+  --z-public-paper: #fffdf7;
+  --z-public-gold: #d8b85b;
+  --z-public-gold-bright: #f5c10e;
+  --z-public-olive: #728269;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(216, 184, 91, .16), transparent 25rem),
+    var(--z-public-cream);
+  color: var(--z-public-ink-deep);
+}
+
+.zestiq-public .public-header {
+  border-color: rgba(40, 46, 43, .1);
+  background: rgba(244, 239, 227, .92);
+  box-shadow: 0 10px 40px rgba(40, 46, 43, .06);
+}
+
+.zestiq-public .public-header nav a {
+  position: relative;
+  transition: color .2s ease;
+}
+
+.zestiq-public .public-header nav a::after {
+  position: absolute;
+  right: 0;
+  bottom: -.45rem;
+  left: 0;
+  height: 2px;
+  content: '';
+  background: var(--z-public-gold);
+  transform: scaleX(0);
+  transition: transform .2s ease;
+}
+
+.zestiq-public .public-header nav a:hover::after { transform: scaleX(1); }
+
+.zestiq-public .public-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 82% 28%, rgba(216, 184, 91, .25), transparent 26rem),
+    linear-gradient(135deg, #343c39 0%, var(--z-public-ink-deep) 72%);
+}
+
+.zestiq-public .public-hero::before,
+.zestiq-public .public-dark-section::before {
+  position: absolute;
+  z-index: -1;
+  top: -8rem;
+  right: -5rem;
+  width: 28rem;
+  height: 28rem;
+  border: 1px solid rgba(216, 184, 91, .2);
+  border-radius: 42% 58% 35% 65%;
+  content: '';
+  transform: rotate(18deg);
+}
+
+.zestiq-public .public-hero h1,
+.zestiq-public .public-dark-section h2 { text-wrap: balance; }
+
+.zestiq-public .public-highlight-strip,
+.zestiq-public .public-gold-section {
+  background:
+    linear-gradient(115deg, rgba(255,255,255,.22), transparent 32%),
+    var(--z-public-gold);
+}
+
+.zestiq-public .public-paper-section { background: var(--z-public-paper); }
+.zestiq-public .public-cream-section { background: var(--z-public-cream); }
+
+.zestiq-public .public-dark-section,
+.zestiq-public .public-footer {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 110%, rgba(216, 184, 91, .18), transparent 28rem),
+    var(--z-public-ink-deep);
+}
+
+.zestiq-public .public-card {
+  border-color: rgba(40, 46, 43, .1);
+  background: rgba(255, 253, 247, .9);
+  box-shadow: 0 22px 55px rgba(40, 46, 43, .1);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+
+.zestiq-public .public-card:hover {
+  border-color: rgba(216, 184, 91, .65);
+  box-shadow: 0 28px 70px rgba(40, 46, 43, .15);
+  transform: translateY(-4px);
+}
+
+.zestiq-public .public-button-gold {
+  background: var(--z-public-gold);
+  color: var(--z-public-ink-deep);
+  box-shadow: 0 10px 28px rgba(216, 184, 91, .22);
+  transition: transform .2s ease, filter .2s ease;
+}
+
+.zestiq-public .public-button-gold:hover { filter: brightness(1.06); transform: translateY(-2px); }
+
+.zestiq-public .public-geometric-panel {
+  position: relative;
+  min-height: 19rem;
+  overflow: hidden;
+  border: 1px solid rgba(216, 184, 91, .35);
+  border-radius: 2rem;
+  background:
+    conic-gradient(from 45deg at 24% 30%, #d8b85b 0 12.5%, #fffdf7 0 25%, #343c39 0 37.5%, #d8b85b 0 50%, #fffdf7 0 62.5%, #6f7e6a 0 75%, #343c39 0 87.5%, #d8b85b 0),
+    var(--z-public-gold);
+  box-shadow: 0 30px 80px rgba(0,0,0,.26);
+}
+
+.zestiq-public .public-geometric-panel::before {
+  position: absolute;
+  inset: 1.25rem;
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 50%;
+  content: '';
+  box-shadow: 0 0 0 1.25rem rgba(40,46,43,.1), 0 0 0 2.5rem rgba(255,253,247,.13);
+}
+
+.zestiq-public .public-geometric-panel::after {
+  position: absolute;
+  right: 12%;
+  bottom: 10%;
+  width: 38%;
+  aspect-ratio: 1;
+  border: 3px solid var(--z-public-ink-deep);
+  content: '';
+  transform: rotate(45deg);
+}
+
+.zestiq-public-auth {
+  background:
+    radial-gradient(circle at 20% 5%, rgba(216, 184, 91, .24), transparent 28rem),
+    var(--z-public-cream, #f4efe3) !important;
+}
+
+@media (max-width: 1279px) {
+  .zestiq-public .public-header nav a::after { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zestiq-public .public-card,
+  .zestiq-public .public-button-gold { transition: none; }
+}
+
+/* Authenticated manager workspace: visual refresh only; behaviour stays unchanged. */
+.zestiq-app-shell {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(216, 184, 91, .12), transparent 25rem),
+    #f2efe7 !important;
+  color: #202623;
+}
+
+.zestiq-app-shell > header {
+  border-color: rgba(40, 46, 43, .1) !important;
+  background: rgba(255, 253, 247, .94) !important;
+  box-shadow: 0 12px 38px rgba(40, 46, 43, .08) !important;
+  backdrop-filter: blur(18px);
+}
+
+.zestiq-app-shell main section[class*='bg-white'],
+.zestiq-app-shell main div[class*='bg-white'][class*='rounded-3xl'] {
+  border-color: rgba(40, 46, 43, .1) !important;
+  background-color: #fffdf7 !important;
+  box-shadow: 0 15px 45px rgba(40, 46, 43, .08);
+}
+
+.zestiq-app-shell input,
+.zestiq-app-shell select,
+.zestiq-app-shell textarea {
+  border-color: rgba(40, 46, 43, .14);
+}
+
+.zestiq-employee-shell {
+  background:
+    radial-gradient(circle at 105% 8%, rgba(216, 184, 91, .24), transparent 18rem),
+    #f2efe7 !important;
+}
+
+.zestiq-employee-shell > header {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #353d3a, #1d2321 72%) !important;
+}
+
+.zestiq-employee-shell > header::after {
+  position: absolute;
+  right: -4rem;
+  bottom: -7rem;
+  width: 16rem;
+  aspect-ratio: 1;
+  border: 1px solid rgba(216,184,91,.3);
+  border-radius: 45% 55% 40% 60%;
+  content: '';
+}
+
+.zestiq-employee-shell main article,
+.zestiq-employee-shell main form,
+.zestiq-employee-shell main > section > div[class*='bg-white'] {
+  border: 1px solid rgba(40, 46, 43, .08);
+  background: #fffdf7 !important;
+  box-shadow: 0 16px 42px rgba(40, 46, 43, .09);
+}
+
+.zestiq-employee-shell > nav {
+  border-color: rgba(40, 46, 43, .1) !important;
+  background: rgba(255, 253, 247, .94) !important;
+}

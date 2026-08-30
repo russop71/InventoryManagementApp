@@ -13,6 +13,7 @@ import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { resolveSuggestionQuantity } from '../utils/orderSuggestionUtils.js';
 import { getSupplierCcEmails, getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
 import { estimateDemandForTomorrow } from '../utils/forecastOrderUtils.js';
+import { buildApiUrl } from '../utils/api';
 
 interface OrderSuggestion {
   itemId: string;
@@ -150,7 +151,7 @@ export function AIOrders() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/send-supplier-email')
+    void fetch(buildApiUrl('/api/send-supplier-email'))
       .then(response => response.json())
       .then(payload => {
         if (cancelled) return;

@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { buildApiUrl } from '../utils/api';
 
 export function ResetPassword() {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ export function ResetPassword() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/v1/auth/password', {
+      const response = await fetch(buildApiUrl('/api/v1/auth/password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

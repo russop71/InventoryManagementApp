@@ -31,6 +31,31 @@
 
   The production output is generated in `dist/`.
 
+  ## Build the ZestIQ iOS app
+
+  The native iPhone and iPad project lives in `ios/` and uses the bundle ID
+  `ca.zestiq.app`.
+
+  1. Build the production web bundle and copy it into the native app:
+
+  ```bash
+  npm run build:ios
+  ```
+
+  2. Open the project in Xcode:
+
+  ```bash
+  npm run ios:open
+  ```
+
+  3. In Xcode, select the `App` target, choose the ZestIQ Apple Developer team,
+     and confirm automatic signing. Use Product > Archive to create the build
+     for TestFlight and App Store Connect.
+
+  Camera, photo-library, and location permission descriptions are included for
+  invoice scanning, recipe capture, and weather-aware forecasting. The native
+  production build sends API requests to `https://zestiq.ca`.
+
   ## Deploy to zestiq.ca
 
   Yes, you can use `zestiq.ca` for this app.

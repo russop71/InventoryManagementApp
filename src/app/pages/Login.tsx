@@ -5,8 +5,10 @@ import { Building, Eye, EyeOff, Lock, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
+import { Capacitor } from '@capacitor/core';
 
 export function Login() {
+  const isNativeApp = Capacitor.isNativePlatform();
   const navigate = useNavigate();
   const location = useLocation();
   const requestedReturnTo = new URLSearchParams(location.search).get('returnTo');
@@ -37,7 +39,7 @@ export function Login() {
     }
 
     try {
-      if (isSignup) {
+      if (isSignup && !isNativeApp) {
         if (!name.trim()) {
           toast.error('Please enter your name');
           setIsLoading(false);
@@ -84,7 +86,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#F5C10E' }}>
+    <div className="zestiq-public zestiq-public-auth min-h-screen flex flex-col" style={{ background: '#F4EFE3' }}>
 
       <div className="flex items-center justify-end px-5 pt-5">
         <button
@@ -98,9 +100,9 @@ export function Login() {
         </button>
       </div>
 
-      {/* ── Yellow hero ───────────────────────────────── */}
+      {/* ── Branded hero ──────────────────────────────── */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
-        <div className="w-full max-w-[560px] rounded-[2rem] bg-white px-5 py-5 shadow-[0_12px_0_rgba(15,23,42,0.12)] sm:px-8 sm:py-6">
+        <div className="public-card w-full max-w-[560px] rounded-[2rem] bg-white px-5 py-5 sm:px-8 sm:py-6">
           <img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-auto w-full drop-shadow-sm" />
         </div>
         <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
@@ -136,7 +138,7 @@ export function Login() {
       )}
 
       {/* ── White card ────────────────────────────────── */}
-      <div className="flex-1 bg-white rounded-t-[32px] px-6 pt-8 pb-10 shadow-2xl">
+      <div className="flex-1 rounded-t-[32px] bg-[#FFFDF7] px-6 pt-8 pb-10 shadow-2xl">
 
         <h2 className="text-2xl font-black mb-1" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)' }}>
           {isSignup ? 'Create your account' : 'Welcome back'}
@@ -253,7 +255,7 @@ export function Login() {
           >
             {isLoading ? (isSignup ? 'Creating account…' : 'Signing in…') : (isSignup ? 'Create Account' : 'Sign In')}
           </button>
-          {!isSignup && <button type="button" onClick={() => setIsSignup(true)} className="mt-3 h-12 w-full rounded-xl border-2 border-[#0F172A] bg-white text-sm font-black text-[#0F172A] transition active:scale-[0.98]">Create your ZestIQ account</button>}
+          {!isSignup && !isNativeApp && <button type="button" onClick={() => setIsSignup(true)} className="mt-3 h-12 w-full rounded-xl border-2 border-[#0F172A] bg-white text-sm font-black text-[#0F172A] transition active:scale-[0.98]">Create your ZestIQ account</button>}
         </form>
 
         <div className="relative my-6">
@@ -286,6 +288,11 @@ export function Login() {
             {isSignup ? 'Sign In' : 'Contact support'}
           </button>
         </p>
+        <div className="mt-5 flex items-center justify-center gap-4 text-[11px] font-semibold text-gray-400">
+          <button type="button" onClick={() => navigate('/privacy')} className="hover:text-[#0F172A]">Privacy</button>
+          <button type="button" onClick={() => navigate('/terms')} className="hover:text-[#0F172A]">Terms</button>
+          <a href="mailto:support@zestiq.ca" className="hover:text-[#0F172A]">Support</a>
+        </div>
       </div>
 
     </div>

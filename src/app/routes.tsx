@@ -40,11 +40,14 @@ import { CanadianOwnedPage, CapabilitiesPage, PricingPage, ProductTourPage, Publ
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 import { OrdersAppLayout } from "./components/OrdersAppLayout";
+import { Capacitor } from "@capacitor/core";
+
+const NativeHome = Capacitor.isNativePlatform() ? Login : Landing;
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: Landing,
+    Component: NativeHome,
   },
   {
     path: "/login",
