@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { AlertTriangle, ShoppingCart, Package, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound, Trash2 } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound, Trash2 } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useState } from 'react';
 import {
@@ -24,7 +24,7 @@ type SalesRangePreset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'la
 export function Dashboard() {
   const navigate = useNavigate();
   const { user, features } = useAuth();
-  const { inventory, orders, recipes, inventoryCounts, suppliers } = useInventory();
+  const { inventory, orders, recipes, inventoryCounts } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
   const { employees, targetLaborPercent, laborCostBreakdownForRange } = useLabor();
   const { entries: wasteEntries } = useWaste();
@@ -458,71 +458,41 @@ export function Dashboard() {
     : isFohManager
       ? `${todaysCovers ? `${todaysCovers} covers are recorded for the latest service day.` : 'Connect or import POS sales to track today’s service.'}`
       : `${lowStockItems.length || pendingOrdersCount ? `${lowStockItems.length} low-stock item${lowStockItems.length === 1 ? '' : 's'} · ${pendingOrdersCount} order${pendingOrdersCount === 1 ? '' : 's'} pending.` : 'Nothing urgent is waiting right now.'}`;
-  const supplierPerformance = (suppliers.length ? suppliers.map(supplier => supplier.name) : Array.from(new Set(inventory.map(item => item.supplier))))
-    .filter(Boolean)
-    .slice(0, 5)
-    .map((name, index) => {
-      const supplierOrders = orders.filter(order => order.supplier === name);
-      const received = supplierOrders.filter(order => order.status === 'received').length;
-      const score = supplierOrders.length ? 94 + (received / supplierOrders.length) * 5 : 98.4 - index * 1.3;
-      return {
-        name,
-        score: Math.min(99.8, score),
-        deliveryDays: 3.2 + index * .3,
-        compliance: Math.max(91, 99.1 - index * 1.5),
-        status: index < 2 ? 'Active' : index === 2 ? 'Review' : 'Active',
-      };
-    });
 
   return (
-    <div className="zestiq-dashboard space-y-4">
-      <div className="dashboard-heading flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Dashboard</h2>
           <p className="text-xs text-gray-400 mt-0.5 font-semibold uppercase tracking-wider">Real-time overview</p>
         </div>
       </div>
 
-      <section className="dashboard-command-center dashboard-reference-layout">
-        <div className="dashboard-kpi-grid dashboard-kpi-grid-three">
-          <Link to="/app/cogs" className="dashboard-kpi-card">
-            <span>Live Food Cost</span><strong>{totalRevenue > 0 ? `${cogsPercent.toFixed(0)}%` : '—'}</strong>
-            <div className="dashboard-mini-bars" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
-          </Link>
-          <Link to="/app/inventory" className="dashboard-kpi-card">
-            <span>Inventory Value</span><strong>${(totalInventoryValue / 1000).toFixed(1)}k</strong>
-            <div className="dashboard-mini-lines" aria-hidden="true"><i /><i /></div>
-          </Link>
-          <Link to="/app/cogs" className="dashboard-kpi-card">
-            <span>Inventory Cost</span><strong>${(Math.max(totalCOGS, totalInventoryValue * .42) / 1000).toFixed(1)}k</strong>
-            <div className="dashboard-mini-area" aria-hidden="true" />
-          </Link>
-        </div>
-
-        <div className="dashboard-supplier-panel">
-          <div className="dashboard-supplier-title">Supplier Performance Metrics</div>
-          <div className="dashboard-supplier-table-wrap">
-            <table className="dashboard-supplier-table">
-              <thead><tr><th>Rank</th><th>Supplier Name</th><th>Performance Score</th><th>Delivery Time</th><th>Compliance</th><th>Status</th></tr></thead>
-              <tbody>{supplierPerformance.map((supplier, index) => (
-                <tr key={supplier.name}>
-                  <td>{index + 1}</td><td className="font-bold">{supplier.name}</td>
-                  <td><span>{supplier.score.toFixed(1)}%</span><i className="supplier-spark" style={{ width: `${Math.max(35, supplier.score - 45)}%` }} /></td>
-                  <td>{supplier.deliveryDays.toFixed(1)} Days</td>
-                  <td><span>{supplier.compliance.toFixed(1)}%</span><i className="supplier-spark supplier-spark-green" style={{ width: `${Math.max(35, supplier.compliance - 45)}%` }} /></td>
-                  <td><span className={`supplier-status ${supplier.status === 'Review' ? 'is-review' : ''}`}>{supplier.status}</span></td>
-                </tr>
-              ))}</tbody>
-            </table>
+      <section className="overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white shadow-lg shadow-slate-900/10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F5C10E]">Today at a glance</p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight">Good morning, {firstName}.</h1>
+            <p className="mt-1 text-sm font-bold text-white">{briefTitle}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{briefSummary}</p>
           </div>
+          <Badge className="border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-black text-white">{user?.role || 'Team member'}</Badge>
         </div>
-
-        <div className="dashboard-key-actions">
-          <strong>Key Actions</strong>
-          <Link to="/app/suppliers">+ Add Supplier</Link>
-          <Link to="/app/invoice-scanner">Scan Invoice</Link>
-          <Link to="/app/reports">Run Report</Link>
-          <button type="button" onClick={() => setSalesRangePreset('this-week')}>Clear Filter</button>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {isBohManager ? <>
+            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} waiting to be received</p></Link>
+          </> : isFohManager ? <>
+            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Sales</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todaysRevenue.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">{todaysCovers} covers · ${todaysAvgCheck.toFixed(0)} average check</p></Link>
+            {canManageLabor ? <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · view schedule</p></Link> : <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? 'Items need attention' : 'No critical items'}</p></Link>}
+            <Link to="/app/beverages" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Bar & beverage</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${beverageCogs.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">Beverage COGS in the selected period</p></Link>
+          </> : <>
+            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            {canManageLabor ? <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link> : <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? 'Items need attention' : 'No critical items'}</p></Link>}
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
+          </>}
+          <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F5C10E]" /></div><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
         </div>
       </section>
 
@@ -617,7 +587,7 @@ export function Dashboard() {
         </Card>}
       </div>}
 
-      <Card className="dashboard-panel border-0 shadow-sm overflow-hidden bg-white">
+      <Card className="border-0 shadow-sm overflow-hidden bg-white">
         <div className="h-[3px] bg-[#F5C10E]" />
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 mb-4">
