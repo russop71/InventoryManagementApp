@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
 import { Capacitor } from '@capacitor/core';
+import { ZestIQBrand } from '../components/ZestIQBrand';
 
 export function Login() {
   const isNativeApp = Capacitor.isNativePlatform();
@@ -102,8 +103,11 @@ export function Login() {
 
       {/* ── Branded hero ──────────────────────────────── */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
-        <div className="public-card w-full max-w-[560px] rounded-[2rem] bg-white px-5 py-5 sm:px-8 sm:py-6">
-          <img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-auto w-full drop-shadow-sm" />
+        <div className="public-card flex w-full max-w-[560px] items-center justify-center rounded-[2rem] bg-white px-7 py-7 sm:px-10 sm:py-9">
+          <ZestIQBrand
+            markClassName="h-24 w-auto sm:h-32"
+            wordmarkClassName="text-5xl sm:text-6xl"
+          />
         </div>
         <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
           Smarter Kitchens. Better Business.

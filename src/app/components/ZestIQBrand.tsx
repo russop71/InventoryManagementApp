@@ -14,12 +14,12 @@ export function ZestIQBrand({
   wordmarkClassName,
 }: ZestIQBrandProps) {
   return (
-    <div className={cn('zestiq-brand inline-flex items-center gap-2', className)} aria-label="ZestIQ">
+    <div className={cn('zestiq-brand inline-flex items-center gap-2.5', className)} aria-label="ZestIQ">
       <img
-        src="/zestiq-mark.svg"
+        src="/zestiq-gold-mark.png"
         alt=""
         aria-hidden="true"
-        className={cn('zestiq-brand-mark h-9 w-9 shrink-0 rounded-xl', markClassName)}
+        className={cn('zestiq-brand-mark h-10 w-auto shrink-0 object-contain', markClassName)}
       />
       <span
         aria-hidden="true"
@@ -29,7 +29,7 @@ export function ZestIQBrand({
           wordmarkClassName,
         )}
       >
-        zest<span className="text-[#D9A900]">IQ</span>
+        Zest<span className="text-[#D8B85B]">IQ</span>
       </span>
     </div>
   );

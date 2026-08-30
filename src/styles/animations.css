@@ -124,14 +124,12 @@
 }
 
 .zestiq-brand-mark {
-  animation: zestiq-citrus-idle 4.5s ease-in-out infinite;
-  filter: drop-shadow(0 2px 2px rgb(15 23 42 / 0.16));
-  transform-origin: 50% 68%;
+  object-fit: contain;
 }
 
 .zestiq-brand:hover .zestiq-brand-mark,
 .zestiq-brand:focus-within .zestiq-brand-mark {
-  animation: zestiq-citrus-pop .7s cubic-bezier(.22, .8, .25, 1) both;
+  transform: translateY(-1px);
 }
 
 .zestiq-brand:hover .zestiq-brand-word,

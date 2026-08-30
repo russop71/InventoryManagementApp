@@ -82,6 +82,23 @@
     var(--z-public-ink-deep);
 }
 
+.zestiq-public .public-header .zestiq-brand-word {
+  color: var(--z-public-ink-deep);
+}
+
+.zestiq-public .public-footer .zestiq-brand-word,
+.zestiq-public .public-dark-section .zestiq-brand-word {
+  color: #fffdf7;
+}
+
+.zestiq-public .public-gold-section {
+  color: var(--z-public-ink-deep);
+}
+
+.zestiq-public .public-gold-section a {
+  box-shadow: 0 12px 28px rgba(29, 35, 33, .14);
+}
+
 .zestiq-public .public-card {
   border-color: rgba(40, 46, 43, .1);
   background: rgba(255, 253, 247, .9);

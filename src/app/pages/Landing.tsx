@@ -244,7 +244,7 @@ function Slider({ label, value, min, max, step, display, onChange }: { label: st
 function PhoneShowcase() {
   const reduceMotion = useReducedMotion();
   return (
-    <section className="overflow-hidden bg-[#F5C10E]">
+    <section className="public-gold-section overflow-hidden">
       <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:py-28">
         <div><p className="text-sm font-black uppercase tracking-[.2em] text-black/45">One website. Two apps.</p><h2 className="mt-3 text-4xl font-black tracking-[-.035em] sm:text-5xl">The office and the floor stay connected.</h2><p className="mt-5 text-lg leading-8 text-black/60">Managers run the operation in ZestIQ. Employees carry ZestEmployee for schedules, swaps and time off. Both use the same protected restaurant and location data.</p><div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#0B1220] px-5 font-black text-white">Open ZestIQ<ArrowRight className="h-4 w-4" /></Link><Link to="/login?returnTo=/employee" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-[#0B1220] px-5 font-black">Open ZestEmployee<ArrowRight className="h-4 w-4" /></Link></div></div>
         <div className="relative mx-auto flex w-full max-w-2xl items-end justify-center gap-3 sm:gap-7">
@@ -569,9 +569,12 @@ export function Landing() {
             <FooterGroup title="Legal" links={[["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"], ["Cookie Policy", "/cookies"], ["AI Transparency", "/ai-transparency"]]} />
           </nav>
           <div id="canadian-owned" className="flex flex-col gap-4 border-t border-white/10 py-6 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 ZestIQ. All rights reserved.</p><p className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-bold text-white/70"><span aria-hidden="true">🇨🇦</span>Proudly Canadian owned &amp; operated</p></div>
-          <div aria-hidden="true" className="pointer-events-none -mb-[.17em] mt-2 flex items-end justify-between gap-5 overflow-hidden">
-            <p className="whitespace-nowrap text-[18vw] font-black leading-[.78] tracking-[-.08em] text-[#F5C10E] opacity-95">zestIQ</p>
-            <img src="/zestiq-lemon.svg" alt="" className="mb-[.12em] h-[20vw] max-h-64 min-h-24 w-[20vw] min-w-24 shrink-0 rotate-[-8deg] object-contain" />
+          <div className="pointer-events-none mt-10 overflow-hidden border-t border-white/10 pt-10" aria-hidden="true">
+            <ZestIQBrand
+              className="origin-left scale-[1.02] text-white opacity-95 sm:scale-100"
+              markClassName="h-24 w-auto sm:h-32 lg:h-40"
+              wordmarkClassName="text-5xl sm:text-7xl lg:text-8xl"
+            />
           </div>
         </div>
       </footer>
