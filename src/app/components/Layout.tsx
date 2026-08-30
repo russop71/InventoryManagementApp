@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router';
 import {
   LayoutDashboard, Package, ChefHat,
   Users, LogOut, CreditCard, HelpCircle, MessageSquare, Bell,
-  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Trash2,
+  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Trash2, TrendingUp,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useNavigate } from 'react-router';
@@ -119,12 +119,43 @@ export function Layout() {
   return (
     <div className="zestiq-app-shell min-h-screen overflow-x-clip bg-[#F4F5F7] pb-20">
 
+      {/* Desktop control rail — the mobile product keeps the compact bottom navigation. */}
+      <aside className="zestiq-desktop-sidebar hidden lg:flex">
+        <Link to="/app" className="zestiq-sidebar-brand" aria-label="ZestIQ dashboard">
+          <ZestIQBrand wordmarkClassName="text-[20px] text-white" />
+        </Link>
+        <div className="zestiq-sidebar-account">
+          <span className="zestiq-sidebar-avatar">{(accountName || 'Z').slice(0, 1).toUpperCase()}</span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">{accountName || 'ZestIQ Account'}</p>
+            <p className="truncate text-[11px] text-white/50">{user?.name || 'Team member'}</p>
+          </div>
+        </div>
+        <nav className="zestiq-sidebar-nav" aria-label="Main navigation">
+          <p className="zestiq-sidebar-label">Operations</p>
+          {navItems.map(({ path, label, icon: Icon }) => {
+            const active = path === '/app'
+              ? location.pathname === '/app' || location.pathname === '/app/dashboard'
+              : location.pathname === path || location.pathname.startsWith(`${path}/`);
+            return <Link key={path} to={path} className={`zestiq-sidebar-link ${active ? 'is-active' : ''}`}><Icon className="h-4 w-4" /><span>{label}</span></Link>;
+          })}
+          <p className="zestiq-sidebar-label mt-5">Intelligence</p>
+          <Link to="/app/forecasting" className={`zestiq-sidebar-link ${location.pathname.startsWith('/app/forecasting') ? 'is-active' : ''}`}><TrendingUp className="h-4 w-4" /><span>Forecasting</span></Link>
+          <Link to="/app/cogs" className={`zestiq-sidebar-link ${location.pathname.startsWith('/app/cogs') ? 'is-active' : ''}`}><FileText className="h-4 w-4" /><span>Reports</span></Link>
+          <Link to="/app/suppliers" className={`zestiq-sidebar-link ${location.pathname.startsWith('/app/suppliers') ? 'is-active' : ''}`}><Truck className="h-4 w-4" /><span>Suppliers</span></Link>
+        </nav>
+        <div className="mt-auto space-y-1">
+          <Link to="/app/account" className="zestiq-sidebar-link"><Settings className="h-4 w-4" /><span>Settings</span></Link>
+          <button onClick={handleLogout} className="zestiq-sidebar-link w-full"><LogOut className="h-4 w-4" /><span>Sign out</span></button>
+        </div>
+      </aside>
+
       {/* ── White header ───────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-100">
+      <header className="zestiq-app-topbar sticky top-0 z-40 border-b border-gray-100 bg-white shadow-sm lg:ml-[228px]">
         <div className="flex items-center justify-between px-4 py-3">
 
           {/* LEFT — hamburger (3 dark lines) */}
-          <DropdownMenu>
+          <div className="lg:hidden"><DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className="w-10 h-10 flex items-center justify-center rounded-xl transition-colors focus:outline-none"
@@ -183,14 +214,18 @@ export function Layout() {
                 </DropdownMenuItem>
               </div>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu></div>
 
           {/* CENTER — ZestIQ logo + wordmark */}
-          <Link to="/app" aria-label="ZestIQ dashboard" className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C10E]">
+          <Link to="/app" aria-label="ZestIQ dashboard" className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C10E] lg:hidden">
             <ZestIQBrand wordmarkClassName="text-[21px] text-[#0F172A]" />
           </Link>
 
           {/* RIGHT — bell */}
+          <div className="hidden min-w-0 items-center gap-3 lg:flex">
+            <div className="text-right"><p className="text-xs font-bold text-slate-900">{user?.name}</p><p className="text-[10px] uppercase tracking-wider text-slate-400">{user?.role}</p></div>
+            <select className="h-9 rounded-xl border border-slate-200 bg-[#F7F5EE] px-3 text-xs font-semibold text-slate-700" value={activeLocationId ?? ''} onChange={(event) => switchLocation(event.target.value)}>{locations.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}</select>
+          </div>
           <button
             onClick={() => navigate('/app/notifications')}
             className="relative w-10 h-10 flex items-center justify-center rounded-xl transition-colors focus:outline-none"
@@ -201,7 +236,7 @@ export function Layout() {
           </button>
         </div>
 
-        <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden">
           <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1.5">
             {topMenuGroups.map(group => (
               <DropdownMenu
@@ -271,12 +306,12 @@ export function Layout() {
       </header>
 
       {/* ── Content ──────────────────────────────────────── */}
-      <main className="min-w-0 overflow-x-clip px-3 py-4 sm:px-4">
+      <main className="zestiq-app-main min-w-0 overflow-x-clip px-3 py-4 sm:px-4 lg:ml-[228px] lg:px-6 lg:py-6">
         <Outlet />
       </main>
 
       {/* ── Bottom nav ───────────────────────────────────── */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 safe-area-inset-bottom z-20">
+      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-100 bg-white/95 backdrop-blur-md safe-area-inset-bottom lg:hidden">
         <div className="flex items-center px-2 py-2">
           {navItems.map(({ path, label, icon: Icon }) => {
             const active = path === '/app'

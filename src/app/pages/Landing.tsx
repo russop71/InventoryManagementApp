@@ -341,9 +341,9 @@ export function Landing() {
       </header>
 
       <main>
-        <section className="public-hero bg-[#0B1220] text-white">
+        <section className="public-hero">
           <div className="mx-auto grid max-w-7xl gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:py-28">
-            <div>
+            <div className="public-hero-copy-card">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[.18em] text-white/70">
                 <Sparkles className="h-4 w-4 text-[#F5C10E]" /> AI-powered restaurant control
               </div>

@@ -104,6 +104,41 @@
 
 .zestiq-public .public-button-gold:hover { filter: brightness(1.06); transform: translateY(-2px); }
 
+/* Reference-led landing composition: a dark brand canopy over a cream product
+   canvas, with the promise contained in a tangible interface card. */
+.zestiq-public .public-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--z-public-ink-deep);
+  background: var(--z-public-cream);
+}
+.zestiq-public .public-hero::before {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 46%;
+  border-bottom-right-radius: clamp(3rem, 9vw, 8rem);
+  background:
+    radial-gradient(circle at 68% 35%, rgba(216,184,91,.2), transparent 22rem),
+    linear-gradient(125deg, #35403d, #202825 70%);
+  content: '';
+}
+.zestiq-public .public-hero-copy-card {
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  border: 1px solid rgba(40,46,43,.1);
+  border-radius: 1.5rem;
+  background: rgba(255,253,247,.97);
+  box-shadow: 0 28px 70px rgba(32,40,37,.17);
+}
+.zestiq-public .public-hero-copy-card h1 { color: var(--z-public-ink-deep); font-size: clamp(2.7rem, 5vw, 4.6rem); }
+.zestiq-public .public-hero-copy-card p { color: rgba(40,46,43,.67) !important; }
+.zestiq-public .public-hero-copy-card > div:first-child { border-color: rgba(40,46,43,.1); background: #f5f0e3; color: rgba(40,46,43,.66); }
+.zestiq-public .public-hero-copy-card > div:first-child svg { color: #a17c24; }
+.zestiq-public .public-hero-copy-card a[href='/capabilities'] { border-color: rgba(40,46,43,.18); color: var(--z-public-ink-deep); }
+.zestiq-public .public-hero-copy-card > div:last-child { color: rgba(40,46,43,.58); }
+.zestiq-public .public-hero-copy-card > div:last-child span { border-color: rgba(40,46,43,.1); background: #f7f3e8; }
+
 .zestiq-public .public-geometric-panel {
   position: relative;
   min-height: 19rem;
@@ -177,6 +212,45 @@
 .zestiq-app-shell select,
 .zestiq-app-shell textarea {
   border-color: rgba(40, 46, 43, .14);
+}
+
+.zestiq-desktop-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  width: 228px;
+  flex-direction: column;
+  padding: 22px 16px 18px;
+  color: #fff;
+  background: linear-gradient(165deg, rgba(216, 184, 91, .12), transparent 34%), #202a3b;
+  border-right: 1px solid rgba(255,255,255,.08);
+  box-shadow: 12px 0 38px rgba(29, 35, 42, .12);
+}
+.zestiq-sidebar-brand { display: inline-flex; align-items: center; min-height: 42px; padding: 0 6px; }
+.zestiq-sidebar-account { display: flex; align-items: center; gap: 10px; margin: 24px 0 18px; padding: 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: rgba(255,255,255,.055); }
+.zestiq-sidebar-avatar { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: #d8b85b; color: #202a3b; font-size: 13px; font-weight: 900; }
+.zestiq-sidebar-nav { flex: 1; }
+.zestiq-sidebar-label { margin: 0 10px 7px; color: rgba(255,255,255,.34); font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.zestiq-sidebar-link { display: flex; align-items: center; gap: 10px; min-height: 38px; margin: 2px 0; padding: 0 11px; border-radius: 10px; color: rgba(255,255,255,.66); font-size: 12px; font-weight: 650; text-align: left; transition: .18s ease; }
+.zestiq-sidebar-link:hover { color: #fff; background: rgba(255,255,255,.07); }
+.zestiq-sidebar-link.is-active { color: #fff; background: linear-gradient(90deg, #3a5269, #32465c); box-shadow: inset 3px 0 #d8b85b, 0 6px 14px rgba(0,0,0,.12); }
+.zestiq-app-topbar { min-height: 62px; }
+.zestiq-app-main { max-width: 1600px; }
+
+.zestiq-dashboard .dashboard-brief { color: #172033; background: #fffdf8; border: 1px solid rgba(53, 65, 80, .1); box-shadow: 0 14px 34px rgba(37, 43, 46, .08); }
+.zestiq-dashboard .dashboard-brief a.rounded-2xl { color: #172033; background: #f7f4eb; border: 1px solid rgba(53, 65, 80, .08); }
+.zestiq-dashboard .dashboard-brief a.rounded-2xl:hover { background: #f1ead8; }
+.zestiq-dashboard .dashboard-brief a.rounded-2xl .text-slate-300 { color: #64748b !important; }
+.zestiq-dashboard .dashboard-panel { border: 1px solid rgba(53, 65, 80, .1) !important; box-shadow: 0 10px 28px rgba(37, 43, 46, .065) !important; }
+
+@media (min-width: 1024px) {
+  .zestiq-app-shell { padding-bottom: 0 !important; }
+  .zestiq-app-main { min-height: calc(100vh - 62px); }
+  .zestiq-app-shell .rounded-3xl { border-radius: 16px; }
+  .zestiq-app-shell .rounded-2xl { border-radius: 12px; }
+  .zestiq-app-shell main > div { max-width: 1380px; margin-inline: auto; }
+  .zestiq-dashboard { max-width: 1380px; }
+  .zestiq-dashboard > * + * { margin-top: 16px; }
 }
 
 .zestiq-employee-shell {

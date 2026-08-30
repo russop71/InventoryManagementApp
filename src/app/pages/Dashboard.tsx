@@ -460,23 +460,23 @@ export function Dashboard() {
       : `${lowStockItems.length || pendingOrdersCount ? `${lowStockItems.length} low-stock item${lowStockItems.length === 1 ? '' : 's'} · ${pendingOrdersCount} order${pendingOrdersCount === 1 ? '' : 's'} pending.` : 'Nothing urgent is waiting right now.'}`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="zestiq-dashboard space-y-4">
+      <div className="dashboard-heading flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Dashboard</h2>
           <p className="text-xs text-gray-400 mt-0.5 font-semibold uppercase tracking-wider">Real-time overview</p>
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white shadow-lg shadow-slate-900/10">
+      <section className="dashboard-brief overflow-hidden rounded-3xl p-5 shadow-lg shadow-slate-900/10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F5C10E]">Today at a glance</p>
             <h1 className="mt-2 text-2xl font-black tracking-tight">Good morning, {firstName}.</h1>
-            <p className="mt-1 text-sm font-bold text-white">{briefTitle}</p>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{briefSummary}</p>
+            <p className="mt-1 text-sm font-bold text-slate-900">{briefTitle}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{briefSummary}</p>
           </div>
-          <Badge className="border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-black text-white">{user?.role || 'Team member'}</Badge>
+          <Badge className="border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700">{user?.role || 'Team member'}</Badge>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {isBohManager ? <>
@@ -587,7 +587,7 @@ export function Dashboard() {
         </Card>}
       </div>}
 
-      <Card className="border-0 shadow-sm overflow-hidden bg-white">
+      <Card className="dashboard-panel border-0 shadow-sm overflow-hidden bg-white">
         <div className="h-[3px] bg-[#F5C10E]" />
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 mb-4">
