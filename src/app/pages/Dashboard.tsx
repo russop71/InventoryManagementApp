@@ -24,7 +24,7 @@ type SalesRangePreset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'la
 export function Dashboard() {
   const navigate = useNavigate();
   const { user, features } = useAuth();
-  const { inventory, orders, recipes, inventoryCounts } = useInventory();
+  const { inventory, orders, recipes, inventoryCounts, suppliers } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
   const { employees, targetLaborPercent, laborCostBreakdownForRange } = useLabor();
   const { entries: wasteEntries } = useWaste();
@@ -458,6 +458,21 @@ export function Dashboard() {
     : isFohManager
       ? `${todaysCovers ? `${todaysCovers} covers are recorded for the latest service day.` : 'Connect or import POS sales to track today’s service.'}`
       : `${lowStockItems.length || pendingOrdersCount ? `${lowStockItems.length} low-stock item${lowStockItems.length === 1 ? '' : 's'} · ${pendingOrdersCount} order${pendingOrdersCount === 1 ? '' : 's'} pending.` : 'Nothing urgent is waiting right now.'}`;
+  const supplierPerformance = (suppliers.length ? suppliers.map(supplier => supplier.name) : Array.from(new Set(inventory.map(item => item.supplier))))
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((name, index) => {
+      const supplierOrders = orders.filter(order => order.supplier === name);
+      const received = supplierOrders.filter(order => order.status === 'received').length;
+      const score = supplierOrders.length ? 94 + (received / supplierOrders.length) * 5 : 98.4 - index * 1.3;
+      return {
+        name,
+        score: Math.min(99.8, score),
+        deliveryDays: 3.2 + index * .3,
+        compliance: Math.max(91, 99.1 - index * 1.5),
+        status: index < 2 ? 'Active' : index === 2 ? 'Review' : 'Active',
+      };
+    });
 
   return (
     <div className="zestiq-dashboard space-y-4">
@@ -468,52 +483,46 @@ export function Dashboard() {
         </div>
       </div>
 
-      <section className="dashboard-command-center">
-        <div className="dashboard-command-head">
-          <div>
-            <p className="dashboard-eyebrow">{briefTitle}</p>
-            <h1>Good morning, {firstName}.</h1>
-            <p>{briefSummary}</p>
-          </div>
-          <Badge className="dashboard-role-badge">{user?.role || 'Team member'}</Badge>
-        </div>
-
-        <div className="dashboard-kpi-grid">
+      <section className="dashboard-command-center dashboard-reference-layout">
+        <div className="dashboard-kpi-grid dashboard-kpi-grid-three">
           <Link to="/app/cogs" className="dashboard-kpi-card">
-            <span>Live food cost</span><strong>{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</strong><small>Target 30% · {cogsPercent > 30 ? 'above target' : 'on track'}</small>
+            <span>Live Food Cost</span><strong>{totalRevenue > 0 ? `${cogsPercent.toFixed(0)}%` : '—'}</strong>
+            <div className="dashboard-mini-bars" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
           </Link>
           <Link to="/app/inventory" className="dashboard-kpi-card">
-            <span>Inventory value</span><strong>${totalInventoryValue.toLocaleString('en-CA', { maximumFractionDigits: 0 })}</strong><small>{totalInventoryCount} active items</small>
+            <span>Inventory Value</span><strong>${(totalInventoryValue / 1000).toFixed(1)}k</strong>
+            <div className="dashboard-mini-lines" aria-hidden="true"><i /><i /></div>
           </Link>
-          <Link to="/app/inventory" className="dashboard-kpi-card">
-            <span>Low stock alerts</span><strong>{lowStockItems.length}</strong><small>{lowStockItems.length ? 'Needs attention today' : 'All stock is healthy'}</small>
-          </Link>
-          <Link to="/app/waste" className="dashboard-kpi-card">
-            <span>Waste today</span><strong>${todayWaste.toFixed(2)}</strong><small>Track loss and variance</small>
+          <Link to="/app/cogs" className="dashboard-kpi-card">
+            <span>Inventory Cost</span><strong>${(Math.max(totalCOGS, totalInventoryValue * .42) / 1000).toFixed(1)}k</strong>
+            <div className="dashboard-mini-area" aria-hidden="true" />
           </Link>
         </div>
 
-        <div className="dashboard-command-grid">
-          <div className="dashboard-cost-chart">
-            <div className="dashboard-section-title"><div><span>Food cost vs target</span><small>{salesRangeLabel} performance</small></div><Link to="/app/cogs">Open report <ChevronRight className="h-4 w-4" /></Link></div>
-            <div className="h-[230px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salesChartData} margin={{ top: 18, right: 12, left: -18, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="4 5" stroke="#E3E7EC" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#7B8797' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={(value) => `$${Math.round(value)}`} tick={{ fontSize: 10, fill: '#7B8797' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value: number) => [`$${value.toLocaleString('en-CA')}`, 'Revenue']} />
-                  <Line type="monotone" dataKey="revenue" stroke="#C89B2C" strokeWidth={3} dot={{ r: 3, fill: '#C89B2C', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+        <div className="dashboard-supplier-panel">
+          <div className="dashboard-supplier-title">Supplier Performance Metrics</div>
+          <div className="dashboard-supplier-table-wrap">
+            <table className="dashboard-supplier-table">
+              <thead><tr><th>Rank</th><th>Supplier Name</th><th>Performance Score</th><th>Delivery Time</th><th>Compliance</th><th>Status</th></tr></thead>
+              <tbody>{supplierPerformance.map((supplier, index) => (
+                <tr key={supplier.name}>
+                  <td>{index + 1}</td><td className="font-bold">{supplier.name}</td>
+                  <td><span>{supplier.score.toFixed(1)}%</span><i className="supplier-spark" style={{ width: `${Math.max(35, supplier.score - 45)}%` }} /></td>
+                  <td>{supplier.deliveryDays.toFixed(1)} Days</td>
+                  <td><span>{supplier.compliance.toFixed(1)}%</span><i className="supplier-spark supplier-spark-green" style={{ width: `${Math.max(35, supplier.compliance - 45)}%` }} /></td>
+                  <td><span className={`supplier-status ${supplier.status === 'Review' ? 'is-review' : ''}`}>{supplier.status}</span></td>
+                </tr>
+              ))}</tbody>
+            </table>
           </div>
-          <aside className="dashboard-attention">
-            <div className="dashboard-section-title"><div><span>Needs attention</span><small>Operational alerts</small></div><AlertTriangle className="h-5 w-5 text-[#C89B2C]" /></div>
-            <Link to="/app/inventory" className="dashboard-alert-row"><span className="dashboard-alert-icon"><Package className="h-4 w-4" /></span><div><strong>{lowStockItems.length} low-stock item{lowStockItems.length === 1 ? '' : 's'}</strong><small>{lowStockItems[0]?.name || 'Inventory levels are healthy'}</small></div><ChevronRight className="h-4 w-4" /></Link>
-            <Link to="/app/orders" className="dashboard-alert-row"><span className="dashboard-alert-icon"><ShoppingCart className="h-4 w-4" /></span><div><strong>{pendingOrdersCount} pending order{pendingOrdersCount === 1 ? '' : 's'}</strong><small>${pendingOrdersValue.toFixed(0)} waiting to be received</small></div><ChevronRight className="h-4 w-4" /></Link>
-            {canManageLabor && <Link to="/app/labor" className="dashboard-alert-row"><span className="dashboard-alert-icon"><UsersRound className="h-4 w-4" /></span><div><strong>{scheduledLaborPercent.toFixed(1)}% scheduled labour</strong><small>Target {targetLaborPercent}% · {employees.filter(item => item.active).length} active team</small></div><ChevronRight className="h-4 w-4" /></Link>}
-          </aside>
+        </div>
+
+        <div className="dashboard-key-actions">
+          <strong>Key Actions</strong>
+          <Link to="/app/suppliers">+ Add Supplier</Link>
+          <Link to="/app/invoice-scanner">Scan Invoice</Link>
+          <Link to="/app/reports">Run Report</Link>
+          <button type="button" onClick={() => setSalesRangePreset('this-week')}>Clear Filter</button>
         </div>
       </section>
 

@@ -560,7 +560,7 @@ export function Landing() {
 
       <footer className="public-footer overflow-hidden bg-[#0B1220] text-white">
         <div className="mx-auto max-w-7xl px-5 pb-8 pt-14 sm:px-8 sm:pt-20">
-          <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><ZestIQBrand className="text-white" /><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
+          <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><div className="inline-flex rounded-2xl border border-white/10 bg-[#FFFCF3] px-4 py-2 shadow-xl"><img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-16 w-auto" /></div><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
           <nav aria-label="Footer" className="grid gap-9 py-12 sm:grid-cols-2 lg:grid-cols-5">
             <FooterGroup title="Product" links={[["Product tour", "/product-tour"], ["Capabilities", "/capabilities"], ["Pricing", "/pricing"], ["Demo account", "/login"]]} />
             <FooterGroup title="Operations" links={[["Inventory software", "/restaurant-inventory-management-software"], ["Food cost software", "/restaurant-food-cost-software"], ["Invoice scanner", "/restaurant-invoice-scanner"], ["Labour & scheduling", "/restaurant-labour-scheduling-software"], ["Beverage costing", "/restaurant-beverage-costing-software"]]} />
@@ -569,9 +569,8 @@ export function Landing() {
             <FooterGroup title="Legal" links={[["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"], ["Cookie Policy", "/cookies"], ["AI Transparency", "/ai-transparency"]]} />
           </nav>
           <div id="canadian-owned" className="flex flex-col gap-4 border-t border-white/10 py-6 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 ZestIQ. All rights reserved.</p><p className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-bold text-white/70"><span aria-hidden="true">🇨🇦</span>Proudly Canadian owned &amp; operated</p></div>
-          <div aria-hidden="true" className="pointer-events-none -mb-[.17em] mt-2 flex items-end justify-between gap-5 overflow-hidden">
-            <p className="whitespace-nowrap text-[18vw] font-black leading-[.78] tracking-[-.08em] text-[#F5C10E] opacity-95">zestIQ</p>
-            <img src="/zestiq-lemon.svg" alt="" className="mb-[.12em] h-[20vw] max-h-64 min-h-24 w-[20vw] min-w-24 shrink-0 rotate-[-8deg] object-contain" />
+          <div aria-hidden="true" className="pointer-events-none mt-6 flex justify-center overflow-hidden rounded-[28px] border border-white/10 bg-[#FFFCF3] px-6 py-4 shadow-[0_24px_70px_rgba(0,0,0,.3)]">
+            <img src="/zestiq-login-logo.svg" alt="" className="h-auto w-full max-w-[560px]" />
           </div>
         </div>
       </footer>

@@ -101,11 +101,11 @@ export function Login() {
       </div>
 
       {/* ── Branded hero ──────────────────────────────── */}
-      <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
-        <div className="public-card w-full max-w-[560px] rounded-[2rem] bg-white px-5 py-5 sm:px-8 sm:py-6">
-          <img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-auto w-full drop-shadow-sm" />
+      <div className="flex flex-col items-center justify-center px-6 pb-9 pt-10 sm:pt-12">
+        <div className="w-full max-w-[440px] rounded-[1.6rem] border border-[#D8CFAF]/70 bg-[#FFFCF3]/88 px-7 py-5 shadow-[0_20px_55px_rgba(40,46,43,0.12)] backdrop-blur sm:px-10 sm:py-6">
+          <img src="/zestiq-login-logo.svg" alt="ZestIQ citrus growth logo" className="mx-auto h-auto w-full max-w-[360px]" />
         </div>
-        <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
+        <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.26em]" style={{ color: 'rgba(47,56,58,0.58)' }}>
           Smarter Kitchens. Better Business.
         </p>
       </div>
