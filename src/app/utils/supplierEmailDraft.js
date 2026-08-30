@@ -4,6 +4,13 @@ export function getSupplierEmailAddress(supplierName, suppliers = []) {
   return matchedSupplier?.email?.trim() || '';
 }
 
+export function getSupplierCcEmails(supplierName, suppliers = []) {
+  const normalized = String(supplierName || '').trim().toLowerCase();
+  const matchedSupplier = suppliers.find(supplier => supplier.name.trim().toLowerCase() === normalized);
+  const values = Array.isArray(matchedSupplier?.ccEmails) ? matchedSupplier.ccEmails : [];
+  return [...new Set(values.map(email => String(email).trim().toLowerCase()).filter(Boolean))];
+}
+
 export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [] }) {
   const supplierGroups = suggestions.reduce((groups, suggestion) => {
     const supplier = suggestion.supplier || 'Supplier';
@@ -26,6 +33,7 @@ export function buildSupplierEmailDrafts({ restaurantName, suggestions, supplier
     return {
       supplier,
       supplierEmail,
+      ccEmails: getSupplierCcEmails(supplier, suppliers),
       canSend: Boolean(supplierEmail),
       items,
       totalCost,

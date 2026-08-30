@@ -146,6 +146,7 @@ export interface Supplier {
   name: string;
   contactPerson: string;
   email: string;
+  ccEmails?: string[];
   phone: string;
   address: string;
   category: string;

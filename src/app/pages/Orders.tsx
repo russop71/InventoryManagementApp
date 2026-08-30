@@ -64,9 +64,21 @@ function fmtMoney(v: number) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function openMailtoDraft(to: string, subject: string, body: string) {
-  const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+function openMailtoDraft(to: string, ccEmails: string[], subject: string, body: string) {
+  const params = new URLSearchParams({ subject, body });
+  if (ccEmails.length) params.set('cc', ccEmails.join(','));
+  const mailtoLink = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
   window.location.href = mailtoLink;
+}
+
+interface SupplierEmailDraft {
+  supplier: string;
+  supplierEmail: string;
+  ccEmails: string[];
+  items: OrderSuggestion[];
+  totalCost: number;
+  emailBody: string;
+  emailSubject: string;
 }
 
 interface OrderSuggestion {
@@ -102,7 +114,7 @@ export function Orders() {
   const [editableItems, setEditableItems] = useState<Record<string, { quantity: number; cost: number }>>({});
   const [supplierDateOverrides, setSupplierDateOverrides] = useState<Record<string, string>>({});
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
-  const [draftEmails, setDraftEmails] = useState<Array<{ supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }>>([]);
+  const [draftEmails, setDraftEmails] = useState<SupplierEmailDraft[]>([]);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false);
   const [manualSupplier, setManualSupplier] = useState<string>('');
@@ -363,14 +375,14 @@ export function Orders() {
     toast.success(`Created order for ${manualSupplier}: ${itemsForOrder.length} item${itemsForOrder.length === 1 ? '' : 's'}`);
   };
 
-  const openEmailClient = async (email: { supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }) => {
+  const openEmailClient = async (email: SupplierEmailDraft) => {
     if (!email.supplierEmail) {
       toast.error('No supplier email address is configured');
       return;
     }
 
     if (emailServiceConfigured === false) {
-      openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+      openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
       toast.info('Email service is not configured. Opened your mail app with a draft instead.');
       return;
     }
@@ -378,6 +390,7 @@ export function Orders() {
     try {
       await sendSupplierEmail({
         to: email.supplierEmail,
+        cc: email.ccEmails,
         subject: email.emailSubject,
         text: email.emailBody,
         senderEmail: user?.email,
@@ -386,12 +399,17 @@ export function Orders() {
       toast.success(`Sent supplier email to ${email.supplier}`);
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
-        openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+        openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
         toast.info('Email service not configured. Opened your mail app with a draft instead.');
         return;
       }
       toast.error(error instanceof Error ? error.message : 'Failed to send email');
     }
+  };
+
+  const updateDraftCcEmails = (supplier: string, value: string) => {
+    const ccEmails = value.split(/[;,\n]/).map(email => email.trim().toLowerCase()).filter(Boolean);
+    setDraftEmails(prev => prev.map(email => email.supplier === supplier ? { ...email, ccEmails } : email));
   };
 
   const updateDraftEmailField = (supplier: string, field: 'emailSubject' | 'emailBody', value: string) => {
@@ -428,7 +446,7 @@ export function Orders() {
     }));
   };
 
-  const copyDraftToClipboard = async (email: { supplier: string; supplierEmail: string; items: OrderSuggestion[]; totalCost: number; emailBody: string; emailSubject: string }) => {
+  const copyDraftToClipboard = async (email: SupplierEmailDraft) => {
     try {
       await navigator.clipboard.writeText(`${email.emailSubject}\n\n${email.emailBody}`);
       toast.success(`Copied ${email.supplier} draft`);
@@ -959,6 +977,7 @@ export function Orders() {
                   <div>
                     <p className="text-sm font-bold text-gray-900">{email.supplier}</p>
                     <p className="text-xs text-gray-500">{email.supplierEmail}</p>
+                    {email.ccEmails.length > 0 && <p className="mt-1 text-xs text-gray-500">CC: {email.ccEmails.join(', ')}</p>}
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => copyDraftToClipboard(email)}>
@@ -968,6 +987,17 @@ export function Orders() {
                       <Mail className="mr-1.5 h-3.5 w-3.5" /> Send
                     </Button>
                   </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">CC team members</label>
+                  <input
+                    type="text"
+                    value={email.ccEmails.join(', ')}
+                    onChange={(event) => updateDraftCcEmails(email.supplier, event.target.value)}
+                    placeholder="souschef@restaurant.com, manager@restaurant.com"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  />
+                  <p className="text-xs text-gray-500">Separate multiple addresses with commas.</p>
                 </div>
                 <div className="mt-3 space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Subject</label>

@@ -30,6 +30,9 @@ export default async function handler(req, res) {
   }
 
   const to = String(req.body?.to || '').trim();
+  const cc = (Array.isArray(req.body?.cc) ? req.body.cc : String(req.body?.cc || '').split(/[;,]/))
+    .map(value => String(value).trim().toLowerCase())
+    .filter((value, index, values) => value && value !== to.toLowerCase() && values.indexOf(value) === index);
   const subject = String(req.body?.subject || '').trim() || 'Supplier order request';
   const text = String(req.body?.text || '').trim();
   const senderEmail = String(req.body?.senderEmail || '').trim();
@@ -47,6 +50,7 @@ export default async function handler(req, res) {
     const buildPayload = (fromValue, includeReplyTo) => ({
       from: fromValue,
       to: [to],
+      ...(cc.length ? { cc } : {}),
       subject,
       text,
       ...(includeReplyTo && senderEmail ? { reply_to: senderEmail } : {}),

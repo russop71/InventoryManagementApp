@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Truck, Plus, Pencil, Trash2, Mail, Phone, MapPin, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { Truck, Plus, Pencil, Trash2, Mail, Phone, MapPin, ChevronDown, ChevronRight, FileText, DollarSign, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Suppliers() {
@@ -23,6 +23,10 @@ export function Suppliers() {
       name: formData.get('name') as string,
       contactPerson: formData.get('contactPerson') as string,
       email: formData.get('email') as string,
+      ccEmails: String(formData.get('ccEmails') || '')
+        .split(/[;,\n]/)
+        .map(email => email.trim().toLowerCase())
+        .filter((email, index, emails) => email && emails.indexOf(email) === index),
       phone: formData.get('phone') as string,
       address: formData.get('address') as string,
       category: formData.get('category') as string,
@@ -184,6 +188,18 @@ export function Suppliers() {
                       placeholder="123 Main St, City, State ZIP"
                     />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ccEmails">Default order email CC</Label>
+                    <textarea
+                      id="ccEmails"
+                      name="ccEmails"
+                      defaultValue={editingSupplierData?.ccEmails?.join(', ') || ''}
+                      rows={3}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      placeholder="souschef@restaurant.com, manager@restaurant.com"
+                    />
+                    <p className="text-xs text-gray-500">These team members are copied automatically on every order sent to this supplier.</p>
+                  </div>
                 </div>
               </div>
 
@@ -332,6 +348,19 @@ export function Suppliers() {
                           <a href={`mailto:${supplier.email}`} className="text-[#2563EB] hover:underline">
                             {supplier.email}
                           </a>
+                        </div>
+                      )}
+                      {supplier.ccEmails && supplier.ccEmails.length > 0 && (
+                        <div className="flex items-start space-x-2 text-sm">
+                          <Users className="mt-0.5 h-4 w-4 text-gray-500" />
+                          <div>
+                            <span className="font-medium text-gray-700">Order email CC:</span>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {supplier.ccEmails.map(email => (
+                                <Badge key={email} variant="outline" className="font-normal">{email}</Badge>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       )}
                       {supplier.phone && (

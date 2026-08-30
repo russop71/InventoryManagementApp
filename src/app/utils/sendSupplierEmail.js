@@ -1,8 +1,8 @@
-export async function sendSupplierEmail({ to, subject, text, senderEmail, senderName }) {
+export async function sendSupplierEmail({ to, cc = [], subject, text, senderEmail, senderName }) {
   const response = await fetch('/api/send-supplier-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, text, senderEmail, senderName }),
+    body: JSON.stringify({ to, cc, subject, text, senderEmail, senderName }),
   });
 
   const payload = await response.json().catch(() => ({}));

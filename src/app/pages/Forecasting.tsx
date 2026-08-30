@@ -10,12 +10,13 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Calendar, Plus, TrendingUp, Sparkles, ShoppingBag, DollarSign, Mail, Copy } from 'lucide-react';
 import { toast } from 'sonner';
-import { getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
+import { getSupplierCcEmails, getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
 import { useAuth } from '../contexts/AuthContext';
 
 interface SupplierEmail {
   supplier: string;
   supplierEmail: string;
+  ccEmails: string[];
   items: {
     name: string;
     quantity: number;
@@ -349,6 +350,7 @@ Restaurant Operations Team`;
       return {
         supplier,
         supplierEmail: getSupplierEmailAddress(supplier, suppliers),
+        ccEmails: getSupplierCcEmails(supplier, suppliers),
         items: emailItems,
         totalCost,
         emailBody,
@@ -367,7 +369,9 @@ Restaurant Operations Team`;
   };
 
   const openEmailClient = (email: SupplierEmail) => {
-    const mailtoLink = `mailto:${email.supplierEmail}?subject=${encodeURIComponent(email.emailSubject)}&body=${encodeURIComponent(email.emailBody)}`;
+    const params = new URLSearchParams({ subject: email.emailSubject, body: email.emailBody });
+    if (email.ccEmails.length) params.set('cc', email.ccEmails.join(','));
+    const mailtoLink = `mailto:${encodeURIComponent(email.supplierEmail)}?${params.toString()}`;
     window.location.href = mailtoLink;
   };
 
@@ -784,6 +788,7 @@ Restaurant Operations Team`;
                       <p className="text-sm text-gray-600 mt-1">
                         {email.items.length} item(s) • ${email.totalCost.toFixed(2)}
                       </p>
+                      {email.ccEmails.length > 0 && <p className="mt-1 text-xs text-gray-500">CC: {email.ccEmails.join(', ')}</p>}
                     </div>
                     <div className="flex space-x-2">
                       <Button

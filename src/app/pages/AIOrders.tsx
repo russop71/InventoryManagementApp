@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { groupBySupplier } from '../utils/invoiceWorkflow';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { resolveSuggestionQuantity } from '../utils/orderSuggestionUtils.js';
-import { getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
+import { getSupplierCcEmails, getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
 import { estimateDemandForTomorrow } from '../utils/forecastOrderUtils.js';
 
 interface OrderSuggestion {
@@ -33,6 +33,7 @@ interface OrderSuggestion {
 interface SupplierEmail {
   supplier: string;
   supplierEmail: string;
+  ccEmails: string[];
   items: OrderSuggestion[];
   totalCost: number;
   emailBody: string;
@@ -105,8 +106,10 @@ function getDefaultOrderDate() {
   return date.toISOString();
 }
 
-function openMailtoDraft(to: string, subject: string, body: string) {
-  const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+function openMailtoDraft(to: string, ccEmails: string[], subject: string, body: string) {
+  const params = new URLSearchParams({ subject, body });
+  if (ccEmails.length) params.set('cc', ccEmails.join(','));
+  const mailtoLink = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
   window.location.href = mailtoLink;
 }
 
@@ -407,6 +410,7 @@ export function AIOrders() {
       emailsToDraft.push({
         supplier,
         supplierEmail: getSupplierEmailAddress(supplier, suppliers),
+        ccEmails: getSupplierCcEmails(supplier, suppliers),
         items,
         totalCost,
         emailBody,
@@ -452,6 +456,7 @@ export function AIOrders() {
       return {
         supplier,
         supplierEmail: getSupplierEmailAddress(supplier, suppliers),
+        ccEmails: getSupplierCcEmails(supplier, suppliers),
         items,
         totalCost,
         emailBody,
@@ -475,6 +480,11 @@ export function AIOrders() {
       if (email.supplier !== supplier) return email;
       return { ...email, [field]: value };
     }));
+  };
+
+  const updateDraftCcEmails = (supplier: string, value: string) => {
+    const ccEmails = value.split(/[;,\n]/).map(email => email.trim().toLowerCase()).filter(Boolean);
+    setDraftEmails(prev => prev.map(email => email.supplier === supplier ? { ...email, ccEmails } : email));
   };
 
   const updateDraftItemQuantity = (supplier: string, itemId: string, value: string) => {
@@ -514,7 +524,7 @@ export function AIOrders() {
 
     if (emailServiceConfigured === false) {
       setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
-      openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+      openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
       toast.info('Email service is not configured. Opened your mail app with a draft instead.');
       return;
     }
@@ -523,6 +533,7 @@ export function AIOrders() {
     try {
       await sendSupplierEmail({
         to: email.supplierEmail,
+        cc: email.ccEmails,
         subject: email.emailSubject,
         text: email.emailBody,
         senderEmail: user?.email,
@@ -533,7 +544,7 @@ export function AIOrders() {
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
         setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
-        openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody);
+        openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
         toast.info('Email service not configured. Opened your mail app with a draft instead.');
         return;
       }
@@ -568,6 +579,7 @@ export function AIOrders() {
       try {
         await sendSupplierEmail({
           to: email.supplierEmail,
+          cc: email.ccEmails,
           subject: email.emailSubject,
           text: email.emailBody,
           senderEmail: user?.email,
@@ -660,6 +672,7 @@ export function AIOrders() {
     const supplierEmailDraft: SupplierEmail = {
       supplier: selectedSupplier,
       supplierEmail: getSupplierEmailAddress(selectedSupplier, suppliers),
+      ccEmails: getSupplierCcEmails(selectedSupplier, suppliers),
       items: itemsForEmail,
       totalCost: manualOrderTotal,
       emailBody,
@@ -1134,6 +1147,17 @@ export function AIOrders() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">CC team members</label>
+                    <input
+                      type="text"
+                      value={email.ccEmails.join(', ')}
+                      onChange={(event) => updateDraftCcEmails(email.supplier, event.target.value)}
+                      placeholder="bar.manager@restaurant.com, bartenders@restaurant.com"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    <p className="text-xs text-gray-500">Defaulted from the supplier record; adjust it for this order if needed.</p>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Subject</label>
                     <input
