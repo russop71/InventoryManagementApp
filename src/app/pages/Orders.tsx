@@ -19,6 +19,7 @@ import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../ut
 import { buildSupplierEmailDrafts } from '../utils/supplierEmailDraft.js';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { buildApiUrl } from '../utils/api';
+import { OrderBufferControl } from '../components/OrderBufferControl';
 
 const Y = '#F5C10E';
 const D = '#0F172A';
@@ -96,6 +97,10 @@ interface OrderSuggestion {
   reasoning: string;
   daysUntilStockout: number;
   confidence: number;
+  forecastDemand?: number;
+  baseSuggestedQuantity?: number;
+  bufferPercent?: number;
+  bufferQuantity?: number;
 }
 
 export function Orders() {
@@ -124,6 +129,7 @@ export function Orders() {
   const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderSupplierFilter, setOrderSupplierFilter] = useState('');
+  const [safetyBufferPercent, setSafetyBufferPercent] = useState(10);
 
   const open      = orders.filter(o => o.status === 'pending');
   const inTransit = orders.filter(o => o.status === 'ordered');
@@ -197,11 +203,19 @@ export function Orders() {
         .find(forecast => forecast.date >= new Date().toISOString().slice(0, 10));
       const estimatedDailyUsage = estimateDemandForTomorrow({ inventoryItem: item, forecastItems: forecasts, salesData });
 
+      const bufferQuantity = estimatedDailyUsage * (safetyBufferPercent / 100);
+      const baseSuggestedQuantity = calculateForecastOrderQuantity({
+        currentStock: item.currentStock,
+        expectedUsage: estimatedDailyUsage,
+        parLevel: item.parLevel,
+        safetyBuffer: 0,
+        minimumOrderQty: item.minimumOrderQty || 0,
+      });
       const suggestedQuantity = calculateForecastOrderQuantity({
         currentStock: item.currentStock,
         expectedUsage: estimatedDailyUsage,
         parLevel: item.parLevel,
-        safetyBuffer: Math.max(item.parLevel * 0.1, 2),
+        safetyBuffer: bufferQuantity,
         minimumOrderQty: item.minimumOrderQty || 0,
       });
 
@@ -237,13 +251,36 @@ export function Orders() {
           reasoning,
           daysUntilStockout,
           confidence,
+          forecastDemand: estimatedDailyUsage,
+          baseSuggestedQuantity,
+          bufferPercent: safetyBufferPercent,
+          bufferQuantity: Math.max(0, suggestedQuantity - baseSuggestedQuantity),
         });
       }
     });
 
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     return suggestions.sort((a, b) => priorityOrder[a.priority] === priorityOrder[b.priority] ? b.confidence - a.confidence : priorityOrder[a.priority] - priorityOrder[b.priority]);
-  }, [inventory, forecasts, salesData]);
+  }, [inventory, forecasts, salesData, safetyBufferPercent]);
+
+  const effectiveSuggestions = useMemo(() => {
+    if (!aiSuggestions) return orderSuggestions;
+    const calculatedByItem = new Map(orderSuggestions.map(suggestion => [suggestion.itemId, suggestion]));
+    return aiSuggestions.map(suggestion => {
+      const calculated = calculatedByItem.get(suggestion.itemId);
+      return calculated
+        ? {
+            ...suggestion,
+            suggestedQuantity: calculated.suggestedQuantity,
+            totalCost: calculated.totalCost,
+            forecastDemand: calculated.forecastDemand,
+            baseSuggestedQuantity: calculated.baseSuggestedQuantity,
+            bufferPercent: calculated.bufferPercent,
+            bufferQuantity: calculated.bufferQuantity,
+          }
+        : suggestion;
+    });
+  }, [aiSuggestions, orderSuggestions]);
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:4001');
@@ -266,8 +303,8 @@ export function Orders() {
   }, [inventory, salesData]);
 
   const displayedSuggestions = showAllSuggestions
-    ? (aiSuggestions || orderSuggestions)
-    : (aiSuggestions || orderSuggestions).filter(s => s.priority === 'critical' || s.priority === 'high');
+    ? effectiveSuggestions
+    : effectiveSuggestions.filter(s => s.priority === 'critical' || s.priority === 'high');
 
   const totalOrderCost = displayedSuggestions.filter(s => selectedSuggestions.has(s.itemId)).reduce((sum, s) => sum + s.totalCost, 0);
   const selectedCount = selectedSuggestions.size;
@@ -457,7 +494,7 @@ export function Orders() {
   };
 
   const handleApproveOrders = () => {
-    const sourceList = aiSuggestions || orderSuggestions;
+    const sourceList = effectiveSuggestions;
     const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
     if (ordersToPlace.length === 0) {
       toast.error('Select at least one item to place an order');
@@ -718,6 +755,10 @@ export function Orders() {
               </div>
             </div>
 
+            <div className="mt-3">
+              <OrderBufferControl value={safetyBufferPercent} onChange={setSafetyBufferPercent} />
+            </div>
+
             <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
               <p className="text-xs text-gray-600">{selectedCount} selected · Est. ${totalOrderCost.toFixed(2)}</p>
               <div className="flex gap-2">
@@ -765,6 +806,11 @@ export function Orders() {
                         <div className="text-right">
                           <p className="text-sm font-semibold text-gray-900">{suggestion.suggestedQuantity} {suggestion.unit}</p>
                           <p className="text-xs text-gray-500">${suggestion.totalCost.toFixed(2)}</p>
+                          {suggestion.bufferPercent !== undefined && (
+                            <p className="mt-1 text-[10px] font-bold text-amber-700">
+                              Includes +{suggestion.bufferQuantity || 0} {suggestion.unit} buffer
+                            </p>
+                          )}
                         </div>
                       </div>
                     </button>

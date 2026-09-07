@@ -193,6 +193,111 @@ function Product() {
   );
 }
 
+function ForecastToOrderShowcase() {
+  const [bufferPercent, setBufferPercent] = useState(10);
+  const lines = [
+    { item: 'Atlantic salmon', forecast: 42, stock: 30, unit: 'lb', unitCost: 13.5, supplier: 'Seafood supplier' },
+    { item: 'Roma tomatoes', forecast: 55, stock: 38, unit: 'lb', unitCost: 2.1, supplier: 'Produce supplier' },
+    { item: 'Olive oil', forecast: 18, stock: 10, unit: 'L', unitCost: 9.5, supplier: 'Foodservice supplier' },
+  ].map(line => {
+    const buffer = Math.ceil(line.forecast * (bufferPercent / 100));
+    const order = Math.max(0, Math.ceil(line.forecast + buffer - line.stock));
+    return { ...line, buffer, order, total: order * line.unitCost };
+  });
+  const orderTotal = lines.reduce((sum, line) => sum + line.total, 0);
+  const money = (value: number) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(value);
+
+  return (
+    <section className="overflow-hidden bg-[#0B1220] text-white">
+      <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[.82fr_1.18fr] lg:items-center lg:py-28">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[.2em] text-[#F5C10E]">Forecast-to-order intelligence</p>
+          <h2 className="mt-3 text-4xl font-black leading-tight tracking-[-.035em] sm:text-5xl">
+            Turn menu demand into a safer, reviewable supplier order.
+          </h2>
+          <p className="mt-5 text-lg leading-8 text-white/60">
+            ZestIQ connects sales forecasts, recipes and live stock, applies the safety buffer you choose, then groups the proposed order by supplier for human approval.
+          </p>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            {[
+              [TrendingDown, '1. Forecast demand', 'Estimate menu-item sales using POS history and operating signals.'],
+              [ClipboardCheck, '2. Calculate ingredients', 'Convert forecast dishes into ingredient demand through linked recipes.'],
+              [ShieldCheck, '3. Apply your buffer', 'Choose 5%, 10% or 15% before quantities are finalized.'],
+              [ShoppingCart, '4. Review the order', 'Deduct usable stock, group by supplier and approve before sending.'],
+            ].map(([Icon, title, text]: any) => (
+              <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <Icon className="h-5 w-5 text-[#F5C10E]" />
+                <p className="mt-3 text-sm font-black">{title}</p>
+                <p className="mt-1 text-xs leading-5 text-white/50">{text}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link to={DEMO_URL} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">
+              See it with your menu <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link to="/product-tour" className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-6 font-bold">
+              Explore the product
+            </Link>
+          </div>
+        </div>
+
+        <div className="relative">
+          <div aria-hidden="true" className="absolute -inset-10 rounded-full bg-[#F5C10E]/15 blur-3xl" />
+          <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[#F7F8FA] text-[#0B1220] shadow-2xl">
+            <div className="flex flex-col gap-4 border-b border-black/10 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[.18em] text-black/40">Example order preview</p>
+                <p className="mt-1 text-xl font-black">Tomorrow’s purchasing plan</p>
+              </div>
+              <div className="flex gap-1 rounded-xl border border-black/10 bg-white p-1" aria-label="Example forecast buffer">
+                {[5, 10, 15].map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={bufferPercent === option}
+                    onClick={() => setBufferPercent(option)}
+                    className={`rounded-lg px-3 py-2 text-xs font-black transition ${bufferPercent === option ? 'bg-[#0B1220] text-white' : 'text-black/50 hover:bg-black/5'}`}
+                  >
+                    {option}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="divide-y divide-black/8">
+              {lines.map(line => (
+                <div key={line.item} className="grid grid-cols-[1fr_auto] gap-4 p-5 sm:p-6">
+                  <div className="min-w-0">
+                    <p className="font-black">{line.item}</p>
+                    <p className="mt-1 text-xs leading-5 text-black/45">
+                      Forecast {line.forecast} {line.unit} + {line.buffer} {line.unit} buffer − {line.stock} {line.unit} on hand
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold text-[#9A7600]">{line.supplier}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold uppercase tracking-wider text-black/35">Order</p>
+                    <p className="mt-1 text-xl font-black">{line.order} {line.unit}</p>
+                    <p className="text-xs text-black/45">{money(line.total)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-4 bg-[#F5C10E] px-5 py-4 sm:px-6">
+              <div><p className="text-xs font-black uppercase tracking-wider text-black/45">Suggested total</p><p className="mt-1 text-2xl font-black">{money(orderTotal)}</p></div>
+              <span className="rounded-full bg-[#0B1220] px-4 py-2 text-xs font-black text-white">Review required</span>
+            </div>
+            <p className="px-5 py-3 text-[11px] leading-5 text-black/40 sm:px-6">
+              Illustrative quantities only. Actual suggestions depend on your recipes, units, supplier packs, stock accuracy and forecast inputs.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SavingsCalculator() {
   const [monthlySales, setMonthlySales] = useState(150000);
   const [foodCostPercent, setFoodCostPercent] = useState(31);
@@ -388,6 +493,7 @@ export function Landing() {
           </div>
         </section>
 
+        <ForecastToOrderShowcase />
         <SavingsCalculator />
         <LiveProductTour />
         <PhoneShowcase />

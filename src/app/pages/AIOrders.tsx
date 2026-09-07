@@ -12,8 +12,9 @@ import { groupBySupplier } from '../utils/invoiceWorkflow';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { resolveSuggestionQuantity } from '../utils/orderSuggestionUtils.js';
 import { getSupplierCcEmails, getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
-import { estimateDemandForTomorrow } from '../utils/forecastOrderUtils.js';
+import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils.js';
 import { buildApiUrl } from '../utils/api';
+import { OrderBufferControl } from '../components/OrderBufferControl';
 
 interface OrderSuggestion {
   itemId: string;
@@ -29,6 +30,10 @@ interface OrderSuggestion {
   reasoning: string;
   daysUntilStockout: number;
   confidence: number;
+  forecastDemand?: number;
+  baseSuggestedQuantity?: number;
+  bufferPercent?: number;
+  bufferQuantity?: number;
 }
 
 interface SupplierEmail {
@@ -131,6 +136,7 @@ export function AIOrders() {
   const [wsConnected, setWsConnected] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<OrderSuggestion[] | null>(null);
   const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
+  const [safetyBufferPercent, setSafetyBufferPercent] = useState(10);
   const restaurantName = useMemo(() => {
     if (accountId) {
       const profileStorageKey = `zestiq:account:${accountId}:profile`;
@@ -251,16 +257,21 @@ export function AIOrders() {
       }
 
       if (shouldOrder) {
-        // Calculate suggested order quantity
-        let suggestedQuantity = item.parLevel - item.currentStock;
-        
-        // Add buffer for high-demand items
-        if (salesTrend > 0.2) {
-          suggestedQuantity *= 1.15; // 15% buffer
-        }
-
-        // Round to reasonable quantities
-        suggestedQuantity = Math.ceil(suggestedQuantity);
+        const bufferQuantity = estimatedDailyUsage * (safetyBufferPercent / 100);
+        const baseSuggestedQuantity = calculateForecastOrderQuantity({
+          currentStock: item.currentStock,
+          expectedUsage: estimatedDailyUsage,
+          parLevel: item.parLevel,
+          safetyBuffer: 0,
+          minimumOrderQty: item.minimumOrderQty || 0,
+        });
+        const suggestedQuantity = calculateForecastOrderQuantity({
+          currentStock: item.currentStock,
+          expectedUsage: estimatedDailyUsage,
+          parLevel: item.parLevel,
+          safetyBuffer: bufferQuantity,
+          minimumOrderQty: item.minimumOrderQty || 0,
+        });
 
         suggestions.push({
           itemId: item.id,
@@ -276,6 +287,10 @@ export function AIOrders() {
           reasoning,
           daysUntilStockout,
           confidence,
+          forecastDemand: estimatedDailyUsage,
+          baseSuggestedQuantity,
+          bufferPercent: safetyBufferPercent,
+          bufferQuantity: Math.max(0, suggestedQuantity - baseSuggestedQuantity),
         });
       }
     });
@@ -288,11 +303,30 @@ export function AIOrders() {
       }
       return b.confidence - a.confidence;
     });
-  }, [inventory, forecasts, salesData]);
+  }, [inventory, forecasts, salesData, safetyBufferPercent]);
+
+  const effectiveSuggestions = useMemo(() => {
+    if (!aiSuggestions) return orderSuggestions;
+    const calculatedByItem = new Map(orderSuggestions.map(suggestion => [suggestion.itemId, suggestion]));
+    return aiSuggestions.map(suggestion => {
+      const calculated = calculatedByItem.get(suggestion.itemId);
+      return calculated
+        ? {
+            ...suggestion,
+            suggestedQuantity: calculated.suggestedQuantity,
+            totalCost: calculated.totalCost,
+            forecastDemand: calculated.forecastDemand,
+            baseSuggestedQuantity: calculated.baseSuggestedQuantity,
+            bufferPercent: calculated.bufferPercent,
+            bufferQuantity: calculated.bufferQuantity,
+          }
+        : suggestion;
+    });
+  }, [aiSuggestions, orderSuggestions]);
 
   const displayedSuggestions = showAllSuggestions 
-    ? (aiSuggestions || orderSuggestions) 
-    : (aiSuggestions || orderSuggestions).filter(s => s.priority === 'critical' || s.priority === 'high');
+    ? effectiveSuggestions
+    : effectiveSuggestions.filter(s => s.priority === 'critical' || s.priority === 'high');
 
   const supplierOptions = useMemo(() => {
     const names = [
@@ -328,9 +362,9 @@ export function AIOrders() {
   };
 
   const selectedApprovalGroups = useMemo(() => {
-    const selectedItems = (aiSuggestions || orderSuggestions).filter(s => selectedSuggestions.has(s.itemId));
+    const selectedItems = effectiveSuggestions.filter(s => selectedSuggestions.has(s.itemId));
     return buildSupplierGroups(selectedItems);
-  }, [aiSuggestions, orderSuggestions, selectedSuggestions]);
+  }, [effectiveSuggestions, selectedSuggestions]);
 
   useEffect(() => {
     if (!selectedSupplier) return;
@@ -370,7 +404,7 @@ export function AIOrders() {
   };
 
   const handleApproveOrders = () => {
-    const sourceList = aiSuggestions || orderSuggestions;
+    const sourceList = effectiveSuggestions;
     const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
 
     if (ordersToPlace.length === 0) {
@@ -444,7 +478,7 @@ export function AIOrders() {
   };
 
   const generateEmails = () => {
-    const sourceList = aiSuggestions || orderSuggestions;
+    const sourceList = effectiveSuggestions;
     const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
     
     // Group orders by supplier
@@ -833,6 +867,8 @@ export function AIOrders() {
         </Card>
       </div>
 
+      <OrderBufferControl value={safetyBufferPercent} onChange={setSafetyBufferPercent} />
+
       {/* Stats Overview */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-gradient-to-br from-[#0F172A] to-[#1E293B] border-[#0F172A]">
@@ -840,12 +876,12 @@ export function AIOrders() {
             <CardTitle className="text-xs font-medium text-white">Suggestions</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-white mb-2">{(aiSuggestions || orderSuggestions).length}</div>
+            <div className="text-2xl font-bold text-white mb-2">{effectiveSuggestions.length}</div>
             <div className="text-xs text-white space-y-1">
-              <p className="whitespace-nowrap">{(aiSuggestions || orderSuggestions).filter(s => s.priority === 'critical').length} critical</p>
-              <p className="whitespace-nowrap">{(aiSuggestions || orderSuggestions).filter(s => s.priority === 'high').length} high</p>
-              <p className="whitespace-nowrap">{(aiSuggestions || orderSuggestions).filter(s => s.priority === 'medium').length} medium</p>
-              <p className="whitespace-nowrap">{(aiSuggestions || orderSuggestions).filter(s => s.priority === 'low').length} low</p>
+              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'critical').length} critical</p>
+              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'high').length} high</p>
+              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'medium').length} medium</p>
+              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'low').length} low</p>
             </div>
           </CardContent>
         </Card>
@@ -856,7 +892,7 @@ export function AIOrders() {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-2xl font-bold text-white mb-2">
-              ${(aiSuggestions || orderSuggestions).reduce((sum, s) => sum + s.totalCost, 0).toFixed(2)}
+              ${effectiveSuggestions.reduce((sum, s) => sum + s.totalCost, 0).toFixed(2)}
             </div>
             <p className="text-xs text-slate-400">Total if all approved</p>
           </CardContent>
@@ -864,7 +900,7 @@ export function AIOrders() {
       </div>
 
       {/* Selection Actions */}
-      {orderSuggestions.length > 0 && (
+      {effectiveSuggestions.length > 0 && (
         <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
           <CardContent className="pt-4">
             <div className="space-y-3">
@@ -1053,6 +1089,20 @@ export function AIOrders() {
                         <p className="font-semibold text-gray-900">{suggestion.supplier}</p>
                       </div>
                     </div>
+
+                    {suggestion.bufferPercent !== undefined && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                        <div className="flex items-center justify-between gap-3 text-xs">
+                          <span className="font-semibold text-amber-900">Forecast buffer</span>
+                          <span className="font-black text-amber-900">
+                            +{suggestion.bufferQuantity || 0} {suggestion.unit} ({suggestion.bufferPercent}%)
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] leading-4 text-amber-900/70">
+                          Base suggestion {suggestion.baseSuggestedQuantity ?? suggestion.suggestedQuantity} {suggestion.unit}; final quantity remains editable before approval.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Days Until Stockout */}
                     {suggestion.daysUntilStockout < 7 && (
