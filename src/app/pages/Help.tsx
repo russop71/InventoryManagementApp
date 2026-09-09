@@ -48,6 +48,7 @@ export function Help() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input
+          aria-label="Search help articles"
           placeholder="Search for help articles..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -57,7 +58,12 @@ export function Help() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => navigate('/app/contact')}>
+        <Card role="button" tabIndex={0} aria-label="Contact support" className="cursor-pointer hover:bg-gray-50" onKeyDown={event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            navigate('/app/contact');
+          }
+        }} onClick={() => navigate('/app/contact')}>
           <CardContent className="pt-4 text-center">
             <MessageCircle className="w-8 h-8 mx-auto text-[#303A43] mb-2" />
             <p className="text-sm font-medium">Contact Support</p>

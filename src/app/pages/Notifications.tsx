@@ -64,7 +64,12 @@ export function Notifications() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => {
+        <Card role="button" tabIndex={0} aria-label="Enable all notifications" className="cursor-pointer hover:bg-gray-50" onKeyDown={event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          updateSettings(current => current.map(s => ({ ...s, email: true, push: true })));
+          toast.success('All notifications enabled');
+        }} onClick={() => {
           updateSettings(current => current.map(s => ({ ...s, email: true, push: true })));
           toast.success('All notifications enabled');
         }}>
@@ -73,7 +78,12 @@ export function Notifications() {
             <p className="text-sm font-medium">Enable All</p>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => {
+        <Card role="button" tabIndex={0} aria-label="Disable all notifications" className="cursor-pointer hover:bg-gray-50" onKeyDown={event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          updateSettings(current => current.map(s => ({ ...s, email: false, push: false, sms: false })));
+          toast.success('All notifications disabled');
+        }} onClick={() => {
           updateSettings(current => current.map(s => ({ ...s, email: false, push: false, sms: false })));
           toast.success('All notifications disabled');
         }}>
@@ -109,6 +119,10 @@ export function Notifications() {
                       <Label className="text-sm font-normal">Email</Label>
                     </div>
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={setting.email}
+                      aria-label={`${setting.label} email notifications`}
                       onClick={() => handleToggle(setting.id, 'email')}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         setting.email ? 'bg-[#303A43]' : 'bg-gray-200'
@@ -129,6 +143,10 @@ export function Notifications() {
                       <Label className="text-sm font-normal">Push Notifications</Label>
                     </div>
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={setting.push}
+                      aria-label={`${setting.label} push notifications`}
                       onClick={() => handleToggle(setting.id, 'push')}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         setting.push ? 'bg-[#303A43]' : 'bg-gray-200'
@@ -149,6 +167,10 @@ export function Notifications() {
                       <Label className="text-sm font-normal">SMS</Label>
                     </div>
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={setting.sms}
+                      aria-label={`${setting.label} SMS notifications`}
                       onClick={() => handleToggle(setting.id, 'sms')}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         setting.sms ? 'bg-[#303A43]' : 'bg-gray-200'

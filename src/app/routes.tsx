@@ -64,6 +64,8 @@ const Waste = lazy(() => import("./pages/Waste").then(module => ({ default: modu
 
 const isEmployeeNativeBuild = import.meta.env.VITE_APP_VARIANT === 'employee';
 function NativeEntry() { return <Navigate to="/employee" replace />; }
+function PublicTermsRedirect() { return <Navigate to="/terms" replace />; }
+function PublicPrivacyRedirect() { return <Navigate to="/privacy" replace />; }
 function LegacyCogsRedirect() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -228,8 +230,8 @@ export const router = createBrowserRouter([
           { path: "order-alarms", Component: OrderAlarms },
           { path: "help", Component: Help },
           { path: "contact", Component: Contact },
-          { path: "terms", Component: Terms },
-            { path: "privacy", Component: Privacy },
+          { path: "terms", Component: PublicTermsRedirect },
+          { path: "privacy", Component: PublicPrivacyRedirect },
           ],
         }],
       },

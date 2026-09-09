@@ -871,7 +871,7 @@ export function InventoryDetail() {
                           value={activePurchaseOption.supplier}
                           onValueChange={(value) => updatePurchaseOption(activePurchaseOption.id, { supplier: value })}
                         >
-                          <SelectTrigger className="mt-1 h-9 w-full">
+                          <SelectTrigger aria-label="Purchase option supplier" className="mt-1 h-9 w-full">
                             <SelectValue placeholder="Select a supplier" />
                           </SelectTrigger>
                           <SelectContent>
@@ -883,11 +883,11 @@ export function InventoryDetail() {
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Product name *</Label>
-                        <Input value={activePurchaseOption.productName} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { productName: event.target.value })} className="mt-1 h-9" />
+                        <Input aria-label="Purchase option product name" value={activePurchaseOption.productName} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { productName: event.target.value })} className="mt-1 h-9" />
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Product Code</Label>
-                        <Input value={activePurchaseOption.productCode} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { productCode: event.target.value })} className="mt-1 h-9" placeholder="Optional, e.g. supplier SKU" />
+                        <Input aria-label="Purchase option product code" value={activePurchaseOption.productCode} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { productCode: event.target.value })} className="mt-1 h-9" placeholder="Optional, e.g. supplier SKU" />
                       </div>
                     </div>
                   </div>
@@ -899,19 +899,19 @@ export function InventoryDetail() {
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Inner pack quantity *</Label>
                         <div className="mt-1 flex items-center gap-2">
-                          <Input type="number" min={0} step="0.01" value={activePurchaseOption.packSize} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packSize: Number(event.target.value) })} className="h-9" />
-                          <select value={activePurchaseOption.packUnit} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packUnit: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm">
+                          <Input aria-label="Purchase option inner pack quantity" type="number" min={0} step="0.01" value={activePurchaseOption.packSize} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packSize: Number(event.target.value) })} className="h-9" />
+                          <select aria-label="Purchase option inner pack unit" value={activePurchaseOption.packUnit} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packUnit: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm">
                             {MARKETMAN_UOM_OPTIONS.map(uom => (<option key={uom} value={uom}>{uom}</option>))}
                           </select>
                         </div>
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Pack nickname</Label>
-                        <Input value={activePurchaseOption.packNickname} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packNickname: event.target.value })} className="mt-1 h-9" placeholder="Bottle, bag, case" />
+                        <Input aria-label="Purchase option pack nickname" value={activePurchaseOption.packNickname} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packNickname: event.target.value })} className="mt-1 h-9" placeholder="Bottle, bag, case" />
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Packs per case</Label>
-                        <Input type="number" min={1} step="1" value={activePurchaseOption.packsPerCase} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packsPerCase: Number(event.target.value) })} className="mt-1 h-9" />
+                        <Input aria-label="Purchase option packs per case" type="number" min={1} step="1" value={activePurchaseOption.packsPerCase} onChange={(event) => updatePurchaseOption(activePurchaseOption.id, { packsPerCase: Number(event.target.value) })} className="mt-1 h-9" />
                       </div>
                     </div>
                   </div>
@@ -924,6 +924,7 @@ export function InventoryDetail() {
                         <div className="mt-1 flex items-center gap-2">
                           <span className="text-sm font-semibold text-gray-500">$</span>
                           <Input
+                            aria-label="Purchase option price"
                             type="number"
                             min={0}
                             step="0.01"
@@ -935,7 +936,7 @@ export function InventoryDetail() {
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Tax rate</Label>
-                        <select className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" value="0% tax" readOnly>
+                        <select aria-label="Purchase option tax rate" className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" value="0% tax" disabled>
                           <option>0% tax</option>
                         </select>
                       </div>

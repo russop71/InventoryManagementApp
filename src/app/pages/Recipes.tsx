@@ -942,7 +942,7 @@ export function Recipes() {
                         <p className="text-[11px]" style={{ color: getMarginColor(marginPercent) }}>{marginPercent.toFixed(0)}%</p>
                       </div>
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}>
+                        <Button aria-label={`Edit ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}>
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}>

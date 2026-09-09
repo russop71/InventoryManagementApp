@@ -239,6 +239,7 @@ export function Invoices() {
           <div className="flex min-w-[220px] items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
             <Search className="h-4 w-4 text-gray-400" />
             <Input
+              aria-label="Search invoices or suppliers"
               value={searchQuery}
               onChange={event => setSearchQuery(event.target.value)}
               placeholder="Search invoice or supplier"
@@ -247,7 +248,7 @@ export function Invoices() {
           </div>
           <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
             <Filter className="h-4 w-4 text-gray-400" />
-            <select value={invoiceFilter} onChange={event => setInvoiceFilter(event.target.value as 'all' | 'open' | 'received' | 'cancelled')} className="bg-transparent text-sm text-gray-700 outline-none">
+            <select aria-label="Filter invoices by status" value={invoiceFilter} onChange={event => setInvoiceFilter(event.target.value as 'all' | 'open' | 'received' | 'cancelled')} className="bg-transparent text-sm text-gray-700 outline-none">
               <option value="all">All types</option>
               <option value="open">Open</option>
               <option value="received">Received</option>

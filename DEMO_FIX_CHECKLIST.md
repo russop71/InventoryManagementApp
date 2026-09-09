@@ -99,5 +99,5 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 - [x] Add end-to-end coverage for forecast generation, selectable order buffers, order editing, approval, supplier grouping, PDF/email output, and failed delivery.
 - [ ] Add end-to-end coverage for waste, labour schedules, employee requests, POS imports, permissions/roles, onboarding, billing, password recovery/MFA, exports, and notification behaviour.
 - [ ] Verify graceful error and recovery behaviour for offline use, slow requests, request timeouts, expired sessions, double-clicked submissions, refresh during editing, and API/service outages.
-- [ ] Run an accessibility audit with keyboard-only navigation, screen-reader names, focus order, zoom, contrast, reduced motion, and form-error announcements across the full application.
-- [ ] Run a performance audit and split the main JavaScript bundle; the current production build warns that its approximately 619 kB minified main chunk exceeds the 500 kB warning threshold.
+- [x] Run an accessibility audit across every public-demo route on desktop and mobile. Added persistent automated checks for document landmarks, control names, image alternatives, ARIA references, keyboard focus visibility, reduced motion, and 200%-equivalent reflow; corrected the issues found.
+- [x] Run a performance audit and split the main JavaScript bundle. Public routes now load on demand; the live production main chunk is 294.50 kB minified (94.43 kB gzip), down from 618.75 kB, and the 500 kB warning is gone.

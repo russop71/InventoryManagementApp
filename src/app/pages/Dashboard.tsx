@@ -823,6 +823,7 @@ export function Dashboard() {
             <p className="text-sm font-semibold text-slate-900">Create COGS category</p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <Input
+                aria-label="New COGS category name"
                 placeholder="New category name"
                 value={newCogsCategoryName}
                 onChange={(e) => setNewCogsCategoryName(e.target.value)}

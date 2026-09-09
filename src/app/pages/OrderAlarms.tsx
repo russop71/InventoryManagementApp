@@ -296,6 +296,10 @@ export function OrderAlarms() {
                     <div className="flex items-center gap-2 shrink-0">
                       {/* Enable toggle */}
                       <button
+                        type="button"
+                        role="switch"
+                        aria-checked={alarm.enabled}
+                        aria-label={`${alarm.enabled ? 'Disable' : 'Enable'} ${alarm.name} alarm`}
                         onClick={() => toggleEnabled(alarm.id)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                           alarm.enabled ? 'bg-[#0F172A]' : 'bg-gray-200'
@@ -308,6 +312,8 @@ export function OrderAlarms() {
                         />
                       </button>
                       <button
+                        type="button"
+                        aria-label={`Delete ${alarm.name} alarm`}
                         onClick={() => handleDelete(alarm.id, alarm.name)}
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                       >

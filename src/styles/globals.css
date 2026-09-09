@@ -27,6 +27,11 @@ canvas {
   accent-color: #f5d62e;
 }
 
+:where(a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid #b58b00 !important;
+  outline-offset: 2px !important;
+}
+
 @media screen and (min-width: 1024px) {
   .zestiq-app-shell [data-slot="card"] {
     background-color: #fffefa;

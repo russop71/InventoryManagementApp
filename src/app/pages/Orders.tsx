@@ -712,12 +712,14 @@ export function Orders() {
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
             <Input
+              aria-label="Search orders, suppliers, or items"
               value={orderSearchQuery}
               onChange={event => setOrderSearchQuery(event.target.value)}
               placeholder="Search orders, suppliers or items…"
               className="h-11 rounded-xl border-slate-200 bg-white"
             />
             <select
+              aria-label="Filter orders by supplier"
               value={orderSupplierFilter}
               onChange={event => setOrderSupplierFilter(event.target.value)}
               className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
