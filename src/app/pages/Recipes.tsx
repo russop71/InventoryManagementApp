@@ -386,6 +386,7 @@ export function Recipes() {
                     id={`qty-${ingredient.inventoryItemId}`}
                     aria-label={`Quantity for ${item.name}`}
                     type="number"
+                    min="0.01"
                     step="0.01"
                     value={ingredient.quantity}
                     onChange={(e) => onUpdateIngredientQuantity(ingredient.inventoryItemId, Number(e.target.value))}
@@ -517,10 +518,30 @@ export function Recipes() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const trimmedName = recipeMenuItemName.trim();
+    const trimmedCategory = recipeCategory.trim();
+    const parsedPrice = Number(recipePrice);
+    if (!trimmedName || !trimmedCategory) {
+      showToast.error('Enter a menu item name and category');
+      return;
+    }
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      showToast.error('Enter a valid price of zero or more');
+      return;
+    }
+    const invalidIngredient = selectedIngredients.find(ingredient => {
+      const item = inventory.find(entry => entry.id === ingredient.inventoryItemId);
+      return !item || !Number.isFinite(ingredient.quantity) || ingredient.quantity <= 0
+        || convertIngredientQuantity(item, ingredient.quantity, ingredient.unit, item.unit) === null;
+    });
+    if (invalidIngredient) {
+      showToast.error('Every ingredient needs a quantity and a compatible unit before the menu item can be costed.');
+      return;
+    }
     const recipePayload = {
-      menuItemName: recipeMenuItemName.trim(),
-      category: recipeCategory.trim(),
-      price: Number(recipePrice || 0),
+      menuItemName: trimmedName,
+      category: trimmedCategory,
+      price: parsedPrice,
       ingredients: selectedIngredients,
       externalId: recipeExternalId.trim() || undefined,
       deletable: true,
@@ -709,6 +730,7 @@ export function Recipes() {
                       id="price"
                       name="price"
                       type="number"
+                      min="0"
                       step="0.01"
                       value={recipePrice}
                       onChange={(e) => setRecipePrice(e.target.value)}
@@ -890,7 +912,7 @@ export function Recipes() {
                       <div className="p-4 md:hidden">
                         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><button type="button" onClick={() => handleEditRecipe(recipe.id)} className="break-words text-left text-base font-black leading-snug text-slate-900">{recipe.menuItemName}</button><p className="mt-1 break-words text-xs text-slate-500">{recipe.category} · {recipe.ingredients.length} ingredients{recipe.externalId ? ` · POS ${recipe.externalId}` : ''}</p></div>{isTopSellerMatch && <Badge className="shrink-0 bg-amber-100 text-[10px] text-amber-800">Top Seller</Badge>}</div>
                         <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Food cost</p><p className="mt-1 font-black text-slate-900">${recipeCost.toFixed(2)}</p><p className="text-[10px] text-slate-500">{foodCostPercent.toFixed(0)}%</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Price</p><p className="mt-1 font-black text-slate-900">${recipe.price.toFixed(2)}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Margin</p><p className="mt-1 font-black" style={{ color: getMarginColor(marginPercent) }}>${margin.toFixed(2)}</p><p className="text-[10px]" style={{ color: getMarginColor(marginPercent) }}>{marginPercent.toFixed(0)}%</p></div></div>
-                        <div className="mt-3 flex gap-2"><Button className="flex-1" size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}><Edit className="mr-1.5 h-4 w-4" />Edit</Button><Button size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
+                        <div className="mt-3 flex gap-2"><Button className="flex-1" size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}><Edit className="mr-1.5 h-4 w-4" />Edit</Button><Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
                       </div>
                       <div className="hidden grid-cols-[minmax(180px,1.3fr)_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_0.9fr] items-center gap-3 px-4 py-4 text-sm text-slate-700 md:grid">
                       <div className="min-w-0">
@@ -923,7 +945,7 @@ export function Recipes() {
                         <Button size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}>
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}>
+                        <Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}>
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
                       </div>
@@ -1000,10 +1022,10 @@ export function Recipes() {
                     <p className="text-right font-semibold text-slate-900 tabular-nums">{component.yieldQuantity} {component.yieldUnit}</p>
                     <p className="text-right font-semibold text-slate-900 tabular-nums">${calculateIngredientCost(component.ingredients).toFixed(2)}</p>
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => openPrepDialog(component.id)}>
+                      <Button aria-label={`Edit ${component.menuItemName}`} size="sm" variant="outline" onClick={() => openPrepDialog(component.id)}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => deletePreppedRecipe(component.id)}>
+                      <Button aria-label={`Delete ${component.menuItemName}`} size="sm" variant="outline" onClick={() => deletePreppedRecipe(component.id)}>
                         Delete
                       </Button>
                     </div>
@@ -1036,7 +1058,7 @@ export function Recipes() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="prepMenuItemName">Recipe Name</Label>
-                <Input
+                  <Input
                   id="prepMenuItemName"
                   value={prepMenuItemName}
                   onChange={(e) => setPrepMenuItemName(e.target.value)}

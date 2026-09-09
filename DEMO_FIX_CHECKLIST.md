@@ -63,7 +63,7 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 ### Verified in this audit
 
 - [x] All 68 automated unit/API tests pass.
-- [x] All 20 local end-to-end browser checks pass across desktop and mobile; the production-only AI check is intentionally excluded from routine runs and passed separately against zestiq.ca.
+- [x] All 24 local end-to-end browser checks pass across desktop and mobile; the production-only AI check is intentionally excluded from routine runs and passed separately against zestiq.ca.
 - [x] The production build and approved-design guard pass.
 - [x] All public-demo routes load without runtime, authentication-token, or horizontal-overflow errors at desktop and mobile widths.
 - [x] The recipe camera flow obtains camera media, captures a JPEG image, sends it to the scanner, and opens human review at desktop and mobile widths using an emulated camera.
@@ -79,6 +79,9 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 - [x] Inventory items support validated creation, refresh persistence, editing, invoice-alias search, multiple storage areas with correct roll-ups, duplicate merging with alias retention, and deletion.
 - [x] Inventory counts support draft saving/resume, the same item in multiple storage areas, finalization, inventory roll-up, and locked finalized records.
 - [x] Inventory item creation and multi-area count controls provide clear validation and accessible field names.
+- [x] Menu items support validated creation, current-cost calculation, compatible unit conversion, duplicate-ingredient prevention, missing-cost display, refresh persistence, editing and deletion.
+- [x] Prepared recipes support validated ingredients and yields, per-yield cost recalculation, refresh persistence, editing and deletion; prepared recipes cannot be selected as their own ingredients, preventing circular references by design.
+- [x] Mobile pages leave enough scroll clearance that the floating AI assistant and bottom navigation do not block end-of-page actions.
 
 ### Still required before calling every function client-ready
 
@@ -86,7 +89,7 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 - [ ] Test handwriting recognition with a broader, consented sample set covering cursive, faint ink, crossed-out lines, fractions, abbreviations, mixed units, multi-page recipes, shadows, rotation, and partially obscured text; define and meet an acceptance threshold.
 - [x] Add end-to-end create, edit, validation, save, refresh, and delete coverage for inventory items, multi-area counts, merges and invoice aliases.
 - [ ] Extend invoice end-to-end coverage beyond the completed camera, image/PDF upload, review, failure-recovery, and post paths to include duplicates, tax, credits, unknown suppliers/items, low-confidence extraction, and rejected/illegible photos.
-- [ ] Add end-to-end coverage for recipe create/edit/delete, yield changes, unit conversions, missing costs, duplicate ingredients, prepped recipes, and circular recipe references.
+- [x] Add end-to-end coverage for recipe create/edit/delete, yield changes, unit conversions, missing costs, duplicate ingredients, prepped recipes, and circular recipe references.
 - [ ] Add end-to-end coverage for forecast generation, selectable order buffers, order editing, approval, supplier grouping, PDF/email output, and failed delivery.
 - [ ] Add end-to-end coverage for waste, labour schedules, employee requests, POS imports, permissions/roles, onboarding, billing, password recovery/MFA, exports, and notification behaviour.
 - [ ] Verify graceful error and recovery behaviour for offline use, slow requests, request timeouts, expired sessions, double-clicked submissions, refresh during editing, and API/service outages.

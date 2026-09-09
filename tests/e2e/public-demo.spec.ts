@@ -126,6 +126,15 @@ async function addInventoryItem(page: Page, values: { name: string; category?: s
   await expect(page.getByText(values.name, { exact: true }).first()).toBeVisible();
 }
 
+async function addRecipeIngredient(page: Page, name: string) {
+  const dialog = page.getByRole('dialog');
+  const search = dialog.getByPlaceholder('Start typing an inventory item...');
+  await search.fill(name);
+  await expect(dialog.getByText(name, { exact: true }).last()).toBeVisible();
+  await search.press('Enter');
+  await expect(dialog.getByLabel(`Quantity for ${name}`)).toBeVisible();
+}
+
 test('fresh public-demo visitor can enter with the keyboard and traverse every demo route', async ({ page }) => {
   test.setTimeout(120_000);
   const runtimeFailures = captureRuntimeFailures(page);
@@ -371,4 +380,105 @@ test('inventory count supports drafts, repeated storage-area lines, finalization
   await expect(page.getByText('Finalized count')).toBeVisible();
   await expect(page.getByText('This count is locked and included in inventory history.')).toBeVisible();
   await expect(page.locator('input[aria-label^="Count "]:visible')).toHaveCount(0);
+});
+
+test('recipes support validated create, costing, unit conversion, editing, persistence, and delete', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/recipes');
+
+  await page.getByRole('button', { name: 'New Menu Item' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Menu Item Name').fill('QA Costed Bowl');
+  await dialog.getByLabel('Category').fill('QA Specials');
+  await dialog.getByLabel('Price').fill('-1');
+  await dialog.getByRole('button', { name: 'Save Menu Item' }).click();
+  await expect(dialog).toBeVisible();
+  expect(await dialog.getByLabel('Price').evaluate((input: HTMLInputElement) => input.validity.rangeUnderflow)).toBe(true);
+
+  await dialog.getByLabel('Price').fill('20');
+  await addRecipeIngredient(page, 'Extra Virgin Olive Oil');
+  await dialog.getByLabel('Quantity for Extra Virgin Olive Oil').fill('0');
+  await dialog.getByRole('button', { name: 'Save Menu Item' }).click();
+  await expect(dialog).toBeVisible();
+  expect(await dialog.getByLabel('Quantity for Extra Virgin Olive Oil').evaluate((input: HTMLInputElement) => input.validity.rangeUnderflow)).toBe(true);
+  await dialog.getByLabel('Quantity for Extra Virgin Olive Oil').fill('0.5');
+  await expect(dialog.getByText('$6.20', { exact: true }).first()).toBeVisible();
+
+  const ingredientSearch = dialog.getByPlaceholder('Start typing an inventory item...');
+  await ingredientSearch.fill('Extra Virgin Olive Oil');
+  await ingredientSearch.press('Enter');
+  await expect(page.getByText('Ingredient already added')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Save Menu Item' }).click();
+  await expect(page.getByRole('button', { name: 'QA Costed Bowl', exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByRole('button', { name: 'QA Costed Bowl', exact: true }).click();
+  await dialog.getByLabel('Menu Item Name').fill('QA Costed Bowl Revised');
+  await dialog.getByLabel('Price').fill('24');
+  await dialog.getByLabel('Unit for Extra Virgin Olive Oil').selectOption('ml');
+  await expect(dialog.getByLabel('Quantity for Extra Virgin Olive Oil')).toHaveValue('500');
+  await expect(dialog.getByText('$6.20', { exact: true }).first()).toBeVisible();
+  await dialog.getByRole('button', { name: 'Update Menu Item' }).click();
+  await expect(page.getByRole('button', { name: 'QA Costed Bowl Revised', exact: true })).toBeVisible();
+
+  page.once('dialog', confirmation => confirmation.accept());
+  await page.getByRole('button', { name: 'Delete QA Costed Bowl Revised' }).click();
+  await expect(page.getByText('QA Costed Bowl Revised', { exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'New Menu Item' }).click();
+  await dialog.getByLabel('Menu Item Name').fill('QA Uncosted Item');
+  await dialog.getByLabel('Category').fill('QA Specials');
+  await dialog.getByLabel('Price').fill('12');
+  await dialog.getByRole('button', { name: 'Save Menu Item' }).click();
+  await page.getByRole('button', { name: 'QA Uncosted Item', exact: true }).click();
+  await expect(dialog.getByText('$0.00', { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByText('Add ingredients from inventory to compute food cost.')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  page.once('dialog', confirmation => confirmation.accept());
+  await page.getByRole('button', { name: 'Delete QA Uncosted Item' }).click();
+  await expect(page.getByText('QA Uncosted Item', { exact: true })).toHaveCount(0);
+});
+
+test('prepared recipes validate yield, prevent duplicate/circular ingredients, persist edits, and delete', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/recipes');
+  await page.getByRole('tab', { name: 'Recipes', exact: true }).click();
+  await page.getByRole('button', { name: 'New Recipe' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Recipe Name').fill('QA House Dressing');
+  await dialog.getByLabel('Category').fill('Dressings');
+  await dialog.getByLabel('Yield Qty').fill('0');
+  await dialog.getByLabel('Yield Unit').fill('portions');
+  await addRecipeIngredient(page, 'Extra Virgin Olive Oil');
+  await dialog.getByLabel('Quantity for Extra Virgin Olive Oil').fill('1');
+
+  const ingredientSearch = dialog.getByPlaceholder('Start typing an inventory item...');
+  await ingredientSearch.fill('Extra Virgin Olive Oil');
+  await ingredientSearch.press('Enter');
+  await expect(page.getByText('Ingredient already added')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Save Recipe' }).click();
+  await expect(dialog).toBeVisible();
+  expect(await dialog.getByLabel('Yield Qty').evaluate((input: HTMLInputElement) => input.validity.rangeUnderflow)).toBe(true);
+
+  await dialog.getByLabel('Yield Qty').fill('4');
+  await expect(dialog.getByText('$12.40', { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByText('$3.10 / portions')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Save Recipe' }).click();
+  await expect(page.getByText('QA House Dressing', { exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByRole('tab', { name: 'Recipes', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit QA House Dressing' }).click();
+  await dialog.getByLabel('Yield Qty').fill('8');
+  await expect(dialog.getByText('$1.55 / portions')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Update Recipe' }).click();
+  await expect(page.getByText('8 portions', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'New Recipe' }).click();
+  await dialog.getByPlaceholder('Start typing an inventory item...').fill('QA House Dressing');
+  await expect(dialog.getByText('No inventory items match “QA House Dressing”.')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Delete QA House Dressing' }).click();
+  await expect(page.getByText('QA House Dressing', { exact: true })).toHaveCount(0);
 });

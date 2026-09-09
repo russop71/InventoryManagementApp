@@ -384,7 +384,7 @@ export function Layout() {
       </header>
 
       {/* ── Content ──────────────────────────────────────── */}
-      <main className="min-w-0 overflow-x-clip px-3 py-4 sm:px-4 md:ml-[264px] md:px-7 md:pb-8 md:pt-[96px]">
+      <main className="min-w-0 overflow-x-clip px-3 pb-40 pt-4 sm:px-4 md:ml-[264px] md:px-7 md:pb-8 md:pt-[96px]">
         <div className="mx-auto w-full max-w-[1500px]">
           <Outlet />
         </div>
