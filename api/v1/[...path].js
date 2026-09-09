@@ -856,12 +856,20 @@ async function ensureDemoLogin() {
   let appUsers = await supabase(`app_users?email=eq.${encodeURIComponent(email)}&select=*`);
   let appUser = appUsers?.[0];
   let authUser = appUser?.auth_user_id ? { id: appUser.auth_user_id } : await findAuthUserByEmail(email);
-  if (!authUser) authUser = await createAuthUser({ email, password, name: 'Demo Owner' });
-  else {
-    await supabaseAuth(`admin/users/${encodeURIComponent(authUser.id)}`, {
-      method: 'PUT',
-      body: { password, email_confirm: true, user_metadata: { name: 'Demo Owner' } },
-    });
+  let tokenPayload;
+  if (!authUser) {
+    authUser = await createAuthUser({ email, password, name: 'Demo Owner' });
+  } else {
+    try {
+      // Reuse the configured credential. Updating the password on every public
+      // demo login revokes other visitors' active Supabase sessions.
+      tokenPayload = await signInWithPassword(email, password);
+    } catch {
+      await supabaseAuth(`admin/users/${encodeURIComponent(authUser.id)}`, {
+        method: 'PUT',
+        body: { password, email_confirm: true, user_metadata: { name: 'Demo Owner' } },
+      });
+    }
   }
   if (!appUser) {
     const created = await supabase('app_users?select=*', {
@@ -877,7 +885,7 @@ async function ensureDemoLogin() {
       body: { auth_user_id: authUser.id, role: 'Owner', status: 'Active', updated_at: new Date().toISOString() },
     });
   }
-  return signInWithPassword(email, password);
+  return tokenPayload || signInWithPassword(email, password);
 }
 
 function appOrigin(req) {

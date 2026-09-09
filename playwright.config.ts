@@ -1,12 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const externalBaseUrl = process.env.E2E_BASE_URL?.replace(/\/$/, '');
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   retries: 0,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: externalBaseUrl || 'http://127.0.0.1:4173',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -20,7 +22,7 @@ export default defineConfig({
       use: { ...devices['iPhone 13'], browserName: 'chromium' },
     },
   ],
-  webServer: [
+  webServer: externalBaseUrl ? undefined : [
     {
       command: 'PORT=4101 npm run server',
       url: 'http://127.0.0.1:4101/openapi.yaml',
