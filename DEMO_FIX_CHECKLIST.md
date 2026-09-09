@@ -12,7 +12,7 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 - [x] Prevent all public-demo account and location mutations—including billing, users, passwords, MFA, recovery, integrations and operational data—at the API layer.
 - [x] Make the visible POS/integration setup controls read-only in the public demo interface.
 - [x] Remove shared-data save conflicts by keeping each visitor’s demo changes local and stopping demo polling/server writes.
-- [ ] Verify every demo route using a fresh public-demo session after deployment.
+- [x] Verify every demo route using a fresh public-demo session after deployment.
 
 ## High — broken or misleading product behaviour
 
@@ -43,5 +43,10 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 
 - [x] Production build passes.
 - [x] Automated test suites pass (61/61 deployable app; 33/33 current-design preview).
-- [ ] Changes are deployed to zestiq.ca.
-- [ ] Live smoke test passes on desktop and mobile widths.
+- [x] Changes are deployed to zestiq.ca.
+- [x] Live smoke test passes on desktop and mobile widths.
+
+## External production configuration discovered during release
+
+- [ ] Configure the missing Vercel production Stripe values: secret key, Basic price, additional-location price, Scheduling price, and webhook secret. `/api/health` remains intentionally not-ready until these values exist.
+- [ ] Reconcile the Supabase migration history reported by the GitHub Supabase Preview check; remote migration versions are currently absent from the repository’s local migration directory.
