@@ -51,7 +51,7 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 - [x] Restore the approved current-design frontend as the single production source in GitHub `main`.
 - [x] Add a production build gate that blocks deployment when the approved homepage, navigation, employee routes, inventory merge/storage features, or lemon brand asset are missing.
 - [x] Archive and clearly label the former standalone preview copy so it cannot be mistaken for the deployable production project.
-- [ ] Protect GitHub `main` so deployments require review and passing checks.
+- [x] Protect GitHub `main` so deployments require review and passing checks.
 
 ## External production configuration discovered during release
 
