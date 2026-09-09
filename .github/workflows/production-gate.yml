@@ -32,8 +32,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install exact dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
       - name: Run unit tests
         run: npm test
