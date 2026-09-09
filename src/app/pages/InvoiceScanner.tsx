@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -38,33 +38,94 @@ export function InvoiceScanner() {
   const [extractedData, setExtractedData] = useState<ExtractedInvoice | null>(null);
   const [editedItems, setEditedItems] = useState<InvoiceItem[]>([]);
   const [supplierMatchMessage, setSupplierMatchMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    setIsCameraActive(false);
+  };
+
+  const selectFile = (file: File) => {
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+      setErrorMessage('Upload a JPEG, PNG, WebP, or PDF invoice.');
+      return false;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setErrorMessage('Use an invoice file smaller than 4 MB.');
+      return false;
+    }
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const url = URL.createObjectURL(file);
+    previewUrlRef.current = url;
+    setSelectedFile(file);
+    setPreviewUrl(url);
+    setExtractedData(null);
+    setEditedItems([]);
+    setSupplierMatchMessage('');
+    setErrorMessage('');
+    return true;
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
-        alert('Please upload a JPEG, PNG, WebP, or PDF invoice.');
-        event.target.value = '';
-        return;
-      }
-      if (file.size > 4 * 1024 * 1024) {
-        alert('Please upload an invoice file smaller than 4 MB.');
-        event.target.value = '';
-        return;
-      }
-      setSelectedFile(file);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      setExtractedData(null);
-      setEditedItems([]);
+    if (file && !selectFile(file)) event.target.value = '';
+  };
+
+  const startCamera = async () => {
+    setErrorMessage('');
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      streamRef.current = mediaStream;
+      setIsCameraActive(true);
+      window.setTimeout(() => {
+        if (videoRef.current) videoRef.current.srcObject = mediaStream;
+      }, 0);
+    } catch (error) {
+      console.error('Error accessing invoice camera', error);
+      setErrorMessage('Camera access was blocked. Allow camera access or upload an invoice instead.');
     }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || videoRef.current.videoWidth === 0) {
+      setErrorMessage('The camera is still starting. Wait a moment, then capture the invoice again.');
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setErrorMessage('This browser could not capture the photo. Upload an invoice image instead.');
+      return;
+    }
+    context.drawImage(videoRef.current, 0, 0);
+    canvas.toBlob(blob => {
+      if (!blob) {
+        setErrorMessage('This browser could not create the photo. Upload an invoice image instead.');
+        return;
+      }
+      selectFile(new File([blob], `invoice-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      stopCamera();
+    }, 'image/jpeg', 0.9);
   };
 
   const handleScan = async () => {
     if (!selectedFile) return;
 
     setIsProcessing(true);
+    setErrorMessage('');
 
     try {
       const reader = new FileReader();
@@ -106,7 +167,7 @@ export function InvoiceScanner() {
           setEditedItems(parsed.items);
         } catch (err) {
           console.error('Invoice scan error', err);
-          alert(err instanceof Error ? err.message : 'Invoice scan failed.');
+          setErrorMessage(err instanceof Error ? err.message : 'Invoice scan failed.');
         } finally {
           setIsProcessing(false);
         }
@@ -121,12 +182,14 @@ export function InvoiceScanner() {
   const handleItemEdit = (index: number, field: keyof InvoiceItem, value: string | number) => {
     const updated = [...editedItems];
     updated[index] = { ...updated[index], [field]: value };
-    
-    // Recalculate total cost if quantity or unit cost changes
-    if (field === 'quantity' || field === 'unitCost') {
+
+    if (field === 'packSize' || field === 'packCount') {
+      updated[index].quantity = Number(updated[index].packSize || 0) * Number(updated[index].packCount || 0);
+    }
+    if (field === 'quantity' || field === 'unitCost' || field === 'packSize' || field === 'packCount') {
       updated[index].totalCost = updated[index].quantity * updated[index].unitCost;
     }
-    
+
     setEditedItems(updated);
   };
 
@@ -149,6 +212,8 @@ export function InvoiceScanner() {
 
     // Reset form
     setSelectedFile(null);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = null;
     setPreviewUrl(null);
     setExtractedData(null);
     setEditedItems([]);
@@ -163,11 +228,15 @@ export function InvoiceScanner() {
   };
 
   const handleClearAll = () => {
+    stopCamera();
     setSelectedFile(null);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = null;
     setPreviewUrl(null);
     setExtractedData(null);
     setEditedItems([]);
     setSupplierMatchMessage('');
+    setErrorMessage('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -191,7 +260,16 @@ export function InvoiceScanner() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+          {!selectedFile && !isCameraActive && <div className="grid gap-3 sm:grid-cols-2">
+            <Button type="button" className="bg-[#303A43] text-white hover:bg-[#1E293B]" onClick={startCamera}>
+              <Camera className="mr-2 h-4 w-4" /> Take Photo
+            </Button>
+            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" /> Upload Invoice
+            </Button>
+          </div>}
+
+          <div className="sr-only">
             <input
               ref={fileInputRef}
               type="file"
@@ -200,16 +278,19 @@ export function InvoiceScanner() {
               className="hidden"
               id="invoice-upload"
             />
-            <label htmlFor="invoice-upload" className="cursor-pointer">
-              <Upload className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-              <p className="text-sm font-medium text-gray-700">
-                Click to upload invoice image
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                JPEG, PNG, WebP, or PDF up to 4 MB
-              </p>
-            </label>
           </div>
+
+          {!selectedFile && !isCameraActive && <p className="text-center text-xs text-gray-500">JPEG, PNG, WebP, or PDF up to 4 MB</p>}
+
+          {isCameraActive && <div className="space-y-3">
+            <div className="overflow-hidden rounded-xl bg-black"><video ref={videoRef} autoPlay playsInline className="w-full" /></div>
+            <div className="flex gap-2">
+              <Button type="button" className="flex-1 bg-[#303A43] text-white" onClick={capturePhoto}><Camera className="mr-2 h-4 w-4" /> Capture Invoice</Button>
+              <Button type="button" variant="outline" aria-label="Close camera" onClick={stopCamera}><XCircle className="h-4 w-4" /></Button>
+            </div>
+          </div>}
+
+          {errorMessage && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-800">{errorMessage}</div>}
 
           {selectedFile && (
             <div className="space-y-3">
@@ -291,19 +372,17 @@ export function InvoiceScanner() {
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-green-700">Vendor</p>
-                  <p className="text-sm font-semibold text-green-900">{extractedData.vendor}</p>
+                  <Label htmlFor="scanned-invoice-vendor" className="text-xs text-green-700">Vendor</Label>
+                  <Input id="scanned-invoice-vendor" value={extractedData.vendor} onChange={event => { setExtractedData({ ...extractedData, vendor: event.target.value }); setSupplierMatchMessage('Supplier name edited. Confirm it before saving.'); }} className="mt-1 bg-white text-sm font-semibold text-green-900" />
                   <p className="mt-1 text-[11px] leading-4 text-green-700">{supplierMatchMessage}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-green-700">Invoice #</p>
-                  <p className="text-sm font-semibold text-green-900">{extractedData.invoiceNumber}</p>
+                  <Label htmlFor="scanned-invoice-number" className="text-xs text-green-700">Invoice #</Label>
+                  <Input id="scanned-invoice-number" value={extractedData.invoiceNumber} onChange={event => setExtractedData({ ...extractedData, invoiceNumber: event.target.value })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
                 </div>
                 <div>
-                  <p className="text-xs text-green-700">Date</p>
-                  <p className="text-sm font-semibold text-green-900">
-                    {new Date(extractedData.date).toLocaleDateString()}
-                  </p>
+                  <Label htmlFor="scanned-invoice-date" className="text-xs text-green-700">Date</Label>
+                  <Input id="scanned-invoice-date" type="date" value={extractedData.date} onChange={event => setExtractedData({ ...extractedData, date: event.target.value })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
                 </div>
                 <div>
                   <p className="text-xs text-green-700">Total Value</p>
@@ -327,8 +406,9 @@ export function InvoiceScanner() {
                 <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-600">Item Name</Label>
+                      <Label htmlFor={`invoice-item-name-${index}`} className="text-xs text-gray-600">Item Name</Label>
                       <Input
+                        id={`invoice-item-name-${index}`}
                         value={item.name}
                         onChange={(e) => handleItemEdit(index, 'name', e.target.value)}
                         className="mt-1"
@@ -346,16 +426,18 @@ export function InvoiceScanner() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs text-gray-600">Category</Label>
+                      <Label htmlFor={`invoice-item-category-${index}`} className="text-xs text-gray-600">Category</Label>
                       <Input
+                        id={`invoice-item-category-${index}`}
                         value={item.category}
                         onChange={(e) => handleItemEdit(index, 'category', e.target.value)}
                         className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-gray-600">Unit</Label>
+                      <Label htmlFor={`invoice-item-unit-${index}`} className="text-xs text-gray-600">Unit</Label>
                       <Input
+                        id={`invoice-item-unit-${index}`}
                         value={item.unit}
                         onChange={(e) => handleItemEdit(index, 'unit', e.target.value)}
                         className="mt-1"
@@ -365,19 +447,20 @@ export function InvoiceScanner() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs text-gray-600">Pack size</Label>
-                      <Input type="number" min="0" step="0.01" value={item.packSize ?? item.quantity} onChange={(e) => handleItemEdit(index, 'packSize', parseFloat(e.target.value) || 0)} className="mt-1" />
+                      <Label htmlFor={`invoice-item-pack-size-${index}`} className="text-xs text-gray-600">Pack size</Label>
+                      <Input id={`invoice-item-pack-size-${index}`} type="number" min="0" step="0.01" value={item.packSize ?? item.quantity} onChange={(e) => handleItemEdit(index, 'packSize', parseFloat(e.target.value) || 0)} className="mt-1" />
                     </div>
                     <div>
-                      <Label className="text-xs text-gray-600">Packages on invoice</Label>
-                      <Input type="number" min="1" step="1" value={item.packCount ?? 1} onChange={(e) => handleItemEdit(index, 'packCount', parseFloat(e.target.value) || 1)} className="mt-1" />
+                      <Label htmlFor={`invoice-item-pack-count-${index}`} className="text-xs text-gray-600">Packages on invoice</Label>
+                      <Input id={`invoice-item-pack-count-${index}`} type="number" min="1" step="1" value={item.packCount ?? 1} onChange={(e) => handleItemEdit(index, 'packCount', parseFloat(e.target.value) || 1)} className="mt-1" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs text-gray-600">Quantity</Label>
+                      <Label htmlFor={`invoice-item-quantity-${index}`} className="text-xs text-gray-600">Quantity</Label>
                       <Input
+                        id={`invoice-item-quantity-${index}`}
                         type="number"
                         value={item.quantity}
                         onChange={(e) => handleItemEdit(index, 'quantity', parseFloat(e.target.value) || 0)}
@@ -385,8 +468,9 @@ export function InvoiceScanner() {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-gray-600">Unit Cost</Label>
+                      <Label htmlFor={`invoice-item-unit-cost-${index}`} className="text-xs text-gray-600">Unit Cost</Label>
                       <Input
+                        id={`invoice-item-unit-cost-${index}`}
                         type="number"
                         step="0.01"
                         value={item.unitCost}
@@ -415,6 +499,7 @@ export function InvoiceScanner() {
 
                 <Button
                   onClick={handleSaveToInventory}
+                  disabled={editedItems.length === 0 || !extractedData.vendor.trim() || !extractedData.invoiceNumber.trim() || !extractedData.date}
                   className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />

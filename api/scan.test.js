@@ -72,6 +72,29 @@ test('leaves ambiguous generic ingredient names for human review', () => {
   assert.equal(recipe.ingredients[0].matchConfidence, 0);
 });
 
+test('matches clear handwritten ingredient wording and leaves unsafe substitutions for review', () => {
+  const recipe = normalizeScannedRecipe({
+    menuItemName: 'Classic Tomato Basil Sauce',
+    yieldQuantity: 4,
+    yieldUnit: 'L',
+    ingredients: [
+      { rawText: '2 kg Roma tomatoes', name: 'Roma tomatoes', quantity: 2, unit: 'kg', matchedInventoryItemId: '', matchConfidence: 0 },
+      { rawText: '30 g fresh basil', name: 'Fresh basil leaves', quantity: 30, unit: 'g', matchedInventoryItemId: '', matchConfidence: 0 },
+      { rawText: '20 g kosher salt', name: 'Kosher salt', quantity: 20, unit: 'g', matchedInventoryItemId: '', matchConfidence: 0 },
+      { rawText: '60 ml olive oil', name: 'Olive oil', quantity: 60, unit: 'ml', matchedInventoryItemId: '', matchConfidence: 0 },
+    ],
+  }, [
+    { id: 'tomato-sauce', name: 'Tomato Sauce', unit: 'case', supplier: 'Food Supplier' },
+    { id: 'basil', name: 'Fresh Basil', unit: 'kg', supplier: 'Produce Supplier' },
+    { id: 'olive-oil', name: 'Extra Virgin Olive Oil', unit: 'L', supplier: 'Food Supplier' },
+  ]);
+
+  assert.equal(recipe.ingredients[0].matchedInventoryItemId, '', 'raw tomatoes must not silently become tomato sauce');
+  assert.equal(recipe.ingredients[1].matchedInventoryItemId, 'basil');
+  assert.equal(recipe.ingredients[2].matchedInventoryItemId, '', 'missing salt must stay in human review');
+  assert.equal(recipe.ingredients[3].matchedInventoryItemId, 'olive-oil');
+});
+
 test('normalizes common recipe quantities and plural item names before matching', () => {
   assert.equal(normalizeRecipeIngredientName('2.5 kg Tomatoes (case)'), 'tomato');
   assert.equal(normalizeRecipeIngredientName('All-purpose flours'), 'ap flour');

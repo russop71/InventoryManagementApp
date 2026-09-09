@@ -121,6 +121,7 @@ export function getCompatibleUnits(unit: string) {
 export function convertQuantity(quantity: number, fromUnit: string, toUnit: string): number | null {
   const from = normalizeUnit(fromUnit);
   const to = normalizeUnit(toUnit);
+  if (from === to) return quantity;
   const fromDef = UNITS[from];
   const toDef = UNITS[to];
 
