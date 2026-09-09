@@ -113,6 +113,19 @@ async function mockInvoiceScan(page: Page, capturedImages: string[] = []) {
   });
 }
 
+async function addInventoryItem(page: Page, values: { name: string; category?: string; supplier?: string; unit?: string; onHand?: string; par?: string; cost?: string }) {
+  await page.getByRole('button', { name: 'Add Item' }).click();
+  await page.getByLabel('Item name', { exact: true }).fill(values.name);
+  await page.getByLabel('Category', { exact: true }).fill(values.category || 'Produce');
+  await page.getByLabel('Supplier', { exact: true }).fill(values.supplier || 'QA Produce Supplier');
+  await page.getByLabel('Unit', { exact: true }).fill(values.unit || 'kg');
+  await page.getByLabel('On hand', { exact: true }).fill(values.onHand || '5');
+  await page.getByLabel('Par level', { exact: true }).fill(values.par || '8');
+  await page.getByLabel('Unit cost', { exact: true }).fill(values.cost || '4.25');
+  await page.getByRole('button', { name: 'Save item' }).click();
+  await expect(page.getByText(values.name, { exact: true }).first()).toBeVisible();
+}
+
 test('fresh public-demo visitor can enter with the keyboard and traverse every demo route', async ({ page }) => {
   test.setTimeout(120_000);
   const runtimeFailures = captureRuntimeFailures(page);
@@ -256,4 +269,106 @@ test('invoice PDF upload reaches review with editable extracted fields', async (
   await expect(page.getByLabel('Vendor')).toBeEditable();
   await expect(page.getByLabel('Invoice #')).toBeEditable();
   await expect(page.getByLabel('Date')).toBeEditable();
+});
+
+test('inventory supports validated add, edit, aliases, multiple areas, merge, persistence, and delete', async ({ page }) => {
+  test.setTimeout(90_000);
+  const primaryName = 'QA Golden Tomatoes';
+  const duplicateName = 'QA Golden Tomatoes Duplicate';
+  await freshDemoLogin(page);
+  await page.goto('/app/inventory');
+
+  await page.getByRole('button', { name: 'Add Item' }).click();
+  await page.getByRole('button', { name: 'Save item' }).click();
+  await expect(page.getByRole('alert')).toContainText('Enter an item name');
+  await page.getByLabel('Item name', { exact: true }).fill(primaryName);
+  await page.getByLabel('On hand', { exact: true }).fill('-1');
+  await page.getByRole('button', { name: 'Save item' }).click();
+  await expect(page.getByRole('alert')).toContainText('zero or greater');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await addInventoryItem(page, { name: primaryName, onHand: '5', par: '8', cost: '4.25' });
+  await page.reload();
+  await expect(page.getByText(primaryName, { exact: true }).first()).toBeVisible();
+  await page.getByText(primaryName, { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Invoice aliases').fill('Golden Roma 5 KG, GR-TOMATO');
+  await page.getByLabel('Category').fill('Fresh Produce');
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+
+  await page.getByLabel('New storage area').fill('Prep Cooler');
+  await page.getByLabel('Storage area on hand').fill('3');
+  await page.getByLabel('Storage area par').fill('4');
+  await page.getByRole('button', { name: 'Save area' }).click();
+  await expect(page.getByText('Prep Cooler', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/Total: 8 kg on hand · par 12/)).toBeVisible();
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.getByPlaceholder('Search items...').fill('Golden Roma 5 KG');
+  await expect(page.getByText(primaryName, { exact: true }).first()).toBeVisible();
+  await page.getByPlaceholder('Search items...').fill('');
+  await addInventoryItem(page, { name: duplicateName, onHand: '2', par: '3', cost: '4.50' });
+
+  await page.getByLabel(`Select ${primaryName}`, { exact: true }).check();
+  await page.getByLabel(`Select ${duplicateName}`, { exact: true }).check();
+  page.once('dialog', dialog => void dialog.accept());
+  await page.getByRole('button', { name: 'Merge items' }).click();
+  await expect(page.getByLabel(`Select ${duplicateName}`, { exact: true })).toHaveCount(0);
+  await page.getByPlaceholder('Search items...').fill(duplicateName);
+  await expect(page.getByText(primaryName, { exact: true }).first()).toBeVisible();
+  await page.getByText(primaryName, { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Invoice aliases')).toHaveValue(/Golden Roma 5 KG/);
+  await expect(page.getByLabel('Invoice aliases')).toHaveValue(/QA Golden Tomatoes Duplicate/);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  page.once('dialog', dialog => void dialog.accept());
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/inventory$/);
+  await page.getByPlaceholder('Search items...').fill(primaryName);
+  await expect(page.getByText(primaryName, { exact: true })).toHaveCount(0);
+});
+
+test('inventory count supports drafts, repeated storage-area lines, finalization, and locking', async ({ page }) => {
+  test.setTimeout(90_000);
+  await freshDemoLogin(page);
+  await page.goto('/app/inventory');
+  await page.getByRole('button', { name: 'Start count' }).click();
+  await expect(page.getByText('Count in progress')).toBeVisible();
+  await page.getByLabel('Description').fill('QA closing count');
+  await page.getByPlaceholder('Search inventory…').fill('Ground Beef');
+
+  const initialCount = page.locator('input[aria-label="Count Ground Beef"]:visible');
+  await expect(initialCount).toHaveCount(1);
+  await initialCount.fill('9');
+  await expect(initialCount).toHaveValue('9');
+  await page.getByLabel('Additional count item').selectOption({ label: 'Ground Beef' });
+  await page.getByLabel('Additional count storage area').selectOption('Bar');
+  await page.getByRole('button', { name: 'Add count line' }).click();
+  const repeatedCounts = page.locator('input[aria-label="Count Ground Beef"]:visible');
+  await expect(repeatedCounts).toHaveCount(2);
+  expect((await repeatedCounts.evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).sort()).toEqual(['', '9']);
+  for (let index = 0; index < await repeatedCounts.count(); index += 1) {
+    if ((await repeatedCounts.nth(index).inputValue()) === '') await repeatedCounts.nth(index).fill('2');
+  }
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText(/Saved \d{1,2}:\d{2}/).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Save & exit' }).click();
+
+  await expect(page.getByRole('button', { name: 'Resume count' })).toBeVisible();
+  await page.getByRole('button', { name: 'Resume count' }).click();
+  await page.getByPlaceholder('Search inventory…').fill('Ground Beef');
+  const resumedCounts = page.locator('input[aria-label="Count Ground Beef"]:visible');
+  await expect(resumedCounts).toHaveCount(2);
+  expect((await resumedCounts.evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).sort()).toEqual(['2', '9']);
+
+  page.once('dialog', dialog => void dialog.accept());
+  await page.getByRole('button', { name: 'Finalize count' }).click();
+  await expect(page).toHaveURL(/\/app\/inventory$/);
+  await expect(page.getByText('QA closing count', { exact: true }).first()).toBeVisible();
+  await page.getByText('QA closing count', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Count view' }).click();
+  await expect(page.getByText('Finalized count')).toBeVisible();
+  await expect(page.getByText('This count is locked and included in inventory history.')).toBeVisible();
+  await expect(page.locator('input[aria-label^="Count "]:visible')).toHaveCount(0);
 });
