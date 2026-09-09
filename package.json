@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build && node scripts/generate-static-routes.mjs",
+    "build": "node scripts/verify-design-baseline.mjs && vite build && node scripts/generate-static-routes.mjs",
     "build:ios": "VITE_API_URL=https://zestiq.ca npm run build && npx cap sync ios",
     "ios:open": "npx cap open ios",
     "build:employee": "VITE_API_URL=https://zestiq.ca VITE_APP_VARIANT=employee vite build --outDir dist-employee",
@@ -14,6 +14,7 @@
     "dev": "vite",
     "server": "node server/api-server.js",
     "test": "node --test",
+    "verify:design": "node scripts/verify-design-baseline.mjs",
     "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/private/tmp/zestiq-playwright} playwright test",
     "backup": "node scripts/backup-supabase.mjs",
     "backup:verify": "node scripts/verify-backup.mjs"
