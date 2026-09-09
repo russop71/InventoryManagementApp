@@ -175,6 +175,10 @@ export interface InvoiceRecord {
   supplier: string;
   items: OrderItem[];
   totalAmount: number;
+  subtotalAmount?: number;
+  taxAmount?: number;
+  creditAmount?: number;
+  confidence?: number;
   status: 'open' | 'received' | 'cancelled';
   orderId?: string;
 }
@@ -218,6 +222,7 @@ export interface ScannedInvoiceItem {
   unitCost: number;
   totalCost: number;
   category: string;
+  confidence?: number;
 }
 
 export interface ScannedInvoiceInput {
@@ -225,7 +230,11 @@ export interface ScannedInvoiceInput {
   invoiceNumber: string;
   date: string;
   items: ScannedInvoiceItem[];
+  subtotal?: number;
+  tax?: number;
+  credits?: number;
   total: number;
+  confidence?: number;
 }
 
 interface InvoiceMutationResult {
@@ -1400,6 +1409,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       supplier: supplierName,
       items: invoiceItems,
       totalAmount: Number.isFinite(invoiceInput.total) ? Math.max(0, invoiceInput.total) : calculatedTotal,
+      subtotalAmount: Number.isFinite(invoiceInput.subtotal) ? Math.max(0, Number(invoiceInput.subtotal)) : calculatedTotal,
+      taxAmount: Number.isFinite(invoiceInput.tax) ? Math.max(0, Number(invoiceInput.tax)) : 0,
+      creditAmount: Number.isFinite(invoiceInput.credits) ? Math.max(0, Number(invoiceInput.credits)) : 0,
+      confidence: Number.isFinite(invoiceInput.confidence) ? Math.max(0, Math.min(1, Number(invoiceInput.confidence))) : undefined,
       status: 'received',
     };
     const nextInvoices = [...invoices, newInvoice];

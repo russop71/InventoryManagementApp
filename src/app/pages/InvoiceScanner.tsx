@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Trash2 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { findBestSupplierMatch } from '../utils/supplierMatching.js';
+import { inventoryItemMatchesInvoiceName } from '../utils/invoiceWorkflow.js';
 
 interface InvoiceItem {
   name: string;
@@ -19,6 +20,7 @@ interface InvoiceItem {
   unitCost: number;
   totalCost: number;
   category: string;
+  confidence?: number;
 }
 
 interface ExtractedInvoice {
@@ -26,11 +28,15 @@ interface ExtractedInvoice {
   invoiceNumber: string;
   date: string;
   items: InvoiceItem[];
+  subtotal: number;
+  tax: number;
+  credits: number;
   total: number;
+  confidence?: number;
 }
 
 export function InvoiceScanner() {
-  const { importScannedInvoice, suppliers } = useInventory();
+  const { importScannedInvoice, suppliers, inventory } = useInventory();
   const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -39,6 +45,7 @@ export function InvoiceScanner() {
   const [editedItems, setEditedItems] = useState<InvoiceItem[]>([]);
   const [supplierMatchMessage, setSupplierMatchMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -74,6 +81,7 @@ export function InvoiceScanner() {
     setEditedItems([]);
     setSupplierMatchMessage('');
     setErrorMessage('');
+    setReviewAcknowledged(false);
     return true;
   };
 
@@ -137,21 +145,39 @@ export function InvoiceScanner() {
             body: JSON.stringify({ imageData: dataUrl })
           });
           // Normalize response
+          const normalizedItems = (json.items || []).map((it: any) => ({
+            name: it.name || it.item || '',
+            quantity: Number(it.quantity) || 0,
+            unit: it.unit || 'ea',
+            packSize: Number(it.packSize) || Number(it.quantity) || 1,
+            packCount: Number(it.packCount) || 1,
+            unitCost: Number(it.unitCost) || Number(it.price) || 0,
+            totalCost: Number(it.totalCost) || (Number(it.quantity) || 0) * (Number(it.unitCost) || 0),
+            category: it.category || 'Uncategorized',
+            confidence: Number.isFinite(Number(it.confidence)) ? Math.max(0, Math.min(1, Number(it.confidence))) : 0,
+          }));
+          if (normalizedItems.length === 0) {
+            setExtractedData(null);
+            setEditedItems([]);
+            setErrorMessage('No invoice line items could be read. Try a clearer, well-lit photo or upload the original PDF.');
+            return;
+          }
+          const lineSubtotal = normalizedItems.reduce((sum: number, item: InvoiceItem) => sum + item.totalCost, 0);
+          const statedTotal = Number(json.total);
+          const statedTax = Number(json.tax);
+          const statedCredits = Number(json.credits);
+          const inferredTax = !Number.isFinite(statedTax) && Number.isFinite(statedTotal) && statedTotal > lineSubtotal ? statedTotal - lineSubtotal : 0;
+          const inferredCredits = !Number.isFinite(statedCredits) && Number.isFinite(statedTotal) && statedTotal < lineSubtotal ? lineSubtotal - statedTotal : 0;
           const parsed: ExtractedInvoice = {
             vendor: json.vendor || 'Unknown',
-            invoiceNumber: json.invoiceNumber || `INV-${Math.floor(Math.random() * 100000)}`,
-            date: json.date || new Date().toISOString().split('T')[0],
-            items: (json.items || []).map((it: any) => ({
-              name: it.name || it.item || 'Item',
-              quantity: Number(it.quantity) || 1,
-              unit: it.unit || it.unit || 'ea',
-              packSize: Number(it.packSize) || Number(it.quantity) || 1,
-              packCount: Number(it.packCount) || 1,
-              unitCost: Number(it.unitCost) || Number(it.price) || 0,
-              totalCost: Number(it.totalCost) || (Number(it.quantity) || 1) * (Number(it.unitCost) || 0),
-              category: it.category || 'Uncategorized'
-            })),
-            total: Number(json.total) || 0
+            invoiceNumber: json.invoiceNumber || '',
+            date: json.date || '',
+            items: normalizedItems,
+            subtotal: Number.isFinite(Number(json.subtotal)) ? Math.max(0, Number(json.subtotal)) : lineSubtotal,
+            tax: Number.isFinite(statedTax) ? Math.max(0, statedTax) : inferredTax,
+            credits: Number.isFinite(statedCredits) ? Math.max(0, statedCredits) : inferredCredits,
+            total: Number.isFinite(statedTotal) ? Math.max(0, statedTotal) : lineSubtotal,
+            confidence: Number.isFinite(Number(json.confidence)) ? Math.max(0, Math.min(1, Number(json.confidence))) : 0,
           };
 
           const supplierMatch = findBestSupplierMatch(parsed.vendor, suppliers);
@@ -165,6 +191,10 @@ export function InvoiceScanner() {
           }
           setExtractedData(parsed);
           setEditedItems(parsed.items);
+          setReviewAcknowledged(false);
+          if (!parsed.invoiceNumber || !parsed.date) {
+            setErrorMessage('The invoice number or date could not be read. Enter the missing information before saving.');
+          }
         } catch (err) {
           console.error('Invoice scan error', err);
           setErrorMessage(err instanceof Error ? err.message : 'Invoice scan failed.');
@@ -203,10 +233,13 @@ export function InvoiceScanner() {
     const result = importScannedInvoice({
       ...extractedData,
       items: editedItems,
-      total: totalValue,
+      subtotal: totalValue,
+      tax: taxValue,
+      credits: creditValue,
+      total: invoiceTotal,
     });
     if (!result.success) {
-      alert(result.error || 'The invoice could not be saved.');
+      setErrorMessage(result.error || 'The invoice could not be saved.');
       return;
     }
 
@@ -218,6 +251,7 @@ export function InvoiceScanner() {
     setExtractedData(null);
     setEditedItems([]);
     setSupplierMatchMessage('');
+    setReviewAcknowledged(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -237,12 +271,22 @@ export function InvoiceScanner() {
     setEditedItems([]);
     setSupplierMatchMessage('');
     setErrorMessage('');
+    setReviewAcknowledged(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const totalValue = editedItems.reduce((sum, item) => sum + item.totalCost, 0);
+  const taxValue = Math.max(0, Number(extractedData?.tax) || 0);
+  const creditValue = Math.max(0, Number(extractedData?.credits) || 0);
+  const invoiceTotal = Math.max(0, totalValue + taxValue - creditValue);
+  const hasLowConfidence = Boolean(extractedData) && (
+    (extractedData?.confidence ?? 0) < 0.75 || editedItems.some(item => (item.confidence ?? 0) < 0.75)
+  );
+  const hasUnknownSupplier = Boolean(extractedData) && !findBestSupplierMatch(extractedData?.vendor || '', suppliers);
+  const hasNewInventoryItems = editedItems.some(item => !inventory.some(existing => inventoryItemMatchesInvoiceName(existing, item.name)));
+  const requiresExplicitReview = hasLowConfidence || hasUnknownSupplier || hasNewInventoryItems;
 
   return (
     <div className="space-y-4 pb-20">
@@ -366,7 +410,9 @@ export function InvoiceScanner() {
                   <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
                   Invoice Extracted
                 </CardTitle>
-                <Badge className="bg-green-600 text-white">Success</Badge>
+                <Badge className={requiresExplicitReview ? 'bg-amber-500 text-white' : 'bg-green-600 text-white'}>
+                  {requiresExplicitReview ? 'Review required' : 'High confidence'}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -385,12 +431,27 @@ export function InvoiceScanner() {
                   <Input id="scanned-invoice-date" type="date" value={extractedData.date} onChange={event => setExtractedData({ ...extractedData, date: event.target.value })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
                 </div>
                 <div>
-                  <p className="text-xs text-green-700">Total Value</p>
+                  <p className="text-xs text-green-700">Line Subtotal</p>
                   <p className="text-sm font-semibold text-green-900">
                     ${totalValue.toFixed(2)}
                   </p>
                 </div>
+                <div>
+                  <Label htmlFor="scanned-invoice-tax" className="text-xs text-green-700">Tax</Label>
+                  <Input id="scanned-invoice-tax" type="number" min="0" step="0.01" value={extractedData.tax} onChange={event => setExtractedData({ ...extractedData, tax: Math.max(0, Number(event.target.value) || 0) })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
+                </div>
+                <div>
+                  <Label htmlFor="scanned-invoice-credits" className="text-xs text-green-700">Credits / allowances</Label>
+                  <Input id="scanned-invoice-credits" type="number" min="0" step="0.01" value={extractedData.credits} onChange={event => setExtractedData({ ...extractedData, credits: Math.max(0, Number(event.target.value) || 0) })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
+                </div>
               </div>
+              {requiresExplicitReview && (
+                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                  {hasLowConfidence && <p>Some text was unclear. Compare every highlighted value with the original invoice.</p>}
+                  {hasUnknownSupplier && <p>This supplier is not in ZestIQ yet and will be created when you approve the invoice.</p>}
+                  {hasNewInventoryItems && <p>One or more unmatched lines will create new inventory items. Edit their names and units first if needed.</p>}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -413,6 +474,11 @@ export function InvoiceScanner() {
                         onChange={(e) => handleItemEdit(index, 'name', e.target.value)}
                         className="mt-1"
                       />
+                      <p className={`mt-1 text-[11px] ${inventory.some(existing => inventoryItemMatchesInvoiceName(existing, item.name)) ? 'text-green-700' : 'text-amber-700'}`}>
+                        {inventory.some(existing => inventoryItemMatchesInvoiceName(existing, item.name))
+                          ? `Matches inventory: ${inventory.find(existing => inventoryItemMatchesInvoiceName(existing, item.name))?.name}`
+                          : 'New inventory item will be created after approval.'}
+                      </p>
                     </div>
                     <Button
                       size="sm"
@@ -493,13 +559,25 @@ export function InvoiceScanner() {
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-sm font-semibold text-gray-900">Invoice Total</p>
                   <p className="text-xl font-bold text-[#303A43]">
-                    ${totalValue.toFixed(2)}
+                    ${invoiceTotal.toFixed(2)}
                   </p>
                 </div>
 
+                {requiresExplicitReview && (
+                  <label className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                    <input
+                      type="checkbox"
+                      checked={reviewAcknowledged}
+                      onChange={event => setReviewAcknowledged(event.target.checked)}
+                      className="mt-1 h-4 w-4"
+                    />
+                    <span>I reviewed the unclear, new, or unmatched information against the original invoice.</span>
+                  </label>
+                )}
+
                 <Button
                   onClick={handleSaveToInventory}
-                  disabled={editedItems.length === 0 || !extractedData.vendor.trim() || !extractedData.invoiceNumber.trim() || !extractedData.date}
+                  disabled={editedItems.length === 0 || !extractedData.vendor.trim() || !extractedData.invoiceNumber.trim() || !extractedData.date || (requiresExplicitReview && !reviewAcknowledged)}
                   className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />

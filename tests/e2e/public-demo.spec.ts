@@ -101,9 +101,13 @@ const scannedInvoiceResponse = {
   invoiceNumber: 'QA-CAMERA-1001',
   date: '2026-09-09',
   items: [
-    { name: 'Fresh Basil', quantity: 30, unit: 'g', packSize: 30, packCount: 1, unitCost: 0.0185, totalCost: 0.555, category: 'Produce' },
+    { name: 'Fresh Basil', quantity: 30, unit: 'g', packSize: 30, packCount: 1, unitCost: 0.0185, totalCost: 0.555, category: 'Produce', confidence: 0.98 },
   ],
+  subtotal: 0.555,
+  tax: 0,
+  credits: 0,
   total: 0.555,
+  confidence: 0.98,
 };
 
 async function mockInvoiceScan(page: Page, capturedImages: string[] = []) {
@@ -238,6 +242,7 @@ test('invoice camera capture supports correction and approval before posting', a
   await page.getByLabel('Packages on invoice').fill('2');
   await expect(page.getByLabel('Quantity')).toHaveValue('100');
   await expect(page.getByText('$1.85').first()).toBeVisible();
+  await page.getByLabel('I reviewed the unclear, new, or unmatched information').check();
   await page.getByRole('button', { name: /Save Invoice & Update Inventory/ }).click();
   await expect(page).toHaveURL(/\/app\/invoices\?invoice=/);
   await expect(page.getByText('QA-CAMERA-1001-CORRECTED').first()).toBeVisible();
@@ -279,6 +284,77 @@ test('invoice PDF upload reaches review with editable extracted fields', async (
   await expect(page.getByLabel('Vendor')).toBeEditable();
   await expect(page.getByLabel('Invoice #')).toBeEditable();
   await expect(page.getByLabel('Date')).toBeEditable();
+});
+
+test('invoice review handles tax, credits, low confidence, new records, duplicates, and unreadable scans', async ({ page }) => {
+  test.setTimeout(60_000);
+  const reviewInvoice = {
+    vendor: 'QA New Farm Supplier',
+    invoiceNumber: 'QA-EDGE-1001',
+    date: '2026-09-09',
+    items: [{ name: 'QA Purple Carrots', quantity: 10, unit: 'kg', packSize: 5, packCount: 2, unitCost: 10, totalCost: 100, category: 'Produce', confidence: 0.52 }],
+    subtotal: 100,
+    tax: 13,
+    credits: 5,
+    total: 108,
+    confidence: 0.58,
+  };
+
+  await page.route('**/api/scan-invoice', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewInvoice) }));
+  await freshDemoLogin(page);
+  await page.goto('/app/invoice-scanner');
+  const upload = page.locator('#invoice-upload');
+  await upload.setInputFiles(path.resolve('tests/fixtures/handwritten-tomato-basil-recipe.png'));
+  await page.getByRole('button', { name: 'Scan Invoice' }).click();
+
+  await expect(page.getByText('Review required')).toBeVisible();
+  await expect(page.getByText('This supplier is not in ZestIQ yet')).toBeVisible();
+  await expect(page.getByText('New inventory item will be created after approval.')).toBeVisible();
+  await expect(page.getByLabel('Tax')).toHaveValue('13');
+  await expect(page.getByLabel('Credits / allowances')).toHaveValue('5');
+  await expect(page.getByText('$108.00')).toBeVisible();
+  const saveInvoice = page.getByRole('button', { name: /Save Invoice & Update Inventory/ });
+  await expect(saveInvoice).toBeDisabled();
+  await page.getByLabel('I reviewed the unclear, new, or unmatched information').check();
+  await saveInvoice.click();
+
+  await expect(page).toHaveURL(/\/app\/invoices\?invoice=/);
+  await expect(page.getByText('QA-EDGE-1001').first()).toBeVisible();
+  await expect(page.getByText('Credits / allowances')).toBeVisible();
+  await expect(page.getByText('$108.00').first()).toBeVisible();
+
+  await page.goto('/app/invoice-scanner');
+  await upload.setInputFiles(path.resolve('tests/fixtures/handwritten-tomato-basil-recipe.png'));
+  await page.getByRole('button', { name: 'Scan Invoice' }).click();
+  await page.getByLabel('I reviewed the unclear, new, or unmatched information').check();
+  await page.getByRole('button', { name: /Save Invoice & Update Inventory/ }).click();
+  await expect(page.getByRole('alert')).toContainText('has already been saved. Inventory was not changed.');
+
+  await page.goto('/app/inventory');
+  await page.getByPlaceholder('Search items...').fill('QA Purple Carrots');
+  await expect(page.getByText('QA Purple Carrots', { exact: true }).first()).toBeVisible();
+  const persistedStock = await page.evaluate(() => {
+    for (const [key, value] of Object.entries(localStorage)) {
+      if (!key.includes('inventory')) continue;
+      try {
+        const items = JSON.parse(value);
+        const match = Array.isArray(items) ? items.find(item => item?.name === 'QA Purple Carrots') : null;
+        if (match) return match.currentStock;
+      } catch {
+        // Ignore unrelated local values.
+      }
+    }
+    return null;
+  });
+  expect(persistedStock).toBe(10);
+
+  await page.unroute('**/api/scan-invoice');
+  await page.route('**/api/scan-invoice', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ vendor: '', invoiceNumber: '', date: '', items: [], total: 0, confidence: 0.05 }) }));
+  await page.goto('/app/invoice-scanner');
+  await page.locator('#invoice-upload').setInputFiles(path.resolve('tests/fixtures/handwritten-tomato-basil-recipe.png'));
+  await page.getByRole('button', { name: 'Scan Invoice' }).click();
+  await expect(page.getByRole('alert')).toContainText('No invoice line items could be read');
+  await expect(page.getByText('Invoice Extracted')).toHaveCount(0);
 });
 
 test('inventory supports validated add, edit, aliases, multiple areas, merge, persistence, and delete', async ({ page }) => {

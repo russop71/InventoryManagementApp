@@ -62,8 +62,8 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 
 ### Verified in this audit
 
-- [x] All 77 automated unit/API tests pass.
-- [x] All 28 local end-to-end browser checks pass across desktop and mobile; the two production-only AI checks are intentionally excluded from routine runs and passed separately against zestiq.ca.
+- [x] All 78 automated unit/API tests pass.
+- [x] All 30 local end-to-end browser checks pass across desktop and mobile; the two production-only AI checks are intentionally excluded from routine runs and passed separately against zestiq.ca.
 - [x] The production build and approved-design guard pass.
 - [x] All public-demo routes load without runtime, authentication-token, or horizontal-overflow errors at desktop and mobile widths.
 - [x] The recipe camera flow obtains camera media, captures a JPEG image, sends it to the scanner, and opens human review at desktop and mobile widths using an emulated camera.
@@ -76,6 +76,7 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 - [x] Invoice-review labels are connected to their fields for keyboard and assistive-technology use.
 - [x] Correcting invoice package size or package count recalculates the total received quantity and line cost.
 - [x] Invoice upload accepts JPEG, PNG, WebP, and PDF; rejects unsupported or oversized files with clear feedback; and leaves the scanner usable after a service failure.
+- [x] Invoice review preserves tax and credits separately, requires acknowledgement for low-confidence or unmatched extraction, labels newly created suppliers/items, blocks duplicate invoice stock updates, and rejects scans with no readable lines.
 - [x] Inventory items support validated creation, refresh persistence, editing, invoice-alias search, multiple storage areas with correct roll-ups, duplicate merging with alias retention, and deletion.
 - [x] Inventory counts support draft saving/resume, the same item in multiple storage areas, finalization, inventory roll-up, and locked finalized records.
 - [x] Inventory item creation and multi-area count controls provide clear validation and accessible field names.
@@ -93,7 +94,7 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 - [ ] Run a real-device camera check on physical iPhone and Android browsers, including first-time permission, denied permission, rear-camera selection, rotation, retake, poor light, and large-photo behaviour. Browser emulation cannot prove physical camera behaviour.
 - [ ] Test handwriting recognition with a broader, consented sample set covering cursive, faint ink, crossed-out lines, fractions, abbreviations, mixed units, multi-page recipes, shadows, rotation, and partially obscured text; define and meet an acceptance threshold.
 - [x] Add end-to-end create, edit, validation, save, refresh, and delete coverage for inventory items, multi-area counts, merges and invoice aliases.
-- [ ] Extend invoice end-to-end coverage beyond the completed camera, image/PDF upload, review, failure-recovery, and post paths to include duplicates, tax, credits, unknown suppliers/items, low-confidence extraction, and rejected/illegible photos.
+- [x] Extend invoice end-to-end coverage beyond the completed camera, image/PDF upload, review, failure-recovery, and post paths to include duplicates, tax, credits, unknown suppliers/items, low-confidence extraction, and rejected/illegible photos.
 - [x] Add end-to-end coverage for recipe create/edit/delete, yield changes, unit conversions, missing costs, duplicate ingredients, prepped recipes, and circular recipe references.
 - [x] Add end-to-end coverage for forecast generation, selectable order buffers, order editing, approval, supplier grouping, PDF/email output, and failed delivery.
 - [ ] Add end-to-end coverage for waste, labour schedules, employee requests, POS imports, permissions/roles, onboarding, billing, password recovery/MFA, exports, and notification behaviour.
