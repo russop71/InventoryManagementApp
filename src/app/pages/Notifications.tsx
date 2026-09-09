@@ -21,7 +21,7 @@ interface NotificationSetting {
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationSetting[] = [
   { id: 'stockouts', label: 'Stockout Alerts', description: 'Get notified when items are 86\'d', icon: AlertTriangle, email: true, push: true, sms: false },
   { id: 'low-inventory', label: 'Low Inventory', description: 'Alert when items fall below par levels', icon: Package, email: true, push: true, sms: true },
-  { id: 'ai-orders', label: 'AI Order Updates', description: 'Notifications about automated orders', icon: TrendingUp, email: true, push: false, sms: false },
+  { id: 'ai-orders', label: 'Order Suggestions', description: 'Updates about forecast-based order suggestions', icon: TrendingUp, email: true, push: false, sms: false },
   { id: 'forecast', label: 'Forecast Alerts', description: 'Daily forecast summaries', icon: TrendingUp, email: true, push: false, sms: false },
   { id: 'integrations', label: 'Integration Updates', description: 'POS sync notifications', icon: Bell, email: false, push: true, sms: false },
 ];

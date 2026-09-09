@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router';
 import {
   LayoutDashboard, Package, ChefHat,
   Users, LogOut, CreditCard, HelpCircle, MessageSquare, Bell,
-  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Trash2, TrendingUp, Wine, Sparkles,
+  FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Trash2, TrendingUp, Wine,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useNavigate } from 'react-router';
@@ -47,7 +47,6 @@ export function Layout() {
       items: [
         { label: 'Orders', path: '/app/orders', icon: Truck },
         { label: 'Invoices', path: '/app/invoices', icon: Receipt },
-        { label: 'AI Orders', path: '/app/ai-orders', icon: Sparkles },
       ],
     },
     {

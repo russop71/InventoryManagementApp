@@ -11,7 +11,7 @@ import { Badge } from '../components/ui/badge';
 import { CalendarDays } from 'lucide-react';
 import {
   Plus, ChevronRight, ShoppingCart, Truck, CheckCircle2,
-  Clock, Package, SlidersHorizontal, Sparkles, Mail,
+  Clock, Package, SlidersHorizontal, Mail,
   Check, AlertCircle, TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -658,13 +658,6 @@ export function Orders() {
             >
               <TrendingUp className="w-4 h-4" />
               Forecasting
-            </button>
-            <button
-              onClick={() => navigate('/app/ai-orders')}
-              className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"
-            >
-              <Sparkles className="w-4 h-4" />
-              AI Orders
             </button>
             <button
               onClick={openManualOrderDialog}

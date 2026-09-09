@@ -29,7 +29,6 @@ const RestaurantInventoryBuyerGuide = lazy(() => import("./pages/RestaurantSeoGu
 const RestaurantInventoryManagementGuide = lazy(() => import("./pages/RestaurantSeoGuides").then(module => ({ default: module.RestaurantInventoryManagementGuide })));
 
 const Account = lazy(() => import("./pages/Account").then(module => ({ default: module.Account })));
-const AIOrders = lazy(() => import("./pages/AIOrders").then(module => ({ default: module.AIOrders })));
 const AuthLayout = lazy(() => import("./components/AuthLayout").then(module => ({ default: module.AuthLayout })));
 const BeverageCosting = lazy(() => import("./pages/BeverageCosting").then(module => ({ default: module.BeverageCosting })));
 const Contact = lazy(() => import("./pages/Contact").then(module => ({ default: module.Contact })));
@@ -66,6 +65,7 @@ const isEmployeeNativeBuild = import.meta.env.VITE_APP_VARIANT === 'employee';
 function NativeEntry() { return <Navigate to="/employee" replace />; }
 function PublicTermsRedirect() { return <Navigate to="/terms" replace />; }
 function PublicPrivacyRedirect() { return <Navigate to="/privacy" replace />; }
+function LegacyAIOrdersRedirect() { return <Navigate to="/app/orders" replace />; }
 function LegacyCogsRedirect() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -215,7 +215,7 @@ export const router = createBrowserRouter([
           { path: "forecasting", Component: Forecasting },
           { path: "orders", Component: Orders },
           { path: "invoices", Component: Invoices },
-          { path: "ai-orders", Component: AIOrders },
+          { path: "ai-orders", Component: LegacyAIOrdersRedirect },
           { path: "costs", Component: CostBreakdown },
           { path: "cogs", Component: LegacyCogsRedirect },
           { path: "integrations", Component: Integrations },
