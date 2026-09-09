@@ -29,7 +29,7 @@ export interface DemoLocationData {
   invoices: Array<Record<string, unknown>>;
 }
 
-export const DEMO_DATA_VERSION = '2026-08-28-received-order-invoice-v6';
+export const DEMO_DATA_VERSION = '2026-09-08-demo-trust-and-costing-v7';
 
 export function buildDemoLocationData(): DemoLocationData {
   const inventory = [

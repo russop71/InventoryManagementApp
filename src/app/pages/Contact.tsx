@@ -4,8 +4,11 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Mail, Phone, MessageSquare, Clock, MapPin, Send } from 'lucide-react';
-import { toast } from 'sonner';
+import { Mail, Phone, MapPin, Send } from 'lucide-react';
+
+const SUPPORT_EMAIL = 'Pat@zestiq.ca';
+const SUPPORT_PHONE_DISPLAY = '416-455-7401';
+const SUPPORT_PHONE_LINK = '+14164557401';
 
 export function Contact() {
   const [formData, setFormData] = useState({
@@ -18,14 +21,14 @@ export function Contact() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Message sent! We\'ll get back to you within 24 hours.');
-    setFormData({
-      name: '',
-      email: '',
-      subject: '',
-      message: '',
-      priority: 'normal'
-    });
+    const body = [
+      `Name: ${formData.name}`,
+      `Reply email: ${formData.email}`,
+      `Priority: ${formData.priority}`,
+      '',
+      formData.message,
+    ].join('\n');
+    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(body)}`;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -44,7 +47,7 @@ export function Contact() {
 
       {/* Contact Methods */}
       <div className="grid grid-cols-1 gap-3">
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = 'mailto:support@86d.com'}>
+        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `mailto:${SUPPORT_EMAIL}`}>
           <CardContent className="py-4">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-[#FEF9C3] rounded-lg flex items-center justify-center">
@@ -52,13 +55,13 @@ export function Contact() {
               </div>
               <div>
                 <p className="font-medium">Email Support</p>
-                <p className="text-sm text-gray-600">support@86d.com</p>
+                <p className="text-sm text-gray-600">{SUPPORT_EMAIL}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = 'tel:+15551234567'}>
+        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `tel:${SUPPORT_PHONE_LINK}`}>
           <CardContent className="py-4">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -66,56 +69,18 @@ export function Contact() {
               </div>
               <div>
                 <p className="font-medium">Phone Support</p>
-                <p className="text-sm text-gray-600">(555) 123-4567</p>
+                <p className="text-sm text-gray-600">{SUPPORT_PHONE_DISPLAY}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => toast.info('Live chat coming soon!')}>
-          <CardContent className="py-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-6 h-6 text-purple-900" />
-              </div>
-              <div>
-                <p className="font-medium">Live Chat</p>
-                <p className="text-sm text-gray-600">Chat with our team</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
-
-      {/* Support Hours */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Clock className="w-5 h-5" />
-            <span>Support Hours</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Monday - Friday</span>
-            <span className="font-medium">8:00 AM - 8:00 PM EST</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Saturday - Sunday</span>
-            <span className="font-medium">10:00 AM - 6:00 PM EST</span>
-          </div>
-          <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs text-gray-500">
-              Emergency support available 24/7 for critical issues
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Contact Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Send us a Message</CardTitle>
+          <CardTitle>Prepare an Email</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -187,7 +152,7 @@ export function Contact() {
 
             <Button type="submit" className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white">
               <Send className="w-4 h-4 mr-2" />
-              Send Message
+              Open in Email App
             </Button>
           </form>
         </CardContent>
@@ -203,9 +168,9 @@ export function Contact() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-600">
-            ZestIQ<br />
-            Canadian-owned, serving restaurant operators across Canada<br />
-            demo@zestiq.ca
+            Zest IQ Inc.<br />
+            5137 Oakley Drive<br />
+            Burlington, Ontario L7L 6P1, Canada
           </p>
         </CardContent>
       </Card>

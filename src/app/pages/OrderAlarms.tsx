@@ -217,7 +217,7 @@ export function OrderAlarms() {
       <div className="bg-[#FEFCE8] border border-[#F5C10E]/20 rounded-xl px-4 py-3 flex items-start gap-3">
         <Bell className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" />
         <p className="text-xs text-[#1D4ED8] font-medium leading-relaxed">
-          Alarms fire as in-app notifications while this app is open. Keep the app running to receive alerts. Alarms check every 30 seconds.
+          Alarms are saved only in this browser and fire as in-app notifications while ZestIQ is open. They are not background push, email or SMS alerts. Alarms check every 30 seconds.
         </p>
       </div>
 

@@ -156,6 +156,10 @@ export function AIOrders() {
   }, [accountId, accountName]);
 
   useEffect(() => {
+    if (user?.email?.trim().toLowerCase() === 'demo@zestiq.com') {
+      setEmailServiceConfigured(false);
+      return;
+    }
     let cancelled = false;
     void fetch(buildApiUrl('/api/send-supplier-email'))
       .then(response => response.json())
@@ -171,7 +175,7 @@ export function AIOrders() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.email]);
 
   // WebSocket connection for live AI suggestions
   useEffect(() => {

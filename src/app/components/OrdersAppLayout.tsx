@@ -26,14 +26,14 @@ export function OrdersAppLayout() {
   }, []);
 
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId || user?.email?.trim().toLowerCase() === 'demo@zestiq.com') return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/usage`, {
       method: 'POST',
       body: JSON.stringify({ eventName: 'page_view', path: location.pathname, metadata: { locationId: activeLocationId, app: 'ZestOrders' } }),
     }).catch(() => {
       // Usage telemetry must not interrupt ordering.
     });
-  }, [accountId, activeLocationId, location.pathname]);
+  }, [accountId, activeLocationId, location.pathname, user?.email]);
 
   const signOut = () => {
     logout();

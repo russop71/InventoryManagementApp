@@ -204,6 +204,7 @@ function buildDemoLabor(): LaborData {
 
 export function LaborProvider({ children }: { children: ReactNode }) {
   const { accountId, activeLocationId, token, user, features } = useAuth();
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const schedulingAvailable = features.scheduling === true;
   const [data, setData] = useState<LaborData>(EMPTY_LABOR);
   const [isLaborLoaded, setIsLaborLoaded] = useState(false);
@@ -212,7 +213,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
   const persist = (next: LaborData) => {
     if (!schedulingAvailable) return;
     if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
-    if (!token || !accountId || !activeLocationId) return;
+    if (!token || !accountId || !activeLocationId || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor`, {
       method: 'PUT', body: JSON.stringify(next),
     }).catch(error => console.error('Failed to sync labour data', error));
@@ -236,7 +237,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
 
   const postLaborRequest = (payload: Record<string, unknown>) => {
     if (!schedulingAvailable) return;
-    if (!token || !accountId || !activeLocationId) return;
+    if (!token || !accountId || !activeLocationId || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/requests`, {
       method: 'POST', body: JSON.stringify(payload),
     }).catch(error => console.error('Failed to sync employee labour request', error));
@@ -244,14 +245,14 @@ export function LaborProvider({ children }: { children: ReactNode }) {
 
   const patchLaborRequest = (payload: Record<string, unknown>) => {
     if (!schedulingAvailable) return;
-    if (!token || !accountId || !activeLocationId) return;
+    if (!token || !accountId || !activeLocationId || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/requests`, {
       method: 'PATCH', body: JSON.stringify(payload),
     }).catch(error => console.error('Failed to update employee labour request', error));
   };
 
   const inviteEmployee = async (employee: Omit<LaborEmployee, 'id' | 'inviteStatus' | 'invitedAt'>) => {
-    if (token && accountId && activeLocationId) {
+    if (token && accountId && activeLocationId && !isDemoAccount) {
       const response = await apiRequest<{ labor: LaborData; employee: LaborEmployee }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/invite`, {
         method: 'POST', body: JSON.stringify({ employee }),
       });
@@ -282,9 +283,9 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     }
     setIsLaborLoaded(false);
     const local = normalizeLaborData(readScopedJson<LaborData>(storageKey, EMPTY_LABOR));
-    const demo = user?.email === 'demo@zestiq.com' ? buildDemoLabor() : EMPTY_LABOR;
-    if (!token) {
-      setData(local.employees.length > 0 ? local : demo);
+    const demo = isDemoAccount ? buildDemoLabor() : EMPTY_LABOR;
+    if (!token || isDemoAccount) {
+      setData(isDemoAccount ? (local.shifts.length > 0 ? local : demo) : local);
       setIsLaborLoaded(true);
       return;
     }
@@ -294,14 +295,17 @@ export function LaborProvider({ children }: { children: ReactNode }) {
         const remoteWithDemoPublication = user?.email === 'demo@zestiq.com' && normalizedRemote.employees.length > 0 && normalizedRemote.publishedPositions.length === 0
           ? { ...normalizedRemote, publishedPositions: Array.from(new Set(normalizedRemote.shifts.map(shift => weekPositionKey(shift.date, normalizedRemote.employees.find(employee => employee.id === shift.employeeId)?.role || '')).filter(key => !key.endsWith('::')))) }
           : normalizedRemote;
-        const next = remoteWithDemoPublication.employees.length > 0 ? remoteWithDemoPublication : (local.employees.length > 0 ? local : demo);
+        const demoReadyRemote = user?.email === 'demo@zestiq.com' && normalizedRemote.shifts.length === 0
+          ? demo
+          : remoteWithDemoPublication;
+        const next = demoReadyRemote.employees.length > 0 ? demoReadyRemote : (local.employees.length > 0 ? local : demo);
         setData(next);
         if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
         if (normalizedRemote.employees.length === 0 && next.employees.length > 0) persist(next);
       })
       .catch(() => setData(local.employees.length > 0 ? local : demo))
       .finally(() => setIsLaborLoaded(true));
-  }, [accountId, activeLocationId, token, user?.email, schedulingAvailable]);
+  }, [accountId, activeLocationId, token, user?.email, schedulingAvailable, isDemoAccount]);
 
   const value = useMemo<LaborContextValue>(() => ({
     ...data,

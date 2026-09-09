@@ -1,4 +1,4 @@
-import type { InventoryItem } from '../contexts/InventoryContext';
+import { getInventoryStorageLocations, type InventoryItem } from '../contexts/InventoryContext';
 
 export type InventoryCountStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
 
@@ -49,32 +49,33 @@ function getInventoryStatus(current: number, par: number): InventoryCountStatus 
 }
 
 export function buildCountEntries(items: InventoryItem[], previousCount?: InventoryCount | null): InventoryCountEntry[] {
-  const previousEntries = new Map(previousCount?.entries.map(entry => [entry.itemId, entry]) || []);
-  return items.map((item, index) => {
-    const hypothetical = Number(item.currentStock) || 0;
+  const previousEntries = new Map(previousCount?.entries.map(entry => [entry.entryId || `${entry.itemId}::${entry.storageArea || 'Unassigned'}`, entry]) || []);
+  return items.flatMap((item, index) => getInventoryStorageLocations(item).map((location, locationIndex) => {
+    const hypothetical = Number(location.currentStock) || 0;
     const unitCost = Number(item.unitCost) || 0;
-    const previousEntry = previousEntries.get(item.id);
+    const entryId = `${item.id}::${location.storageArea}`;
+    const previousEntry = previousEntries.get(entryId);
     return {
-      entryId: `${item.id}::${item.storageArea?.trim() || 'Unassigned'}`,
+      entryId,
       itemId: item.id,
       name: item.name,
       hypothetical,
       sales: 0,
       counted: 0,
-      parLevel: Number(item.parLevel) || 0,
+      parLevel: Number(location.parLevel) || 0,
       unit: item.unit || 'ea',
       unitOptions: [item.unit || 'ea'],
       unitCost,
       value: 0,
-      status: getInventoryStatus(hypothetical, Number(item.parLevel) || 0),
-      storageArea: item.storageArea?.trim() || 'Unassigned',
+      status: getInventoryStatus(hypothetical, Number(location.parLevel) || 0),
+      storageArea: location.storageArea,
       category: item.category || 'Other',
       supplier: item.supplier || 'Unknown',
-      shelfOrder: item.countOrder ?? previousEntry?.shelfOrder ?? index,
+      shelfOrder: item.countOrder ?? previousEntry?.shelfOrder ?? (index * 100 + locationIndex),
       previousCounted: previousEntry?.counted ?? hypothetical,
       isCounted: false,
     };
-  });
+  }));
 }
 
 export function createInventoryCount(items: InventoryItem[], overrides: Partial<InventoryCount> = {}, previousCount?: InventoryCount | null): InventoryCount {

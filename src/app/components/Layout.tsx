@@ -103,7 +103,7 @@ export function Layout() {
   }, []);
 
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId || user?.email?.trim().toLowerCase() === 'demo@zestiq.com') return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/usage`, {
       method: 'POST',
       body: JSON.stringify({
@@ -114,7 +114,7 @@ export function Layout() {
     }).catch(() => {
       // Usage telemetry must never interrupt the user workflow.
     });
-  }, [accountId, activeLocationId, location.pathname]);
+  }, [accountId, activeLocationId, location.pathname, user?.email]);
 
   return (
     <div className="zestiq-app-shell min-h-screen overflow-x-clip bg-[#F4F5F7] pb-20">

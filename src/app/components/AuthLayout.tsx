@@ -5,6 +5,7 @@ import { ShieldAlert } from 'lucide-react';
 export function AuthLayout() {
   const location = useLocation();
   const { isAuthenticated, user, productAccess, onboarding, mfaRequired, features, logout } = useAuth();
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
 
   // Loading state
   if (isAuthenticated === null) {
@@ -39,7 +40,7 @@ export function AuthLayout() {
   }
 
   const schedulingRoute = location.pathname === '/employee' || location.pathname.startsWith('/app/labor');
-  if (schedulingRoute && features.scheduling !== true) {
+  if (schedulingRoute && features.scheduling !== true && !isDemoAccount) {
     const isEmployeeRoute = location.pathname === '/employee';
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC] p-6">
@@ -57,7 +58,7 @@ export function AuthLayout() {
     );
   }
 
-  if (!productAccess) {
+  if (!productAccess && !isDemoAccount) {
     const ownerBillingRoute = user?.role === 'Owner' && ['/app/payment-method', '/app/account'].includes(location.pathname);
     if (user?.role === 'Owner' && !ownerBillingRoute) return <Navigate to="/app/payment-method" replace />;
     if (user?.role !== 'Owner') {
@@ -75,7 +76,7 @@ export function AuthLayout() {
 
   const onboardingNeeded = !user?.platformAdmin && ['Owner', 'Admin'].includes(user?.role || '') && ['not_started', 'in_progress'].includes(onboarding.status);
   const onboardingExempt = ['/app/onboarding', '/app/payment-method', '/app/account'].includes(location.pathname);
-  if (productAccess && onboardingNeeded && !onboardingExempt) return <Navigate to="/app/onboarding" replace />;
+  if ((productAccess || isDemoAccount) && onboardingNeeded && !onboardingExempt) return <Navigate to="/app/onboarding" replace />;
 
   // Render protected routes
   return <Outlet />;

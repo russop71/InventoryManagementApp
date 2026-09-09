@@ -159,7 +159,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     };
 
     const restoreServer = async () => {
-      if (!token) return restoreLocal();
+      if (!token || isDemoAccount) return restoreLocal();
       try {
         const payload = await apiRequest<ToastIntegrationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`);
         if (isDemoAccount) {
@@ -199,7 +199,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     write('toastConnected', isConnected); write('posProvider', provider); write('posConnectionMode', connectionMode);
     write('toastRestaurantId', restaurantId); write('toastLastSync', lastSync); write('toastCogsCategories', cogsCategories);
     write('toastSalesData', salesData); write('toastMenuItems', menuItems);
-    if (!token || user?.role === 'Ordering') return;
+    if (!token || user?.role === 'Ordering' || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`, {
       method: 'PUT',
       body: JSON.stringify({ connected: isConnected, provider, connectionMode, restaurantId, salesData, menuItems, cogsCategories, lastSync }),

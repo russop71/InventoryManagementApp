@@ -60,13 +60,14 @@ export function Users() {
     .map(level => ({ ...level, detail: `${level.detail}${schedulingAvailable ? level.schedulingDetail || '' : ''}` }));
   const isOwner = currentUser?.role === 'Owner';
   const isSuperAdmin = Boolean(currentUser?.platformAdmin);
+  const isDemoAccount = currentUser?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const [users, setUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   const loadUsers = useCallback(async (quiet = false) => {
-    if (!accountId || !isOwner) {
+    if (!accountId || !isOwner || isDemoAccount) {
       setUsers([]);
       return;
     }
@@ -79,11 +80,11 @@ export function Users() {
     } finally {
       if (!quiet) setIsLoading(false);
     }
-  }, [accountId, isOwner]);
+  }, [accountId, isDemoAccount, isOwner]);
 
   useEffect(() => {
     void loadUsers();
-    if (!accountId || !isOwner) return;
+    if (!accountId || !isOwner || isDemoAccount) return;
     const intervalId = window.setInterval(() => void loadUsers(true), 30_000);
     return () => window.clearInterval(intervalId);
   }, [accountId, isOwner, loadUsers]);
@@ -102,7 +103,7 @@ export function Users() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!accountId || !isOwner) return;
+    if (!accountId || !isOwner || isDemoAccount) return;
     const formData = new FormData(event.currentTarget);
     const payload = {
       name: String(formData.get('name') || '').trim(),
@@ -147,7 +148,7 @@ export function Users() {
   };
 
   const deleteUser = async (user: CompanyUser) => {
-    if (!accountId || !isOwner || !confirm(`Remove ${user.name} from ${accountName}? This revokes their company access.`)) return;
+    if (!accountId || !isOwner || isDemoAccount || !confirm(`Remove ${user.name} from ${accountName}? This revokes their company access.`)) return;
     setIsLoading(true);
     try {
       await apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/users/${encodeURIComponent(user.id)}`, {
@@ -161,6 +162,35 @@ export function Users() {
       setIsLoading(false);
     }
   };
+
+  if (isDemoAccount) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Public demo</p>
+          <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Team access preview</h2>
+          <p className="mt-1 text-sm text-slate-600">This page uses fictional roles and contains no real team records.</p>
+        </div>
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-5">
+            <Shield className="mb-3 h-8 w-8 text-amber-700" />
+            <p className="font-semibold text-amber-950">Administrative controls are disabled in the public demo.</p>
+            <p className="mt-1 text-sm text-amber-800">Billing, invitations, password resets, role changes and user removal are available only in a private customer workspace.</p>
+          </CardContent>
+        </Card>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {accessLevels.map(level => (
+            <Card key={level.role}>
+              <CardContent className="py-4">
+                <Badge className={roleBadgeClass(level.role)}><Shield className="mr-1 h-3 w-3" />{level.title}</Badge>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{level.detail}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!isOwner) {
     return (

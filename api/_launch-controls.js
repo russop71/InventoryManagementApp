@@ -14,6 +14,14 @@ export function isDemoAccount(account) {
   return String(account?.slug || '').trim().toLowerCase() === 'demo-zestiq-com';
 }
 
+export function isDemoAdministrativeMutation(account, segments = [], method = 'GET') {
+  if (!isDemoAccount(account) || String(method).toUpperCase() === 'GET') return false;
+  const area = segments[2];
+  if (['users', 'billing', 'profile', 'onboarding'].includes(area)) return true;
+  if (segments.length === 2) return true;
+  return area === 'locations';
+}
+
 export function hasActiveSubscription(account) {
   return ACTIVE_BILLING_STATUSES.has(String(account?.billing_status || '').trim().toLowerCase());
 }

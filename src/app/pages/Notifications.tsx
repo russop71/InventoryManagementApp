@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Bell, Mail, MessageSquare, AlertTriangle, TrendingUp, Package } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
+import { locationScopedStorageKey } from '../utils/storageScope';
 
 interface NotificationSetting {
   id: string;
@@ -14,57 +16,37 @@ interface NotificationSetting {
   sms: boolean;
 }
 
+const DEFAULT_NOTIFICATION_SETTINGS: NotificationSetting[] = [
+  { id: 'stockouts', label: 'Stockout Alerts', description: 'Get notified when items are 86\'d', icon: AlertTriangle, email: true, push: true, sms: false },
+  { id: 'low-inventory', label: 'Low Inventory', description: 'Alert when items fall below par levels', icon: Package, email: true, push: true, sms: true },
+  { id: 'ai-orders', label: 'AI Order Updates', description: 'Notifications about automated orders', icon: TrendingUp, email: true, push: false, sms: false },
+  { id: 'forecast', label: 'Forecast Alerts', description: 'Daily forecast summaries', icon: TrendingUp, email: true, push: false, sms: false },
+  { id: 'integrations', label: 'Integration Updates', description: 'POS sync notifications', icon: Bell, email: false, push: true, sms: false },
+];
+
 export function Notifications() {
-  const [settings, setSettings] = useState<NotificationSetting[]>([
-    {
-      id: 'stockouts',
-      label: 'Stockout Alerts',
-      description: 'Get notified when items are 86\'d',
-      icon: AlertTriangle,
-      email: true,
-      push: true,
-      sms: false
-    },
-    {
-      id: 'low-inventory',
-      label: 'Low Inventory',
-      description: 'Alert when items fall below par levels',
-      icon: Package,
-      email: true,
-      push: true,
-      sms: true
-    },
-    {
-      id: 'ai-orders',
-      label: 'AI Order Updates',
-      description: 'Notifications about automated orders',
-      icon: TrendingUp,
-      email: true,
-      push: false,
-      sms: false
-    },
-    {
-      id: 'forecast',
-      label: 'Forecast Alerts',
-      description: 'Daily forecast summaries',
-      icon: TrendingUp,
-      email: true,
-      push: false,
-      sms: false
-    },
-    {
-      id: 'integrations',
-      label: 'Integration Updates',
-      description: 'Toast POS sync notifications',
-      icon: Bell,
-      email: false,
-      push: true,
-      sms: false
-    }
-  ]);
+  const { accountId, activeLocationId } = useAuth();
+  const [settings, setSettings] = useState<NotificationSetting[]>(DEFAULT_NOTIFICATION_SETTINGS);
+  const storageKey = accountId && activeLocationId ? locationScopedStorageKey(accountId, activeLocationId, 'notificationPreferences') : null;
+
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+      if (Array.isArray(saved)) setSettings(DEFAULT_NOTIFICATION_SETTINGS.map(setting => ({ ...setting, ...(saved.find(item => item?.id === setting.id) || {}) })));
+    } catch { setSettings(DEFAULT_NOTIFICATION_SETTINGS); }
+  }, [storageKey]);
+
+  const updateSettings = (updater: (current: NotificationSetting[]) => NotificationSetting[]) => {
+    setSettings(current => {
+      const next = updater(current);
+      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next.map(({ icon: _icon, ...setting }) => setting)));
+      return next;
+    });
+  };
 
   const handleToggle = (id: string, type: 'email' | 'push' | 'sms') => {
-    setSettings(settings.map(setting => {
+    updateSettings(current => current.map(setting => {
       if (setting.id === id) {
         return { ...setting, [type]: !setting[type] };
       }
@@ -83,7 +65,7 @@ export function Notifications() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="cursor-pointer hover:bg-gray-50" onClick={() => {
-          setSettings(settings.map(s => ({ ...s, email: true, push: true })));
+          updateSettings(current => current.map(s => ({ ...s, email: true, push: true })));
           toast.success('All notifications enabled');
         }}>
           <CardContent className="pt-4 text-center">
@@ -92,7 +74,7 @@ export function Notifications() {
           </CardContent>
         </Card>
         <Card className="cursor-pointer hover:bg-gray-50" onClick={() => {
-          setSettings(settings.map(s => ({ ...s, email: false, push: false, sms: false })));
+          updateSettings(current => current.map(s => ({ ...s, email: false, push: false, sms: false })));
           toast.success('All notifications disabled');
         }}>
           <CardContent className="pt-4 text-center">
@@ -196,13 +178,15 @@ export function Notifications() {
           <div className="flex items-center justify-between">
             <Label>Enable Quiet Hours</Label>
             <button
-              onClick={() => toast.info('Quiet hours feature coming soon')}
-              className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200"
+              type="button"
+              disabled
+              aria-label="Quiet hours are not available yet"
+              className="relative inline-flex h-6 w-11 cursor-not-allowed items-center rounded-full bg-gray-200 opacity-70"
             >
               <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-1" />
             </button>
           </div>
-          <p className="text-sm text-gray-500">Configure quiet hours in app settings</p>
+          <p className="text-sm text-gray-500">Not available yet. This control will be enabled after background notification delivery is connected.</p>
         </CardContent>
       </Card>
     </div>

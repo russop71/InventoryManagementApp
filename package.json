@@ -10,6 +10,7 @@
     "dev": "vite",
     "server": "node server/api-server.js",
     "test": "node --test",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/private/tmp/zestiq-playwright} playwright test",
     "backup": "node scripts/backup-supabase.mjs",
     "backup:verify": "node scripts/verify-backup.mjs"
   },
@@ -85,6 +86,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "@tailwindcss/vite": "4.1.12",
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.1.12",

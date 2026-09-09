@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useToast, type PosImportPayload } from '../contexts/ToastContext';
 import { useInventory } from '../contexts/InventoryContext';
@@ -38,14 +38,19 @@ function parseCsv(text: string) {
 
 export function Integrations() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
-  const { isConnected, provider, connectionMode, disconnectToast, importSalesData, selectPosProvider, lastSync, salesData, menuItems } = useToast();
+  const { logout, user } = useAuth();
+  const { isConnected, provider, connectionMode, disconnectToast, importSalesData, lastSync, salesData, menuItems } = useToast();
   const { suppliers } = useInventory();
   const [pendingPayload, setPendingPayload] = useState<PosImportPayload | null>(null);
   const [fileName, setFileName] = useState('');
   const [jsonPayload, setJsonPayload] = useState('');
   const [isImporting, setIsImporting] = useState(false);
-  const selected = getPosProvider(provider);
+  const [setupProviderId, setSetupProviderId] = useState(provider);
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
+  const selected = getPosProvider(setupProviderId);
+  const connectedProvider = getPosProvider(provider);
+
+  useEffect(() => setSetupProviderId(provider), [provider]);
 
   const prepareFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -53,7 +58,7 @@ export function Integrations() {
     try {
       const text = await file.text();
       const parsed = file.name.toLowerCase().endsWith('.json') ? JSON.parse(text) : { rows: parseCsv(text) };
-      setPendingPayload({ ...parsed, provider });
+      setPendingPayload({ ...parsed, provider: setupProviderId });
       setFileName(file.name);
       showToast.success(`${file.name} is ready to import`);
     } catch {
@@ -71,7 +76,7 @@ export function Integrations() {
     if (!payload) { showToast.error('Choose a CSV/JSON export or paste JSON first'); return; }
     setIsImporting(true);
     try {
-      await importSalesData({ ...payload, provider });
+      await importSalesData({ ...payload, provider: setupProviderId });
       setPendingPayload(null); setFileName(''); setJsonPayload('');
       showToast.success(`${selected.name} sales imported successfully`);
     } catch (error) {
@@ -96,7 +101,7 @@ export function Integrations() {
       <section className="overflow-hidden rounded-[30px] bg-[#0B1220] p-6 text-white sm:p-8">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5C10E]">Sales integrations</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Connect the POS you already use.</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">Bring sales and menu mix into forecasting, recipe costing and ordering. Choose a Canadian restaurant POS below, then import an export now or request a direct API connection.</p></div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><p className="text-[10px] font-black uppercase tracking-wider text-white/40">Current provider</p><p className="mt-1 font-black">{selected.name}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><p className="text-[10px] font-black uppercase tracking-wider text-white/40">Current provider</p><p className="mt-1 font-black">{connectedProvider.name}</p></div>
         </div>
       </section>
 
@@ -105,8 +110,8 @@ export function Integrations() {
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {POS_PROVIDERS.map(item => {
-              const active = item.id === provider;
-              return <button key={item.id} type="button" onClick={() => { selectPosProvider(item.id); setPendingPayload(null); setFileName(''); }} className={`rounded-2xl border p-4 text-left transition ${active ? 'border-[#F5C10E] bg-[#FEFCE8] ring-2 ring-[#F5C10E]/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}>
+              const active = item.id === setupProviderId;
+              return <button key={item.id} type="button" disabled={isDemoAccount} onClick={() => { setSetupProviderId(item.id); setPendingPayload(null); setFileName(''); }} className={`rounded-2xl border p-4 text-left transition ${active ? 'border-[#F5C10E] bg-[#FEFCE8] ring-2 ring-[#F5C10E]/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'} ${isDemoAccount ? 'cursor-not-allowed opacity-70' : ''}`}>
                 <div className="flex items-start justify-between gap-3"><span className="flex h-10 min-w-10 items-center justify-center rounded-xl px-2 text-xs font-black text-white" style={{ backgroundColor: item.colour }}>{item.mark}</span>{active && <CheckCircle className="h-5 w-5 text-emerald-600" />}</div>
                 <p className="mt-3 font-black text-slate-900">{item.name}</p><p className="mt-1 min-h-10 text-xs leading-5 text-slate-500">{item.description}</p><span className="mt-3 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-slate-500">{item.connection}</span>
               </button>;
@@ -115,17 +120,19 @@ export function Integrations() {
         </CardContent>
       </Card>
 
+      {isDemoAccount && <Card className="border-amber-200 bg-amber-50"><CardContent className="py-4"><p className="font-semibold text-amber-950">Integration setup is read-only in the public demo.</p><p className="mt-1 text-sm text-amber-800">The Toast connection and sample sales remain available to explore. Connectors, imports and disconnection are enabled in a private workspace.</p></CardContent></Card>}
+
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="overflow-hidden">
           <CardHeader className="border-b border-slate-100"><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-lg"><FileSpreadsheet className="h-5 w-5 text-[#B58B00]" />Import sales now</CardTitle><CardDescription className="mt-1">Upload a {selected.name} CSV or JSON export. ZestIQ recognizes common item, quantity, revenue, category, date and cover headers.</CardDescription></div><Badge className="bg-emerald-100 text-emerald-800">Ready</Badge></div></CardHeader>
           <CardContent className="space-y-4 pt-5">
             <label htmlFor="pos-file" className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center transition hover:border-[#F5C10E] hover:bg-[#FEFCE8]">
               <Upload className="h-7 w-7 text-slate-400" /><span className="mt-3 font-black text-slate-800">{fileName || 'Choose a sales export'}</span><span className="mt-1 text-xs text-slate-500">CSV or JSON · one day or many days</span>
-              <input id="pos-file" type="file" accept=".csv,.json,text/csv,application/json" onChange={prepareFile} className="sr-only" />
+              <input id="pos-file" type="file" accept=".csv,.json,text/csv,application/json" onChange={prepareFile} disabled={isDemoAccount} className="sr-only" />
             </label>
             <div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-500"><strong className="text-slate-700">Best columns:</strong> Business Date, Menu Item, Quantity Sold, Net Sales, Category, Price and Covers. Common alternate headings are matched automatically.</div>
             <details><summary className="cursor-pointer text-xs font-bold text-slate-500">Advanced: paste JSON instead</summary><div className="mt-3"><Label htmlFor="pos-json">POS sales payload</Label><Textarea id="pos-json" value={jsonPayload} onChange={event => setJsonPayload(event.target.value)} placeholder='{"salesData":[{"date":"2026-08-20","revenue":2480,"covers":74,"topItems":[...]}]}' className="mt-1 min-h-28 font-mono text-xs" /></div></details>
-            <Button onClick={handleImport} disabled={isImporting || (!pendingPayload && !jsonPayload.trim())} className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]">{isImporting ? 'Importing sales…' : `Import ${selected.name} sales`}</Button>
+            <Button onClick={handleImport} disabled={isDemoAccount || isImporting || (!pendingPayload && !jsonPayload.trim())} className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]">{isImporting ? 'Importing sales…' : `Import ${selected.name} sales`}</Button>
           </CardContent>
         </Card>
 
@@ -134,18 +141,18 @@ export function Integrations() {
           <CardContent className="space-y-4 pt-5">
             <div className="rounded-2xl bg-[#FEFCE8] p-4"><p className="font-black text-slate-900">{selected.name}</p><p className="mt-2 text-xs leading-5 text-slate-600">Direct connections use provider-approved OAuth or server-held credentials. ZestIQ does not ask you to paste secret API keys into this screen.</p></div>
             <div className="space-y-3 text-sm"><Feature icon={ShieldCheck} text="Credentials remain server-side" /><Feature icon={Database} text="Sales stays separated by company and location" /><Feature icon={Wifi} text="Connection health and last sync are visible" /></div>
-            <a href={requestUrl} className="flex h-10 w-full items-center justify-center rounded-md bg-[#F5C10E] px-4 text-sm font-black text-[#0F172A] hover:bg-[#E5B60D]">Request direct activation</a>
+            {isDemoAccount ? <span className="flex h-10 w-full cursor-not-allowed items-center justify-center rounded-md bg-slate-200 px-4 text-sm font-black text-slate-500">Available in a private workspace</span> : <a href={requestUrl} className="flex h-10 w-full items-center justify-center rounded-md bg-[#F5C10E] px-4 text-sm font-black text-[#0F172A] hover:bg-[#E5B60D]">Request direct activation</a>}
             <a href={selected.website} target={selected.website.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="flex items-center justify-center gap-1 text-xs font-bold text-[#2563EB] hover:underline">View provider information<ExternalLink className="h-3.5 w-3.5" /></a>
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><CardTitle className="text-lg">Sales connection status</CardTitle><CardDescription>{isConnected ? `${selected.name} data is available to ZestIQ.` : 'No real sales data has been connected for this location yet.'}</CardDescription></div><Badge className={isConnected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}>{isConnected ? <><CheckCircle className="mr-1 h-3 w-3" />Data active</> : <><XCircle className="mr-1 h-3 w-3" />Not connected</>}</Badge></div></CardHeader>
+        <CardHeader><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><CardTitle className="text-lg">Sales connection status</CardTitle><CardDescription>{isConnected ? `${connectedProvider.name} data is available to ZestIQ.` : 'No real sales data has been connected for this location yet.'}</CardDescription></div><Badge className={isConnected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}>{isConnected ? <><CheckCircle className="mr-1 h-3 w-3" />Data active</> : <><XCircle className="mr-1 h-3 w-3" />Not connected</>}</Badge></div></CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-4"><Stat label="Provider" value={selected.name} /><Stat label="Method" value={connectionMode === 'direct' ? 'Direct API' : 'Secure import'} /><Stat label="Sales days" value={String(salesData.length)} /><Stat label="Menu items" value={String(menuItems.length)} /></div>
+          <div className="grid gap-3 sm:grid-cols-4"><Stat label="Provider" value={connectedProvider.name} /><Stat label="Method" value={connectionMode === 'direct' ? 'Direct API' : 'Secure import'} /><Stat label="Sales days" value={String(salesData.length)} /><Stat label="Menu items" value={String(menuItems.length)} /></div>
           <p className="mt-3 text-xs text-slate-500">Last data update: {formatDate(lastSync)}</p>
-          {isConnected && <div className="mt-4 flex flex-col gap-2 sm:flex-row"><Button variant="outline" onClick={handleDisconnect}>Disconnect sales data</Button></div>}
+          {isConnected && !isDemoAccount && <div className="mt-4 flex flex-col gap-2 sm:flex-row"><Button variant="outline" onClick={handleDisconnect}>Disconnect sales data</Button></div>}
         </CardContent>
       </Card>
 

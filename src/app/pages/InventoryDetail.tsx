@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { useInventory } from '../contexts/InventoryContext';
+import { getInventoryStorageLocations, useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -64,11 +64,13 @@ export function InventoryDetail() {
   const [quickReportUom, setQuickReportUom] = useState('EA');
   const [quickStorageArea, setQuickStorageArea] = useState('');
   const [quickCustomStorageArea, setQuickCustomStorageArea] = useState('');
+  const [quickCurrentStock, setQuickCurrentStock] = useState(0);
   const [quickParLevel, setQuickParLevel] = useState(0);
   const [purchaseOptions, setPurchaseOptions] = useState<PurchaseOptionDraft[]>([]);
   const [isPurchaseOptionsExpanded, setIsPurchaseOptionsExpanded] = useState(true);
   const [editForm, setEditForm] = useState({
     name: '',
+    invoiceAliases: '',
     category: '',
     storageArea: '',
     supplier: '',
@@ -139,8 +141,10 @@ export function InventoryDetail() {
     if (!item) return;
     setQuickUom((item.unit || 'oz').toLowerCase());
     setQuickReportUom((item.packUnit || item.unit || 'oz').toLowerCase());
-    setQuickStorageArea(item.storageArea || 'Unassigned');
-    setQuickParLevel(item.parLevel || 0);
+    const itemLocations = getInventoryStorageLocations(item);
+    setQuickStorageArea(itemLocations[0]?.storageArea || 'Unassigned');
+    setQuickCurrentStock(itemLocations[0]?.currentStock || 0);
+    setQuickParLevel(itemLocations[0]?.parLevel || 0);
     setQuickCustomStorageArea('');
     const existingOptions = item.purchaseOptions?.length
       ? item.purchaseOptions
@@ -165,6 +169,7 @@ export function InventoryDetail() {
 
     setEditForm({
       name: item.name,
+      invoiceAliases: (item.invoiceAliases || []).join(', '),
       category: item.category,
       storageArea: item.storageArea || '',
       supplier: item.supplier,
@@ -297,15 +302,28 @@ export function InventoryDetail() {
       });
     }
 
+    const existingLocations = getInventoryStorageLocations(item);
+    const nextLocations = existingLocations.length === 1
+      ? [{ storageArea: editForm.storageArea.trim() || 'Unassigned', currentStock: Number(editForm.currentStock), parLevel: Number(editForm.parLevel) }]
+      : existingLocations;
+    const invoiceAliases = Array.from(new Set(
+      editForm.invoiceAliases
+        .split(/[,;\n]/)
+        .map(alias => alias.trim())
+        .filter(alias => alias && alias.toLowerCase() !== editForm.name.trim().toLowerCase()),
+    ));
+
     updateInventoryItem(item.id, {
       name: editForm.name.trim(),
+      invoiceAliases,
       category: editForm.category.trim(),
-      storageArea: editForm.storageArea.trim(),
+      storageArea: nextLocations[0]?.storageArea || 'Unassigned',
+      storageLocations: nextLocations,
       supplier: nextSupplier,
       sku: editForm.sku.trim(),
       vendorItemCode: editForm.vendorItemCode.trim(),
       unit: editForm.unit.trim(),
-      currentStock: Number(editForm.currentStock),
+      currentStock: nextLocations.reduce((sum, location) => sum + location.currentStock, 0),
       unitCost: Number(editForm.unitCost),
       packSize: Number(editForm.packSize),
       packUnit: editForm.packUnit.trim(),
@@ -313,7 +331,7 @@ export function InventoryDetail() {
       taxRate: Number(editForm.taxRate),
       wastePercent: Number(editForm.wastePercent),
       yieldPercent: Number(editForm.yieldPercent),
-      parLevel: Number(editForm.parLevel),
+      parLevel: nextLocations.reduce((sum, location) => sum + location.parLevel, 0),
       reorderPoint: Number(editForm.reorderPoint),
       minimumOrderQty: Number(editForm.minimumOrderQty),
       leadTimeDays: Number(editForm.leadTimeDays),
@@ -350,15 +368,42 @@ export function InventoryDetail() {
       addStorageArea(customArea);
     }
 
-    updateInventoryItem(item.id, {
+    const existingLocations = getInventoryStorageLocations(item);
+    const existingIndex = existingLocations.findIndex(location => location.storageArea === nextStorageArea);
+    const nextLocation = {
       storageArea: nextStorageArea,
+      currentStock: Number(quickCurrentStock),
       parLevel: Number(quickParLevel),
+    };
+    const hasEmptyUnassignedPlaceholder = existingLocations.length === 1
+      && existingLocations[0].storageArea === 'Unassigned'
+      && existingLocations[0].currentStock === 0
+      && existingLocations[0].parLevel === 0;
+    const nextLocations = existingIndex >= 0
+      ? existingLocations.map((location, index) => index === existingIndex ? nextLocation : location)
+      : hasEmptyUnassignedPlaceholder
+        ? [nextLocation]
+        : [...existingLocations, nextLocation];
+
+    updateInventoryItem(item.id, {
+      storageArea: nextLocations[0]?.storageArea || 'Unassigned',
+      storageLocations: nextLocations,
+      currentStock: nextLocations.reduce((sum, location) => sum + location.currentStock, 0),
+      parLevel: nextLocations.reduce((sum, location) => sum + location.parLevel, 0),
       lastUpdated: new Date().toISOString().split('T')[0],
     });
 
     setQuickStorageArea(nextStorageArea);
+    setQuickCurrentStock(nextLocation.currentStock);
     setQuickCustomStorageArea('');
-    showToast.success('Storage area and par updated');
+    showToast.success(existingIndex >= 0 ? 'Storage area updated' : 'Storage area added');
+  };
+
+  const selectQuickStorageArea = (storageArea: string) => {
+    setQuickStorageArea(storageArea);
+    const location = getInventoryStorageLocations(item).find(entry => entry.storageArea === storageArea);
+    setQuickCurrentStock(location?.currentStock || 0);
+    setQuickParLevel(location?.parLevel || 0);
   };
 
   const updatePurchaseOption = (optionId: string, patch: Partial<PurchaseOptionDraft>) => {
@@ -499,14 +544,15 @@ export function InventoryDetail() {
     : 0;
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="-mx-4 min-h-screen bg-[#F7F8FA] px-3 py-3 pb-24 sm:px-5 sm:py-5">
+      <div className="mx-auto max-w-6xl space-y-3">
       {/* Header */}
-      <div>
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
         <Button
           variant="outline"
           size="sm"
           onClick={() => navigate('/app/inventory')}
-          className="mb-3"
+          className="mb-2 h-9 rounded-xl"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
           Back
@@ -522,18 +568,18 @@ export function InventoryDetail() {
                 navigate('/app/inventory');
               }
             }}
-            className="mb-3 ml-2 text-red-600 border-red-200 hover:bg-red-50"
+            className="mb-2 ml-2 h-9 rounded-xl text-red-600 border-red-200 hover:bg-red-50"
           >
             Delete
           </Button>
         )}
 
-        <div className="flex items-start justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">{item.name}</h2>
-            <p className="text-sm text-gray-600 mt-1">{item.category} • {item.supplier}</p>
+            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight sm:text-2xl">{item.name}</h2>
+            <p className="mt-0.5 text-xs text-gray-600">{item.category} • {item.supplier}</p>
           </div>
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge className={item.inactive ? 'bg-gray-200 text-gray-700' : isLowStock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
               {item.inactive ? 'Inactive' : isLowStock ? '🟡 Low' : '🟢 OK'}
             </Badge>
@@ -546,17 +592,17 @@ export function InventoryDetail() {
             </Button>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Current Stock Card */}
-      <Card>
-        <CardHeader>
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base">Current Stock</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 px-4 pb-4">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-4xl font-bold text-gray-900">{item.currentStock}</p>
+              <p className="text-3xl font-bold text-gray-900">{item.currentStock}</p>
               <p className="text-sm text-gray-500 mt-1">{item.unit}</p>
             </div>
             <div className="text-right">
@@ -565,9 +611,9 @@ export function InventoryDetail() {
             </div>
           </div>
 
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="h-2 w-full rounded-full bg-gray-200">
             <div
-              className={`h-3 rounded-full transition-all ${
+              className={`h-2 rounded-full transition-all ${
                 isLowStock ? 'bg-yellow-500' : 'bg-green-500'
               }`}
               style={{ width: `${Math.min(stockPercentage, 100)}%` }}
@@ -609,6 +655,16 @@ export function InventoryDetail() {
                 <div>
                   <Label htmlFor="name">Name</Label>
                   <Input id="name" value={editForm.name} onChange={event => setEditForm(prev => ({ ...prev, name: event.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="invoiceAliases">Invoice aliases</Label>
+                  <Input
+                    id="invoiceAliases"
+                    value={editForm.invoiceAliases}
+                    onChange={event => setEditForm(prev => ({ ...prev, invoiceAliases: event.target.value }))}
+                    placeholder="Bella Casara Mozzarella, BC Mozz 2.2 kg"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Supplier descriptions ZestIQ should recognize as this inventory item. Separate multiple names with commas.</p>
                 </div>
                 <div>
                   <Label htmlFor="supplier">Supplier</Label>
@@ -943,12 +999,14 @@ export function InventoryDetail() {
             <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
               <p className="text-xs font-bold text-slate-800">Counting and Inventory management</p>
             </div>
-            <div className="grid gap-2 px-3 py-3 md:grid-cols-[1fr_1fr_1fr_auto] border-b border-slate-100 bg-white">
+            <div className="border-b border-slate-100 bg-white px-3 py-3">
+              <p className="mb-3 text-xs leading-5 text-slate-600">Add the same item to each place it is stored. On-hand and par are tracked by area and rolled up into the item total.</p>
+              <div className="grid gap-2 md:grid-cols-[1fr_1fr_0.7fr_0.7fr_auto]">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Storage area</p>
                 <select
                   value={quickStorageArea}
-                  onChange={(event) => setQuickStorageArea(event.target.value)}
+                  onChange={(event) => selectQuickStorageArea(event.target.value)}
                   className="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm"
                 >
                   {storageAreas.map(area => (
@@ -957,11 +1015,27 @@ export function InventoryDetail() {
                 </select>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Add storage area</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">New area (optional)</p>
                 <Input
                   value={quickCustomStorageArea}
-                  onChange={(event) => setQuickCustomStorageArea(event.target.value)}
+                  onChange={(event) => {
+                    if (!quickCustomStorageArea && event.target.value) {
+                      setQuickCurrentStock(0);
+                      setQuickParLevel(0);
+                    }
+                    setQuickCustomStorageArea(event.target.value);
+                  }}
                   placeholder="e.g. Prep Cooler"
+                  className="h-10"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">On hand</p>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={quickCurrentStock}
+                  onChange={(event) => setQuickCurrentStock(Number(event.target.value))}
                   className="h-10"
                 />
               </div>
@@ -977,14 +1051,28 @@ export function InventoryDetail() {
               </div>
               <div className="flex items-end">
                 <Button type="button" onClick={saveQuickInventoryManagement} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
-                  Save Counting
+                  Save area
                 </Button>
+              </div>
               </div>
             </div>
             <div className="grid gap-3 px-3 py-3 md:grid-cols-2">
               <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Storage areas</p>
-                <p className="mt-1 text-sm text-slate-800">{item.storageArea || 'Unassigned'}</p>
+                <div className="mt-2 space-y-2">
+                  {getInventoryStorageLocations(item).map(location => (
+                    <button
+                      key={location.storageArea}
+                      type="button"
+                      onClick={() => selectQuickStorageArea(location.storageArea)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-left text-sm text-slate-800 hover:bg-amber-50"
+                    >
+                      <span className="font-semibold">{location.storageArea}</span>
+                      <span className="text-xs text-slate-500">{location.currentStock} {item.unit} on hand · par {location.parLevel}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs font-semibold text-slate-600">Total: {item.currentStock} {item.unit} on hand · par {item.parLevel}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Count forms (up to 4 allowed)</p>
@@ -1387,6 +1475,7 @@ export function InventoryDetail() {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 }

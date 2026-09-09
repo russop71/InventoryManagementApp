@@ -6,6 +6,7 @@ import {
   filterInvoiceItems,
   hasDuplicateInvoiceNumber,
   normalizeInventoryItemName,
+  inventoryItemMatchesInvoiceName,
 } from './invoiceWorkflow.js';
 
 test('groups order suggestions by supplier and totals each supplier group', () => {
@@ -21,6 +22,17 @@ test('groups order suggestions by supplier and totals each supplier group', () =
     { supplier: 'Sysco', items: [suggestions[0], suggestions[2]], totalCost: 70 },
     { supplier: 'US Foods', items: [suggestions[1]], totalCost: 20 },
   ]);
+});
+
+test('matches supplier invoice descriptions through hidden inventory aliases', () => {
+  const mozzarella = {
+    name: 'Mozzarella',
+    invoiceAliases: ['Bella Casara Mozzarella'],
+    purchaseOptions: [{ productName: 'BC Mozzarella 2.2 kg' }],
+  };
+  assert.equal(inventoryItemMatchesInvoiceName(mozzarella, 'Bella Casara Mozzarella'), true);
+  assert.equal(inventoryItemMatchesInvoiceName(mozzarella, 'BC Mozzarella 2.2 kg'), true);
+  assert.equal(inventoryItemMatchesInvoiceName(mozzarella, 'Cheddar'), false);
 });
 
 test('calculates invoice totals from line items', () => {

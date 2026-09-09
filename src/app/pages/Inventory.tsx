@@ -34,6 +34,7 @@ const Y = '#F5C10E';
 const D = '#0F172A';
 
 type Status = 'in-stock' | 'low-stock' | 'out-of-stock';
+type InventorySort = 'name-asc' | 'name-desc' | 'stock-asc' | 'stock-desc' | 'status' | 'value-desc' | 'value-asc' | 'supplier' | 'updated';
 
 function getStatus(current: number, par: number): Status {
   if (current <= 0) return 'out-of-stock';
@@ -53,6 +54,7 @@ export function Inventory() {
   const { inventory, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount, deleteInventoryItems, mergeInventoryItems } = useInventory();
   const canManageCounts = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<InventorySort>('name-asc');
   const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock'>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '', supplier: '', unit: 'ea', parLevel: '10', currentStock: '0', unitCost: '0' });
@@ -117,13 +119,30 @@ export function Inventory() {
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return inventory.filter(item => {
-      const matchesQuery = !query || `${item.name} ${item.category} ${item.supplier}`.toLowerCase().includes(query);
+    const matches = inventory.filter(item => {
+      const matchesQuery = !query || `${item.name} ${item.category} ${item.supplier} ${(item.invoiceAliases || []).join(' ')}`.toLowerCase().includes(query);
       const status = getStatus(item.currentStock, item.parLevel);
       const matchesTab = activeTab === 'all' ? true : activeTab === 'low-stock' ? status === 'low-stock' : status === 'out-of-stock';
       return matchesQuery && matchesTab;
     });
-  }, [activeTab, inventory, search]);
+    const statusRank: Record<Status, number> = { 'out-of-stock': 0, 'low-stock': 1, 'in-stock': 2 };
+    return [...matches].sort((left, right) => {
+      let result = 0;
+      if (sortBy === 'name-asc') result = left.name.localeCompare(right.name);
+      if (sortBy === 'name-desc') result = right.name.localeCompare(left.name);
+      if (sortBy === 'stock-asc') result = left.currentStock - right.currentStock;
+      if (sortBy === 'stock-desc') result = right.currentStock - left.currentStock;
+      if (sortBy === 'status') {
+        result = statusRank[getStatus(left.currentStock, left.parLevel)] - statusRank[getStatus(right.currentStock, right.parLevel)];
+        if (result === 0) result = (left.currentStock / Math.max(left.parLevel, 1)) - (right.currentStock / Math.max(right.parLevel, 1));
+      }
+      if (sortBy === 'value-desc') result = (right.currentStock * right.unitCost) - (left.currentStock * left.unitCost);
+      if (sortBy === 'value-asc') result = (left.currentStock * left.unitCost) - (right.currentStock * right.unitCost);
+      if (sortBy === 'supplier') result = left.supplier.localeCompare(right.supplier);
+      if (sortBy === 'updated') result = new Date(right.lastUpdated || 0).getTime() - new Date(left.lastUpdated || 0).getTime();
+      return result || left.name.localeCompare(right.name);
+    });
+  }, [activeTab, inventory, search, sortBy]);
   const selectedInventoryItems = inventory.filter(item => selectedItemIds.includes(item.id));
   const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItemIds.includes(item.id));
 
@@ -217,6 +236,11 @@ export function Inventory() {
     navigate(activeDraftCount ? `/app/inventory/counts/${activeDraftCount.id}` : '/app/inventory/counts/new');
   };
 
+  const handleOpenCountView = () => {
+    const countId = activeDraftCount?.id || selectedCountRow?.id || countRows[0]?.id;
+    navigate(countId ? `/app/inventory/counts/${countId}` : '/app/inventory/counts/new');
+  };
+
   const handleDeleteCount = (countId: string) => {
     const count = countRows.find(row => row.id === countId);
     if (!canManageCounts || !window.confirm(`Delete “${count?.description || 'this inventory count'}”? This cannot be recovered.`)) return;
@@ -227,9 +251,9 @@ export function Inventory() {
   };
 
   return (
-    <div className="-mx-4 min-h-screen bg-white">
-      <div className="px-4 pt-2 pb-5">
-        <div className="rounded-[28px] border border-gray-200 bg-[#FCFCFD] p-4 shadow-sm">
+    <div className="-mx-4 min-h-screen bg-[#F7F8FA]">
+      <div className="px-3 pb-5 pt-2 sm:px-5">
+        <div className="rounded-2xl border border-gray-200 bg-[#FCFCFD] p-3 shadow-sm sm:p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1 className="text-[24px] font-black tracking-tight" style={{ color: D }}>INVENTORY COUNTS</h1>
@@ -312,7 +336,7 @@ export function Inventory() {
                 <Download className="mr-2 h-4 w-4" style={{ color: Y }} />
                 Export
               </button>
-              <button className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm">
+              <button type="button" onClick={handleOpenCountView} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm">
                 <ClipboardList className="h-4 w-4" style={{ color: Y }} />
                 Count view
               </button>
@@ -476,7 +500,24 @@ export function Inventory() {
 
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-50">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}</p>
-        <div className="flex items-center gap-3"><button type="button" onClick={() => toggleAllInventorySelection(!allFilteredSelected)} className="text-[11px] font-black text-slate-700 underline underline-offset-2">{allFilteredSelected ? 'Clear visible' : 'Select all visible'}</button><button className="flex items-center gap-1 text-[11px] font-bold text-gray-500"><SlidersHorizontal className="h-3 w-3" />Sort: A–Z</button></div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => toggleAllInventorySelection(!allFilteredSelected)} className="text-[11px] font-black text-slate-700 underline underline-offset-2">{allFilteredSelected ? 'Clear visible' : 'Select all visible'}</button>
+          <label className="flex items-center gap-1 text-[11px] font-bold text-gray-500">
+            <SlidersHorizontal className="h-3 w-3 shrink-0" />
+            <span className="sr-only">Sort inventory</span>
+            <select aria-label="Sort inventory" value={sortBy} onChange={event => setSortBy(event.target.value as InventorySort)} className="max-w-[132px] cursor-pointer rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-amber-400">
+              <option value="name-asc">Name: A–Z</option>
+              <option value="name-desc">Name: Z–A</option>
+              <option value="status">Low stock first</option>
+              <option value="stock-asc">On hand: low–high</option>
+              <option value="stock-desc">On hand: high–low</option>
+              <option value="value-desc">Value: high–low</option>
+              <option value="value-asc">Value: low–high</option>
+              <option value="supplier">Supplier: A–Z</option>
+              <option value="updated">Recently updated</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {selectedItemIds.length > 0 && (
@@ -489,9 +530,17 @@ export function Inventory() {
                   {selectedInventoryItems.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
-              <button type="button" onClick={handleMergeSelected} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900"><GitMerge className="h-3.5 w-3.5" />Merge items</button>
             </>
           )}
+          <button
+            type="button"
+            onClick={handleMergeSelected}
+            disabled={selectedItemIds.length < 2}
+            title={selectedItemIds.length < 2 ? 'Select at least two inventory items to merge' : 'Merge selected inventory items'}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <GitMerge className="h-3.5 w-3.5" />Merge items
+          </button>
           <button type="button" onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white"><Trash2 className="h-3.5 w-3.5" />Delete selected</button>
           <button type="button" onClick={() => { setSelectedItemIds([]); setMergeTargetId(''); }} className="px-2 py-2 text-xs font-bold text-slate-600 underline">Clear</button>
         </div>

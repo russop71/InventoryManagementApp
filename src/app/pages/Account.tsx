@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 
 export function Account() {
   const { user, accountId, accountName, locations, addLocation, logout, changePassword, deleteCurrentAccount, updateLocalAccountProfile } = useAuth();
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const [isEditing, setIsEditing] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -20,15 +21,15 @@ export function Account() {
   const [formData, setFormData] = useState({
     name: user?.name || 'Team Member',
     email: user?.email || '',
-    phone: '(555) 123-4567',
+    phone: '',
     restaurant: accountName || 'Restaurant Group',
-    address: '123 Main Street, New York, NY 10001'
+    address: ''
   });
 
   const profileStorageKey = accountId ? `zestiq:account:${accountId}:profile` : null;
 
   useEffect(() => {
-    if (!profileStorageKey) return;
+    if (!profileStorageKey || isDemoAccount) return;
     const raw = localStorage.getItem(profileStorageKey);
     if (!raw) return;
     try {
@@ -37,7 +38,7 @@ export function Account() {
     } catch {
       // Ignore malformed profile payloads.
     }
-  }, [profileStorageKey]);
+  }, [isDemoAccount, profileStorageKey]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +97,16 @@ export function Account() {
       setIsPasswordSaving(false);
     }
   };
+
+  if (isDemoAccount) {
+    return (
+      <div className="space-y-4">
+        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Public demo</p><h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Account settings preview</h2><p className="mt-1 text-sm text-slate-600">A safe, read-only example of the information a restaurant controls.</p></div>
+        <Card className="border-amber-200 bg-amber-50"><CardContent className="py-5"><KeyRound className="mb-3 h-8 w-8 text-amber-700" /><p className="font-semibold text-amber-950">Account administration is disabled in the public demo.</p><p className="mt-1 text-sm text-amber-800">Profile editing, passwords, two-factor authentication, locations, data reset and account deletion are available only in a private workspace.</p></CardContent></Card>
+        <Card><CardHeader><CardTitle>Fictional demo restaurant</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Restaurant</p><p className="mt-1 font-semibold text-slate-900">Zestaurant</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Region</p><p className="mt-1 font-semibold text-slate-900">Burlington, Ontario, Canada</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Demo access</p><p className="mt-1 font-semibold text-slate-900">Owner preview</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Location</p><p className="mt-1 font-semibold text-slate-900">Main Location</p></div></CardContent></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -243,9 +254,10 @@ export function Account() {
           <Button
             variant="outline"
             className="w-full justify-start"
-            onClick={() => toast.info('2FA feature coming soon')}
+            disabled
+            aria-label="Two-factor authentication is not available yet"
           >
-            Enable Two-Factor Authentication
+            Two-Factor Authentication — Not available yet
           </Button>
         </CardContent>
       </Card>

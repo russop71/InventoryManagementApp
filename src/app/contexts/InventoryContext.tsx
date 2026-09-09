@@ -7,7 +7,7 @@ import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
 import { buildDemoLocationData, DEMO_DATA_VERSION } from '../utils/demoData';
 import { markDemoSessionReset, shouldResetDemoSession } from '../utils/demoSession.js';
 import { mergeLocationData } from '../utils/locationDataMerge.js';
-import { hasDuplicateInvoiceNumber, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
+import { hasDuplicateInvoiceNumber, inventoryItemMatchesInvoiceName, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
 import { findBestSupplierMatch, mergeDuplicateSuppliers, normalizeSupplierName } from '../utils/supplierMatching.js';
 import { convertQuantity, normalizeUnit } from '../utils/unitConversion';
 import type { InventoryCount } from '../utils/inventoryCounts';
@@ -23,13 +23,51 @@ function sortUniqueStorageAreas(storageAreas: string[]) {
   return Array.from(new Set(storageAreas.map(area => area.trim()).filter(Boolean))).sort((left, right) => left.localeCompare(right));
 }
 
+export interface InventoryStorageLocation {
+  storageArea: string;
+  currentStock: number;
+  parLevel: number;
+}
+
+export function getInventoryStorageLocations(item: Pick<InventoryItem, 'storageArea' | 'currentStock' | 'parLevel' | 'storageLocations'>): InventoryStorageLocation[] {
+  const source = item.storageLocations?.length
+    ? item.storageLocations
+    : [{ storageArea: normalizeStorageArea(item.storageArea), currentStock: item.currentStock, parLevel: item.parLevel }];
+
+  const byArea = new Map<string, InventoryStorageLocation>();
+  source.forEach(location => {
+    const storageArea = normalizeStorageArea(location.storageArea);
+    const existing = byArea.get(storageArea);
+    byArea.set(storageArea, {
+      storageArea,
+      currentStock: (existing?.currentStock || 0) + (Number(location.currentStock) || 0),
+      parLevel: (existing?.parLevel || 0) + (Number(location.parLevel) || 0),
+    });
+  });
+  return Array.from(byArea.values());
+}
+
+function normalizeInventoryStorage(item: InventoryItem): InventoryItem {
+  const storageLocations = getInventoryStorageLocations(item);
+  return {
+    ...item,
+    storageArea: storageLocations[0]?.storageArea || 'Unassigned',
+    storageLocations,
+    currentStock: storageLocations.reduce((sum, location) => sum + location.currentStock, 0),
+    parLevel: storageLocations.reduce((sum, location) => sum + location.parLevel, 0),
+  };
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
   category: string;
   storageArea?: string;
+  storageLocations?: InventoryStorageLocation[];
   sku?: string;
   vendorItemCode?: string;
+  /** Supplier-facing descriptions used to match invoice lines to this clean inventory name. */
+  invoiceAliases?: string[];
   currentStock: number;
   unit: string;
   packSize?: number;
@@ -264,6 +302,7 @@ function normalizePreppedRecipe(recipe: Partial<PreppedRecipe> & Pick<PreppedRec
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const { user, accountId, activeLocationId, token } = useAuth();
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const pollRef = useRef<number | null>(null);
   const locationVersionsRef = useRef<Map<string, string>>(new Map());
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -368,7 +407,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       effectivePreppedRecipes,
       effectiveInventoryCounts,
     );
-    if (!token) return;
+    if (!token || isDemoAccount) return;
     const locationId = activeLocationId;
     const requestPath = `/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(locationId)}/data`;
     const snapshot = {
@@ -449,8 +488,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
 
     const localInventory = readScopedJson<InventoryItem[]>(localKey('inventory'), []).map(item => ({
-      ...item,
-      storageArea: normalizeStorageArea(item.storageArea),
+      ...normalizeInventoryStorage(item),
       inactive: item.inactive ?? false,
     }));
     const localRecipes = readScopedJson<Recipe[]>(localKey('recipes'), []);
@@ -458,14 +496,35 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const localInventoryCounts = readScopedJson<InventoryCount[]>(localKey('inventoryCounts'), []);
 
     const demoData = buildDemoLocationData();
-    const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
-    const fallbackInventory = isDemoAccount ? demoData.inventory as unknown as InventoryItem[] : [];
+    const fallbackInventory = isDemoAccount ? (demoData.inventory as unknown as InventoryItem[]).map(normalizeInventoryStorage) : [];
     const fallbackRecipes = isDemoAccount ? demoData.recipes as unknown as Recipe[] : [];
     const fallbackStorageAreas = isDemoAccount ? demoData.storageAreas : [...DEFAULT_STORAGE_AREAS];
     const fallbackOrders = isDemoAccount ? demoData.orders as unknown as DailyOrder[] : [];
     const fallbackInvoices = isDemoAccount ? demoData.invoices as unknown as InvoiceRecord[] : [];
     const fallbackSuppliers = isDemoAccount ? demoData.suppliers as unknown as Supplier[] : [];
     const fallbackPreppedRecipes = isDemoAccount ? demoData.preppedRecipes as unknown as PreppedRecipe[] : [];
+
+    if (isDemoAccount) {
+      const shouldReset = shouldResetDemoSession(DEMO_DATA_VERSION);
+      const localOrders = readScopedJson<DailyOrder[]>(localKey('orders'), []);
+      const localInvoices = readScopedJson<InvoiceRecord[]>(localKey('invoices'), []);
+      const localSuppliers = readScopedJson<Supplier[]>(localKey('suppliers'), []);
+      const localPreppedRecipes = readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe));
+      const nextInventory = shouldReset || localInventory.length === 0 ? fallbackInventory : localInventory;
+      const nextRecipes = shouldReset || localRecipes.length === 0 ? fallbackRecipes : localRecipes;
+      const nextStorageAreas = shouldReset || localStorageAreas.length === 0 ? fallbackStorageAreas : localStorageAreas;
+      const nextOrders = shouldReset || localOrders.length === 0 ? fallbackOrders : localOrders;
+      const nextInvoices = shouldReset || localInvoices.length === 0 ? fallbackInvoices : localInvoices;
+      const nextSuppliers = shouldReset || localSuppliers.length === 0 ? fallbackSuppliers : localSuppliers;
+      const nextPreppedRecipes = shouldReset || localPreppedRecipes.length === 0 ? fallbackPreppedRecipes : localPreppedRecipes;
+      const nextCounts = shouldReset ? [] : localInventoryCounts;
+      const mergedStorageAreas = sortUniqueStorageAreas([...DEFAULT_STORAGE_AREAS, ...nextStorageAreas, ...nextInventory.map(item => normalizeStorageArea(item.storageArea))]);
+      setInventory(nextInventory); setRecipes(nextRecipes); setStorageAreas(mergedStorageAreas); setOrders(nextOrders); setInvoices(nextInvoices); setSuppliers(nextSuppliers); setPreppedRecipes(nextPreppedRecipes); setInventoryCounts(nextCounts);
+      persistLocalLocationData(nextInventory, nextRecipes, mergedStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextCounts);
+      markDemoSessionReset(DEMO_DATA_VERSION);
+      setIsLocationLoaded(true);
+      return;
+    }
 
     if (!token) {
       const nextStorageAreas = sortUniqueStorageAreas([
@@ -531,8 +590,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       );
 
       const apiInventory = (merged.inventory || []).map(item => ({
-        ...item,
-        storageArea: normalizeStorageArea(item.storageArea),
+        ...normalizeInventoryStorage(item),
         inactive: item.inactive ?? false,
       }));
       const apiRecipes = merged.recipes || [];
@@ -636,7 +694,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [accountId, activeLocationId, user?.email, token]);
 
   useEffect(() => {
-    if (!accountId || !activeLocationId || !token) return;
+    if (!accountId || !activeLocationId || !token || isDemoAccount) return;
     if (pollRef.current) window.clearInterval(pollRef.current);
 
     pollRef.current = window.setInterval(() => {
@@ -649,7 +707,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         pollRef.current = null;
       }
     };
-  }, [accountId, activeLocationId, token]);
+  }, [accountId, activeLocationId, token, isDemoAccount]);
 
   useEffect(() => {
     const key = localKey('forecasts');
@@ -692,10 +750,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [preppedRecipes, accountId, activeLocationId]);
 
   const addInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
+    const storageArea = normalizeStorageArea(item.storageArea);
     const newItem: InventoryItem = {
       ...item,
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      storageArea: normalizeStorageArea(item.storageArea),
+      storageArea,
+      storageLocations: item.storageLocations?.length
+        ? item.storageLocations
+        : [{ storageArea, currentStock: Number(item.currentStock) || 0, parLevel: Number(item.parLevel) || 0 }],
       deletable: item.deletable !== false,
       inactive: item.inactive ?? false,
     };
@@ -773,15 +835,17 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const primary = inventory.find(item => item.id === primaryId);
     const sources = inventory.filter(item => idSet.has(item.id) && item.id !== primaryId);
     if (!primary || sources.length === 0) return { success: false, error: 'Select at least two inventory items to merge.' };
-    if (sources.some(item => normalizeInventoryItemName(item.name) !== normalizeInventoryItemName(primary.name))) {
-      return { success: false, error: 'Only items with the same name can be merged. Rename them first if they are truly the same item.' };
-    }
-
     let mergedStock = primary.currentStock;
     let mergedValue = primary.currentStock * primary.unitCost;
     const mergedHistory = [...(primary.history || [])];
     const mergedPriceHistory = [...(primary.priceHistory || [])];
     const mergedOptions = [...(primary.purchaseOptions || [])];
+    const mergedAliases = new Map<string, string>();
+    [primary.name, ...(primary.invoiceAliases || []), ...(primary.purchaseOptions || []).map(option => option.productName)].forEach(name => {
+      const normalized = normalizeInventoryItemName(name);
+      if (normalized) mergedAliases.set(normalized, name.trim());
+    });
+    const mergedLocations = getInventoryStorageLocations(primary).map(location => ({ ...location }));
     const conversions = new Map<string, number>();
     for (const item of sources) {
       const converted = convertQuantity(item.currentStock, item.unit, primary.unit);
@@ -794,6 +858,21 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       mergedValue += item.currentStock * item.unitCost;
       mergedHistory.push(...(item.history || []));
       mergedPriceHistory.push(...(item.priceHistory || []));
+      [item.name, ...(item.invoiceAliases || []), ...(item.purchaseOptions || []).map(option => option.productName)].forEach(name => {
+        const normalized = normalizeInventoryItemName(name);
+        if (normalized && !mergedAliases.has(normalized)) mergedAliases.set(normalized, name.trim());
+      });
+      getInventoryStorageLocations(item).forEach(location => {
+        const stock = convertQuantity(location.currentStock, item.unit, primary.unit) || 0;
+        const par = convertQuantity(location.parLevel, item.unit, primary.unit) || 0;
+        const existingLocation = mergedLocations.find(entry => entry.storageArea === location.storageArea);
+        if (existingLocation) {
+          existingLocation.currentStock += stock;
+          existingLocation.parLevel += par;
+        } else {
+          mergedLocations.push({ storageArea: location.storageArea, currentStock: stock, parLevel: par });
+        }
+      });
       for (const option of item.purchaseOptions || []) {
         if (!mergedOptions.some(existing => normalizeSupplierName(existing.supplier) === normalizeSupplierName(option.supplier) && existing.productCode === option.productCode)) {
           mergedOptions.push({ ...option, id: `${primary.id}-${option.id}` });
@@ -804,6 +883,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const nextPrimary: InventoryItem = {
       ...primary,
       currentStock: mergedStock,
+      parLevel: mergedLocations.reduce((sum, location) => sum + location.parLevel, 0),
+      storageLocations: mergedLocations,
+      invoiceAliases: Array.from(mergedAliases.values()).filter(name => normalizeInventoryItemName(name) !== normalizeInventoryItemName(primary.name)),
       unitCost: mergedStock > 0 ? mergedValue / mergedStock : primary.unitCost,
       purchaseOptions: mergedOptions,
       history: [...mergedHistory, { date: now, change: 0, reason: `Merged ${sources.length} duplicate inventory item${sources.length === 1 ? '' : 's'}`, newStock: mergedStock }],
@@ -819,19 +901,45 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         const converted = source ? convertQuantity(ingredient.quantity, ingredient.unit, primary.unit) : null;
         return { ...ingredient, inventoryItemId: primaryId, quantity: converted ?? ingredient.quantity, unit: primary.unit };
       }),
+      modifiers: recipe.modifiers?.map(modifier => ({
+        ...modifier,
+        ingredientChanges: modifier.ingredientChanges.map(change => idSet.has(change.inventoryItemId)
+          ? { ...change, inventoryItemId: primaryId }
+          : change),
+      })),
+    }));
+    const nextPreppedRecipes = preppedRecipes.map(recipe => ({
+      ...recipe,
+      ingredients: recipe.ingredients.map(ingredient => {
+        if (!idSet.has(ingredient.inventoryItemId) || ingredient.inventoryItemId === primaryId) return ingredient;
+        const source = inventory.find(item => item.id === ingredient.inventoryItemId);
+        const converted = source ? convertQuantity(ingredient.quantity, ingredient.unit, primary.unit) : null;
+        return { ...ingredient, inventoryItemId: primaryId, quantity: converted ?? ingredient.quantity, unit: primary.unit };
+      }),
+    }));
+    const nextOrders = orders.map(order => ({
+      ...order,
+      items: order.items.map(line => idSet.has(line.itemId) ? { ...line, itemId: primaryId } : line),
     }));
     const nextInvoices = invoices.map(invoice => ({ ...invoice, items: invoice.items.map(line => idSet.has(line.itemId) ? { ...line, itemId: primaryId } : line) }));
     setInventory(nextInventory);
     setRecipes(nextRecipes);
+    setPreppedRecipes(nextPreppedRecipes);
+    setOrders(nextOrders);
     setInvoices(nextInvoices);
-    saveLocationData(nextInventory, nextRecipes, storageAreas, orders, nextInvoices, suppliers, preppedRecipes, inventoryCounts);
+    saveLocationData(nextInventory, nextRecipes, storageAreas, nextOrders, nextInvoices, suppliers, nextPreppedRecipes, inventoryCounts);
     return { success: true };
   };
 
   const adjustInventory = (id: string, change: number, reason: string) => {
     const nextInventory = inventory.map(item => {
       if (item.id !== id) return item;
-      const newStock = item.currentStock + change;
+      const locations = getInventoryStorageLocations(item);
+      const primary = locations[0];
+      const nextLocations = primary
+        ? [{ ...primary, currentStock: primary.currentStock + change }, ...locations.slice(1)]
+        : locations;
+      const newStock = nextLocations.reduce((sum, location) => sum + location.currentStock, 0);
       const newHistory = [
         ...(item.history || []),
         {
@@ -844,6 +952,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       return {
         ...item,
         currentStock: newStock,
+        storageLocations: nextLocations,
         history: newHistory,
       };
     });
@@ -1123,7 +1232,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     for (const [index, scannedItem] of invoiceInput.items.entries()) {
       const normalizedName = normalizeInventoryItemName(scannedItem.name);
       const matchingIndexes = nextInventory.map((item, itemIndex) => ({ item, itemIndex })).filter(({ item }) => (
-        normalizedName.length > 0 && normalizeInventoryItemName(item.name) === normalizedName
+        normalizedName.length > 0 && inventoryItemMatchesInvoiceName(item, scannedItem.name)
       ));
       const itemIndex = matchingIndexes.find(({ item }) => normalizeSupplierName(item.supplier) === normalizedSupplier || item.purchaseOptions?.some(option => normalizeSupplierName(option.supplier) === normalizedSupplier))?.itemIndex ?? matchingIndexes[0]?.itemIndex ?? -1;
       const scannedUnit = normalizeUnit(scannedItem.unit.trim() || 'ea');
@@ -1189,6 +1298,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
         nextInventory[itemIndex] = {
           ...existingItem,
+          invoiceAliases: Array.from(new Set([...(existingItem.invoiceAliases || []), scannedItem.name.trim()].filter(name => name && normalizeInventoryItemName(name) !== normalizeInventoryItemName(existingItem.name)))),
           currentStock: newStock,
           supplier: isPrimarySupplier ? supplierName : existingItem.supplier,
           unitCost: isPrimarySupplier ? unitCost : existingItem.unitCost,
@@ -1387,10 +1497,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     };
     // A product can be counted in several storage areas. Inventory on hand is the
     // sum of those lines, not whichever line happens to be saved last.
-    const countedByItem = new Map<string, { counted: number; shelfOrder?: number }>();
+    const countedByItem = new Map<string, { counted: number; shelfOrder?: number; locations: InventoryStorageLocation[] }>();
     finalizedCount.entries.forEach(entry => {
-      const current = countedByItem.get(entry.itemId) || { counted: 0, shelfOrder: entry.shelfOrder };
+      const current = countedByItem.get(entry.itemId) || { counted: 0, shelfOrder: entry.shelfOrder, locations: [] };
       current.counted += Number(entry.counted) || 0;
+      const storageArea = normalizeStorageArea(entry.storageArea);
+      const existingLocation = current.locations.find(location => location.storageArea === storageArea);
+      if (existingLocation) {
+        existingLocation.currentStock += Number(entry.counted) || 0;
+        existingLocation.parLevel += Number(entry.parLevel) || 0;
+      } else {
+        current.locations.push({ storageArea, currentStock: Number(entry.counted) || 0, parLevel: Number(entry.parLevel) || 0 });
+      }
       if (entry.shelfOrder !== undefined) current.shelfOrder = entry.shelfOrder;
       countedByItem.set(entry.itemId, current);
     });
@@ -1403,6 +1521,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       return {
         ...item,
         currentStock: nextStock,
+        storageArea: countedEntry.locations[0]?.storageArea || item.storageArea,
+        storageLocations: countedEntry.locations,
+        parLevel: countedEntry.locations.reduce((sum, location) => sum + location.parLevel, 0),
         countOrder: countedEntry.shelfOrder ?? item.countOrder,
         lastCountedAt: now,
         lastUpdated: now,

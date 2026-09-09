@@ -9,6 +9,7 @@ interface HelpArticle {
   title: string;
   category: string;
   icon: any;
+  route: string;
 }
 
 export function Help() {
@@ -16,19 +17,19 @@ export function Help() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const categories = [
-    { name: 'Getting Started', icon: Lightbulb, color: 'bg-[#FEF9C3] text-[#0F172A]', articles: 5 },
-    { name: 'Inventory Management', icon: Book, color: 'bg-green-100 text-green-900', articles: 8 },
-    { name: 'AI & Forecasting', icon: Zap, color: 'bg-purple-100 text-purple-900', articles: 6 },
-    { name: 'Integrations', icon: FileText, color: 'bg-orange-100 text-orange-900', articles: 4 }
+    { name: 'Getting Started', icon: Lightbulb, color: 'bg-[#FEF9C3] text-[#0F172A]', articles: 5, route: '/app/onboarding' },
+    { name: 'Inventory Management', icon: Book, color: 'bg-green-100 text-green-900', articles: 8, route: '/app/inventory' },
+    { name: 'AI & Forecasting', icon: Zap, color: 'bg-purple-100 text-purple-900', articles: 6, route: '/app/forecasting' },
+    { name: 'Integrations', icon: FileText, color: 'bg-orange-100 text-orange-900', articles: 4, route: '/app/integrations' }
   ];
 
   const popularArticles: HelpArticle[] = [
-    { id: '1', title: 'How to connect or import from your POS', category: 'Integrations', icon: FileText },
-    { id: '2', title: 'Understanding par levels and reorder points', category: 'Inventory', icon: Book },
-    { id: '3', title: 'How AI forecasting works', category: 'AI & Forecasting', icon: Zap },
-    { id: '4', title: 'Creating and managing recipes', category: 'Recipes', icon: Book },
-    { id: '5', title: 'Reading the cost breakdown report', category: 'Reports', icon: FileText },
-    { id: '6', title: 'Managing user roles and permissions', category: 'Users', icon: Book }
+    { id: '1', title: 'How to connect or import from your POS', category: 'Integrations', icon: FileText, route: '/app/integrations' },
+    { id: '2', title: 'Understanding par levels and reorder points', category: 'Inventory', icon: Book, route: '/app/inventory' },
+    { id: '3', title: 'How AI forecasting works', category: 'AI & Forecasting', icon: Zap, route: '/app/forecasting' },
+    { id: '4', title: 'Creating and managing recipes', category: 'Recipes', icon: Book, route: '/app/recipes' },
+    { id: '5', title: 'Reading the cost breakdown report', category: 'Reports', icon: FileText, route: '/app/costs' },
+    { id: '6', title: 'Managing user roles and permissions', category: 'Users', icon: Book, route: '/app/users' }
   ];
 
   const filteredArticles = popularArticles.filter(article =>
@@ -63,11 +64,11 @@ export function Help() {
             <p className="text-xs text-gray-500 mt-1">Get help from our team</p>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => alert('Video tutorials coming soon')}>
+        <Card className="bg-gray-50 opacity-75">
           <CardContent className="pt-4 text-center">
             <Video className="w-8 h-8 mx-auto text-[#0F172A] mb-2" />
             <p className="text-sm font-medium">Video Tutorials</p>
-            <p className="text-xs text-gray-500 mt-1">Watch & learn</p>
+            <p className="text-xs text-gray-500 mt-1">Coming soon</p>
           </CardContent>
         </Card>
       </div>
@@ -79,7 +80,7 @@ export function Help() {
           {categories.map(category => {
             const Icon = category.icon;
             return (
-              <Card key={category.name} className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card key={category.name} role="button" tabIndex={0} onClick={() => navigate(category.route)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') navigate(category.route); }} className="cursor-pointer hover:shadow-md transition-shadow">
                 <CardContent className="pt-4">
                   <div className={`w-12 h-12 rounded-lg ${category.color} flex items-center justify-center mb-3`}>
                     <Icon className="w-6 h-6" />
@@ -109,7 +110,7 @@ export function Help() {
             filteredArticles.map(article => {
               const Icon = article.icon;
               return (
-                <Card key={article.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                <Card key={article.id} role="button" tabIndex={0} onClick={() => navigate(article.route)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') navigate(article.route); }} className="cursor-pointer hover:shadow-md transition-shadow">
                   <CardContent className="py-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
@@ -139,11 +140,11 @@ export function Help() {
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm">All systems operational</span>
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <span className="text-sm">No public status page is available yet</span>
             </div>
-            <button className="text-sm text-[#0F172A] hover:underline">
-              View Status
+            <button type="button" onClick={() => navigate('/app/contact')} className="text-sm text-[#0F172A] hover:underline">
+              Report an issue
             </button>
           </div>
         </CardContent>
@@ -159,7 +160,7 @@ export function Help() {
             </div>
             <div className="flex justify-between">
               <span>Last Updated</span>
-              <span className="font-medium">March 27, 2026</span>
+              <span className="font-medium">September 8, 2026</span>
             </div>
           </div>
         </CardContent>

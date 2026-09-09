@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
 import type { InventoryItem, InvoiceRecord, OrderItem } from '../contexts/InventoryContext';
@@ -303,9 +303,8 @@ export function Invoices() {
               {filteredInvoices.map(invoice => {
                 const isExpanded = expandedInvoiceId === invoice.id;
                 return (
-                  <>
+                  <Fragment key={invoice.id}>
                     <tr
-                      key={invoice.id}
                       className={`align-top cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/70' : 'hover:bg-gray-50'}`}
                       onClick={() => setExpandedInvoiceId(current => current === invoice.id ? null : invoice.id)}
                     >
@@ -540,7 +539,7 @@ export function Invoices() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

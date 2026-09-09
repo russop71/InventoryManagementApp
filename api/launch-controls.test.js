@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canAdministerAccount, canManageOperations, hasProductAccess, validateFinalizedCounts } from './_launch-controls.js';
+import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAdministrativeMutation, validateFinalizedCounts } from './_launch-controls.js';
 
 test('new clients are gated until the CAD Premium subscription is active', () => {
   const account = { id: 'company-a', slug: 'company-a', billing_status: 'not_configured' };
@@ -25,4 +25,15 @@ test('finalized counts cannot be edited, deleted, or finalized with missing line
   assert.equal(validateFinalizedCounts([finalized], []).valid, false);
   assert.equal(validateFinalizedCounts([finalized], [{ ...finalized, value: 999 }]).valid, false);
   assert.equal(validateFinalizedCounts([], [{ id: 'count-2', status: 'finalized', entries: [{ itemId: 'a', counted: 0, isCounted: false }] }]).valid, false);
+});
+
+test('public demo blocks administrative mutations but keeps operational data available', () => {
+  const demo = { slug: 'demo-zestiq-com' };
+  assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'users'], 'POST'), true);
+  assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'billing', 'portal'], 'POST'), true);
+  assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'locations'], 'POST'), true);
+  assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'locations', 'loc', 'integrations', 'toast'], 'PUT'), true);
+  assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'users'], 'GET'), false);
+  assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'locations', 'loc', 'data'], 'PUT'), true);
+  assert.equal(isDemoAdministrativeMutation({ slug: 'customer' }, ['accounts', 'id', 'users'], 'POST'), false);
 });

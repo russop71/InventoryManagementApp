@@ -1,7 +1,7 @@
 import { normalizePosImportPayload } from '../../server/pos-import.js';
 import { extractResponseText } from '../scan.js';
 import { enforceAiQuota, recordAiUsage } from '../_ai-quota.js';
-import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAccount, isPlatformAdminEmail, validateFinalizedCounts } from '../_launch-controls.js';
+import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAccount, isDemoAdministrativeMutation, isPlatformAdminEmail, validateFinalizedCounts } from '../_launch-controls.js';
 import { enforceRateLimit } from '../_request-guard.js';
 import { launchReadiness } from '../_launch-readiness.js';
 import { reportServerError } from '../_observability.js';
@@ -996,6 +996,7 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'enroll' && method === 'POST') {
       const auth = await getAuthContext(req);
+      if (String(auth.authUser?.email || '').trim().toLowerCase() === 'demo@zestiq.com') return json(res, 403, { error: 'Two-step verification changes are disabled in the public demo' });
       if (!canEnrollMfa(auth.appUser, auth.authUser)) return json(res, 403, { error: 'Two-step verification is available to account owners and administrators' });
       const enrolled = await supabaseAuth('factors', {
         method: 'POST',
@@ -1026,6 +1027,7 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'password' && method === 'POST') {
       const auth = await getAuthContext(req);
+      if (String(auth.authUser?.email || '').trim().toLowerCase() === 'demo@zestiq.com') return json(res, 403, { error: 'Password changes are disabled in the public demo' });
       const password = String(req.body?.password || '');
       if (password.length < 10) return json(res, 400, { error: 'Use a password with at least 10 characters' });
       await supabaseAuth('user', { method: 'PUT', accessToken: auth.token, body: { password } });
@@ -1036,6 +1038,7 @@ export default async function handler(req, res) {
       enforceRateLimit(req, res, 'auth-recover', { limit: 4, windowMs: 60 * 60 * 1000 });
       const email = String(req.body?.email || '').trim().toLowerCase();
       if (!email) return json(res, 400, { error: 'email is required' });
+      if (email === 'demo@zestiq.com') return json(res, 403, { error: 'Password recovery is disabled for the public demo account' });
       const redirectTo = `${appOrigin(req)}/reset-password`;
       await supabaseAuth(`recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
         method: 'POST',
@@ -1321,6 +1324,13 @@ export default async function handler(req, res) {
     const access = await requireAccountAccess(req, requestedAccountId, { ownerOnly });
     const account = access.account;
     const accountId = account.id;
+
+    if (isDemoAdministrativeMutation(account, segments, method)) {
+      return json(res, 403, { error: 'Account administration is disabled in the public demo' });
+    }
+    if (isDemoAccount(account) && segments[2] === 'users' && method === 'GET') {
+      return json(res, 200, { users: [{ ...mapUser(access.appUser), name: 'Demo Owner', email: 'demo@zestiq.com', usage: { eventCount: 0, lastActive: null, topArea: null } }] });
+    }
 
     const accessExempt = segments[2] === 'billing'
       || segments[2] === 'profile'

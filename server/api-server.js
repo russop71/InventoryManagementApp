@@ -182,7 +182,7 @@ function ensureLocationData(data, accountId, locationId) {
 }
 
 // Shared live-data API
-app.post('/api/v1/auth/login', (req, res) => {
+function handleLocalLogin(req, res) {
   const { email, password } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: 'email and password are required' });
@@ -232,18 +232,32 @@ app.post('/api/v1/auth/login', (req, res) => {
   return res.json({
     token: issuedToken,
     user,
-    account: { id: account.id, name: account.name, onboarding: account.onboarding },
+    account: {
+      id: account.id,
+      name: account.name,
+      onboarding: account.onboarding,
+      billingStatus: normalizedEmail === 'demo@zestiq.com' ? 'active' : 'not_configured',
+      productAccess: normalizedEmail === 'demo@zestiq.com',
+      features: { scheduling: normalizedEmail === 'demo@zestiq.com' },
+    },
     locations: account.locations,
     activeLocationId: account.locations[0]?.id || 'main',
   });
+}
+
+app.post('/api/v1/auth/login', handleLocalLogin);
+app.post('/api/v1/auth/demo', (req, res) => {
+  req.body = { email: 'demo@zestiq.com', password: 'local-demo-access' };
+  return handleLocalLogin(req, res);
 });
 
-app.get('/api/v1/auth/session/:token', (req, res) => {
-  const { token } = req.params;
+function handleLocalSession(req, res) {
+  const authorization = String(req.headers.authorization || '');
+  const token = req.params.token || (authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '');
   const data = readLiveData();
   const session = data.sessions[token];
   if (!session) {
-    return res.status(404).json({ error: 'session not found' });
+    return res.status(401).json({ error: 'session not found' });
   }
 
   const account = ensureAccount(data, session.accountId, session.accountId);
@@ -255,11 +269,21 @@ app.get('/api/v1/auth/session/:token', (req, res) => {
   return res.json({
     token,
     user,
-    account: { id: account.id, name: account.name, onboarding: account.onboarding },
+    account: {
+      id: account.id,
+      name: account.name,
+      onboarding: account.onboarding,
+      billingStatus: session.email === 'demo@zestiq.com' ? 'active' : 'not_configured',
+      productAccess: session.email === 'demo@zestiq.com',
+      features: { scheduling: session.email === 'demo@zestiq.com' },
+    },
     locations: account.locations,
     activeLocationId: account.locations[0]?.id || 'main',
   });
-});
+}
+
+app.get('/api/v1/auth/session', handleLocalSession);
+app.get('/api/v1/auth/session/:token', handleLocalSession);
 
 app.get('/api/v1/accounts/:accountId/users', (req, res) => {
   const { accountId } = req.params;

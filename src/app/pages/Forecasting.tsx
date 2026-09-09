@@ -685,7 +685,7 @@ Restaurant Operations Team`;
             <CardContent className="flex flex-col items-center justify-center py-12">
               <TrendingUp className="w-12 h-12 text-gray-400 mb-4" />
               <p className="text-gray-500 text-center text-sm">
-                No forecasts yet. Create your first forecast to start generating orders.
+                No saved supplier forecast yet. The seven-day projection above is ready to review; create a forecast when you want to turn it into an order plan.
               </p>
             </CardContent>
           </Card>

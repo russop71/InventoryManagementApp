@@ -25,6 +25,7 @@ const Y = '#F5C10E';
 const D = '#0F172A';
 
 type OrderStatus = 'pending' | 'ordered' | 'received' | 'cancelled';
+type OrderSort = 'newest' | 'oldest' | 'total-desc' | 'total-asc' | 'supplier';
 
 const STATUS_CFG: Record<OrderStatus, { label: string; bg: string; color: string }> = {
   pending:   { label: 'Open',       bg: `${Y}25`,  color: '#7A5E00' },
@@ -64,6 +65,13 @@ function getDefaultOrderDate() {
 
 function fmtMoney(v: number) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatOrderReference(id: string) {
+  const demoNumber = id.match(/^demo-order-(\d+)$/i)?.[1];
+  if (demoNumber) return `ZIQ-${1000 + Number(demoNumber)}`;
+  if (/^(PO|ZIQ)-/i.test(id)) return id.toUpperCase();
+  return `ZIQ-${id.replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase()}`;
 }
 
 function openMailtoDraft(to: string, ccEmails: string[], subject: string, body: string) {
@@ -129,6 +137,7 @@ export function Orders() {
   const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderSupplierFilter, setOrderSupplierFilter] = useState('');
+  const [orderSort, setOrderSort] = useState<OrderSort>('newest');
   const [safetyBufferPercent, setSafetyBufferPercent] = useState(10);
 
   const open      = orders.filter(o => o.status === 'pending');
@@ -136,7 +145,6 @@ export function Orders() {
   const received  = orders.filter(o => o.status === 'received');
   const cancelled = orders.filter(o => o.status === 'cancelled');
 
-  const sorted = [...orders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const primarySupplierFor = (order: (typeof orders)[number]) => {
     const counts: Record<string, number> = {};
     order.items.forEach(line => {
@@ -145,6 +153,13 @@ export function Orders() {
     });
     return Object.entries(counts).sort((left, right) => right[1] - left[1])[0]?.[0] || 'Supplier';
   };
+  const sorted = [...orders].sort((a, b) => {
+    if (orderSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
+    if (orderSort === 'total-desc') return b.totalCost - a.totalCost;
+    if (orderSort === 'total-asc') return a.totalCost - b.totalCost;
+    if (orderSort === 'supplier') return primarySupplierFor(a).localeCompare(primarySupplierFor(b));
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
   const orderSuppliers = Array.from(new Set(orders.map(primarySupplierFor))).sort((left, right) => left.localeCompare(right));
   const filtered = (activeTab === 'all' ? sorted : sorted.filter(order => order.status === activeTab)).filter(order => {
     const supplier = primarySupplierFor(order);
@@ -172,6 +187,10 @@ export function Orders() {
   }, [accountId, accountName]);
 
   useEffect(() => {
+    if (user?.email?.trim().toLowerCase() === 'demo@zestiq.com') {
+      setEmailServiceConfigured(false);
+      return;
+    }
     let cancelled = false;
     void fetch(buildApiUrl('/api/send-supplier-email'))
       .then(response => response.json())
@@ -187,7 +206,7 @@ export function Orders() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.email]);
 
   const orderSuggestions = useMemo(() => {
     const suggestions: OrderSuggestion[] = [];
@@ -733,10 +752,13 @@ export function Orders() {
         <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">
           {filtered.length} order{filtered.length !== 1 ? 's' : ''}
         </p>
-        <button className="flex items-center gap-1 text-[11px] font-bold text-gray-500">
+        <label className="flex items-center gap-1 text-[11px] font-bold text-gray-500">
           <SlidersHorizontal className="w-3 h-3" />
-          Sort: Newest
-        </button>
+          <span className="sr-only">Sort orders</span>
+          <select value={orderSort} onChange={event => setOrderSort(event.target.value as OrderSort)} className="cursor-pointer border-0 bg-transparent p-0 pr-5 text-[11px] font-bold text-gray-500 focus:ring-0">
+            <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="total-desc">Highest total</option><option value="total-asc">Lowest total</option><option value="supplier">Supplier A–Z</option>
+          </select>
+        </label>
       </div>
 
       <div className="px-4 mt-4 space-y-3">
@@ -875,7 +897,7 @@ export function Orders() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[13px] font-bold text-gray-900 truncate">
-                      Order #{order.id.slice(0, 8).toUpperCase()}
+                      Order #{formatOrderReference(order.id)}
                     </p>
                     <span
                       className="text-[9px] font-black px-2 py-1 rounded-full shrink-0"
@@ -1095,7 +1117,7 @@ export function Orders() {
         <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              {detailOrder ? `Order #${detailOrder.id.slice(0,8).toUpperCase()}` : 'Order Details'}
+              {detailOrder ? `Order #${formatOrderReference(detailOrder.id)}` : 'Order Details'}
             </DialogTitle>
           </DialogHeader>
 

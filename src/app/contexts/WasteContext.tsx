@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useAuth } from './AuthContext';
 import { apiRequest } from '../utils/api';
 import { locationScopedStorageKey, readScopedJson } from '../utils/storageScope';
+import { useInventory } from './InventoryContext';
+import { convertQuantity } from '../utils/unitConversion';
 
 export interface WasteEntry {
   id: string; itemId: string; itemName: string; category: string; quantity: number; unit: string;
@@ -25,6 +27,8 @@ function demoWaste(): WasteEntry[] {
 
 export function WasteProvider({ children }: { children: ReactNode }) {
   const { accountId, activeLocationId, token, user } = useAuth();
+  const { inventory, updateInventoryItem } = useInventory();
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const [entries, setEntries] = useState<WasteEntry[]>([]);
   const [isWasteLoaded, setIsWasteLoaded] = useState(false);
   const storageKey = accountId && activeLocationId ? locationScopedStorageKey(accountId, activeLocationId, 'waste-v1') : null;
@@ -33,28 +37,63 @@ export function WasteProvider({ children }: { children: ReactNode }) {
     if (!accountId || !activeLocationId) { setEntries([]); setIsWasteLoaded(true); return; }
     setIsWasteLoaded(false);
     const local = readScopedJson<WasteEntry[]>(storageKey, []);
-    const demo = user?.email === 'demo@zestiq.com' ? demoWaste() : [];
+    const demo = isDemoAccount ? demoWaste() : [];
+    if (isDemoAccount) {
+      const next = local.length ? local : demo;
+      setEntries(next);
+      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
+      setIsWasteLoaded(true);
+      return;
+    }
     if (!token) { setEntries(local.length ? local : demo); setIsWasteLoaded(true); return; }
     void apiRequest<{ entries: WasteEntry[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/waste`)
       .then(remote => {
-        const next = user?.email === 'demo@zestiq.com' ? demo : (remote.entries?.length ? remote.entries : local);
+        const next = remote.entries?.length ? remote.entries : local;
         setEntries(next); if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
       }).catch(() => setEntries(local.length ? local : demo)).finally(() => setIsWasteLoaded(true));
-  }, [accountId, activeLocationId, token, user?.email]);
+  }, [accountId, activeLocationId, token, isDemoAccount, storageKey]);
 
   const value = useMemo<WasteContextValue>(() => ({
     entries, isWasteLoaded,
     recordWaste: async input => {
       if (!accountId || !activeLocationId) throw new Error('Choose a restaurant location before logging waste');
+      if (isDemoAccount) {
+        const item = inventory.find(candidate => candidate.id === input.itemId);
+        if (!item) throw new Error('Choose an inventory item before logging waste');
+        const inventoryQuantity = convertQuantity(Number(input.quantity), input.unit, item.unit) ?? Number(input.quantity);
+        const entry: WasteEntry = {
+          id: `demo-waste-${Date.now()}`,
+          itemId: item.id,
+          itemName: item.name,
+          category: item.category,
+          quantity: Number(input.quantity),
+          unit: input.unit,
+          inventoryQuantity,
+          inventoryUnit: item.unit,
+          unitCost: item.unitCost,
+          totalCost: inventoryQuantity * item.unitCost,
+          reason: input.reason,
+          notes: input.notes,
+          employeeName: input.employeeName,
+          loggedBy: user?.name || 'Demo',
+          occurredAt: input.occurredAt,
+          createdAt: new Date().toISOString(),
+        };
+        const next = [entry, ...entries];
+        setEntries(next);
+        if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
+        updateInventoryItem(item.id, { currentStock: Math.max(0, item.currentStock - inventoryQuantity) });
+        return entry;
+      }
       const response = await apiRequest<{ waste: { entries: WasteEntry[] }; entry: WasteEntry }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/waste`, { method: 'POST', body: JSON.stringify(input) });
       setEntries(current => {
-        const next = user?.email === 'demo@zestiq.com' ? [response.entry, ...current] : response.waste.entries;
+        const next = response.waste.entries;
         if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
         return next;
       });
       return response.entry;
     },
-  }), [entries, isWasteLoaded, accountId, activeLocationId, storageKey, user?.email]);
+  }), [entries, isWasteLoaded, accountId, activeLocationId, storageKey, user?.name, isDemoAccount, inventory, updateInventoryItem]);
   return <WasteContext.Provider value={value}>{children}</WasteContext.Provider>;
 }
 

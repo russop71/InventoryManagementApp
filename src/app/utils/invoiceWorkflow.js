@@ -50,3 +50,14 @@ export function normalizeInventoryItemName(name) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+export function inventoryItemMatchesInvoiceName(item, invoiceName) {
+  const normalizedInvoiceName = normalizeInventoryItemName(invoiceName);
+  if (!normalizedInvoiceName) return false;
+  const recognizedNames = [
+    item?.name,
+    ...(item?.invoiceAliases || []),
+    ...(item?.purchaseOptions || []).map(option => option?.productName),
+  ];
+  return recognizedNames.some(name => normalizeInventoryItemName(name) === normalizedInvoiceName);
+}

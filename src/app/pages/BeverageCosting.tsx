@@ -2,15 +2,22 @@ import { useMemo, useState } from 'react';
 import { Beer, Calculator, ExternalLink, GlassWater, PackagePlus, Wine } from 'lucide-react';
 import { Link } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
+import { useAuth } from '../contexts/AuthContext';
+import { buildDemoLocationData } from '../utils/demoData';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 
 const BEVERAGE_WORDS = ['beverage', 'wine', 'beer', 'liquor', 'spirit', 'cocktail', 'bar'];
 const isBeverage = (value = '') => BEVERAGE_WORDS.some(word => value.toLowerCase().includes(word));
+const DEMO_COST_INVENTORY = buildDemoLocationData().inventory;
 
 export function BeverageCosting() {
   const { inventory, recipes, updateRecipe } = useInventory();
+  const { user } = useAuth();
+  const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
+  const findCostItem = (id: string) => inventory.find(item => item.id === id)
+    || (isDemoAccount ? DEMO_COST_INVENTORY.find(item => item.id === id) : undefined);
   const [bottleCost, setBottleCost] = useState(30);
   const [bottleSize, setBottleSize] = useState(750);
   const [pourSize, setPourSize] = useState(44);
@@ -30,11 +37,11 @@ export function BeverageCosting() {
 
   const recipeRows = useMemo(() => beverageRecipes.map(recipe => {
     const cost = recipe.ingredients.reduce((sum, ingredient) => {
-      const item = inventory.find(candidate => candidate.id === ingredient.inventoryItemId);
+      const item = findCostItem(ingredient.inventoryItemId);
       return sum + (item ? item.unitCost * ingredient.quantity : 0);
     }, 0);
     return { ...recipe, cost, costPercent: recipe.price > 0 ? (cost / recipe.price) * 100 : 0 };
-  }).sort((left, right) => right.costPercent - left.costPercent), [beverageRecipes, inventory]);
+  }).sort((left, right) => right.costPercent - left.costPercent), [beverageRecipes, inventory, isDemoAccount]);
   const editingRecipe = recipeRows.find(recipe => recipe.id === editingRecipeId) || null;
   const openRecipeEditor = (recipe: typeof recipeRows[number]) => {
     setEditingRecipeId(recipe.id);
