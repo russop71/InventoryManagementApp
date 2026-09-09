@@ -112,7 +112,7 @@ interface SupplierEmailDraft {
 }
 
 export function Orders() {
-  const { orders, inventory, forecasts, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
+  const { orders, inventory, forecasts, updateOrder, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
   const { salesData } = useToast();
   const { accountId, accountName, user } = useAuth();
   const navigate = useNavigate();
@@ -593,10 +593,13 @@ export function Orders() {
 
     const updatedTotal = nextItems.reduce((sum, item) => sum + item.cost, 0);
     const updatedOrder = { ...order, items: nextItems, totalCost: updatedTotal };
+    const supplierDates = { ...(order.supplierDates || {}), ...supplierDateOverrides };
+    updateOrder(orderId, { items: updatedOrder.items, totalCost: updatedOrder.totalCost, supplierDates });
+    setDetailOrder({ ...updatedOrder, supplierDates });
 
     const existingInvoice = invoices.find(invoice => invoice.orderId === orderId);
     if (existingInvoice) {
-      updateInvoice(existingInvoice.id, { items: nextItems, totalAmount: updatedTotal, supplier: order.supplier });
+      updateInvoice(existingInvoice.id, { items: nextItems, totalAmount: updatedTotal, supplier: primarySupplierFor(order) });
     }
 
     toast.success('Order lines updated');
@@ -1169,6 +1172,7 @@ export function Orders() {
                           <label className="flex items-center gap-1 text-[11px] font-semibold text-gray-600">
                             <CalendarDays className="h-3.5 w-3.5" />
                             <input
+                              aria-label={`Expected receipt date for ${sup}`}
                               type="date"
                               value={receiptDate}
                               onChange={(event) => setSupplierDateOverrides(prev => ({ ...prev, [sup]: event.target.value }))}
@@ -1200,6 +1204,7 @@ export function Orders() {
                                   </td>
                                   <td className="px-3 py-2">
                                     <Input
+                                      aria-label={`Order quantity for ${item.name}`}
                                       type="number"
                                       min="0"
                                       value={current.quantity}
@@ -1209,6 +1214,7 @@ export function Orders() {
                                   </td>
                                   <td className="px-3 py-2">
                                     <Input
+                                      aria-label={`Order cost for ${item.name}`}
                                       type="number"
                                       min="0"
                                       step="0.01"
@@ -1228,6 +1234,9 @@ export function Orders() {
                 })}
 
                 <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1 font-bold" onClick={() => handleSaveLineEdits(detailOrder.id)}>
+                    Save Changes
+                  </Button>
                   {detailOrder.status === 'pending' && (
                     <Button className="flex-1 font-bold" style={{ background: D, color: '#fff' }}
                       onClick={() => { handleStatus(detailOrder.id, 'ordered'); setDetailOrder(null); }}>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
-import { Sparkles, Package, Check, X, AlertCircle, Mail, Copy } from 'lucide-react';
+import { Sparkles, Package, Check, X, AlertCircle, Mail, Copy, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { groupBySupplier } from '../utils/invoiceWorkflow';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
@@ -15,6 +15,7 @@ import { getSupplierCcEmails, getSupplierEmailAddress, parseEmailList } from '..
 import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils.js';
 import { apiRequest } from '../utils/api';
 import { OrderBufferControl } from '../components/OrderBufferControl';
+import { downloadSupplierOrdersPdf } from '../utils/supplierOrderPdf.js';
 
 interface OrderSuggestion {
   itemId: string;
@@ -124,6 +125,7 @@ export function AIOrders() {
   const { salesData } = useToast();
   const { accountId, accountName, user } = useAuth();
   const createOrderRef = useRef<HTMLDivElement | null>(null);
+  const approvalInProgressRef = useRef(false);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
   const [editableSuggestionQuantities, setEditableSuggestionQuantities] = useState<Record<string, number>>({});
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
@@ -380,9 +382,14 @@ export function AIOrders() {
   };
 
   const selectedApprovalGroups = useMemo(() => {
-    const selectedItems = effectiveSuggestions.filter(s => selectedSuggestions.has(s.itemId));
+    const selectedItems = effectiveSuggestions
+      .filter(s => selectedSuggestions.has(s.itemId))
+      .map(suggestion => {
+        const { quantity, totalCost } = resolveSuggestionQuantity(suggestion, editableSuggestionQuantities);
+        return { ...suggestion, suggestedQuantity: quantity, totalCost };
+      });
     return buildSupplierGroups(selectedItems);
-  }, [effectiveSuggestions, selectedSuggestions]);
+  }, [effectiveSuggestions, selectedSuggestions, editableSuggestionQuantities]);
 
   useEffect(() => {
     if (!selectedSupplier) return;
@@ -422,6 +429,7 @@ export function AIOrders() {
   };
 
   const handleApproveOrders = () => {
+    if (approvalInProgressRef.current) return;
     const sourceList = effectiveSuggestions;
     const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
 
@@ -429,6 +437,7 @@ export function AIOrders() {
       toast.error('Select at least one item to place an order');
       return;
     }
+    approvalInProgressRef.current = true;
 
     const adjustedOrdersToPlace = ordersToPlace.map(suggestion => {
       const { quantity, totalCost } = resolveSuggestionQuantity(suggestion, editableSuggestionQuantities);
@@ -487,7 +496,12 @@ export function AIOrders() {
 
   const generateEmails = () => {
     const sourceList = effectiveSuggestions;
-    const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
+    const ordersToPlace = sourceList
+      .filter(s => selectedSuggestions.has(s.itemId))
+      .map(suggestion => {
+        const { quantity, totalCost } = resolveSuggestionQuantity(suggestion, editableSuggestionQuantities);
+        return { ...suggestion, suggestedQuantity: quantity, totalCost };
+      });
     
     // Group orders by supplier
     const supplierGroups = buildSupplierGroups(ordersToPlace);
@@ -787,6 +801,7 @@ export function AIOrders() {
                           <td className="px-3 py-2 text-gray-700">{item.parLevel} {item.unit}</td>
                           <td className="px-3 py-2">
                             <input
+                              aria-label={`Manual order quantity for ${item.name}`}
                               type="number"
                               min={0}
                               step="1"
@@ -1024,6 +1039,7 @@ export function AIOrders() {
                         <div className="flex flex-col items-end gap-1">
                           <label className="text-[10px] uppercase tracking-wide text-gray-500">Qty</label>
                           <input
+                            aria-label={`Order quantity for ${suggestion.itemName}`}
                             type="number"
                             min="0"
                             step="1"
@@ -1111,7 +1127,10 @@ export function AIOrders() {
       {/* Email Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={(open) => {
         setShowEmailDialog(open);
-        if (!open) resetEmailSendStatus();
+        if (!open) {
+          resetEmailSendStatus();
+          approvalInProgressRef.current = false;
+        }
       }}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -1123,7 +1142,16 @@ export function AIOrders() {
               Review each draft before sending it to the supplier.
             </DialogDescription>
           </DialogHeader>
-          <div className="pt-2">
+          <div className="grid gap-2 pt-2 sm:grid-cols-2">
+            <Button
+              variant="outline"
+              onClick={() => downloadSupplierOrdersPdf({ restaurantName, drafts: draftEmails })}
+              disabled={draftEmails.length === 0}
+              className="w-full"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download PDF
+            </Button>
             <Button
               onClick={sendAllDraftEmails}
               disabled={sendingAllEmails || draftEmails.length === 0}
@@ -1180,6 +1208,7 @@ export function AIOrders() {
                   <div className="space-y-2">
                     <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">CC recipients</label>
                     <input
+                      aria-label={`CC recipients for ${email.supplier}`}
                       type="text"
                       value={email.ccText}
                       onChange={(event) => updateDraftEmailField(email.supplier, 'ccText', event.target.value)}
@@ -1191,6 +1220,7 @@ export function AIOrders() {
                   <div className="space-y-2">
                     <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Subject</label>
                     <input
+                      aria-label={`Subject for ${email.supplier}`}
                       value={email.emailSubject}
                       onChange={(event) => updateDraftEmailField(email.supplier, 'emailSubject', event.target.value)}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -1199,6 +1229,7 @@ export function AIOrders() {
                   <div className="space-y-2">
                     <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Body</label>
                     <textarea
+                      aria-label={`Body for ${email.supplier}`}
                       value={email.emailBody}
                       onChange={(event) => updateDraftEmailField(email.supplier, 'emailBody', event.target.value)}
                       rows={8}
@@ -1215,6 +1246,7 @@ export function AIOrders() {
                             <p className="text-xs text-gray-500">{item.supplier}</p>
                           </div>
                           <input
+                            aria-label={`Draft quantity for ${item.itemName}`}
                             type="number"
                             min="0"
                             step="1"

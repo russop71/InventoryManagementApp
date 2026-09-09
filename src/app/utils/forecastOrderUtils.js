@@ -6,10 +6,11 @@ export function calculateForecastOrderQuantity({ currentStock, expectedUsage, pa
   const normalizedMinimumOrderQty = Number(minimumOrderQty) || 0;
 
   const projectedStock = normalizedCurrentStock - normalizedExpectedUsage;
-  const targetStock = Math.max(normalizedParLevel, normalizedExpectedUsage + normalizedSafetyBuffer);
+  const targetStock = normalizedParLevel + Math.max(0, normalizedSafetyBuffer);
   const shortage = targetStock - projectedStock;
   const quantityNeeded = Math.max(0, shortage);
 
+  if (quantityNeeded === 0) return 0;
   return Math.max(normalizedMinimumOrderQty, Math.ceil(quantityNeeded));
 }
 

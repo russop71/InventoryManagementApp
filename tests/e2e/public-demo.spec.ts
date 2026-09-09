@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const demoRoutes = [
@@ -481,4 +482,82 @@ test('prepared recipes validate yield, prevent duplicate/circular ingredients, p
 
   await page.getByRole('button', { name: 'Delete QA House Dressing' }).click();
   await expect(page.getByText('QA House Dressing', { exact: true })).toHaveCount(0);
+});
+
+test('builds and saves a POS-informed supplier forecast', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/forecasting');
+
+  await page.getByRole('button', { name: "Build tomorrow's forecast" }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'Create Sales Forecast' })).toBeVisible();
+  await expect(dialog.locator('input[name="date"]')).not.toHaveValue('');
+  await expect(dialog.locator('input[name="expectedRevenue"]')).not.toHaveValue('');
+  await expect(dialog.getByText(/items$/).first()).toBeVisible();
+  await dialog.getByRole('button', { name: 'Create Forecast' }).click();
+  await expect(page.getByText('Forecast added successfully')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Generate Order' })).toHaveCount(1);
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Generate Order' })).toHaveCount(1);
+});
+
+test('forecast buffers create editable supplier-grouped orders and recover from missing email setup', async ({ page }) => {
+  test.setTimeout(60_000);
+  await freshDemoLogin(page);
+  await page.goto('/app/inventory');
+  await addInventoryItem(page, { name: 'QA Buffer Tomatoes', supplier: 'QA Forecast One', onHand: '0', par: '10', cost: '2' });
+  await addInventoryItem(page, { name: 'QA Buffer Peppers', supplier: 'QA Forecast Two', onHand: '0', par: '10', cost: '3' });
+
+  await page.goto('/app/ai-orders');
+  const bufferControl = page.getByLabel('Forecast safety buffer percentage');
+  await bufferControl.getByRole('button', { name: '0%', exact: true }).click();
+  await expect(page.getByLabel('Order quantity for QA Buffer Tomatoes')).toHaveValue('12');
+  await bufferControl.getByRole('button', { name: '10%', exact: true }).click();
+  await expect(page.getByLabel('Order quantity for QA Buffer Tomatoes')).toHaveValue('13');
+
+  const tomatoesCard = page.getByText('QA Buffer Tomatoes', { exact: true }).locator('xpath=ancestor::*[@data-slot="card"][1]');
+  const peppersCard = page.getByText('QA Buffer Peppers', { exact: true }).locator('xpath=ancestor::*[@data-slot="card"][1]');
+  await tomatoesCard.click();
+  await peppersCard.click();
+  await page.getByLabel('Order quantity for QA Buffer Tomatoes').fill('9');
+  await expect(page.getByText('QA Forecast One', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('1 item • $18.00', { exact: true })).toBeVisible();
+  await expect(page.getByText('QA Forecast Two', { exact: true }).last()).toBeVisible();
+
+  const approve = page.getByRole('button', { name: 'Approve 2 orders' });
+  await approve.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
+  const emailDialog = page.getByRole('dialog');
+  await expect(emailDialog.getByText('Supplier email drafts (2)')).toBeVisible();
+  await expect(emailDialog.getByLabel('Draft quantity for QA Buffer Tomatoes')).toHaveValue('9');
+  await emailDialog.getByLabel('Draft quantity for QA Buffer Tomatoes').fill('10');
+  await expect(emailDialog.getByLabel('Body for QA Forecast One')).toContainText('QA Buffer Tomatoes - 10');
+  await emailDialog.getByLabel('Subject for QA Forecast One').fill('QA reviewed supplier order');
+  const downloadPromise = page.waitForEvent('download');
+  await emailDialog.getByRole('button', { name: 'Download PDF' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^zestiq-supplier-orders-.*\.pdf$/);
+  const downloadedBytes = await readFile(await download.path());
+  expect(downloadedBytes.subarray(0, 8).toString()).toBe('%PDF-1.4');
+  expect(downloadedBytes.toString('latin1')).toContain('QA Buffer Tomatoes');
+  await emailDialog.getByRole('button', { name: 'Open Email' }).first().click();
+  await expect(page.getByText('No supplier email address is configured')).toBeVisible();
+  await emailDialog.getByRole('button', { name: 'Close' }).click();
+
+  await page.goto('/app/orders');
+  const firstSupplierOrder = page.locator('button:has-text("QA Forecast One"):visible');
+  await expect(firstSupplierOrder).toHaveCount(1);
+  await expect(page.locator('button:has-text("QA Forecast Two"):visible')).toHaveCount(1);
+  await firstSupplierOrder.click();
+  const orderDialog = page.getByRole('dialog');
+  await orderDialog.getByLabel('Order quantity for QA Buffer Tomatoes').fill('11');
+  await orderDialog.getByLabel('Order cost for QA Buffer Tomatoes').fill('22');
+  await orderDialog.getByRole('button', { name: 'Save Changes' }).click();
+  await expect(page.getByText('Order lines updated')).toBeVisible();
+  await orderDialog.getByRole('button', { name: 'Close' }).first().click();
+
+  await page.reload();
+  await page.locator('button:has-text("QA Forecast One"):visible').click();
+  await expect(page.getByRole('dialog').getByLabel('Order quantity for QA Buffer Tomatoes')).toHaveValue('11');
+  await expect(page.getByRole('dialog').getByLabel('Order cost for QA Buffer Tomatoes')).toHaveValue('22');
 });

@@ -260,6 +260,7 @@ interface InventoryContextType {
   addForecast: (forecast: Omit<ForecastData, 'id'>) => void;
   generateDailyOrder: (forecastId: string) => void;
   placeOrder: (order: { date: string; items: OrderItem[]; supplier: string; totalCost: number; status?: DailyOrder['status']; supplierDates?: Record<string, string>; }) => void;
+  updateOrder: (orderId: string, updates: Partial<Omit<DailyOrder, 'id'>>) => void;
   updateOrderStatus: (orderId: string, status: DailyOrder['status']) => void;
   addInvoice: (invoice: Omit<InvoiceRecord, 'id'>) => InvoiceRecord;
   updateInvoice: (invoiceId: string, updates: Partial<InvoiceRecord>) => InvoiceMutationResult;
@@ -318,6 +319,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const [preppedRecipes, setPreppedRecipes] = useState<PreppedRecipe[]>([]);
   const [inventoryCounts, setInventoryCounts] = useState<InventoryCount[]>([]);
   const [isLocationLoaded, setIsLocationLoaded] = useState(false);
+  const ordersRef = useRef(orders);
+  const invoicesRef = useRef(invoices);
+  ordersRef.current = orders;
+  invoicesRef.current = invoices;
 
   const localKey = (key: string) => {
     if (!accountId || !activeLocationId) return null;
@@ -1104,8 +1109,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       orderId: newOrder.id,
     };
 
-    const nextOrders = [...orders, newOrder];
-    const nextInvoices = [...invoices, newInvoice];
+    const nextOrders = [...ordersRef.current, newOrder];
+    const nextInvoices = [...invoicesRef.current, newInvoice];
+    ordersRef.current = nextOrders;
+    invoicesRef.current = nextInvoices;
     setOrders(nextOrders);
     setInvoices(nextInvoices);
     saveLocationData(inventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
@@ -1151,6 +1158,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setInventory(nextInventory);
     setInvoices(nextInvoices);
     saveLocationData(nextInventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
+  };
+
+  const updateOrder = (orderId: string, updates: Partial<Omit<DailyOrder, 'id'>>) => {
+    setOrders(previous => {
+      const nextOrders = previous.map(order => order.id === orderId ? { ...order, ...updates } : order);
+      saveLocationData(inventory, recipes, storageAreas, nextOrders, invoices, suppliers, preppedRecipes);
+      return nextOrders;
+    });
   };
 
   const addInvoice = (invoiceInput: Omit<InvoiceRecord, 'id'>) => {
@@ -1569,6 +1584,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         addForecast,
         generateDailyOrder,
         placeOrder,
+        updateOrder,
         updateOrderStatus,
         addInvoice,
         updateInvoice,

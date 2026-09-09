@@ -482,6 +482,7 @@ Restaurant Operations Team`;
                     name="date" 
                     type="date" 
                     required 
+                    value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)} 
                   />
                 </div>
