@@ -219,3 +219,41 @@ test('invoice camera capture supports correction and approval before posting', a
   await expect(page).toHaveURL(/\/app\/invoices\?invoice=/);
   await expect(page.getByText('QA-CAMERA-1001-CORRECTED').first()).toBeVisible();
 });
+
+test('invoice upload validates files and explains scan-service failures', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/invoice-scanner');
+  const upload = page.locator('#invoice-upload');
+
+  await upload.setInputFiles({ name: 'invoice.txt', mimeType: 'text/plain', buffer: Buffer.from('not an invoice image') });
+  await expect(page.getByRole('alert')).toContainText('JPEG, PNG, WebP, or PDF');
+
+  await upload.setInputFiles({ name: 'too-large.png', mimeType: 'image/png', buffer: Buffer.alloc((4 * 1024 * 1024) + 1) });
+  await expect(page.getByRole('alert')).toContainText('smaller than 4 MB');
+
+  await page.route('**/api/scan-invoice', route => route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Invoice extraction failed. Try a clearer image or PDF.' }) }));
+  await upload.setInputFiles(path.resolve('tests/fixtures/handwritten-tomato-basil-recipe.png'));
+  await page.getByRole('button', { name: 'Scan Invoice' }).click();
+  await expect(page.getByRole('alert')).toContainText('Try a clearer image or PDF');
+  await expect(page.getByRole('button', { name: 'Scan Invoice' })).toBeEnabled();
+});
+
+test('invoice PDF upload reaches review with editable extracted fields', async ({ page }) => {
+  const capturedDocuments: string[] = [];
+  await mockInvoiceScan(page, capturedDocuments);
+  await freshDemoLogin(page);
+  await page.goto('/app/invoice-scanner');
+  await page.locator('#invoice-upload').setInputFiles({
+    name: 'supplier-invoice.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF'),
+  });
+  await expect(page.getByTitle('Invoice PDF preview')).toBeVisible();
+  await page.getByRole('button', { name: 'Scan Invoice' }).click();
+  await expect(page.getByText('Invoice Extracted')).toBeVisible();
+  expect(capturedDocuments).toHaveLength(1);
+  expect(capturedDocuments[0]).toMatch(/^data:application\/pdf;base64,/);
+  await expect(page.getByLabel('Vendor')).toBeEditable();
+  await expect(page.getByLabel('Invoice #')).toBeEditable();
+  await expect(page.getByLabel('Date')).toBeEditable();
+});
