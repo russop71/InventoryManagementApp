@@ -52,6 +52,23 @@ export function summarizeInventoryCount(count) {
   };
 }
 
+export function completeInventoryCountWithZeros(count) {
+  if (!count || !Array.isArray(count.entries)) return count;
+  return {
+    ...count,
+    entries: count.entries.map(entry => {
+      if (isInventoryCountEntryComplete(entry, count)) return entry;
+      return {
+        ...entry,
+        counted: 0,
+        value: 0,
+        isCounted: true,
+        status: 'out-of-stock',
+      };
+    }),
+  };
+}
+
 export function getUnusualInventoryLosses(count, options = {}) {
   if (!isInventoryCountFinalized(count)) {
     return { isUnusual: false, totalLossValue: 0, affectedItems: 0, items: [] };

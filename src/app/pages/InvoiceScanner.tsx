@@ -255,7 +255,7 @@ export function InvoiceScanner() {
                 <Button
                   onClick={handleScan}
                   disabled={isProcessing}
-                  className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white"
+                  className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white"
                 >
                   {isProcessing ? (
                     <>
@@ -408,14 +408,14 @@ export function InvoiceScanner() {
               <div className="border-t-2 border-gray-300 pt-3 mt-4">
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-sm font-semibold text-gray-900">Invoice Total</p>
-                  <p className="text-xl font-bold text-[#0F172A]">
+                  <p className="text-xl font-bold text-[#303A43]">
                     ${totalValue.toFixed(2)}
                   </p>
                 </div>
 
                 <Button
                   onClick={handleSaveToInventory}
-                  className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white"
+                  className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Save Invoice & Update Inventory ({editedItems.length} items)

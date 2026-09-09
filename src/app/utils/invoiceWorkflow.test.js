@@ -30,6 +30,7 @@ test('matches supplier invoice descriptions through hidden inventory aliases', (
     invoiceAliases: ['Bella Casara Mozzarella'],
     purchaseOptions: [{ productName: 'BC Mozzarella 2.2 kg' }],
   };
+
   assert.equal(inventoryItemMatchesInvoiceName(mozzarella, 'Bella Casara Mozzarella'), true);
   assert.equal(inventoryItemMatchesInvoiceName(mozzarella, 'BC Mozzarella 2.2 kg'), true);
   assert.equal(inventoryItemMatchesInvoiceName(mozzarella, 'Cheddar'), false);

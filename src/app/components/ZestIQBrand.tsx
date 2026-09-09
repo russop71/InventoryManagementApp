@@ -16,10 +16,10 @@ export function ZestIQBrand({
   return (
     <div className={cn('zestiq-brand inline-flex items-center gap-2', className)} aria-label="ZestIQ">
       <img
-        src="/zestiq-mark.svg"
+        src="/zestiq-mark-exact.png"
         alt=""
         aria-hidden="true"
-        className={cn('zestiq-brand-mark h-9 w-9 shrink-0 rounded-xl', markClassName)}
+        className={cn('zestiq-brand-mark h-9 w-9 shrink-0 rounded-xl bg-transparent object-contain', markClassName)}
       />
       <span
         aria-hidden="true"
@@ -29,7 +29,7 @@ export function ZestIQBrand({
           wordmarkClassName,
         )}
       >
-        zest<span className="text-[#D9A900]">IQ</span>
+        zest<span className="text-[#F5D62E]">IQ</span>
       </span>
     </div>
   );

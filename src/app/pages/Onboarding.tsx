@@ -22,9 +22,9 @@ function FieldLabel({ htmlFor, children }: { htmlFor: string; children: ReactNod
 function SetupProgress({ currentStep, completedSteps }: { currentStep: OnboardingStepId; completedSteps: OnboardingStepId[] }) {
   const currentIndex = STEPS.findIndex(step => step.id === currentStep);
   return (
-    <aside className="rounded-[28px] bg-[#0B1220] p-5 text-white lg:sticky lg:top-28 lg:self-start">
+    <aside className="rounded-[28px] bg-[#303A43] p-5 text-white lg:sticky lg:top-28 lg:self-start">
       <div className="flex min-w-0 items-center gap-3 border-b border-white/10 pb-5">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#F5C10E] text-[#0B1220]"><Rocket className="h-5 w-5" /></div>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#F5D62E] text-[#303A43]"><Rocket className="h-5 w-5" /></div>
         <div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-white/45">Workspace launch</p><p className="mt-1 break-words font-black leading-tight">Get useful data in</p></div>
       </div>
       <ol className="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-1">
@@ -33,21 +33,21 @@ function SetupProgress({ currentStep, completedSteps }: { currentStep: Onboardin
           const active = step.id === currentStep;
           const Icon = step.icon;
           return (
-            <li key={step.id} aria-current={active ? 'step' : undefined} className={`flex min-w-0 items-center gap-2.5 rounded-2xl p-2.5 ${active ? 'bg-white text-[#0B1220]' : 'text-white/60'}`}>
-              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${complete ? 'bg-emerald-500 text-white' : active ? 'bg-[#F5C10E] text-[#0B1220]' : 'bg-white/10'}`}>{complete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}</span>
+            <li key={step.id} aria-current={active ? 'step' : undefined} className={`flex min-w-0 items-center gap-2.5 rounded-2xl p-2.5 ${active ? 'bg-white text-[#303A43]' : 'text-white/60'}`}>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${complete ? 'bg-emerald-500 text-white' : active ? 'bg-[#F5D62E] text-[#303A43]' : 'bg-white/10'}`}>{complete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}</span>
               <span className="min-w-0"><span className="block text-[9px] font-black uppercase tracking-[0.12em] opacity-55 lg:text-[10px] lg:tracking-[0.16em]">Step {index + 1}</span><span className="block break-words text-xs font-bold leading-tight lg:text-sm">{step.label}</span></span>
             </li>
           );
         })}
       </ol>
-      <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#F5C10E]" style={{ width: `${Math.max(8, ((currentIndex + 1) / STEPS.length) * 100)}%` }} /></div>
+      <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#F5D62E]" style={{ width: `${Math.max(8, ((currentIndex + 1) / STEPS.length) * 100)}%` }} /></div>
       <p className="mt-2 text-xs text-white/45">Progress saves to this company account.</p>
     </aside>
   );
 }
 
 function StepHeading({ step }: { step: (typeof STEPS)[number] }) {
-  return <div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#9A7600]">Step {STEPS.findIndex(item => item.id === step.id) + 1} of {STEPS.length}</p><h1 className="mt-2 text-3xl font-black tracking-[-0.03em] text-[#0B1220] sm:text-4xl">{step.label}</h1><p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">{step.description}</p></div>;
+  return <div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#9A7600]">Step {STEPS.findIndex(item => item.id === step.id) + 1} of {STEPS.length}</p><h1 className="mt-2 text-3xl font-black tracking-[-0.03em] text-[#303A43] sm:text-4xl">{step.label}</h1><p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">{step.description}</p></div>;
 }
 
 export function Onboarding() {
@@ -192,10 +192,10 @@ export function Onboarding() {
   if (!canManage) {
     return (
       <div className="mx-auto max-w-xl rounded-3xl bg-white p-8 text-center shadow-sm">
-        <Building2 className="mx-auto h-12 w-12 text-[#F5C10E]" />
-        <h1 className="mt-4 text-2xl font-black text-[#0B1220]">An owner or admin completes setup</h1>
+        <Building2 className="mx-auto h-12 w-12 text-[#F5D62E]" />
+        <h1 className="mt-4 text-2xl font-black text-[#303A43]">An owner or admin completes setup</h1>
         <p className="mt-2 text-slate-600">Your account is protected. Ask your company owner to finish the restaurant setup.</p>
-        <Link to="/app" className="mt-6 inline-flex rounded-xl bg-[#0B1220] px-5 py-3 font-bold text-white">Back to dashboard</Link>
+        <Link to="/app" className="mt-6 inline-flex rounded-xl bg-[#303A43] px-5 py-3 font-bold text-white">Back to dashboard</Link>
       </div>
     );
   }
@@ -213,14 +213,14 @@ export function Onboarding() {
           <div className="mt-8">
             {currentStep.id === 'restaurant' && (
               <form onSubmit={saveRestaurant} className="space-y-5">
-                <div><FieldLabel htmlFor="restaurant-name">Restaurant or company name</FieldLabel><input id="restaurant-name" value={restaurantName} onChange={event => setRestaurantName(event.target.value)} className="h-13 w-full rounded-2xl border border-slate-200 px-4 text-base font-semibold outline-none focus:border-[#F5C10E]" placeholder="e.g. North & Vine" /></div>
+                <div><FieldLabel htmlFor="restaurant-name">Restaurant or company name</FieldLabel><input id="restaurant-name" value={restaurantName} onChange={event => setRestaurantName(event.target.value)} className="h-13 w-full rounded-2xl border border-slate-200 px-4 text-base font-semibold outline-none focus:border-[#F5D62E]" placeholder="e.g. North & Vine" /></div>
                 <div className="rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900"><Sparkles className="mr-2 inline h-4 w-4" />This name stays inside your company workspace and appears on reports.</div>
                 <StepActions saving={saving} onSkip={skip} label="Save restaurant" />
               </form>
             )}
             {currentStep.id === 'location' && (
               <form onSubmit={saveLocation} className="space-y-5">
-                <div><FieldLabel htmlFor="location-name">Location name</FieldLabel><input id="location-name" value={locationName} onChange={event => setLocationName(event.target.value)} className="h-13 w-full rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#F5C10E]" placeholder="e.g. King Street" /></div>
+                <div><FieldLabel htmlFor="location-name">Location name</FieldLabel><input id="location-name" value={locationName} onChange={event => setLocationName(event.target.value)} className="h-13 w-full rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#F5D62E]" placeholder="e.g. King Street" /></div>
                 <p className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">Inventory, counts, invoices, recipes, labour and schedules are isolated by location. Additional locations can be added to your plan later.</p>
                 <StepActions saving={saving} onSkip={skip} label="Save location" />
               </form>
@@ -244,7 +244,7 @@ export function Onboarding() {
               <form onSubmit={saveRecipe} className="space-y-5">
                 <div className="grid gap-4 sm:grid-cols-2"><div><FieldLabel htmlFor="recipe-name">Menu item</FieldLabel><input id="recipe-name" value={recipeName} onChange={event => setRecipeName(event.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 px-4" placeholder="e.g. Margherita Pizza" /></div><div><FieldLabel htmlFor="recipe-price">Selling price</FieldLabel><input id="recipe-price" type="number" min="0" step="0.01" value={recipePrice} onChange={event => setRecipePrice(event.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 px-4" placeholder="0.00" /></div></div>
                 <div className="grid gap-4 sm:grid-cols-[1fr_140px]"><div><FieldLabel htmlFor="recipe-item">Ingredient</FieldLabel><select id="recipe-item" value={recipeItemId || inventory[0]?.id || ''} onChange={event => setRecipeItemId(event.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4"><option value="">Select an inventory item</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div><FieldLabel htmlFor="recipe-quantity">Quantity</FieldLabel><input id="recipe-quantity" type="number" min="0" step="0.01" value={recipeQuantity} onChange={event => setRecipeQuantity(event.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 px-4" /></div></div>
-                <div className="rounded-2xl bg-[#0B1220] p-4 text-white"><p className="text-xs uppercase tracking-wider text-white/50">Live ingredient cost</p><p className="mt-1 text-2xl font-black">${estimatedRecipeCost.toFixed(2)}</p><p className="mt-1 text-xs text-white/55">Future invoice price changes will flow into this recipe.</p></div>
+                <div className="rounded-2xl bg-[#303A43] p-4 text-white"><p className="text-xs uppercase tracking-wider text-white/50">Live ingredient cost</p><p className="mt-1 text-2xl font-black">${estimatedRecipeCost.toFixed(2)}</p><p className="mt-1 text-xs text-white/55">Future invoice price changes will flow into this recipe.</p></div>
                 <StepActions saving={saving} onSkip={skip} label="Create recipe" />
               </form>
             )}
@@ -252,7 +252,7 @@ export function Onboarding() {
               <div className="space-y-5">
                 <div className="max-h-[390px] space-y-2 overflow-auto rounded-2xl border border-slate-100 p-2">{inventory.map(item => <label key={item.id} className="grid grid-cols-[1fr_100px] items-center gap-3 rounded-xl p-3 hover:bg-slate-50"><span className="min-w-0"><span className="block break-words font-bold text-slate-900">{item.name}</span><span className="text-xs text-slate-500">${item.unitCost.toFixed(2)} / {item.unit}</span></span><input aria-label={`${item.name} count`} type="number" min="0" step="0.01" value={countValues[item.id] ?? String(item.currentStock)} onChange={event => setCountValues(current => ({ ...current, [item.id]: event.target.value }))} className="h-11 rounded-xl border border-slate-200 px-3 text-right font-bold" /></label>)}</div>
                 <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4"><span className="font-bold text-emerald-950">Opening inventory value</span><span className="text-xl font-black text-emerald-800">${countTotal.toFixed(2)}</span></div>
-                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"><button type="button" onClick={() => moveToStep(STEPS[Math.max(0, stepIndex - 1)].id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 font-bold text-slate-700"><ArrowLeft className="h-4 w-4" />Back</button><button type="button" disabled={saving} onClick={() => void finishCount()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-5 py-3 font-black text-[#0B1220] disabled:opacity-50">Finish setup<CheckCircle2 className="h-5 w-5" /></button></div>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"><button type="button" onClick={() => moveToStep(STEPS[Math.max(0, stepIndex - 1)].id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 font-bold text-slate-700"><ArrowLeft className="h-4 w-4" />Back</button><button type="button" disabled={saving} onClick={() => void finishCount()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F5D62E] px-5 py-3 font-black text-[#303A43] disabled:opacity-50">Finish setup<CheckCircle2 className="h-5 w-5" /></button></div>
               </div>
             )}
           </div>
@@ -266,7 +266,7 @@ function StepActions({ saving, onSkip, label }: { saving: boolean; onSkip: () =>
   return (
     <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
       <button type="button" onClick={() => void onSkip()} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50">Skip for now</button>
-      <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-5 py-3 font-black text-[#0B1220] disabled:opacity-50">{saving ? 'Saving…' : label}<ArrowRight className="h-4 w-4" /></button>
+      <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F5D62E] px-5 py-3 font-black text-[#303A43] disabled:opacity-50">{saving ? 'Saving…' : label}<ArrowRight className="h-4 w-4" /></button>
     </div>
   );
 }

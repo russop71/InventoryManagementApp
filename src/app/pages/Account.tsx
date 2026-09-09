@@ -10,7 +10,7 @@ import { clearLocationScopedData } from '../utils/storageScope';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
 export function Account() {
-  const { user, accountId, accountName, locations, addLocation, logout, changePassword, deleteCurrentAccount, updateLocalAccountProfile } = useAuth();
+  const { user, accountId, accountName, locations, addLocation, logout, changePassword, updateLocalAccountProfile } = useAuth();
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const [isEditing, setIsEditing] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
@@ -102,7 +102,7 @@ export function Account() {
     return (
       <div className="space-y-4">
         <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Public demo</p><h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Account settings preview</h2><p className="mt-1 text-sm text-slate-600">A safe, read-only example of the information a restaurant controls.</p></div>
-        <Card className="border-amber-200 bg-amber-50"><CardContent className="py-5"><KeyRound className="mb-3 h-8 w-8 text-amber-700" /><p className="font-semibold text-amber-950">Account administration is disabled in the public demo.</p><p className="mt-1 text-sm text-amber-800">Profile editing, passwords, two-factor authentication, locations, data reset and account deletion are available only in a private workspace.</p></CardContent></Card>
+        <Card className="border-amber-200 bg-amber-50"><CardContent className="py-5"><KeyRound className="mb-3 h-8 w-8 text-amber-700" /><p className="font-semibold text-amber-950">Account administration is disabled in the public demo.</p><p className="mt-1 text-sm text-amber-800">Profile editing, passwords, two-factor authentication, locations and data reset are available only in a private workspace.</p></CardContent></Card>
         <Card><CardHeader><CardTitle>Fictional demo restaurant</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Restaurant</p><p className="mt-1 font-semibold text-slate-900">Zestaurant</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Region</p><p className="mt-1 font-semibold text-slate-900">Burlington, Ontario, Canada</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Demo access</p><p className="mt-1 font-semibold text-slate-900">Owner preview</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Location</p><p className="mt-1 font-semibold text-slate-900">Main Location</p></div></CardContent></Card>
       </div>
     );
@@ -134,7 +134,7 @@ export function Account() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-center mb-6">
               <div className="w-24 h-24 bg-[#FEF9C3] rounded-full flex items-center justify-center">
-                <span className="text-[#0F172A] font-bold text-3xl">
+                <span className="text-[#303A43] font-bold text-3xl">
                   {formData.name.split(' ').map(n => n[0]).join('')}
                 </span>
               </div>
@@ -229,7 +229,7 @@ export function Account() {
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 bg-[#0F172A] hover:bg-[#1E293B] text-white"
+                  className="flex-1 bg-[#303A43] hover:bg-[#1E293B] text-white"
                 >
                   Save Changes
                 </Button>
@@ -295,7 +295,7 @@ export function Account() {
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isPasswordSaving} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">
+              <Button type="submit" disabled={isPasswordSaving} className="bg-[#303A43] text-white hover:bg-[#1E293B]">
                 {isPasswordSaving ? 'Saving…' : 'Save password'}
               </Button>
             </div>
@@ -322,7 +322,7 @@ export function Account() {
               onChange={(event) => setNewLocationName(event.target.value)}
               placeholder="Add location (example: Downtown)"
             />
-            <Button onClick={() => void handleAddLocation()} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+            <Button onClick={() => void handleAddLocation()} className="bg-[#303A43] hover:bg-[#1E293B] text-white">
               Add
             </Button>
           </div>
@@ -349,25 +349,6 @@ export function Account() {
             }}
           >
             Reset App Data
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full text-red-600 border-red-300 hover:bg-red-50"
-            onClick={async () => {
-              if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) {
-                return;
-              }
-
-              try {
-                await deleteCurrentAccount();
-                toast.success('Account deleted');
-              } catch (error) {
-                const message = error instanceof Error ? error.message : 'Failed to delete account';
-                toast.error(message);
-              }
-            }}
-          >
-            Delete Account
           </Button>
         </CardContent>
       </Card>

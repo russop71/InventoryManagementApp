@@ -357,7 +357,17 @@ export function Recipes() {
       </div>
 
       {ingredients.length > 0 ? (
-        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <div className="min-w-[430px]">
+              <div className="grid grid-cols-[minmax(130px,1fr)_68px_76px_62px_32px] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                <span>Ingredient</span>
+                <span>Quantity</span>
+                <span>Unit</span>
+                <span className="text-right">Cost</span>
+                <span className="sr-only">Remove</span>
+              </div>
+              <div className="divide-y divide-slate-100">
           {ingredients.map((ingredient) => {
             const item = inventory.find((inventoryItem) => inventoryItem.id === ingredient.inventoryItemId);
             if (!item) return null;
@@ -368,32 +378,25 @@ export function Recipes() {
               : [...compatibleUnits, { value: normalizedIngredientUnit, label: formatUnitLabel(normalizedIngredientUnit) }];
             const lineCost = calculateIngredientLineCost(ingredient);
             return (
-              <div key={ingredient.inventoryItemId} className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3 sm:grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr_auto] sm:items-end">
+              <div key={ingredient.inventoryItemId} className="grid grid-cols-[minmax(130px,1fr)_68px_76px_62px_32px] items-center gap-2 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-900 truncate">{item.name}</p>
-                  <p className="mt-1 text-[11px] text-slate-500 truncate">
-                    Base: {formatUnitLabel(item.unit)} • {item.supplier} • ${item.unitCost.toFixed(2)}/{formatUnitLabel(item.unit)}
-                  </p>
+                  <p className="truncate text-sm font-semibold text-slate-900" title={`${item.name} · ${item.supplier} · $${item.unitCost.toFixed(2)}/${formatUnitLabel(item.unit)}`}>{item.name}</p>
                 </div>
-                <div>
-                  <Label htmlFor={`qty-${ingredient.inventoryItemId}`}>Quantity</Label>
                   <Input
                     id={`qty-${ingredient.inventoryItemId}`}
+                    aria-label={`Quantity for ${item.name}`}
                     type="number"
                     step="0.01"
                     value={ingredient.quantity}
                     onChange={(e) => onUpdateIngredientQuantity(ingredient.inventoryItemId, Number(e.target.value))}
-                    className="min-w-0"
+                    className="h-8 min-w-0 rounded-lg px-2 text-sm"
                   />
-                  <p className="mt-1 text-[11px] text-slate-500">Used in {formatUnitLabel(ingredient.unit || item.unit)}</p>
-                </div>
-                <div>
-                  <Label htmlFor={`unit-${ingredient.inventoryItemId}`}>Unit</Label>
                   <select
                     id={`unit-${ingredient.inventoryItemId}`}
+                    aria-label={`Unit for ${item.name}`}
                     value={normalizedIngredientUnit}
                     onChange={(e) => onUpdateIngredientUnit(ingredient.inventoryItemId, e.target.value)}
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    className="h-8 w-full rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700"
                   >
                     {availableUnits.map((unitOption) => (
                       <option key={unitOption.value} value={unitOption.value}>
@@ -401,32 +404,29 @@ export function Recipes() {
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Line Cost</p>
-                  <span className="text-sm font-semibold text-slate-900">${lineCost.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-end">
-                  <Button size="sm" variant="outline" type="button" onClick={() => onRemoveIngredient(ingredient.inventoryItemId)}>
-                    <Trash2 className="w-4 h-4" />
+                <span className="text-right text-xs font-bold tabular-nums text-slate-900">${lineCost.toFixed(2)}</span>
+                  <Button aria-label={`Remove ${item.name}`} size="sm" variant="ghost" type="button" onClick={() => onRemoveIngredient(ingredient.inventoryItemId)} className="h-8 w-8 p-0 text-slate-400 hover:bg-rose-50 hover:text-rose-700">
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
-                </div>
               </div>
             );
           })}
+              </div>
+            </div>
+          </div>
 
-          <div className="grid gap-3 rounded-lg bg-slate-100 px-4 py-3 text-sm sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2 text-sm">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Ingredient Lines</p>
-              <p className="mt-1 font-semibold text-slate-900">{ingredients.length}</p>
+              <p className="text-[9px] uppercase tracking-[0.14em] text-slate-500">Lines</p>
+              <p className="font-semibold text-slate-900">{ingredients.length}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Total Cost</p>
-              <p className="mt-1 font-semibold text-slate-900">${calculateIngredientCost(ingredients).toFixed(2)}</p>
+              <p className="text-[9px] uppercase tracking-[0.14em] text-slate-500">Total cost</p>
+              <p className="font-semibold text-slate-900">${calculateIngredientCost(ingredients).toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Per Yield</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-[9px] uppercase tracking-[0.14em] text-slate-500">Per yield</p>
+              <p className="truncate font-semibold text-slate-900">
                 {yieldContext && yieldContext.quantity > 0
                   ? `$${(calculateIngredientCost(ingredients) / yieldContext.quantity).toFixed(2)} / ${yieldContext.unit}`
                   : 'Set yield to calculate'}
@@ -655,7 +655,7 @@ export function Recipes() {
                 <Plus className="w-4 h-4 mr-2" />New Menu Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-5 sm:max-w-4xl sm:p-7">
               <DialogHeader>
                 <DialogTitle>{editingRecipe ? 'Edit Menu Item' : 'Create Menu Item'}</DialogTitle>
                 <DialogDescription>
@@ -663,8 +663,8 @@ export function Recipes() {
                 </DialogDescription>
               </DialogHeader>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <Label htmlFor="externalId">POS Number</Label>
                     <select
@@ -718,7 +718,7 @@ export function Recipes() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Card className="border-slate-200 bg-slate-50">
                     <CardContent className="p-4">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Linked POS</p>
@@ -758,7 +758,7 @@ export function Recipes() {
                   undefined,
                 )}
 
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
@@ -1021,19 +1021,19 @@ export function Recipes() {
           resetPrepForm();
         }
       }}>
-        <DialogContent className="max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[88vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-4 sm:max-w-3xl sm:p-5">
           <DialogHeader>
             <DialogTitle>{editingPrepId ? 'Edit Recipe' : 'Create Recipe'}</DialogTitle>
             <DialogDescription>Build a reusable component recipe with ingredients and yield for menu items.</DialogDescription>
           </DialogHeader>
           <form
-            className="space-y-4"
+            className="space-y-3"
             onSubmit={(e) => {
               e.preventDefault();
               handleCreatePreppedRecipe();
             }}
           >
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="prepMenuItemName">Recipe Name</Label>
                 <Input
@@ -1056,7 +1056,7 @@ export function Recipes() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="prepYieldQuantity">Yield Qty</Label>
                 <Input
@@ -1118,7 +1118,7 @@ export function Recipes() {
               { quantity: Number(prepYieldQuantity) || 0, unit: prepYieldUnit || 'yield' },
             )}
 
-            <div className="flex items-center justify-between rounded-md bg-slate-50 px-4 py-3 text-sm">
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
               <span>Recipe cost</span>
               <span className="font-semibold text-slate-900">${calculateIngredientCost(selectedPrepIngredients).toFixed(2)}</span>
             </div>

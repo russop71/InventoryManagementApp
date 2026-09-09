@@ -21,7 +21,7 @@ interface CompanyUser {
   id: string;
   name: string;
   email: string;
-  role: 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Ordering' | 'Staff';
+  role: 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Staff';
   status: 'Active' | 'Inactive';
   lastLogin: string;
   usage?: UserUsage;
@@ -34,30 +34,24 @@ function formatDate(value: string | null | undefined) {
 }
 
 function roleBadgeClass(role: CompanyUser['role']) {
-  if (role === 'Owner') return 'bg-[#0F172A] text-white';
+  if (role === 'Owner') return 'bg-[#303A43] text-white';
   if (role === 'Admin') return 'bg-red-100 text-red-800';
-  if (role === 'Ordering') return 'bg-sky-100 text-sky-800';
   if (role === 'Manager' || role === 'BOH Manager' || role === 'FOH Manager') return 'bg-[#FEF9C3] text-[#1E3A5F]';
   return 'bg-slate-100 text-slate-700';
 }
 
-const baseAccessLevels: Array<{ role: CompanyUser['role']; title: string; detail: string; schedulingDetail?: string }> = [
+const accessLevels: Array<{ role: CompanyUser['role']; title: string; detail: string }> = [
   { role: 'Owner', title: 'Owner', detail: 'Full company access, including users, billing, locations and all operational areas.' },
   { role: 'Admin', title: 'Admin', detail: 'Runs day-to-day operations, setup and reporting, without subscription ownership.' },
-  { role: 'Manager', title: 'Manager', detail: 'Works across inventory, recipes, purchasing, invoices and reports.', schedulingDetail: ' Also manages labour and schedules.' },
-  { role: 'BOH Manager', title: 'BOH management', detail: 'Chef-focused access for food inventory, recipes, ordering and invoices.', schedulingDetail: ' Also manages kitchen labour and schedules.' },
-  { role: 'FOH Manager', title: 'FOH management', detail: 'Front-of-house access for beverage operations and sales reporting.', schedulingDetail: ' Also manages front-of-house labour and schedules.' },
-  { role: 'Ordering', title: 'Ordering only', detail: 'ZestOrders access only: review stock, create supplier orders, track deliveries and receive orders into shared inventory.' },
+  { role: 'Manager', title: 'Manager', detail: 'Works across restaurant operations, including inventory, purchasing, reports and scheduling.' },
+  { role: 'BOH Manager', title: 'BOH management', detail: 'Chef-focused operational access for food inventory, recipes, ordering, invoices and kitchen labour.' },
+  { role: 'FOH Manager', title: 'FOH management', detail: 'Front-of-house access for beverage operations, sales reporting and labour scheduling.' },
   { role: 'Staff', title: 'Employee', detail: 'ZestEmployee access only: personal schedule, shift swaps and time-off requests.' },
 ];
 
 export function Users() {
   const navigate = useNavigate();
-  const { user: currentUser, accountId, accountName, features } = useAuth();
-  const schedulingAvailable = features.scheduling === true;
-  const accessLevels = baseAccessLevels
-    .filter(level => schedulingAvailable || level.role !== 'Staff')
-    .map(level => ({ ...level, detail: `${level.detail}${schedulingAvailable ? level.schedulingDetail || '' : ''}` }));
+  const { user: currentUser, accountId, accountName } = useAuth();
   const isOwner = currentUser?.role === 'Owner';
   const isSuperAdmin = Boolean(currentUser?.platformAdmin);
   const isDemoAccount = currentUser?.email?.trim().toLowerCase() === 'demo@zestiq.com';
@@ -65,6 +59,8 @@ export function Users() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [supplierEmailCc, setSupplierEmailCc] = useState<string[]>([]);
+  const [onboardingState, setOnboardingState] = useState<Record<string, any> | null>(null);
 
   const loadUsers = useCallback(async (quiet = false) => {
     if (!accountId || !isOwner || isDemoAccount) {
@@ -89,6 +85,18 @@ export function Users() {
     return () => window.clearInterval(intervalId);
   }, [accountId, isOwner, loadUsers]);
 
+  useEffect(() => {
+    if (!accountId || !isOwner || isDemoAccount) return;
+    void apiRequest<{ onboarding?: Record<string, any> }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/onboarding`)
+      .then(payload => {
+        const onboarding = payload.onboarding || {};
+        const cc = onboarding.clientProfile?.supplierEmailCc;
+        setOnboardingState(onboarding);
+        setSupplierEmailCc(Array.isArray(cc) ? cc : []);
+      })
+      .catch(error => toast.error(error instanceof Error ? error.message : 'Unable to load order email settings'));
+  }, [accountId, isOwner]);
+
   const selectedUser = users.find(user => user.id === editingUserId);
   const activeUserCount = users.filter(user => user.status === 'Active').length;
   const activeThisMonth = users.filter(user => user.usage?.lastActive).length;
@@ -103,7 +111,7 @@ export function Users() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!accountId || !isOwner || isDemoAccount) return;
+    if (!accountId || !isOwner) return;
     const formData = new FormData(event.currentTarget);
     const payload = {
       name: String(formData.get('name') || '').trim(),
@@ -158,6 +166,27 @@ export function Users() {
       await loadUsers(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to remove user');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveSupplierEmailCc = async () => {
+    if (!accountId || !isOwner || !onboardingState) return;
+    setIsLoading(true);
+    try {
+      const clientProfile = {
+        ...(onboardingState.clientProfile || {}),
+        supplierEmailCc,
+      };
+      const payload = await apiRequest<{ onboarding: Record<string, any> }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/onboarding`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ...onboardingState, clientProfile }),
+      });
+      setOnboardingState(payload.onboarding);
+      toast.success('Supplier email CC settings saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save order email settings');
     } finally {
       setIsLoading(false);
     }
@@ -228,7 +257,7 @@ export function Users() {
               <Button
                 type="button"
                 disabled={isLoading}
-                className="bg-[#0F172A] text-white hover:bg-[#1E293B]"
+                className="bg-[#303A43] text-white hover:bg-[#1E293B]"
                 onClick={() => setEditingUserId(null)}
               >
                 <Plus className="mr-2 h-4 w-4" /> Add user
@@ -252,8 +281,7 @@ export function Users() {
                 </div>
                 <div>
                   <Label htmlFor="team-role">Access level</Label>
-                  <select id="team-role" name="role" defaultValue={selectedUser?.role || (schedulingAvailable ? 'Staff' : 'Manager')} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
-                    {!schedulingAvailable && selectedUser?.role === 'Staff' && <option value="Staff">Employee · Scheduling unavailable</option>}
+                  <select id="team-role" name="role" defaultValue={selectedUser?.role || 'Staff'} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
                     {accessLevels.map(level => <option key={level.role} value={level.role}>{level.title}</option>)}
                   </select>
                   <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
@@ -275,7 +303,7 @@ export function Users() {
                 )}
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={isLoading} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">
+                  <Button type="submit" disabled={isLoading} className="bg-[#303A43] text-white hover:bg-[#1E293B]">
                     {editingUserId ? 'Save access' : 'Add user'}
                   </Button>
                 </div>
@@ -294,7 +322,7 @@ export function Users() {
         ].map(metric => (
           <Card key={metric.label}>
             <CardContent className="flex items-center gap-3 py-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FEF9C3] text-[#0F172A]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FEF9C3] text-[#303A43]">
                 <metric.icon className="h-5 w-5" />
               </div>
               <div>
@@ -315,6 +343,41 @@ export function Users() {
         </CardContent>
       </Card>
 
+      <Card className="gap-0 overflow-hidden border-[#F5D62E]/60">
+        <CardHeader className="border-b border-[#F5D62E]/30 bg-[#303A43] px-5 py-4 text-white">
+          <CardTitle className="flex items-center gap-2 text-lg"><Mail className="h-5 w-5 text-[#F5D62E]" />Supplier order email CC</CardTitle>
+          <p className="mt-1 text-sm text-slate-300">Choose the active managers who should automatically receive a copy of every supplier order email.</p>
+        </CardHeader>
+        <CardContent className="space-y-3 px-5 py-4">
+          {users.filter(user => user.status === 'Active' && user.role !== 'Staff').length ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {users.filter(user => user.status === 'Active' && user.role !== 'Staff').map(user => (
+                <label key={user.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-[#F5D62E]">
+                  <input
+                    type="checkbox"
+                    checked={supplierEmailCc.includes(user.email)}
+                    onChange={event => setSupplierEmailCc(current => event.target.checked
+                      ? [...new Set([...current, user.email])]
+                      : current.filter(email => email !== user.email))}
+                    className="h-4 w-4 accent-[#F5D62E]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-slate-900">{user.name}</span>
+                    <span className="block truncate text-xs text-slate-500">{user.email} · {user.role}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Add an active owner, admin, or manager to enable automatic CC copies.</p>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-500">{supplierEmailCc.length ? `${supplierEmailCc.length} recipient${supplierEmailCc.length === 1 ? '' : 's'} selected` : 'No automatic CC recipients'}</p>
+            <Button type="button" disabled={isLoading || !onboardingState} onClick={() => void saveSupplierEmailCc()} className="bg-[#F5D62E] font-bold text-[#303A43] hover:bg-[#E9C900]">Save email settings</Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Company team</CardTitle>
@@ -331,7 +394,7 @@ export function Users() {
             <div key={user.id} className="rounded-2xl border border-slate-200 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FEF9C3] font-bold text-[#0F172A]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FEF9C3] font-bold text-[#303A43]">
                     {user.name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2)}
                   </div>
                   <div className="min-w-0">

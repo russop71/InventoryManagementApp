@@ -3,7 +3,7 @@ import { apiRequest } from '../utils/api';
 import { clearAllAccountScopedData } from '../utils/storageScope';
 import { clearDemoSessionReset } from '../utils/demoSession.js';
 
-export type UserRole = 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Ordering' | 'Staff';
+export type UserRole = 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Staff';
 
 export interface AccountLocation {
   id: string;
@@ -46,10 +46,9 @@ interface AuthContextType {
   mfaRequired: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginDemo: () => Promise<void>;
-  register: (name: string, companyName: string, email: string, password: string) => Promise<void>;
+  register: (name: string, companyName: string, email: string, password: string, legal: { privacyAccepted: boolean; termsAccepted: boolean }) => Promise<void>;
   logout: () => void;
   changePassword: (password: string) => Promise<void>;
-  deleteCurrentAccount: () => Promise<void>;
   switchLocation: (locationId: string) => void;
   addLocation: (locationName: string) => Promise<void>;
   updateLocation: (locationId: string, locationName: string) => Promise<void>;
@@ -171,10 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accountName: payload.account.name,
       billingStatus: payload.account.billingStatus || 'not_configured',
       productAccess: payload.account.productAccess === true,
-      // Optional modules are deny-by-default. An older or partially migrated
-      // account must never receive Scheduling unless the server explicitly
-      // grants it.
-      features: { scheduling: payload.account.features?.scheduling === true },
+      features: { scheduling: payload.account.features?.scheduling !== false },
       onboarding: payload.account.onboarding || DEFAULT_ONBOARDING,
       locations: payload.locations,
       activeLocationId,
@@ -192,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/session');
+        const payload = await apiRequest<AuthApiResponse>(`/api/v1/auth/session/${encodeURIComponent(stored.token)}`);
         applySession(payload, stored);
         return;
       } catch {
@@ -228,14 +224,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginDemo = async () => {
     clearDemoSessionReset();
-    const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/demo', { method: 'POST' });
+    const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/demo', {
+      method: 'POST',
+    });
     applySession(payload);
   };
 
-  const register = async (name: string, companyName: string, email: string, password: string) => {
+  const register = async (name: string, companyName: string, email: string, password: string, legal: { privacyAccepted: boolean; termsAccepted: boolean }) => {
     const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, companyName, email, password }),
+      body: JSON.stringify({ name, companyName, email, password, ...legal }),
     });
     applySession(payload);
   };
@@ -243,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshSession = async () => {
     const stored = readStoredSession();
     if (!stored?.token) throw new Error('Sign in is required');
-    const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/session');
+    const payload = await apiRequest<AuthApiResponse>(`/api/v1/auth/session/${encodeURIComponent(stored.token)}`);
     applySession(payload, stored);
   };
 
@@ -278,16 +276,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: current.user && nextName ? { ...current.user, name: nextName } : current.user,
       accountName: nextAccountName || current.accountName,
     }));
-  };
-
-  const deleteCurrentAccount = async () => {
-    const currentAccountId = authState.accountId;
-    if (!currentAccountId) throw new Error('No signed-in account to delete.');
-    await apiRequest(`/api/v1/accounts/${encodeURIComponent(currentAccountId)}`, {
-      method: 'DELETE',
-    });
-    clearAllAccountScopedData(currentAccountId);
-    logout();
   };
 
   const switchLocation = (locationId: string) => {
@@ -372,7 +360,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       changePassword,
-      deleteCurrentAccount,
       switchLocation,
       addLocation,
       updateLocation,

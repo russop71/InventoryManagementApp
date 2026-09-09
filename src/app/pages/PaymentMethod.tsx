@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Check, CreditCard, Download, ExternalLink, LockKeyhole, Receipt, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, CreditCard, Download, ExternalLink, LockKeyhole, Receipt, RefreshCw, UsersRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -9,17 +9,19 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
-import { Capacitor } from '@capacitor/core';
 
 type BillingPlan = 'monthly';
 
 interface BillingDetails {
   configured: boolean;
   additionalLocationPriceConfigured: boolean;
+  schedulingPriceConfigured: boolean;
+  schedulingEnabled: boolean;
   customerCreated: boolean;
   customerEmail?: string | null;
   plan: BillingPlan | null;
   status: string;
+  approvalStatus: 'approved' | 'pending_payment' | 'pending_ceo_approval';
   additionalLocationQuantity: number;
   subscriptionStartedAt: string | null;
   currentPeriodEnd: string | null;
@@ -51,8 +53,12 @@ interface BillingDetails {
 }
 
 const PLANS: Array<{ id: BillingPlan; name: string; price: string; detail: string }> = [
-  { id: 'monthly', name: 'ZestIQ Premium', price: 'CAD $249.99', detail: 'Per month · one location included · no free trial' },
+  { id: 'monthly', name: 'ZestIQ Basic', price: 'CAD $249.99', detail: 'Per month · one location included · no free trial' },
 ];
+
+const BASE_MONTHLY_PRICE = 249.99;
+const ADDITIONAL_LOCATION_PRICE = 199.99;
+const ZEST_EMPLOYEE_PRICE = 49.99;
 
 function formatDate(value: string | null) {
   if (!value) return 'Not available';
@@ -87,14 +93,18 @@ function billingAttentionMessage(status: string) {
 }
 
 export function PaymentMethod() {
-  const isNativeApp = Capacitor.isNativePlatform();
   const { user, accountId, accountName, locations, productAccess, refreshSession } = useAuth();
   const isOwner = user?.role === 'Owner';
   const [billing, setBilling] = useState<BillingDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [locationCount, setLocationCount] = useState(Math.max(1, locations.length));
-  const [includeScheduling, setIncludeScheduling] = useState(false);
+  const [zestEmployeeEnabled, setZestEmployeeEnabled] = useState(false);
   const [commitmentAccepted, setCommitmentAccepted] = useState(false);
+  const zestEmployeeIncluded = locationCount > 1;
+  const includeZestEmployee = zestEmployeeIncluded || zestEmployeeEnabled;
+  const monthlyTotal = BASE_MONTHLY_PRICE
+    + Math.max(0, locationCount - 1) * ADDITIONAL_LOCATION_PRICE
+    + (locationCount === 1 && zestEmployeeEnabled ? ZEST_EMPLOYEE_PRICE : 0);
   const billingNeedsAttention = ['past_due', 'unpaid', 'incomplete', 'canceled'].includes(billing?.status || '');
   const expiredPaymentMethod = (billing?.paymentMethods || []).some(paymentMethodExpired);
 
@@ -105,6 +115,7 @@ export function PaymentMethod() {
       const payload = await apiRequest<{ billing: BillingDetails }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing`);
       setBilling(payload.billing);
       setLocationCount(Math.max(1, locations.length, 1 + Number(payload.billing.additionalLocationQuantity || 0)));
+      setZestEmployeeEnabled(payload.billing.schedulingEnabled === true);
       const checkoutSucceeded = new URLSearchParams(window.location.search).get('checkout') === 'success';
       if (payload.billing.status === 'active' && !productAccess && checkoutSucceeded && sessionStorage.getItem('zestiq:billing-refresh') !== 'done') {
         sessionStorage.setItem('zestiq:billing-refresh', 'done');
@@ -149,7 +160,7 @@ export function PaymentMethod() {
     try {
       const result = await apiRequest<{ url: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing/checkout`, {
         method: 'POST',
-        body: JSON.stringify({ plan, locationCount, schedulingEnabled: includeScheduling, commitmentAccepted: true }),
+        body: JSON.stringify({ plan, locationCount, schedulingEnabled: includeZestEmployee, commitmentAccepted: true }),
       });
       window.location.assign(result.url);
     } catch (error) {
@@ -211,7 +222,7 @@ export function PaymentMethod() {
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
           </Button>
           {billing?.customerCreated && (
-            <Button type="button" disabled={isLoading} onClick={() => void openPortal()} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">
+            <Button type="button" disabled={isLoading} onClick={() => void openPortal()} className="bg-[#303A43] text-white hover:bg-[#1E293B]">
               Manage in Stripe <ExternalLink className="ml-2 h-4 w-4" />
             </Button>
           )}
@@ -222,6 +233,18 @@ export function PaymentMethod() {
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="py-4 text-sm text-amber-900">
             Secure billing screens are ready, but Stripe keys and plan price IDs still need to be connected before customers can subscribe.
+          </CardContent>
+        </Card>
+      )}
+
+      {billing?.approvalStatus === 'pending_ceo_approval' && (
+        <Card className="border-[#F5D62E] bg-[#FFFCED]">
+          <CardContent className="flex items-start gap-3 py-5">
+            <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#A16207]" />
+            <div>
+              <p className="font-bold text-[#303A43]">Payment received — final approval pending</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">Your account and payment details are set. ZestIQ’s CEO can now review and approve the workspace. You can return here at any time to check its status.</p>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -283,15 +306,7 @@ export function PaymentMethod() {
         </Card>
       )}
 
-      {isNativeApp && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="py-4 text-sm leading-6 text-amber-950">
-            ZestIQ subscriptions are arranged directly with your restaurant. This app is for existing ZestIQ business customers; contact support if your account or plan needs attention.
-          </CardContent>
-        </Card>
-      )}
-
-      {!isNativeApp && <Card>
+      <Card>
         <CardHeader>
           <CardTitle>Subscription plan</CardTitle>
         </CardHeader>
@@ -299,10 +314,10 @@ export function PaymentMethod() {
           {PLANS.map(plan => {
             const current = billing?.plan === plan.id;
             return (
-              <div key={plan.id} className={`rounded-2xl border-2 p-4 ${current ? 'border-[#F5C10E] bg-[#FEFCE8]' : 'border-slate-200'}`}>
+              <div key={plan.id} className={`rounded-2xl border-2 p-4 ${current ? 'border-[#F5D62E] bg-[#FEFCE8]' : 'border-slate-200'}`}>
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-bold text-slate-950">{plan.name}</p>
-                  {current && <Badge className="bg-[#F5C10E] text-[#0F172A]"><Check className="mr-1 h-3 w-3" />Current</Badge>}
+                  {current && <Badge className="bg-[#F5D62E] text-[#303A43]"><Check className="mr-1 h-3 w-3" />Current</Badge>}
                 </div>
                 <p className="mt-3 text-2xl font-extrabold text-slate-950">{plan.price}</p>
                 <p className="mt-1 text-sm text-slate-500">{plan.detail}</p>
@@ -318,37 +333,59 @@ export function PaymentMethod() {
                     onChange={event => setLocationCount(Math.max(Math.max(1, locations.length), Math.min(100, Number(event.target.value) || 1)))}
                     disabled={current}
                   />
-                  <p className="mt-2 text-xs text-slate-500">The first location is CAD $249.99/month. Each additional location is CAD $199/month.</p>
-                  <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
-                    <Checkbox checked={includeScheduling} onCheckedChange={checked => setIncludeScheduling(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#0F172A]" />
-                    <span><span className="block font-bold text-slate-950">Add Scheduling — CAD $49.99/month</span><span className="mt-1 block leading-5">Required to use Scheduling. One add-on covers every location on this account.</span></span>
-                  </label>
+                  <p className="mt-2 text-xs text-slate-500">The first location is CAD $249.99/month. Each additional location is CAD $199.99/month and includes Zest Employee.</p>
+                </div>
+                <label className={`mt-3 flex items-start gap-3 rounded-xl border-2 p-4 transition-colors ${includeZestEmployee ? 'border-[#F5D62E] bg-[#FFFCED]' : 'border-slate-200 bg-white'} ${current || zestEmployeeIncluded ? 'cursor-default' : 'cursor-pointer'}`}>
+                  <Checkbox
+                    checked={includeZestEmployee}
+                    onCheckedChange={checked => setZestEmployeeEnabled(checked === true)}
+                    disabled={current || zestEmployeeIncluded}
+                    className="mt-1 border-slate-400 data-[state=checked]:border-[#303A43] data-[state=checked]:bg-[#303A43]"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2 font-bold text-slate-950">
+                      <UsersRound className="h-5 w-5 text-[#B88A00]" />
+                      Add Zest Employee
+                      {zestEmployeeIncluded && <Badge className="bg-[#F5D62E] text-[#303A43]">Included</Badge>}
+                    </span>
+                    <span className="mt-1 block text-sm leading-5 text-slate-600">Employee schedules, shifts, availability and time-off requests.</span>
+                    <span className="mt-2 flex items-center gap-1.5 text-sm font-bold text-slate-950">
+                      <CalendarClock className="h-4 w-4 text-[#B88A00]" />
+                      {zestEmployeeIncluded ? 'Included with additional locations' : 'CAD $49.99/month'}
+                    </span>
+                  </span>
+                </label>
+                <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Monthly total</p>
                   <p className="mt-2 text-lg font-extrabold text-slate-950">
-                    CAD ${(249.99 + Math.max(0, locationCount - 1) * 199 + (includeScheduling ? 49.99 : 0)).toFixed(2)}/month
+                    CAD ${monthlyTotal.toFixed(2)}/month
                   </p>
                 </div>
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
                   <p className="font-bold text-slate-950">12-month commitment</p>
                   <p className="mt-1 leading-5">Your subscription is billed monthly, with an initial 12-month term. It automatically renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.</p>
                   <label className="mt-3 flex cursor-pointer items-start gap-2 leading-5">
-                    <Checkbox checked={commitmentAccepted} onCheckedChange={checked => setCommitmentAccepted(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#0F172A]" />
+                    <Checkbox checked={commitmentAccepted} onCheckedChange={checked => setCommitmentAccepted(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#303A43]" />
                     <span>I understand and agree to the 12-month commitment and 90-day non-renewal notice.</span>
                   </label>
                   <a href="/terms" target="_blank" rel="noreferrer" className="mt-2 inline-block font-semibold text-slate-900 underline underline-offset-2">Read Terms of Service</a>
                 </div>
                 <Button
                   type="button"
-                  className="mt-4 w-full bg-[#0F172A] text-white hover:bg-[#1E293B]"
-                  disabled={isLoading || current || !commitmentAccepted || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured) || (includeScheduling && !billing?.schedulingPriceConfigured)}
+                  className="mt-4 w-full bg-[#303A43] text-white hover:bg-[#1E293B]"
+                  disabled={isLoading || current || !commitmentAccepted || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured) || (locationCount === 1 && zestEmployeeEnabled && !billing?.schedulingPriceConfigured)}
                   onClick={() => void openCheckout(plan.id)}
                 >
-                  {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${(249.99 + Math.max(0, locationCount - 1) * 199 + (includeScheduling ? 49.99 : 0)).toFixed(2)}/month`}
+                  {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${monthlyTotal.toFixed(2)}/month`}
                 </Button>
+                {locationCount === 1 && zestEmployeeEnabled && !billing?.schedulingPriceConfigured && (
+                  <p className="mt-2 text-xs font-medium text-amber-700">Zest Employee checkout will be available once its Stripe price is connected.</p>
+                )}
               </div>
             );
           })}
         </CardContent>
-      </Card>}
+      </Card>
 
       <Card>
         <CardHeader>

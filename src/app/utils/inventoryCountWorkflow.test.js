@@ -2,12 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  completeInventoryCountWithZeros,
   getLatestDraftInventoryCount,
   getLatestFinalizedInventoryCount,
   getUnusualInventoryLosses,
   isInventoryCountFinalized,
   summarizeInventoryCount,
 } from './inventoryCountWorkflow.js';
+
+test('finalization records every blank inventory line as a counted zero', () => {
+  const completed = completeInventoryCountWithZeros({
+    status: 'draft',
+    entries: [
+      { itemId: 'counted', counted: 3, value: 15, isCounted: true, status: 'in-stock' },
+      { itemId: 'blank', counted: 8, value: 40, isCounted: false, status: 'in-stock' },
+    ],
+  });
+
+  assert.deepEqual(completed.entries[0], { itemId: 'counted', counted: 3, value: 15, isCounted: true, status: 'in-stock' });
+  assert.deepEqual(completed.entries[1], { itemId: 'blank', counted: 0, value: 0, isCounted: true, status: 'out-of-stock' });
+});
 
 test('separates resumable drafts from finalized inventory counts', () => {
   const counts = [

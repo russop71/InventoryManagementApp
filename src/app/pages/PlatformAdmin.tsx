@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Building2, CheckCircle2, ClipboardCheck, CreditCard, ExternalLink, Loader2, MapPin, Plus, RefreshCw, ShieldCheck, TrendingUp, UserCheck, Users } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, CheckCircle2, ClipboardCheck, CreditCard, ExternalLink, Loader2, MapPin, Plus, RefreshCw, ShieldCheck, Trash2, TrendingUp, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -8,6 +8,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
 
@@ -24,6 +25,7 @@ interface ClientSummary {
   locationCount: number;
   actionCount30Days: number;
   lastActive: string | null;
+  accessDisabled?: boolean;
   billing: {
     configured: boolean;
     additionalLocationPriceConfigured: boolean;
@@ -32,6 +34,7 @@ interface ClientSummary {
     customerCreated: boolean;
     plan: BillingPlan | null;
     status: string;
+    approvalStatus: 'approved' | 'pending_payment' | 'pending_ceo_approval';
     additionalLocationQuantity: number;
     currentPeriodEnd: string | null;
   };
@@ -42,7 +45,12 @@ interface ClientDetail {
   name: string;
   slug: string;
   createdAt: string;
-  onboarding: { clientProfile?: ClientOnboardingDetails; status?: string };
+  onboarding: {
+    clientProfile?: ClientOnboardingDetails;
+    status?: string;
+    accountDeletion?: { requestedAt?: string; requestedBy?: string; reason?: string; accessRemoved?: boolean; billingContinues?: boolean };
+    accountAccess?: { disabled?: boolean; reason?: string; changedAt?: string; changedBy?: string; activeUserIds?: string[] };
+  };
   users: Array<{ id: string; name: string; email: string; role: string; status: string; lastLogin: string }>;
   locations: Array<{ id: string; name: string }>;
   billing: ClientSummary['billing'] & {
@@ -75,10 +83,15 @@ interface ClientOnboardingDetails {
   schedulingEnabled?: boolean;
   privacyAccepted?: boolean;
   termsAccepted?: boolean;
+  selfServiceSignup?: boolean;
+  approvalRequired?: boolean;
+  ceoApproved?: boolean;
+  ceoApprovedAt?: string;
+  ceoApprovedBy?: string;
 }
 
 const PLANS: Array<{ id: BillingPlan; label: string }> = [
-  { id: 'monthly', label: 'Create Premium payment link' },
+  { id: 'monthly', label: 'Create Basic payment link' },
 ];
 
 function formatDate(value: string | null | undefined) {
@@ -126,6 +139,9 @@ export function PlatformAdmin() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [paymentLink, setPaymentLink] = useState('');
+  const [accountAccessReason, setAccountAccessReason] = useState('');
+  const [permanentDeleteReason, setPermanentDeleteReason] = useState('');
+  const [permanentDeleteConfirmation, setPermanentDeleteConfirmation] = useState('');
   const [billableLocationCount, setBillableLocationCount] = useState(1);
   const [commitmentConfirmed, setCommitmentConfirmed] = useState(false);
   const [isEditingClient, setIsEditingClient] = useState(false);
@@ -161,12 +177,13 @@ export function PlatformAdmin() {
     const activeOrCollecting = clients.filter(client => ['active', 'past_due', 'unpaid'].includes(client.billing.status));
     const estimatedMrr = activeOrCollecting.reduce((total, client) => {
       const locationCount = Math.max(1, client.locationCount);
-      const schedulingCharge = client.billing.schedulingEnabled ? 49.99 : 0;
-      return total + 249.99 + Math.max(0, locationCount - 1) * 199 + schedulingCharge;
+      const schedulingCharge = locationCount === 1 && client.billing.schedulingEnabled ? 49.99 : 0;
+      return total + 249.99 + Math.max(0, locationCount - 1) * 199.99 + schedulingCharge;
     }, 0);
     const health = clients.map(client => ({ client, ...healthFor(client) }));
     const actionItems = [
       ...clients.filter(client => ['past_due', 'unpaid'].includes(client.billing.status)).map(client => ({ client, title: 'Payment needs attention', detail: `${client.name} is ${client.billing.status.replace('_', ' ')}. Review the Stripe subscription and contact the owner.`, tone: 'text-red-700 bg-red-50 border-red-200' })),
+      ...clients.filter(client => client.billing.approvalStatus === 'pending_ceo_approval').map(client => ({ client, title: 'CEO approval ready', detail: `${client.name} completed payment and is ready for final account approval.`, tone: 'text-[#303A43] bg-[#FFF7C2] border-[#F5D62E]' })),
       ...clients.filter(client => client.billing.status === 'not_configured').map(client => ({ client, title: 'Billing is not configured', detail: `${client.name} has no active subscription. Create a checkout link when the client is ready.`, tone: 'text-amber-800 bg-amber-50 border-amber-200' })),
       ...clients.filter(client => !client.owner).map(client => ({ client, title: 'Owner required', detail: `${client.name} does not have a company owner assigned.`, tone: 'text-red-700 bg-red-50 border-red-200' })),
       ...health.filter(item => item.inactiveDays >= 14 && Number.isFinite(item.inactiveDays)).map(item => ({ client: item.client, title: 'Client may need outreach', detail: `${item.client.name} has not been active for ${item.inactiveDays} days.`, tone: 'text-amber-800 bg-amber-50 border-amber-200' })),
@@ -188,6 +205,9 @@ export function PlatformAdmin() {
     setIsLoading(true);
     setPaymentLink('');
     setCommitmentConfirmed(false);
+    setAccountAccessReason('');
+    setPermanentDeleteReason('');
+    setPermanentDeleteConfirmation('');
     try {
       const result = await apiRequest<{ client: ClientDetail }>(`/api/v1/platform/accounts/${encodeURIComponent(clientId)}`);
       setSelectedClient(result.client);
@@ -314,13 +334,59 @@ export function PlatformAdmin() {
     } finally { setIsLoading(false); }
   };
 
+  const setClientAccountDisabled = async (disabled: boolean) => {
+    if (!selectedClient || accountAccessReason.trim().length < 3) {
+      toast.error(`Enter a reason for ${disabled ? 'disabling' : 're-enabling'} this account.`);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/access`, {
+        method: 'POST',
+        body: JSON.stringify({ disabled, reason: accountAccessReason.trim() }),
+      });
+      toast.success(disabled ? 'Client account disabled. Billing was not changed.' : 'Client account re-enabled. Billing was not changed.');
+      setAccountAccessReason('');
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `Unable to ${disabled ? 'disable' : 're-enable'} this client account`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const permanentlyDeleteClientAccount = async () => {
+    if (!selectedClient || permanentDeleteReason.trim().length < 3 || permanentDeleteConfirmation.trim() !== selectedClient.name) {
+      toast.error(`Enter a reason and type ${selectedClient?.name || 'the company name'} exactly.`);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/permanent`, {
+        method: 'DELETE',
+        body: JSON.stringify({ reason: permanentDeleteReason.trim(), confirmation: permanentDeleteConfirmation.trim() }),
+      });
+      const deletedName = selectedClient.name;
+      setSelectedClient(null);
+      setPermanentDeleteReason('');
+      setPermanentDeleteConfirmation('');
+      toast.success(`${deletedName} was permanently deleted. Stripe billing was not changed.`);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to permanently delete this client account');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const createPaymentLink = async (plan: BillingPlan) => {
     if (!selectedClient) return;
     setIsLoading(true);
     try {
       const result = await apiRequest<{ url: string }>(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/billing/checkout`, {
         method: 'POST',
-        body: JSON.stringify({ plan, locationCount: billableLocationCount, schedulingEnabled: selectedClient.onboarding?.clientProfile?.schedulingEnabled === true, commitmentAccepted: true }),
+        body: JSON.stringify({ plan, locationCount: billableLocationCount, schedulingEnabled: selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false, commitmentAccepted: true }),
       });
       setPaymentLink(result.url);
       toast.success('Secure Stripe checkout link created for this client');
@@ -347,6 +413,19 @@ export function PlatformAdmin() {
     } finally { setIsLoading(false); }
   };
 
+  const approveClientAccess = async () => {
+    if (!selectedClient) return;
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/approval`, { method: 'POST' });
+      toast.success(`${selectedClient.name} is approved and can now access ZestIQ`);
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to approve this client account');
+    } finally { setIsLoading(false); }
+  };
+
   const copyPaymentLink = async () => {
     if (!paymentLink) return;
     try {
@@ -369,6 +448,10 @@ export function PlatformAdmin() {
     );
   }
 
+  const selectedClientAccess = selectedClient?.onboarding.accountAccess;
+  const selectedClientAccessDisabled = selectedClientAccess?.disabled === true
+    || (!selectedClientAccess && selectedClient?.onboarding.accountDeletion?.accessRemoved === true);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -383,7 +466,7 @@ export function PlatformAdmin() {
           </Button>
           <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
             <DialogTrigger asChild>
-              <Button type="button" className="bg-[#0F172A] text-white hover:bg-[#1E293B]"><Plus className="mr-2 h-4 w-4" /> New client</Button>
+              <Button type="button" className="bg-[#303A43] text-white hover:bg-[#1E293B]"><Plus className="mr-2 h-4 w-4" /> New client</Button>
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-2xl">
               <DialogHeader>
@@ -414,10 +497,10 @@ export function PlatformAdmin() {
                 </div>
                   <div><Label htmlFor="client-ordering">Ordering days</Label><Input id="client-ordering" name="orderingDays" placeholder="e.g. Monday, Thursday" /></div>
                   <div><Label htmlFor="client-imports">Data import status</Label><Input id="client-imports" name="importStatus" placeholder="Inventory, recipes, menu, sales history…" /></div>
-                  <label className="flex items-start gap-3 rounded-xl border border-[#F5C10E] bg-[#FEF9C3] p-3 text-sm sm:col-span-2"><Checkbox name="schedulingEnabled" className="mt-0.5" /><span><span className="block font-bold text-slate-950">Add Labour & Scheduling — CAD $49.99/month</span><span className="mt-1 block text-slate-600">Optional module. Leave it off for ZestIQ Basic; it can be enabled later from this client account.</span></span></label>
+                  <label className="flex items-start gap-3 rounded-xl border border-[#F5D62E] bg-[#FEF9C3] p-3 text-sm sm:col-span-2"><Checkbox name="schedulingEnabled" className="mt-0.5" /><span><span className="block font-bold text-slate-950">Add Labour & Scheduling — CAD $49.99/month</span><span className="mt-1 block text-slate-600">Optional module. Leave it off for ZestIQ Basic; it can be enabled later from this client account.</span></span></label>
                 <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="privacyAccepted" /> Privacy acknowledgement received</label>
                 <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="termsAccepted" /> Agreement and 12-month billing terms discussed</label>
-                <Button type="submit" disabled={isLoading} className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]">
+                <Button type="submit" disabled={isLoading} className="w-full bg-[#303A43] text-white hover:bg-[#1E293B]">
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Create & invite owner
                 </Button>
               </form>
@@ -426,19 +509,19 @@ export function PlatformAdmin() {
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white shadow-sm">
+      <section className="overflow-hidden rounded-3xl bg-[#303A43] p-5 text-white shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#F5C10E]">CEO action centre</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#F5D62E]">CEO action centre</p>
             <h3 className="mt-1 text-2xl font-extrabold">What needs your attention today</h3>
             <p className="mt-1 max-w-2xl text-sm text-slate-300">Prioritized account, revenue and adoption signals—without opening a client’s operational workspace.</p>
           </div>
-          <div className="rounded-2xl bg-white/10 px-4 py-3"><p className="text-xs uppercase tracking-wide text-slate-300">Accounts at risk</p><p className="mt-1 text-2xl font-extrabold text-[#F5C10E]">{executive.atRisk}</p></div>
+          <div className="rounded-2xl bg-white/10 px-4 py-3"><p className="text-xs uppercase tracking-wide text-slate-300">Accounts at risk</p><p className="mt-1 text-2xl font-extrabold text-[#F5D62E]">{executive.atRisk}</p></div>
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {executive.actionItems.length ? executive.actionItems.map(item => (
             <button key={`${item.title}-${item.client.id}`} type="button" onClick={() => void openClient(item.client.id)} className="flex items-start gap-3 rounded-2xl bg-white/10 p-4 text-left transition hover:bg-white/15">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#F5C10E]" />
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#F5D62E]" />
               <span><span className="block font-bold">{item.title}</span><span className="mt-1 block text-sm text-slate-300">{item.detail}</span></span>
             </button>
           )) : <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/15 p-4 text-emerald-100"><CheckCircle2 className="h-5 w-5" />No urgent billing or client-health issues right now.</div>}
@@ -453,7 +536,7 @@ export function PlatformAdmin() {
           { label: '30-day product activity', value: metrics.actions, icon: Activity, note: `${metrics.users} client users` },
         ].map(metric => (
           <Card key={metric.label}><CardContent className="flex items-center gap-3 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FEF9C3] text-[#0F172A]"><metric.icon className="h-5 w-5" /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FEF9C3] text-[#303A43]"><metric.icon className="h-5 w-5" /></div>
             <div><p className="text-2xl font-bold text-slate-950">{metric.value}</p><p className="text-xs text-slate-500">{metric.label}</p><p className="mt-1 text-[11px] text-slate-400">{metric.note}</p></div>
           </CardContent></Card>
         ))}
@@ -462,7 +545,7 @@ export function PlatformAdmin() {
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2"><CardHeader><CardTitle>Client health & product adoption</CardTitle><p className="text-sm text-slate-500">A practical health signal based on subscription state, active users, recent use and last activity.</p></CardHeader><CardContent className="space-y-2">
           {executive.health.length ? executive.health.sort((a, b) => a.score - b.score).map(item => (
-            <button type="button" key={item.client.id} onClick={() => void openClient(item.client.id)} className="grid w-full gap-3 rounded-2xl border border-slate-200 p-3 text-left transition hover:border-[#F5C10E] sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+            <button type="button" key={item.client.id} onClick={() => void openClient(item.client.id)} className="grid w-full gap-3 rounded-2xl border border-slate-200 p-3 text-left transition hover:border-[#F5D62E] sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
               <div><p className="font-semibold text-slate-950">{item.client.name}</p><p className="mt-1 text-xs text-slate-500">{item.client.activeUserCount}/{item.client.userCount} active users · {item.client.actionCount30Days} actions in 30 days · {item.inactiveDays === Infinity ? 'No recent activity' : `active ${item.inactiveDays === 0 ? 'today' : `${item.inactiveDays}d ago`}`}</p></div>
               <Badge className={item.tone}>{item.label}</Badge><span className="text-sm font-bold text-slate-700">{item.score}/100</span>
             </button>
@@ -491,10 +574,10 @@ export function PlatformAdmin() {
           ) : clients.length === 0 ? (
             <p className="py-10 text-center text-sm text-slate-500">No client companies yet. Create the first one above.</p>
           ) : clients.map(client => (
-            <button key={client.id} type="button" onClick={() => void openClient(client.id)} className="w-full rounded-2xl border border-slate-200 p-4 text-left transition hover:border-[#F5C10E] hover:bg-[#FEFCE8]/40">
+            <button key={client.id} type="button" onClick={() => void openClient(client.id)} className="w-full rounded-2xl border border-slate-200 p-4 text-left transition hover:border-[#F5D62E] hover:bg-[#FEFCE8]/40">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><p className="font-bold text-slate-950">{client.name}</p><p className="mt-1 text-sm text-slate-500">{client.owner ? `${client.owner.name} · ${client.owner.email}` : 'No client owner assigned'}</p></div>
-                <Badge className={`capitalize ${billingStatusClass(client.billing.status)}`}>{client.billing.status.replaceAll('_', ' ')}</Badge>
+                <div className="flex flex-wrap gap-2">{client.accessDisabled && <Badge className="bg-red-100 text-red-800">Access disabled</Badge>}<Badge className={`capitalize ${billingStatusClass(client.billing.status)}`}>{client.billing.status.replaceAll('_', ' ')}</Badge></div>
               </div>
               <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-5">
                 <span>{client.activeUserCount}/{client.userCount} active users</span>
@@ -522,26 +605,39 @@ export function PlatformAdmin() {
                 <Card><CardContent className="py-4"><p className="text-xs text-slate-400">Next renewal</p><p className="mt-2 font-semibold">{formatDate(selectedClient.billing.currentPeriodEnd)}</p></CardContent></Card>
               </div>
 
-              <div className="rounded-2xl border border-[#F5C10E] bg-[#FFFCED] p-4">
+              {selectedClient.billing.approvalStatus === 'pending_ceo_approval' && (
+                <div className="rounded-2xl border-2 border-[#F5D62E] bg-[#FFFCED] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div><p className="font-bold text-[#303A43]">Self-serve signup ready for approval</p><p className="mt-1 text-sm text-slate-600">Stripe billing is active and a payment method is attached. Approving unlocks the client workspace.</p></div>
+                    <Button type="button" disabled={isLoading} onClick={() => void approveClientAccess()} className="bg-[#303A43] text-white hover:bg-[#1E293B]"><UserCheck className="mr-2 h-4 w-4" />Approve account</Button>
+                  </div>
+                </div>
+              )}
+
+              {selectedClient.billing.approvalStatus === 'approved' && selectedClient.onboarding?.clientProfile?.approvalRequired === true && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><strong>CEO approved</strong>{selectedClient.onboarding.clientProfile.ceoApprovedAt ? ` · ${formatDate(selectedClient.onboarding.clientProfile.ceoApprovedAt)}` : ''}</div>
+              )}
+
+              <div className="rounded-2xl border border-[#F5D62E] bg-[#FFFCED] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><p className="font-semibold text-slate-950">Client app access</p><p className="mt-1 text-sm text-slate-600">ZestIQ Basic keeps inventory, recipes, purchasing, invoices, reporting and AI. The CAD $49.99/month add-on unlocks labour tracking, manager scheduling and ZestEmployee across every location.</p></div>
-                  <Badge className={selectedClient.onboarding?.clientProfile?.schedulingEnabled === true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}>{selectedClient.onboarding?.clientProfile?.schedulingEnabled === true ? 'Enabled' : 'Not included'}</Badge>
+                  <div><p className="font-semibold text-slate-950">Labour &amp; Scheduling module</p><p className="mt-1 text-sm text-slate-600">Optional add-on: CAD $49.99/month. When off, Labour tools are hidden and unavailable to this client.</p></div>
+                  <Badge className={selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}>{selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'Enabled' : 'Not included'}</Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" size="sm" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled === true} onClick={() => void saveSchedulingModule(true)} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Enable add-on +$49.99</Button>
-                  <Button type="button" size="sm" variant="outline" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled !== true} onClick={() => void saveSchedulingModule(false)}>Remove add-on</Button>
+                  <Button type="button" size="sm" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false} onClick={() => void saveSchedulingModule(true)} className="bg-[#303A43] text-white hover:bg-[#1E293B]">Enable Scheduling +$49.99</Button>
+                  <Button type="button" size="sm" variant="outline" disabled={isLoading || selectedClient.onboarding?.clientProfile?.schedulingEnabled === false} onClick={() => void saveSchedulingModule(false)}>Turn off Scheduling</Button>
                 </div>
-                <p className="mt-3 text-xs text-slate-500">Access changes immediately for the client. If a Stripe subscription already exists, update its Scheduling line item in Stripe so billing matches access.</p>
+                <p className="mt-3 text-xs text-slate-500">If a Stripe subscription already exists, update its add-on in Stripe before changing the amount billed.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="font-semibold text-slate-950">Secure billing setup</p>
-                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for the first location. Each additional location is CAD $199/month. Scheduling is a CAD $49.99/month account add-on and covers every location only when selected. There is no free trial.</p>
+                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for the first location. Each additional location is CAD $199.99/month and includes Scheduling. Single-location Scheduling is an optional CAD $49.99/month add-on. There is no free trial.</p>
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
                   <p className="font-semibold text-slate-950">Contract term disclosure</p>
                   <p className="mt-1">Billed monthly with a 12-month initial commitment. The subscription renews for another 12-month term unless written non-renewal notice is received at least 90 days before term end.</p>
                   <label className="mt-3 flex cursor-pointer items-start gap-2">
-                    <Checkbox checked={commitmentConfirmed} onCheckedChange={checked => setCommitmentConfirmed(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#0F172A]" />
+                    <Checkbox checked={commitmentConfirmed} onCheckedChange={checked => setCommitmentConfirmed(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#303A43]" />
                     <span>I have confirmed these terms with this client before creating their checkout link.</span>
                   </label>
                 </div>
@@ -556,18 +652,19 @@ export function PlatformAdmin() {
                     value={billableLocationCount}
                     onChange={event => setBillableLocationCount(Math.max(Math.max(1, selectedClient.locations.length), Math.min(100, Number(event.target.value) || 1)))}
                   />
-                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 199 + (selectedClient.onboarding?.clientProfile?.schedulingEnabled === true ? 49.99 : 0)).toFixed(2)}/month</p>
-                  <p className="mt-1 text-xs text-slate-500">Scheduling: {selectedClient.onboarding?.clientProfile?.schedulingEnabled === true ? 'CAD $49.99/month, covering every location' : 'not included'}</p>
+                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 199.99 + (billableLocationCount === 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 49.99 : 0)).toFixed(2)}/month</p>
+                  <p className="mt-1 text-xs text-slate-500">Additional locations are CAD $199.99/month each with Scheduling included.</p>
+                  <p className="mt-1 text-xs text-slate-500">Scheduling: {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'included at CAD $49.99/month' : 'not included'}</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured) || (selectedClient.onboarding?.clientProfile?.schedulingEnabled === true && !selectedClient.billing.schedulingPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
+                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured) || (billableLocationCount === 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
                 </div>
                 {selectedClient.billing.customerCreated && <p className="mt-3 text-xs text-slate-500">This client already has Stripe billing. Use Stripe to manage its existing subscription rather than creating a duplicate.</p>}
                 {!selectedClient.billing.configured && <p className="mt-3 text-xs text-amber-700">Connect Stripe keys and price IDs before creating payment links.</p>}
-                {selectedClient.onboarding?.clientProfile?.schedulingEnabled === true && !selectedClient.billing.schedulingPriceConfigured && <p className="mt-3 text-xs text-amber-700">Add the CAD $49.99 monthly Scheduling price ID in Stripe/Vercel before creating this checkout link.</p>}
+                {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured && <p className="mt-3 text-xs text-amber-700">Add the CAD $49.99 monthly Scheduling price ID in Stripe/Vercel before creating this checkout link.</p>}
                 {paymentLink && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" onClick={() => void copyPaymentLink()} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Copy client payment link</Button>
+                    <Button type="button" size="sm" onClick={() => void copyPaymentLink()} className="bg-[#303A43] text-white hover:bg-[#1E293B]">Copy client payment link</Button>
                     <a href={paymentLink} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-md border border-slate-200 px-3 text-sm font-medium">Open checkout <ExternalLink className="ml-2 h-4 w-4" /></a>
                   </div>
                 )}
@@ -599,9 +696,11 @@ export function PlatformAdmin() {
                     ['Privacy acknowledged', details.privacyAccepted === true],
                     ['Agreement discussed', details.termsAccepted === true],
                     ['Billing active', selectedClient.billing.status === 'active'],
+                    ['CEO approval', details.approvalRequired !== true || details.ceoApproved === true],
                   ];
                   const complete = checks.filter(([, done]) => done).length;
-                  return <><p className="mt-1 text-sm text-slate-500">{complete}/{checks.length} onboarding checks complete</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{checks.map(([label, done]) => <div key={label} className={`rounded-xl p-3 text-sm ${done ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{done ? '✓' : '○'} {label}</div>)}</div><div className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-slate-500">Legal name:</span> {details.legalName || 'Not added'}</p><p><span className="text-slate-500">Business phone:</span> {details.phone || 'Not added'}</p><p><span className="text-slate-500">Business address:</span> {details.businessAddress || 'Not added'}</p><p><span className="text-slate-500">Billing:</span> {details.billingEmail || 'Not added'}</p><p><span className="text-slate-500">POS:</span> {details.posSystem || 'Not selected'}</p><p><span className="text-slate-500">Targets:</span> food {details.foodCostTarget || '—'}% · labour {details.labourTarget || '—'}%</p></div>{isEditingClient && <form onSubmit={saveClientProfile} className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-2"><div><Label>Restaurant name</Label><Input name="companyName" defaultValue={selectedClient.name} required /></div><div><Label>Legal name</Label><Input name="legalName" defaultValue={details.legalName || ''} /></div><div><Label>Owner name</Label><Input name="ownerName" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.name || ''} /></div><div><Label>Owner sign-in email</Label><Input name="ownerEmail" type="email" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.email || ''} /></div><div><Label>Business phone</Label><Input name="phone" type="tel" defaultValue={details.phone || ''} /></div><div><Label>Billing phone</Label><Input name="billingPhone" type="tel" defaultValue={details.billingPhone || ''} /></div><div><Label>Business address</Label><Input name="businessAddress" defaultValue={details.businessAddress || ''} /></div><div><Label>Billing address</Label><Input name="billingAddress" defaultValue={details.billingAddress || ''} /></div><div><Label>Billing email</Label><Input name="billingEmail" type="email" defaultValue={details.billingEmail || ''} /></div><div><Label>Primary manager</Label><Input name="primaryManager" defaultValue={details.primaryManager || ''} /></div><div><Label>Manager email</Label><Input name="primaryManagerEmail" type="email" defaultValue={details.primaryManagerEmail || ''} /></div><div><Label>Locations</Label><Input name="locationCount" type="number" min="1" defaultValue={details.locationCount || selectedClient.locations.length || 1} /></div><div><Label>POS</Label><Input name="posSystem" defaultValue={details.posSystem || ''} /></div><div><Label>Supplier accounts</Label><Input name="supplierAccounts" defaultValue={details.supplierAccounts || ''} /></div><div><Label>Tax settings</Label><Input name="taxSettings" defaultValue={details.taxSettings || ''} /></div><div><Label>Currency</Label><Input name="currency" defaultValue={details.currency || 'CAD'} /></div><div><Label>Food cost target %</Label><Input name="foodCostTarget" type="number" defaultValue={details.foodCostTarget || ''} /></div><div><Label>Labour target %</Label><Input name="labourTarget" type="number" defaultValue={details.labourTarget || ''} /></div><div><Label>Ordering days</Label><Input name="orderingDays" defaultValue={details.orderingDays || ''} /></div><div><Label>Import status</Label><Input name="importStatus" defaultValue={details.importStatus || ''} /></div><label className="flex items-center gap-2 text-sm"><Checkbox name="privacyAccepted" defaultChecked={details.privacyAccepted === true} /> Privacy acknowledgement</label><label className="flex items-center gap-2 text-sm"><Checkbox name="termsAccepted" defaultChecked={details.termsAccepted === true} /> Agreement discussed</label><Button type="submit" disabled={isLoading} className="sm:col-span-2 bg-[#0F172A] text-white">Save client details</Button></form>}</>;
+                  const schedulingIncluded = details.schedulingEnabled !== false;
+                  return <><p className="mt-1 text-sm text-slate-500">{complete}/{checks.length} onboarding checks complete</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{checks.map(([label, done]) => <div key={label} className={`rounded-xl p-3 text-sm ${done ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{done ? '✓' : '○'} {label}</div>)}</div><div className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-slate-500">Legal name:</span> {details.legalName || 'Not added'}</p><p><span className="text-slate-500">Business phone:</span> {details.phone || 'Not added'}</p><p><span className="text-slate-500">Business address:</span> {details.businessAddress || 'Not added'}</p><p><span className="text-slate-500">Billing:</span> {details.billingEmail || 'Not added'}</p><p><span className="text-slate-500">POS:</span> {details.posSystem || 'Not selected'}</p><p><span className="text-slate-500">Targets:</span> food {details.foodCostTarget || '—'}% · labour {details.labourTarget || '—'}%</p></div>{isEditingClient && <form onSubmit={saveClientProfile} className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-2"><div><Label>Restaurant name</Label><Input name="companyName" defaultValue={selectedClient.name} required /></div><div><Label>Legal name</Label><Input name="legalName" defaultValue={details.legalName || ''} /></div><div><Label>Owner name</Label><Input name="ownerName" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.name || ''} /></div><div><Label>Owner sign-in email</Label><Input name="ownerEmail" type="email" defaultValue={selectedClient.users.find(user => user.role === 'Owner')?.email || ''} /></div><div><Label>Business phone</Label><Input name="phone" type="tel" defaultValue={details.phone || ''} /></div><div><Label>Billing phone</Label><Input name="billingPhone" type="tel" defaultValue={details.billingPhone || ''} /></div><div><Label>Business address</Label><Input name="businessAddress" defaultValue={details.businessAddress || ''} /></div><div><Label>Billing address</Label><Input name="billingAddress" defaultValue={details.billingAddress || ''} /></div><div><Label>Billing email</Label><Input name="billingEmail" type="email" defaultValue={details.billingEmail || ''} /></div><div><Label>Primary manager</Label><Input name="primaryManager" defaultValue={details.primaryManager || ''} /></div><div><Label>Manager email</Label><Input name="primaryManagerEmail" type="email" defaultValue={details.primaryManagerEmail || ''} /></div><div><Label>Locations</Label><Input name="locationCount" type="number" min="1" defaultValue={details.locationCount || selectedClient.locations.length || 1} /></div><div><Label>POS</Label><Input name="posSystem" defaultValue={details.posSystem || ''} /></div><div><Label>Supplier accounts</Label><Input name="supplierAccounts" defaultValue={details.supplierAccounts || ''} /></div><div><Label>Tax settings</Label><Input name="taxSettings" defaultValue={details.taxSettings || ''} /></div><div><Label>Currency</Label><Input name="currency" defaultValue={details.currency || 'CAD'} /></div><div><Label>Food cost target %</Label><Input name="foodCostTarget" type="number" defaultValue={details.foodCostTarget || ''} /></div><div><Label>Labour target %</Label><Input name="labourTarget" type="number" defaultValue={details.labourTarget || ''} /></div><div><Label>Ordering days</Label><Input name="orderingDays" defaultValue={details.orderingDays || ''} /></div><div><Label>Import status</Label><Input name="importStatus" defaultValue={details.importStatus || ''} /></div><label className="flex items-center gap-2 text-sm"><Checkbox name="privacyAccepted" defaultChecked={details.privacyAccepted === true} /> Privacy acknowledgement</label><label className="flex items-center gap-2 text-sm"><Checkbox name="termsAccepted" defaultChecked={details.termsAccepted === true} /> Agreement discussed</label><Button type="submit" disabled={isLoading} className="sm:col-span-2 bg-[#303A43] text-white">Save client details</Button></form>}</>;
                 })()}
               </div>
 
@@ -612,13 +711,31 @@ export function PlatformAdmin() {
                 )) : <p className="mt-2 text-sm text-slate-500">No payment method is attached.</p>}
                 <p className="mt-3 text-xs text-slate-400">Full card numbers and security codes remain inside Stripe and are never returned to ZestIQ.</p>
               </div>
+
+              <div className="space-y-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <div><p className="flex items-center gap-2 font-semibold text-red-900"><ShieldCheck className="h-4 w-4" /> CEO account controls</p><p className="mt-1 text-sm text-red-800">Only platform administration can change company-level access. These controls never modify Stripe billing.</p></div>
+
+                <div className="rounded-xl border border-amber-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold text-slate-950">{selectedClientAccessDisabled ? 'Account disabled' : 'Disable account'}</p><p className="mt-1 text-xs leading-5 text-slate-500">{selectedClientAccessDisabled ? 'Users cannot sign in. Company data and authentication records are preserved.' : 'Immediately blocks every company user while preserving all company data.'}</p></div><Badge className={selectedClientAccessDisabled ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}>{selectedClientAccessDisabled ? 'Disabled' : 'Active'}</Badge></div>
+                  {selectedClientAccessDisabled && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><p className="font-semibold text-slate-800">{selectedClientAccess?.reason || selectedClient.onboarding.accountDeletion?.reason || 'No reason recorded'}</p><p className="mt-1">Changed {formatDate(selectedClientAccess?.changedAt || selectedClient.onboarding.accountDeletion?.requestedAt || null)} by {selectedClientAccess?.changedBy || selectedClient.onboarding.accountDeletion?.requestedBy || 'platform administration'}.</p></div>}
+                  <Label htmlFor="account-access-reason" className="mt-3 block">Administrative reason</Label><Textarea id="account-access-reason" value={accountAccessReason} onChange={event => setAccountAccessReason(event.target.value)} className="mt-2 min-h-16 bg-white" maxLength={1000} placeholder={selectedClientAccessDisabled ? 'Why is access being restored?' : 'Why is this account being disabled?'} />
+                  <Button type="button" variant={selectedClientAccessDisabled ? 'outline' : 'destructive'} disabled={isLoading || accountAccessReason.trim().length < 3} onClick={() => void setClientAccountDisabled(!selectedClientAccessDisabled)} className="mt-3">{selectedClientAccessDisabled ? 'Re-enable account' : 'Disable account'}</Button>
+                </div>
+
+                <div className="rounded-xl border-2 border-red-300 bg-white p-4">
+                  <p className="flex items-center gap-2 font-semibold text-red-900"><Trash2 className="h-4 w-4" /> Permanently delete account</p><p className="mt-1 text-xs leading-5 text-slate-600">Deletes the company workspace, users, locations and operational data. This cannot be undone. Accounts with active or outstanding billing must be resolved in Stripe first.</p>
+                  <Label htmlFor="permanent-delete-reason" className="mt-3 block">Deletion reason</Label><Textarea id="permanent-delete-reason" value={permanentDeleteReason} onChange={event => setPermanentDeleteReason(event.target.value)} className="mt-2 min-h-16 bg-white" maxLength={1000} placeholder="Record why this company data is being permanently deleted" />
+                  <Label htmlFor="permanent-delete-confirmation" className="mt-3 block">Type <strong>{selectedClient.name}</strong> to confirm</Label><Input id="permanent-delete-confirmation" value={permanentDeleteConfirmation} onChange={event => setPermanentDeleteConfirmation(event.target.value)} className="mt-2 bg-white" autoComplete="off" />
+                  <Button type="button" variant="destructive" disabled={isLoading || permanentDeleteReason.trim().length < 3 || permanentDeleteConfirmation.trim() !== selectedClient.name} onClick={() => void permanentlyDeleteClientAccount()} className="mt-3">Permanently delete account</Button>
+                </div>
+              </div>
             </>
           )}
         </DialogContent>
       </Dialog>
       <Dialog open={Boolean(selectedClientUser)} onOpenChange={open => { if (!open) setSelectedClientUser(null); }}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
-          {selectedClientUser && <><DialogHeader><DialogTitle>Manage client user</DialogTitle><DialogDescription>Platform-only access support for {selectedClient?.name}. Changes take effect on the user’s next request.</DialogDescription></DialogHeader><form onSubmit={saveClientUser} className="space-y-4"><div className="rounded-2xl bg-slate-50 p-3 text-sm"><p className="font-semibold text-slate-900">Last sign-in</p><p className="mt-1 text-slate-500">{formatDate(selectedClientUser.lastLogin)}</p></div><div><Label htmlFor="client-user-name">Full name</Label><Input id="client-user-name" name="name" className="mt-2" defaultValue={selectedClientUser.name} required /></div><div><Label htmlFor="client-user-email">Sign-in email</Label><Input id="client-user-email" name="email" type="email" className="mt-2" defaultValue={selectedClientUser.email} required /></div><div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="client-user-role">Permissions</Label><select id="client-user-role" name="role" defaultValue={selectedClientUser.role} className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option>Owner</option><option>Admin</option><option>Manager</option><option>BOH Manager</option><option>FOH Manager</option><option>Ordering</option><option>Staff</option></select><p className="mt-1 text-xs text-slate-500">Ordering sends this user to ZestOrders with purchasing-only access.</p></div><div><Label htmlFor="client-user-status">Account access</Label><select id="client-user-status" name="status" defaultValue={selectedClientUser.status} className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option>Active</option><option>Inactive</option></select></div></div><div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><p className="font-semibold">Support tools</p><p className="mt-1">Send a password reset if the client cannot sign in. Set an account to Inactive to pause access without deleting their record.</p></div><div className="flex flex-wrap justify-between gap-2 border-t pt-4"><Button type="button" variant="outline" disabled={isLoading} onClick={() => void resetClientUserPassword()}>Send password reset</Button><Button type="button" variant="destructive" disabled={isLoading} onClick={() => void deleteClientUser()}>Delete user</Button><div className="ml-auto flex gap-2"><Button type="button" variant="outline" onClick={() => setSelectedClientUser(null)}>Cancel</Button><Button type="submit" disabled={isLoading} className="bg-[#0F172A] text-white hover:bg-[#1E293B]">Save permissions</Button></div></div></form></>}
+          {selectedClientUser && <><DialogHeader><DialogTitle>Manage client user</DialogTitle><DialogDescription>Platform-only access support for {selectedClient?.name}. Changes take effect on the user’s next request.</DialogDescription></DialogHeader><form onSubmit={saveClientUser} className="space-y-4"><div className="rounded-2xl bg-slate-50 p-3 text-sm"><p className="font-semibold text-slate-900">Last sign-in</p><p className="mt-1 text-slate-500">{formatDate(selectedClientUser.lastLogin)}</p></div><div><Label htmlFor="client-user-name">Full name</Label><Input id="client-user-name" name="name" className="mt-2" defaultValue={selectedClientUser.name} required /></div><div><Label htmlFor="client-user-email">Sign-in email</Label><Input id="client-user-email" name="email" type="email" className="mt-2" defaultValue={selectedClientUser.email} required /></div><div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="client-user-role">Permissions</Label><select id="client-user-role" name="role" defaultValue={selectedClientUser.role} className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option>Owner</option><option>Admin</option><option>Manager</option><option>BOH Manager</option><option>FOH Manager</option><option>Staff</option></select></div><div><Label htmlFor="client-user-status">Account access</Label><select id="client-user-status" name="status" defaultValue={selectedClientUser.status} className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option>Active</option><option>Inactive</option></select></div></div><div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><p className="font-semibold">Support tools</p><p className="mt-1">Send a password reset if the client cannot sign in. Set an account to Inactive to pause access without deleting their record.</p></div><div className="flex flex-wrap justify-between gap-2 border-t pt-4"><Button type="button" variant="outline" disabled={isLoading} onClick={() => void resetClientUserPassword()}>Send password reset</Button><Button type="button" variant="destructive" disabled={isLoading} onClick={() => void deleteClientUser()}>Delete user</Button><div className="ml-auto flex gap-2"><Button type="button" variant="outline" onClick={() => setSelectedClientUser(null)}>Cancel</Button><Button type="submit" disabled={isLoading} className="bg-[#303A43] text-white hover:bg-[#1E293B]">Save permissions</Button></div></div></form></>}
         </DialogContent>
       </Dialog>
     </div>

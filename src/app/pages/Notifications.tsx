@@ -69,7 +69,7 @@ export function Notifications() {
           toast.success('All notifications enabled');
         }}>
           <CardContent className="pt-4 text-center">
-            <Bell className="w-6 h-6 mx-auto text-[#0F172A] mb-2" />
+            <Bell className="w-6 h-6 mx-auto text-[#303A43] mb-2" />
             <p className="text-sm font-medium">Enable All</p>
           </CardContent>
         </Card>
@@ -93,7 +93,7 @@ export function Notifications() {
               <CardContent className="py-4">
                 <div className="flex items-start space-x-3 mb-4">
                   <div className="w-10 h-10 bg-[#FEF9C3] rounded-lg flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-[#0F172A]" />
+                    <Icon className="w-5 h-5 text-[#303A43]" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900">{setting.label}</h3>
@@ -111,7 +111,7 @@ export function Notifications() {
                     <button
                       onClick={() => handleToggle(setting.id, 'email')}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        setting.email ? 'bg-[#0F172A]' : 'bg-gray-200'
+                        setting.email ? 'bg-[#303A43]' : 'bg-gray-200'
                       }`}
                     >
                       <span
@@ -131,7 +131,7 @@ export function Notifications() {
                     <button
                       onClick={() => handleToggle(setting.id, 'push')}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        setting.push ? 'bg-[#0F172A]' : 'bg-gray-200'
+                        setting.push ? 'bg-[#303A43]' : 'bg-gray-200'
                       }`}
                     >
                       <span
@@ -151,7 +151,7 @@ export function Notifications() {
                     <button
                       onClick={() => handleToggle(setting.id, 'sms')}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        setting.sms ? 'bg-[#0F172A]' : 'bg-gray-200'
+                        setting.sms ? 'bg-[#303A43]' : 'bg-gray-200'
                       }`}
                     >
                       <span

@@ -1,53 +1,62 @@
-import { createBrowserRouter } from "react-router";
-import { Dashboard } from "./pages/Dashboard";
-import { Inventory } from "./pages/Inventory";
-import { InventoryDetail } from "./pages/InventoryDetail";
-import { InventoryCountEditor } from "./pages/InventoryCountEditor";
-import { Recipes } from "./pages/Recipes";
-import { Forecasting } from "./pages/Forecasting";
-import { Orders } from "./pages/Orders";
-import { AIOrders } from "./pages/AIOrders";
-import { Invoices } from "./pages/Invoices";
-import { CostBreakdown } from "./pages/CostBreakdown";
-import { COGSBreakdown } from "./pages/COGSBreakdown";
-import { Integrations } from "./pages/Integrations";
-import { InvoiceScanner } from "./pages/InvoiceScanner";
-import { Suppliers } from "./pages/Suppliers";
+import { lazy } from "react";
+import { createBrowserRouter, Navigate, useLocation } from "react-router";
 import { Login } from "./pages/Login";
-import { Users } from "./pages/Users";
-import { Account } from "./pages/Account";
-import { PaymentMethod } from "./pages/PaymentMethod";
-import { Payment } from "./pages/Payment";
-import { Notifications } from "./pages/Notifications";
-import { OrderAlarms } from "./pages/OrderAlarms";
-import { Help } from "./pages/Help";
-import { Contact } from "./pages/Contact";
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import { AITransparency, CookiePolicy, LegalCenter, Subprocessors } from "./pages/LegalPages";
 import { Landing } from "./pages/Landing";
-import { ResetPassword } from "./pages/ResetPassword";
-import { Mfa } from "./pages/Mfa";
-import { PlatformAdmin } from "./pages/PlatformAdmin";
-import { LaborScheduling } from "./pages/LaborScheduling";
-import { EmployeeApp } from "./pages/EmployeeApp";
-import { BeverageCosting } from "./pages/BeverageCosting";
-import { BookDemo } from "./pages/BookDemo";
-import { Onboarding } from "./pages/Onboarding";
-import { Waste } from "./pages/Waste";
+import { BookDemo, BookDemoThankYou } from "./pages/BookDemo";
 import { MultiLocationSeo, PosIntegrationsSeo, RestaurantBeverageSeo, RestaurantFoodCostSeo, RestaurantInventorySeo, RestaurantInvoiceScannerSeo, RestaurantLabourSeo, RestaurantOrderingSeo } from "./pages/RestaurantSeoPages";
 import { CanadianOwnedPage, CapabilitiesPage, PricingPage, ProductTourPage, PublicContactPage } from "./pages/PublicMarketingPages";
-import { Layout } from "./components/Layout";
-import { AuthLayout } from "./components/AuthLayout";
-import { OrdersAppLayout } from "./components/OrdersAppLayout";
-import { Capacitor } from "@capacitor/core";
+import { RestaurantFoodCostCalculator, RestaurantInventoryBuyerGuide, RestaurantInventoryManagementGuide } from "./pages/RestaurantSeoGuides";
 
-const NativeHome = Capacitor.isNativePlatform() ? Login : Landing;
+const Account = lazy(() => import("./pages/Account").then(module => ({ default: module.Account })));
+const AIOrders = lazy(() => import("./pages/AIOrders").then(module => ({ default: module.AIOrders })));
+const AuthLayout = lazy(() => import("./components/AuthLayout").then(module => ({ default: module.AuthLayout })));
+const BeverageCosting = lazy(() => import("./pages/BeverageCosting").then(module => ({ default: module.BeverageCosting })));
+const Contact = lazy(() => import("./pages/Contact").then(module => ({ default: module.Contact })));
+const CostBreakdown = lazy(() => import("./pages/CostBreakdown").then(module => ({ default: module.CostBreakdown })));
+const Dashboard = lazy(() => import("./pages/Dashboard").then(module => ({ default: module.Dashboard })));
+const EmployeeApp = lazy(() => import("./pages/EmployeeApp").then(module => ({ default: module.EmployeeApp })));
+const Forecasting = lazy(() => import("./pages/Forecasting").then(module => ({ default: module.Forecasting })));
+const Help = lazy(() => import("./pages/Help").then(module => ({ default: module.Help })));
+const Integrations = lazy(() => import("./pages/Integrations").then(module => ({ default: module.Integrations })));
+const Inventory = lazy(() => import("./pages/Inventory").then(module => ({ default: module.Inventory })));
+const InventoryCountEditor = lazy(() => import("./pages/InventoryCountEditor").then(module => ({ default: module.InventoryCountEditor })));
+const InventoryDetail = lazy(() => import("./pages/InventoryDetail").then(module => ({ default: module.InventoryDetail })));
+const InvoiceScanner = lazy(() => import("./pages/InvoiceScanner").then(module => ({ default: module.InvoiceScanner })));
+const Invoices = lazy(() => import("./pages/Invoices").then(module => ({ default: module.Invoices })));
+const LaborEmployeeForm = lazy(() => import("./pages/LaborEmployeeForm").then(module => ({ default: module.LaborEmployeeForm })));
+const LaborScheduling = lazy(() => import("./pages/LaborScheduling").then(module => ({ default: module.LaborScheduling })));
+const Layout = lazy(() => import("./components/Layout").then(module => ({ default: module.Layout })));
+const Mfa = lazy(() => import("./pages/Mfa").then(module => ({ default: module.Mfa })));
+const Notifications = lazy(() => import("./pages/Notifications").then(module => ({ default: module.Notifications })));
+const Onboarding = lazy(() => import("./pages/Onboarding").then(module => ({ default: module.Onboarding })));
+const OrderAlarms = lazy(() => import("./pages/OrderAlarms").then(module => ({ default: module.OrderAlarms })));
+const Orders = lazy(() => import("./pages/Orders").then(module => ({ default: module.Orders })));
+const Payment = lazy(() => import("./pages/Payment").then(module => ({ default: module.Payment })));
+const PaymentMethod = lazy(() => import("./pages/PaymentMethod").then(module => ({ default: module.PaymentMethod })));
+const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin").then(module => ({ default: module.PlatformAdmin })));
+const PrivateAppProviders = lazy(() => import("./components/PrivateAppProviders").then(module => ({ default: module.PrivateAppProviders })));
+const Recipes = lazy(() => import("./pages/Recipes").then(module => ({ default: module.Recipes })));
+const ResetPassword = lazy(() => import("./pages/ResetPassword").then(module => ({ default: module.ResetPassword })));
+const Suppliers = lazy(() => import("./pages/Suppliers").then(module => ({ default: module.Suppliers })));
+const Users = lazy(() => import("./pages/Users").then(module => ({ default: module.Users })));
+const Waste = lazy(() => import("./pages/Waste").then(module => ({ default: module.Waste })));
+
+const isEmployeeNativeBuild = import.meta.env.VITE_APP_VARIANT === 'employee';
+function NativeEntry() { return <Navigate to="/employee" replace />; }
+function LegacyCogsRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set('view', 'cogs');
+  return <Navigate to={`/app/costs?${params.toString()}`} replace />;
+}
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: NativeHome,
+    Component: isEmployeeNativeBuild ? NativeEntry : Landing,
   },
   {
     path: "/login",
@@ -56,6 +65,10 @@ export const router = createBrowserRouter([
   {
     path: "/book-demo",
     Component: BookDemo,
+  },
+  {
+    path: "/book-demo/thank-you",
+    Component: BookDemoThankYou,
   },
   {
     path: "/product-tour",
@@ -76,6 +89,18 @@ export const router = createBrowserRouter([
   {
     path: "/canadian-owned",
     Component: CanadianOwnedPage,
+  },
+  {
+    path: "/best-restaurant-inventory-management-software-canada",
+    Component: RestaurantInventoryBuyerGuide,
+  },
+  {
+    path: "/restaurant-inventory-management-guide",
+    Component: RestaurantInventoryManagementGuide,
+  },
+  {
+    path: "/restaurant-food-cost-calculator",
+    Component: RestaurantFoodCostCalculator,
   },
   {
     path: "/privacy",
@@ -144,32 +169,23 @@ export const router = createBrowserRouter([
   {
     path: "/employee",
     Component: AuthLayout,
-    children: [{ index: true, Component: EmployeeApp }],
-  },
-  {
-    path: "/orders",
-    Component: AuthLayout,
-    children: [
-      {
-        Component: OrdersAppLayout,
-        children: [
-          { index: true, Component: Orders },
-          { path: "ai", Component: AIOrders },
-        ],
-      },
-    ],
+    children: [{ Component: PrivateAppProviders, children: [{ index: true, Component: EmployeeApp }] }],
   },
   {
     path: "/app",
     Component: AuthLayout,
     children: [
       {
-        Component: Layout,
-        children: [
-          { index: true, Component: Dashboard },
+        Component: PrivateAppProviders,
+        children: [{
+          Component: Layout,
+          children: [
+            { index: true, Component: Dashboard },
           { path: "dashboard", Component: Dashboard },
           { path: "onboarding", Component: Onboarding },
           { path: "labor", Component: LaborScheduling },
+          { path: "labor/employees/new", Component: LaborEmployeeForm },
+          { path: "labor/employees/:employeeId", Component: LaborEmployeeForm },
           { path: "waste", Component: Waste },
           { path: "beverages", Component: BeverageCosting },
           { path: "inventory", Component: Inventory },
@@ -181,7 +197,7 @@ export const router = createBrowserRouter([
           { path: "invoices", Component: Invoices },
           { path: "ai-orders", Component: AIOrders },
           { path: "costs", Component: CostBreakdown },
-          { path: "cogs", Component: COGSBreakdown },
+          { path: "cogs", Component: LegacyCogsRedirect },
           { path: "integrations", Component: Integrations },
           { path: "invoice-scanner", Component: InvoiceScanner },
           { path: "suppliers", Component: Suppliers },
@@ -195,8 +211,9 @@ export const router = createBrowserRouter([
           { path: "help", Component: Help },
           { path: "contact", Component: Contact },
           { path: "terms", Component: Terms },
-          { path: "privacy", Component: Privacy },
-        ],
+            { path: "privacy", Component: Privacy },
+          ],
+        }],
       },
     ],
   },

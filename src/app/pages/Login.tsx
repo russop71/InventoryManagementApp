@@ -1,29 +1,27 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Input } from '../components/ui/input';
 import { Building, Eye, EyeOff, Lock, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
-import { Capacitor } from '@capacitor/core';
+import { ZestIQBrand } from '../components/ZestIQBrand';
 
 export function Login() {
-  const isNativeApp = Capacitor.isNativePlatform();
   const navigate = useNavigate();
   const location = useLocation();
-  const requestedReturnTo = new URLSearchParams(location.search).get('returnTo');
-  const returnTo = requestedReturnTo === '/employee'
-    ? '/employee'
-    : requestedReturnTo === '/orders'
-      ? '/orders'
-      : '/app';
+  const searchParams = new URLSearchParams(location.search);
+  const requestedReturnTo = searchParams.get('returnTo');
+  const returnTo = requestedReturnTo === '/employee' ? '/employee' : '/app';
   const [name, setName]           = useState('');
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignup, setIsSignup]   = useState(false);
+  const [isSignup, setIsSignup]   = useState(searchParams.get('mode') === 'signup');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const { login, loginDemo, register } = useAuth();
@@ -39,7 +37,7 @@ export function Login() {
     }
 
     try {
-      if (isSignup && !isNativeApp) {
+      if (isSignup) {
         if (!name.trim()) {
           toast.error('Please enter your name');
           setIsLoading(false);
@@ -50,7 +48,12 @@ export function Login() {
           setIsLoading(false);
           return;
         }
-        await register(name, companyName, email, password);
+        if (!privacyAccepted || !termsAccepted) {
+          toast.error('Accept the Privacy Policy and Terms of Service to create your account.');
+          setIsLoading(false);
+          return;
+        }
+        await register(name, companyName, email, password, { privacyAccepted, termsAccepted });
         try {
           await apiRequest<{ sent: boolean }>('/api/send-welcome-email', {
             method: 'POST',
@@ -59,7 +62,7 @@ export function Login() {
         } catch (emailError) {
           console.error('Failed to send welcome email', emailError);
         }
-        toast.success('Account created successfully');
+        toast.success('Account created. Next, add your secure payment details.');
         navigate('/app/payment-method');
       } else {
         await login(email, password);
@@ -86,26 +89,26 @@ export function Login() {
   };
 
   return (
-    <div className="zestiq-public zestiq-public-auth min-h-screen flex flex-col" style={{ background: '#F4EFE3' }}>
+    <div className="min-h-screen flex flex-col bg-[#303A43]">
 
       <div className="flex items-center justify-end px-5 pt-5">
         <button
           type="button"
           onClick={() => setMenuOpen(value => !value)}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/70 shadow-sm backdrop-blur transition-transform active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 shadow-sm backdrop-blur transition-transform active:scale-95"
           aria-label="Open menu"
           aria-expanded={menuOpen}
         >
-          {menuOpen ? <X className="h-5 w-5 text-[#0F172A]" /> : <Menu className="h-5 w-5 text-[#0F172A]" />}
+          {menuOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
         </button>
       </div>
 
-      {/* ── Branded hero ──────────────────────────────── */}
-      <div className="flex flex-col items-center justify-center pt-16 pb-10 px-6">
-        <div className="public-card w-full max-w-[560px] rounded-[2rem] bg-white px-5 py-5 sm:px-8 sm:py-6">
-          <img src="/zestiq-login-logo.svg" alt="ZestIQ" className="h-auto w-full drop-shadow-sm" />
-        </div>
-        <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(15,23,42,0.45)' }}>
+      {/* ── Brand hero ────────────────────────────────── */}
+      <div className="flex flex-col items-center justify-center px-6 pb-10 pt-12 sm:pt-16">
+        <Link to="/" aria-label="ZestIQ home" className="flex w-full max-w-[560px] items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 px-6 py-9 shadow-[0_20px_50px_rgba(0,0,0,0.18)] backdrop-blur transition hover:border-[#F5D62E]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E] sm:px-10 sm:py-12">
+          <ZestIQBrand markClassName="h-24 w-24 rounded-none sm:h-28 sm:w-28" wordmarkClassName="text-5xl text-white sm:text-6xl" />
+        </Link>
+        <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.22em] text-white/45">
           Smarter Kitchens. Better Business.
         </p>
       </div>
@@ -121,13 +124,13 @@ export function Login() {
                   setMenuOpen(false);
                   handleDemoLogin();
                 }}
-                className="h-11 rounded-2xl border border-[#F5C10E]/30 bg-[#F5C10E]/10 text-sm font-bold text-[#0F172A] transition-colors active:scale-[0.99]"
+                className="h-11 rounded-2xl border border-[#F5D62E]/30 bg-[#F5D62E]/10 text-sm font-bold text-[#303A43] transition-colors active:scale-[0.99]"
               >
                 Try Demo Account
               </button>
               <a
                 href="mailto:sales@zestiq.ca?subject=zestIQ%20Sales%20Inquiry"
-                className="flex h-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm font-bold text-[#0F172A] transition-colors"
+                className="flex h-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm font-bold text-[#303A43] transition-colors"
                 onClick={() => setMenuOpen(false)}
               >
                 Contact Sales
@@ -138,13 +141,13 @@ export function Login() {
       )}
 
       {/* ── White card ────────────────────────────────── */}
-      <div className="flex-1 rounded-t-[32px] bg-[#FFFDF7] px-6 pt-8 pb-10 shadow-2xl">
+      <div className="flex-1 rounded-t-[32px] bg-[#FCFBF7] px-6 pb-10 pt-8 shadow-2xl lg:mx-auto lg:mb-10 lg:w-[min(640px,calc(100%-3rem))] lg:flex-none lg:rounded-[32px] lg:px-10">
 
-        <h2 className="text-2xl font-black mb-1" style={{ color: '#0F172A', fontFamily: 'var(--font-sans)' }}>
+        <h2 className="text-2xl font-black mb-1" style={{ color: '#303A43', fontFamily: 'var(--font-sans)' }}>
           {isSignup ? 'Create your account' : 'Welcome back'}
         </h2>
         <p className="text-sm text-gray-400 font-medium mb-8">
-          {isSignup ? 'Set up your login to save data under your account' : 'Sign in to manage your restaurant inventory'}
+          {isSignup ? 'Create your company workspace, then complete secure payment for CEO approval.' : 'Sign in to manage your restaurant inventory'}
         </p>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -160,7 +163,7 @@ export function Login() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     required={isSignup}
-                    className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#0F172A] placeholder:text-gray-400"
+                    className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#303A43] placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -174,7 +177,7 @@ export function Login() {
                     value={companyName}
                     onChange={e => setCompanyName(e.target.value)}
                     required={isSignup}
-                    className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#0F172A] placeholder:text-gray-400"
+                    className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#303A43] placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -191,7 +194,7 @@ export function Login() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#0F172A] placeholder:text-gray-400"
+                className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 text-[#303A43] placeholder:text-gray-400"
               />
             </div>
           </div>
@@ -206,14 +209,14 @@ export function Login() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                className="h-12 rounded-xl border-gray-200 bg-gray-50 pl-10 pr-12 text-[#0F172A]"
+                className="h-12 rounded-xl border-gray-200 bg-gray-50 pl-10 pr-12 text-[#303A43]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(current => !current)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 aria-pressed={showPassword}
-                className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-gray-500 transition hover:bg-gray-200 hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C10E]"
+                className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-gray-500 transition hover:bg-gray-200 hover:text-[#303A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E]"
               >
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
@@ -225,7 +228,7 @@ export function Login() {
               <button
                 type="button"
                 className="text-xs font-semibold"
-                style={{ color: '#0F172A' }}
+                style={{ color: '#303A43' }}
                 onClick={async () => {
                   if (!email.trim()) {
                     toast.error('Enter your email first');
@@ -247,15 +250,28 @@ export function Login() {
             </div>
           )}
 
+          {isSignup && (
+            <div className="space-y-3 rounded-xl border border-[#F5D62E]/60 bg-[#FFFBE5] p-4 text-sm text-[#303A43]">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input type="checkbox" checked={privacyAccepted} onChange={event => setPrivacyAccepted(event.target.checked)} required className="mt-0.5 h-4 w-4 accent-[#303A43]" />
+                <span>I have read and accept the <Link to="/privacy" target="_blank" rel="noreferrer" className="font-bold underline underline-offset-4">Privacy Policy</Link>.</span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} required className="mt-0.5 h-4 w-4 accent-[#303A43]" />
+                <span>I agree to the <Link to="/terms" target="_blank" rel="noreferrer" className="font-bold underline underline-offset-4">Terms of Service</Link> and confirm I can bind the business.</span>
+              </label>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || (isSignup && (!privacyAccepted || !termsAccepted))}
             className="w-full h-12 rounded-xl text-sm font-black tracking-wide transition-all active:scale-[0.98] disabled:opacity-60"
-            style={{ background: '#0F172A', color: '#F5C10E' }}
+            style={{ background: '#303A43', color: '#F5D62E' }}
           >
             {isLoading ? (isSignup ? 'Creating account…' : 'Signing in…') : (isSignup ? 'Create Account' : 'Sign In')}
           </button>
-          {!isSignup && !isNativeApp && <button type="button" onClick={() => setIsSignup(true)} className="mt-3 h-12 w-full rounded-xl border-2 border-[#0F172A] bg-white text-sm font-black text-[#0F172A] transition active:scale-[0.98]">Create your ZestIQ account</button>}
+          {!isSignup && <button type="button" onClick={() => setIsSignup(true)} className="mt-3 h-12 w-full rounded-xl border-2 border-[#303A43] bg-white text-sm font-black text-[#303A43] transition active:scale-[0.98]">Create your ZestIQ account</button>}
         </form>
 
         <div className="relative my-6">
@@ -272,7 +288,7 @@ export function Login() {
           onClick={handleDemoLogin}
           disabled={isLoading}
           className="w-full h-12 rounded-xl text-sm font-bold border-2 transition-all active:scale-[0.98] disabled:opacity-60"
-          style={{ borderColor: '#F5C10E', color: '#0F172A', background: 'transparent' }}
+          style={{ borderColor: '#F5D62E', color: '#303A43', background: 'transparent' }}
         >
           Try Demo Account
         </button>
@@ -283,16 +299,17 @@ export function Login() {
             type="button"
             onClick={() => isSignup ? setIsSignup(false) : window.location.assign('mailto:demo@zestiq.ca?subject=ZestIQ%20sign-in%20help')}
             className="font-bold"
-            style={{ color: '#0F172A' }}
+            style={{ color: '#303A43' }}
           >
             {isSignup ? 'Sign In' : 'Contact support'}
           </button>
         </p>
-        <div className="mt-5 flex items-center justify-center gap-4 text-[11px] font-semibold text-gray-400">
-          <button type="button" onClick={() => navigate('/privacy')} className="hover:text-[#0F172A]">Privacy</button>
-          <button type="button" onClick={() => navigate('/terms')} className="hover:text-[#0F172A]">Terms</button>
-          <a href="mailto:support@zestiq.ca" className="hover:text-[#0F172A]">Support</a>
-        </div>
+
+        <nav aria-label="Login support links" className="mt-7 flex items-center justify-center gap-6 border-t border-slate-200 pt-5 text-sm font-semibold text-slate-400">
+          <Link to="/privacy" className="transition hover:text-[#303A43]">Privacy</Link>
+          <Link to="/terms" className="transition hover:text-[#303A43]">Terms</Link>
+          <a href="mailto:demo@zestiq.ca?subject=ZestIQ%20support" className="transition hover:text-[#303A43]">Support</a>
+        </nav>
       </div>
 
     </div>

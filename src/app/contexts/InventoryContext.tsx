@@ -361,6 +361,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
     nextInventoryCounts: InventoryCount[] = inventoryCounts,
+    options: { allowEmptyInventoryCounts?: boolean } = {},
   ) => {
     if (!accountId || !activeLocationId) return;
     const currentLocalInventory = readScopedJson<InventoryItem[]>(localKey('inventory'), []);
@@ -393,7 +394,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const effectivePreppedRecipes = nextPreppedRecipes.length === 0 && currentLocalPreppedRecipes.length > 0
       ? currentLocalPreppedRecipes
       : nextPreppedRecipes;
-    const effectiveInventoryCounts = nextInventoryCounts.length === 0 && currentLocalInventoryCounts.length > 0
+    const effectiveInventoryCounts = !options.allowEmptyInventoryCounts && nextInventoryCounts.length === 0 && currentLocalInventoryCounts.length > 0
       ? currentLocalInventoryCounts
       : nextInventoryCounts;
 
@@ -1477,7 +1478,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const deleteInventoryCount = (countId: string) => {
     const nextCounts = inventoryCounts.filter(item => item.id !== countId);
     setInventoryCounts(nextCounts);
-    saveLocationData(inventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, nextCounts);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, nextCounts, { allowEmptyInventoryCounts: true });
   };
 
   const finalizeInventoryCount = (count: InventoryCount) => {

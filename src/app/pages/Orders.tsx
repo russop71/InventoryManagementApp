@@ -16,13 +16,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils';
-import { buildSupplierEmailDrafts } from '../utils/supplierEmailDraft.js';
+import { buildSupplierEmailDrafts, parseEmailList } from '../utils/supplierEmailDraft.js';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
-import { buildApiUrl } from '../utils/api';
+import { apiRequest } from '../utils/api';
 import { OrderBufferControl } from '../components/OrderBufferControl';
 
-const Y = '#F5C10E';
-const D = '#0F172A';
+const Y = '#F5D62E';
+const D = '#303A43';
 
 type OrderStatus = 'pending' | 'ordered' | 'received' | 'cancelled';
 type OrderSort = 'newest' | 'oldest' | 'total-desc' | 'total-asc' | 'supplier';
@@ -74,21 +74,11 @@ function formatOrderReference(id: string) {
   return `ZIQ-${id.replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase()}`;
 }
 
-function openMailtoDraft(to: string, ccEmails: string[], subject: string, body: string) {
+function openMailtoDraft(to: string, subject: string, body: string, cc: string[] = []) {
   const params = new URLSearchParams({ subject, body });
-  if (ccEmails.length) params.set('cc', ccEmails.join(','));
+  if (cc.length) params.set('cc', cc.join(','));
   const mailtoLink = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
   window.location.href = mailtoLink;
-}
-
-interface SupplierEmailDraft {
-  supplier: string;
-  supplierEmail: string;
-  ccEmails: string[];
-  items: OrderSuggestion[];
-  totalCost: number;
-  emailBody: string;
-  emailSubject: string;
 }
 
 interface OrderSuggestion {
@@ -111,11 +101,20 @@ interface OrderSuggestion {
   bufferQuantity?: number;
 }
 
+interface SupplierEmailDraft {
+  supplier: string;
+  supplierEmail: string;
+  ccText: string;
+  items: OrderSuggestion[];
+  totalCost: number;
+  emailBody: string;
+  emailSubject: string;
+}
+
 export function Orders() {
   const { orders, inventory, forecasts, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
   const { salesData } = useToast();
   const { accountId, accountName, user } = useAuth();
-  const orderingOnly = user?.role === 'Ordering';
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
   // Keep the selected order itself. Some imported/demo orders can be refreshed
@@ -135,6 +134,7 @@ export function Orders() {
   const [manualItemQuery, setManualItemQuery] = useState('');
   const [manualQuantities, setManualQuantities] = useState<Record<string, number>>({});
   const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
+  const [supplierEmailCc, setSupplierEmailCc] = useState<string[]>([]);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderSupplierFilter, setOrderSupplierFilter] = useState('');
   const [orderSort, setOrderSort] = useState<OrderSort>('newest');
@@ -192,7 +192,7 @@ export function Orders() {
       return;
     }
     let cancelled = false;
-    void fetch(buildApiUrl('/api/send-supplier-email'))
+    void fetch('/api/send-supplier-email')
       .then(response => response.json())
       .then(payload => {
         if (cancelled) return;
@@ -207,6 +207,19 @@ export function Orders() {
       cancelled = true;
     };
   }, [user?.email]);
+
+  useEffect(() => {
+    if (!accountId || user?.email?.trim().toLowerCase() === 'demo@zestiq.com') return;
+    let cancelled = false;
+    void apiRequest<{ onboarding?: { clientProfile?: { supplierEmailCc?: string[] } } }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/onboarding`)
+      .then(payload => {
+        if (!cancelled) setSupplierEmailCc(Array.isArray(payload.onboarding?.clientProfile?.supplierEmailCc) ? payload.onboarding.clientProfile.supplierEmailCc : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSupplierEmailCc([]);
+      });
+    return () => { cancelled = true; };
+  }, [accountId, user?.email]);
 
   const orderSuggestions = useMemo(() => {
     const suggestions: OrderSuggestion[] = [];
@@ -424,7 +437,8 @@ export function Orders() {
       restaurantName,
       suggestions: itemsForOrder,
       suppliers,
-    });
+      defaultCc: supplierEmailCc,
+    }).map(draft => ({ ...draft, ccText: draft.ccEmails.join(', ') }));
 
     setDraftEmails(drafts);
     setShowManualOrderDialog(false);
@@ -439,7 +453,7 @@ export function Orders() {
     }
 
     if (emailServiceConfigured === false) {
-      openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
+      openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody, parseEmailList(email.ccText));
       toast.info('Email service is not configured. Opened your mail app with a draft instead.');
       return;
     }
@@ -447,7 +461,7 @@ export function Orders() {
     try {
       await sendSupplierEmail({
         to: email.supplierEmail,
-        cc: email.ccEmails,
+        cc: parseEmailList(email.ccText),
         subject: email.emailSubject,
         text: email.emailBody,
         senderEmail: user?.email,
@@ -456,7 +470,7 @@ export function Orders() {
       toast.success(`Sent supplier email to ${email.supplier}`);
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
-        openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
+        openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody, parseEmailList(email.ccText));
         toast.info('Email service not configured. Opened your mail app with a draft instead.');
         return;
       }
@@ -464,12 +478,7 @@ export function Orders() {
     }
   };
 
-  const updateDraftCcEmails = (supplier: string, value: string) => {
-    const ccEmails = value.split(/[;,\n]/).map(email => email.trim().toLowerCase()).filter(Boolean);
-    setDraftEmails(prev => prev.map(email => email.supplier === supplier ? { ...email, ccEmails } : email));
-  };
-
-  const updateDraftEmailField = (supplier: string, field: 'emailSubject' | 'emailBody', value: string) => {
+  const updateDraftEmailField = (supplier: string, field: 'emailSubject' | 'emailBody' | 'ccText', value: string) => {
     setDraftEmails(prev => prev.map(email => {
       if (email.supplier !== supplier) return email;
       return { ...email, [field]: value };
@@ -526,7 +535,8 @@ export function Orders() {
       supplierMap[suggestion.supplier].push(suggestion);
     });
 
-    const drafts = buildSupplierEmailDrafts({ restaurantName, suggestions: ordersToPlace, suppliers });
+    const drafts = buildSupplierEmailDrafts({ restaurantName, suggestions: ordersToPlace, suppliers, defaultCc: supplierEmailCc })
+      .map(draft => ({ ...draft, ccText: draft.ccEmails.join(', ') }));
 
     Object.entries(supplierMap).forEach(([supplier, suggestions]) => {
       const items = suggestions.map(suggestion => ({
@@ -640,14 +650,14 @@ export function Orders() {
           </div>
           <div className="flex items-center gap-2 mt-1">
             <button
-              onClick={() => navigate(orderingOnly ? '/orders/ai' : '/app/forecasting')}
+              onClick={() => navigate('/app/forecasting')}
               className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"
             >
               <TrendingUp className="w-4 h-4" />
               Forecasting
             </button>
             <button
-              onClick={() => navigate(orderingOnly ? '/orders/ai' : '/app/ai-orders')}
+              onClick={() => navigate('/app/ai-orders')}
               className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"
             >
               <Sparkles className="w-4 h-4" />
@@ -695,7 +705,7 @@ export function Orders() {
               <p className="text-sm font-black text-slate-900">Order workspace</p>
               <p className="text-xs text-slate-500">Find a supplier, product or purchase order in seconds.</p>
             </div>
-            <span className="rounded-full bg-[#F5C10E] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[#0F172A]">Fast order</span>
+            <span className="rounded-full bg-[#F5D62E] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[#303A43]">Fast order</span>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
             <Input
@@ -770,7 +780,7 @@ export function Orders() {
                 <p className="text-xs text-gray-500">Smart recommendations based on inventory risk and recent sales.</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className="bg-[#0F172A] text-white">{wsConnected ? 'Live' : 'Offline'}</Badge>
+                <Badge className="bg-[#303A43] text-white">{wsConnected ? 'Live' : 'Offline'}</Badge>
                 <Button size="sm" variant="outline" onClick={() => setShowAllSuggestions(!showAllSuggestions)}>
                   {showAllSuggestions ? 'Priority only' : 'Show all'}
                 </Button>
@@ -815,7 +825,7 @@ export function Orders() {
                     <button
                       key={suggestion.itemId}
                       onClick={() => toggleSelection(suggestion.itemId)}
-                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${selectedSuggestions.has(suggestion.itemId) ? 'border-[#0F172A] bg-[#FEFCE8]' : 'border-gray-200 bg-white'}`}
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${selectedSuggestions.has(suggestion.itemId) ? 'border-[#303A43] bg-[#FEFCE8]' : 'border-gray-200 bg-white'}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
@@ -842,7 +852,7 @@ export function Orders() {
 
             {selectedCount > 0 && (
               <div className="mt-3 flex gap-2">
-                <Button className="flex-1 bg-[#0F172A] hover:bg-[#1E293B] text-white" onClick={handleApproveOrders}>
+                <Button className="flex-1 bg-[#303A43] hover:bg-[#1E293B] text-white" onClick={handleApproveOrders}>
                   <Check className="mr-2 h-4 w-4" /> Approve {selectedCount} orders
                 </Button>
               </div>
@@ -1021,7 +1031,7 @@ export function Orders() {
 
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setShowManualOrderDialog(false)}>Cancel</Button>
-                  <Button className="bg-[#0F172A] hover:bg-[#1E293B] text-white" onClick={handleCreateManualOrderFromDialog}>
+                  <Button className="bg-[#303A43] hover:bg-[#1E293B] text-white" onClick={handleCreateManualOrderFromDialog}>
                     Create Order & Generate Email
                   </Button>
                 </div>
@@ -1046,7 +1056,6 @@ export function Orders() {
                   <div>
                     <p className="text-sm font-bold text-gray-900">{email.supplier}</p>
                     <p className="text-xs text-gray-500">{email.supplierEmail}</p>
-                    {email.ccEmails.length > 0 && <p className="mt-1 text-xs text-gray-500">CC: {email.ccEmails.join(', ')}</p>}
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => copyDraftToClipboard(email)}>
@@ -1058,15 +1067,15 @@ export function Orders() {
                   </div>
                 </div>
                 <div className="mt-3 space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">CC team members</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">CC recipients</label>
                   <input
                     type="text"
-                    value={email.ccEmails.join(', ')}
-                    onChange={(event) => updateDraftCcEmails(email.supplier, event.target.value)}
-                    placeholder="souschef@restaurant.com, manager@restaurant.com"
+                    value={email.ccText}
+                    onChange={(event) => updateDraftEmailField(email.supplier, 'ccText', event.target.value)}
+                    placeholder="chef@restaurant.ca, manager@restaurant.ca"
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                   />
-                  <p className="text-xs text-gray-500">Separate multiple addresses with commas.</p>
+                  <p className="text-xs text-gray-500">Supplier defaults are included automatically. Edit this list for this order only.</p>
                 </div>
                 <div className="mt-3 space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Subject</label>

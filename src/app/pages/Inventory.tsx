@@ -24,14 +24,25 @@ import {
 } from 'lucide-react';
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import {
   getLatestDraftInventoryCount,
   isInventoryCountFinalized,
   summarizeInventoryCount,
 } from '../utils/inventoryCountWorkflow.js';
 
-const Y = '#F5C10E';
-const D = '#0F172A';
+const Y = '#F5D62E';
+const D = '#303A43';
 
 type Status = 'in-stock' | 'low-stock' | 'out-of-stock';
 type InventorySort = 'name-asc' | 'name-desc' | 'stock-asc' | 'stock-desc' | 'status' | 'value-desc' | 'value-asc' | 'supplier' | 'updated';
@@ -66,6 +77,18 @@ export function Inventory() {
   const [selectedCountId, setSelectedCountId] = useState('');
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [mergeTargetId, setMergeTargetId] = useState('');
+  const [countPendingDelete, setCountPendingDelete] = useState<InventoryCount | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [supplierFilter, setSupplierFilter] = useState('all');
+  const [storageAreaFilter, setStorageAreaFilter] = useState('all');
+
+  const filterOptions = useMemo(() => ({
+    categories: Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).sort(),
+    suppliers: Array.from(new Set(inventory.map(item => item.supplier).filter(Boolean))).sort(),
+    storageAreas: Array.from(new Set(inventory.map(item => item.storageArea || 'Unassigned'))).sort(),
+  }), [inventory]);
+  const activeFilterCount = [categoryFilter, supplierFilter, storageAreaFilter].filter(value => value !== 'all').length;
 
   const handleAddItem = () => {
     const trimmedName = newItem.name.trim();
@@ -123,7 +146,10 @@ export function Inventory() {
       const matchesQuery = !query || `${item.name} ${item.category} ${item.supplier} ${(item.invoiceAliases || []).join(' ')}`.toLowerCase().includes(query);
       const status = getStatus(item.currentStock, item.parLevel);
       const matchesTab = activeTab === 'all' ? true : activeTab === 'low-stock' ? status === 'low-stock' : status === 'out-of-stock';
-      return matchesQuery && matchesTab;
+      const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+      const matchesSupplier = supplierFilter === 'all' || item.supplier === supplierFilter;
+      const matchesStorageArea = storageAreaFilter === 'all' || (item.storageArea || 'Unassigned') === storageAreaFilter;
+      return matchesQuery && matchesTab && matchesCategory && matchesSupplier && matchesStorageArea;
     });
     const statusRank: Record<Status, number> = { 'out-of-stock': 0, 'low-stock': 1, 'in-stock': 2 };
     return [...matches].sort((left, right) => {
@@ -142,7 +168,7 @@ export function Inventory() {
       if (sortBy === 'updated') result = new Date(right.lastUpdated || 0).getTime() - new Date(left.lastUpdated || 0).getTime();
       return result || left.name.localeCompare(right.name);
     });
-  }, [activeTab, inventory, search, sortBy]);
+  }, [activeTab, categoryFilter, inventory, search, sortBy, storageAreaFilter, supplierFilter]);
   const selectedInventoryItems = inventory.filter(item => selectedItemIds.includes(item.id));
   const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItemIds.includes(item.id));
 
@@ -243,11 +269,19 @@ export function Inventory() {
 
   const handleDeleteCount = (countId: string) => {
     const count = countRows.find(row => row.id === countId);
-    if (!canManageCounts || !window.confirm(`Delete “${count?.description || 'this inventory count'}”? This cannot be recovered.`)) return;
+    if (!canManageCounts || !count || isInventoryCountFinalized(count)) return;
+    setCountPendingDelete(count);
+  };
+
+  const confirmDeleteCount = () => {
+    if (!countPendingDelete) return;
+    const countId = countPendingDelete.id;
     deleteInventoryCount(countId);
     if (selectedCountId === countId) {
       setSelectedCountId('');
     }
+    setCountPendingDelete(null);
+    toast.success('Inventory count deleted');
   };
 
   return (
@@ -261,7 +295,7 @@ export function Inventory() {
             <button
               type="button"
               onClick={handleAddCount}
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-[#0F172A] shadow-sm"
+              className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-[#303A43] shadow-sm"
               style={{ background: Y }}
             >
               {activeDraftCount ? <Clock3 className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
@@ -364,7 +398,7 @@ export function Inventory() {
                         setSelectedCountId(current => (current === row.id ? '' : row.id));
                       }
                     }}
-                    className={`grid w-full gap-3 px-4 py-4 text-left text-sm transition-colors sm:grid-cols-[0.9fr_1.4fr_0.8fr_0.8fr_auto] sm:items-center ${isActive ? 'bg-amber-50/70' : 'hover:bg-gray-50'}`}
+                    className={`grid w-full gap-2 px-3 py-3 text-left text-sm transition-colors sm:grid-cols-[0.9fr_1.4fr_0.8fr_0.8fr_auto] sm:items-center ${isActive ? 'bg-amber-50/70' : 'hover:bg-gray-50'}`}
                   >
                     <div><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${finalized ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>{finalized ? <CheckCircle2 className="h-3 w-3" /> : <Clock3 className="h-3 w-3" />}{finalized ? 'Finalized' : 'Draft'}</span></div>
                     <div className="min-w-0"><p className="break-words font-black text-gray-900">{row.description}</p><p className="mt-1 text-xs text-gray-500">{row.countDate}{finalized && row.finalizedBy ? ` · ${row.finalizedBy}` : ''}</p></div>
@@ -372,7 +406,7 @@ export function Inventory() {
                     <div className="font-semibold text-gray-700 sm:text-right" style={{ fontFamily: 'var(--font-mono)' }}>{fmtVal(rowSummary.countedValue)}</div>
                     <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                       <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedCountId(row.id); navigate(`/app/inventory/counts/${row.id}`); }} className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-700">{finalized ? 'View' : 'Resume'}</button>
-                      {canManageCounts && <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteCount(row.id); }} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700">Delete</button>}
+                      {canManageCounts && !finalized && <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteCount(row.id); }} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700">Delete</button>}
                     </div>
                   </div>
                 );
@@ -463,14 +497,61 @@ export function Inventory() {
               className="h-10 w-full rounded-xl border-0 bg-gray-100 pl-9 pr-4 text-sm text-gray-800 placeholder:text-gray-400 outline-none"
             />
           </div>
-          <button className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white shrink-0" aria-label="Filter">
+          <button
+            type="button"
+            onClick={() => setShowFilters(open => !open)}
+            aria-expanded={showFilters}
+            aria-controls="inventory-filters"
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-white transition ${showFilters || activeFilterCount > 0 ? 'border-[#F5D62E] ring-2 ring-[#F5D62E]/20' : 'border-gray-200 hover:border-gray-300'}`}
+            aria-label="Filter inventory"
+          >
             <Filter className="h-4 w-4 text-gray-600" />
+            {activeFilterCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#303A43] px-1 text-[10px] font-black text-white">{activeFilterCount}</span>}
           </button>
           <button onClick={() => setShowAddDialog(true)} className="flex h-10 items-center gap-1.5 rounded-xl px-4 text-sm font-bold shrink-0" style={{ background: Y, color: D }}>
             <Plus className="h-4 w-4" />
             Add Item
           </button>
         </div>
+
+        {showFilters && (
+          <div id="inventory-filters" className="mt-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-[#303A43]">Filter inventory</p>
+                <p className="text-xs text-gray-500">Narrow the list by category, supplier, or storage area.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setCategoryFilter('all'); setSupplierFilter('all'); setStorageAreaFilter('all'); }}
+                disabled={activeFilterCount === 0}
+                className="text-xs font-bold text-[#303A43] underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                Clear filters
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="text-xs font-bold text-gray-600">Category
+                <select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F5D62E]">
+                  <option value="all">All categories</option>
+                  {filterOptions.categories.map(category => <option key={category} value={category}>{category}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-bold text-gray-600">Supplier
+                <select value={supplierFilter} onChange={event => setSupplierFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F5D62E]">
+                  <option value="all">All suppliers</option>
+                  {filterOptions.suppliers.map(supplier => <option key={supplier} value={supplier}>{supplier}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-bold text-gray-600">Storage area
+                <select value={storageAreaFilter} onChange={event => setStorageAreaFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F5D62E]">
+                  <option value="all">All storage areas</option>
+                  {filterOptions.storageAreas.map(area => <option key={area} value={area}>{area}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+        )}
 
       </div>
 
@@ -532,15 +613,7 @@ export function Inventory() {
               </label>
             </>
           )}
-          <button
-            type="button"
-            onClick={handleMergeSelected}
-            disabled={selectedItemIds.length < 2}
-            title={selectedItemIds.length < 2 ? 'Select at least two inventory items to merge' : 'Merge selected inventory items'}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <GitMerge className="h-3.5 w-3.5" />Merge items
-          </button>
+          <button type="button" onClick={handleMergeSelected} disabled={selectedItemIds.length < 2} title={selectedItemIds.length < 2 ? 'Select at least two items to merge' : 'Merge selected items'} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"><GitMerge className="h-3.5 w-3.5" />Merge items</button>
           <button type="button" onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white"><Trash2 className="h-3.5 w-3.5" />Delete selected</button>
           <button type="button" onClick={() => { setSelectedItemIds([]); setMergeTargetId(''); }} className="px-2 py-2 text-xs font-bold text-slate-600 underline">Clear</button>
         </div>
@@ -631,14 +704,27 @@ export function Inventory() {
           </div>
           {importError && <p className="mt-2 text-sm text-red-600">{importError}</p>}
           <div className="mt-3 flex gap-2">
-            <button onClick={handleAddItem} className="rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-semibold text-white">Save item</button>
+            <button onClick={handleAddItem} className="rounded-xl bg-[#303A43] px-4 py-2 text-sm font-semibold text-white">Save item</button>
             <button onClick={() => setShowAddDialog(false)} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button>
           </div>
         </div>
       )}
 
+      <AlertDialog open={Boolean(countPendingDelete)} onOpenChange={open => { if (!open) setCountPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this inventory count?</AlertDialogTitle>
+            <AlertDialogDescription>“{countPendingDelete?.description || 'This inventory count'}” will be permanently removed. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep count</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteCount} className="bg-rose-700 text-white hover:bg-rose-800">Delete count</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="mt-2 border-t border-gray-100 px-4 py-4">
-        <div className="flex items-center justify-center rounded-2xl bg-[#0F172A] px-4 py-3 text-[12px] font-bold text-white shadow-sm">
+        <div className="flex items-center justify-center rounded-2xl bg-[#303A43] px-4 py-3 text-[12px] font-bold text-white shadow-sm">
           <ClipboardList className="mr-2 h-4 w-4" />
           Inventory
         </div>

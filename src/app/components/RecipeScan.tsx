@@ -202,7 +202,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
         <div className="space-y-4">
           {!image && !isCameraActive && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <Button type="button" className="bg-[#0F172A] text-white hover:bg-[#1E293B]" onClick={startCamera} disabled={inventory.length === 0}>
+              <Button type="button" className="bg-[#303A43] text-white hover:bg-[#1E293B]" onClick={startCamera} disabled={inventory.length === 0}>
                 <Camera className="mr-2 h-4 w-4" /> Take Photo
               </Button>
               <input
@@ -228,7 +228,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
                 <video ref={videoRef} autoPlay playsInline className="w-full" />
               </div>
               <div className="flex gap-2">
-                <Button type="button" className="flex-1 bg-[#0F172A] text-white" onClick={capturePhoto}>
+                <Button type="button" className="flex-1 bg-[#303A43] text-white" onClick={capturePhoto}>
                   <Camera className="mr-2 h-4 w-4" /> Capture Recipe
                 </Button>
                 <Button type="button" variant="outline" onClick={stopCamera}><X className="h-4 w-4" /></Button>
@@ -353,7 +353,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
 
               <div className="flex gap-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={close}>Cancel</Button>
-                <Button type="submit" className="flex-1 bg-[#0F172A] text-white hover:bg-[#1E293B]">Review Recipe</Button>
+                <Button type="submit" className="flex-1 bg-[#303A43] text-white hover:bg-[#1E293B]">Review Recipe</Button>
               </div>
             </form>
           )}

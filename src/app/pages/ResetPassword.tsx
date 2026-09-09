@@ -6,7 +6,6 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { buildApiUrl } from '../utils/api';
 
 export function ResetPassword() {
   const navigate = useNavigate();
@@ -35,7 +34,7 @@ export function ResetPassword() {
 
     setIsSaving(true);
     try {
-      const response = await fetch(buildApiUrl('/api/v1/auth/password'), {
+      const response = await fetch('/api/v1/auth/password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,10 +55,10 @@ export function ResetPassword() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F5C10E] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#F5D62E] p-4">
       <Card className="w-full max-w-md border-0 shadow-2xl">
         <CardHeader>
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0F172A] text-[#F5C10E]">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#303A43] text-[#F5D62E]">
             <KeyRound className="h-6 w-6" />
           </div>
           <CardTitle>Choose a new password</CardTitle>
@@ -92,7 +91,7 @@ export function ResetPassword() {
                   required
                 />
               </div>
-              <Button type="submit" disabled={isSaving} className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]">
+              <Button type="submit" disabled={isSaving} className="w-full bg-[#303A43] text-white hover:bg-[#1E293B]">
                 {isSaving ? 'Saving…' : 'Save password'}
               </Button>
             </form>

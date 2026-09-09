@@ -68,14 +68,16 @@ export function InventoryDetail() {
   const [quickParLevel, setQuickParLevel] = useState(0);
   const [purchaseOptions, setPurchaseOptions] = useState<PurchaseOptionDraft[]>([]);
   const [isPurchaseOptionsExpanded, setIsPurchaseOptionsExpanded] = useState(true);
+  const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState('');
+  const [showPurchaseOptionSettings, setShowPurchaseOptionSettings] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    invoiceAliases: '',
     category: '',
     storageArea: '',
     supplier: '',
     sku: '',
     vendorItemCode: '',
+    invoiceAliases: '',
     unit: '',
     currentStock: 0,
     unitCost: 0,
@@ -135,7 +137,7 @@ export function InventoryDetail() {
     ? createFallbackPurchaseOption(item.name, item.supplier, marketmanSku, item.unit, item.packUnit || item.unit, item.packSize ?? 1, item.unitCost, item.parLevel, item.currentStock)
     : null;
   const renderedPurchaseOptions = purchaseOptions.length > 0 ? purchaseOptions : (fallbackPurchaseOption ? [fallbackPurchaseOption] : []);
-  const activePurchaseOption = renderedPurchaseOptions[0] || null;
+  const activePurchaseOption = renderedPurchaseOptions.find(option => option.id === selectedPurchaseOptionId) || renderedPurchaseOptions[0] || null;
 
   useEffect(() => {
     if (!item) return;
@@ -150,8 +152,7 @@ export function InventoryDetail() {
       ? item.purchaseOptions
       : [fallbackPurchaseOption ?? createFallbackPurchaseOption(item.name, item.supplier, marketmanSku, item.unit, item.packUnit || item.unit, item.packSize ?? 1, item.unitCost, item.parLevel, item.currentStock)];
 
-    setPurchaseOptions(
-      existingOptions.map((option, index) => ({
+    const normalizedOptions = existingOptions.map((option, index) => ({
         id: option.id || `po-${index + 1}`,
         productName: option.productName || item.name,
         supplier: option.supplier || item.supplier || 'Unknown',
@@ -164,17 +165,19 @@ export function InventoryDetail() {
         orderingStatus: option.orderingStatus === 'Ready' ? 'Ready' : 'OK',
         isMain: index === 0 ? true : Boolean(option.isMain),
         isLocal: Boolean(option.isLocal),
-      })),
-    );
+      }));
+    setPurchaseOptions(normalizedOptions);
+    setSelectedPurchaseOptionId(current => normalizedOptions.some(option => option.id === current) ? current : normalizedOptions[0]?.id || '');
+    setShowPurchaseOptionSettings(false);
 
     setEditForm({
       name: item.name,
-      invoiceAliases: (item.invoiceAliases || []).join(', '),
       category: item.category,
       storageArea: item.storageArea || '',
       supplier: item.supplier,
       sku: item.sku || '',
       vendorItemCode: item.vendorItemCode || '',
+      invoiceAliases: (item.invoiceAliases || []).join(', '),
       unit: item.unit,
       currentStock: item.currentStock,
       unitCost: item.unitCost,
@@ -194,7 +197,10 @@ export function InventoryDetail() {
     });
     setSupplierSelection(item.supplier || '');
     setNewSupplierName('');
-  }, [item]);
+  // Initialize drafts when navigating to a different item. Inventory context
+  // refreshes can replace the item object while the user is typing; depending
+  // on the full object would overwrite those unsaved edits.
+  }, [item?.id]);
 
   if (!isLocationLoaded) {
     return (
@@ -306,22 +312,16 @@ export function InventoryDetail() {
     const nextLocations = existingLocations.length === 1
       ? [{ storageArea: editForm.storageArea.trim() || 'Unassigned', currentStock: Number(editForm.currentStock), parLevel: Number(editForm.parLevel) }]
       : existingLocations;
-    const invoiceAliases = Array.from(new Set(
-      editForm.invoiceAliases
-        .split(/[,;\n]/)
-        .map(alias => alias.trim())
-        .filter(alias => alias && alias.toLowerCase() !== editForm.name.trim().toLowerCase()),
-    ));
 
     updateInventoryItem(item.id, {
       name: editForm.name.trim(),
-      invoiceAliases,
       category: editForm.category.trim(),
       storageArea: nextLocations[0]?.storageArea || 'Unassigned',
       storageLocations: nextLocations,
       supplier: nextSupplier,
       sku: editForm.sku.trim(),
       vendorItemCode: editForm.vendorItemCode.trim(),
+      invoiceAliases: Array.from(new Set(editForm.invoiceAliases.split(/[\n,;]/).map(alias => alias.trim()).filter(Boolean))),
       unit: editForm.unit.trim(),
       currentStock: nextLocations.reduce((sum, location) => sum + location.currentStock, 0),
       unitCost: Number(editForm.unitCost),
@@ -415,38 +415,38 @@ export function InventoryDetail() {
   };
 
   const addPurchaseOption = () => {
-    setPurchaseOptions(prev => {
-      const next: PurchaseOptionDraft = {
-        id: `po-${Date.now()}`,
-        productName: item.name,
-        supplier: item.supplier || '',
-        productCode: '',
-        packSize: 1,
-        packUnit: item.packUnit || item.unit || 'UNIT',
-        packNickname: 'case',
-        packsPerCase: 1,
-        unitPrice: item.unitCost || 0,
-        orderingStatus: 'OK',
-        isMain: prev.length === 0,
-        isLocal: true,
-      };
-      return [...prev, next];
-    });
+    const next: PurchaseOptionDraft = {
+      id: `po-${Date.now()}`,
+      productName: item.name,
+      supplier: item.supplier || '',
+      productCode: '',
+      packSize: 1,
+      packUnit: item.packUnit || item.unit || 'UNIT',
+      packNickname: 'case',
+      packsPerCase: 1,
+      unitPrice: item.unitCost || 0,
+      orderingStatus: 'OK',
+      isMain: purchaseOptions.length === 0,
+      isLocal: true,
+    };
+    setPurchaseOptions(prev => [...prev, next]);
+    setSelectedPurchaseOptionId(next.id);
+    setShowPurchaseOptionSettings(false);
+    showToast.success('New purchase option ready to edit');
   };
 
   const removePurchaseOption = (optionId: string) => {
-    setPurchaseOptions(prev => {
-      if (prev.length <= 1) {
-        showToast.error('At least one purchase option is required');
-        return prev;
-      }
+    if (purchaseOptions.length <= 1) {
+      showToast.error('At least one purchase option is required');
+      return;
+    }
 
-      const filtered = prev.filter(option => option.id !== optionId);
-      if (!filtered.some(option => option.isMain)) {
-        filtered[0] = { ...filtered[0], isMain: true };
-      }
-      return filtered;
-    });
+    const filtered = purchaseOptions.filter(option => option.id !== optionId);
+    if (!filtered.some(option => option.isMain)) filtered[0] = { ...filtered[0], isMain: true };
+    setPurchaseOptions(filtered);
+    if (selectedPurchaseOptionId === optionId) setSelectedPurchaseOptionId(filtered[0]?.id || '');
+    setShowPurchaseOptionSettings(false);
+    showToast.success('Purchase option removed');
   };
 
   const savePurchaseOptions = () => {
@@ -546,72 +546,45 @@ export function InventoryDetail() {
   return (
     <div className="-mx-4 min-h-screen bg-[#F7F8FA] px-3 py-3 pb-24 sm:px-5 sm:py-5">
       <div className="mx-auto max-w-6xl space-y-3">
-      {/* Header */}
       <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate('/app/inventory')}
-          className="mb-2 h-9 rounded-xl"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
-        </Button>
-        {item && item.deletable !== false && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => navigate('/app/inventory')} className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-700">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+          <div className="min-w-[180px] flex-1 px-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{item.name}</h1>
+              <Badge className={item.inactive ? 'bg-gray-200 text-gray-700' : isLowStock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
+                {item.inactive ? 'Inactive' : isLowStock ? 'Low stock' : 'In stock'}
+              </Badge>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">{item.category} · {item.supplier}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="h-9 rounded-xl" onClick={() => setIsEditing(current => !current)}>{isEditing ? 'Close editor' : 'Edit'}</Button>
+            <Button variant="outline" size="sm" className={`h-9 rounded-xl ${item.inactive ? 'border-green-200 text-green-700' : 'border-slate-200 text-slate-700'}`} onClick={toggleInactive}>
+              {item.inactive ? <Undo2 className="mr-1 h-4 w-4" /> : <Archive className="mr-1 h-4 w-4" />}{item.inactive ? 'Reactivate' : 'Deactivate'}
+            </Button>
+            {item.deletable !== false && <Button variant="outline" size="sm" className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => {
               if (confirm(`Delete "${item.name}" from inventory? This cannot be undone.`)) {
                 deleteInventoryItem(item.id);
                 showToast.success('Item deleted');
                 navigate('/app/inventory');
               }
-            }}
-            className="mb-2 ml-2 h-9 rounded-xl text-red-600 border-red-200 hover:bg-red-50"
-          >
-            Delete
-          </Button>
-        )}
-
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight sm:text-2xl">{item.name}</h2>
-            <p className="mt-0.5 text-xs text-gray-600">{item.category} • {item.supplier}</p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Badge className={item.inactive ? 'bg-gray-200 text-gray-700' : isLowStock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
-              {item.inactive ? 'Inactive' : isLowStock ? '🟡 Low' : '🟢 OK'}
-            </Badge>
-            <Button variant="outline" size="sm" onClick={() => setIsEditing(current => !current)}>
-              {isEditing ? 'Hide Editor' : 'Edit Item'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={toggleInactive} className={item.inactive ? 'border-green-200 text-green-700 hover:bg-green-50' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}>
-              {item.inactive ? <Undo2 className="w-4 h-4 mr-1" /> : <Archive className="w-4 h-4 mr-1" />}
-              {item.inactive ? 'Reactivate' : 'Deactivate'}
-            </Button>
+            }}>Delete</Button>}
           </div>
         </div>
       </section>
 
-      {/* Current Stock Card */}
       <Card className="border-slate-200 shadow-sm">
-        <CardHeader className="px-4 py-3">
-          <CardTitle className="text-base">Current Stock</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 px-4 pb-4">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-3xl font-bold text-gray-900">{item.currentStock}</p>
-              <p className="text-sm text-gray-500 mt-1">{item.unit}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Par Level</p>
-              <p className="text-2xl font-semibold text-gray-700">{item.parLevel}</p>
-            </div>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">On hand</p><p className="mt-1 text-2xl font-black text-slate-950">{item.currentStock} <span className="text-sm text-slate-500">{item.unit}</span></p></div>
+            <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Par level</p><p className="mt-1 text-2xl font-black text-slate-950">{item.parLevel}</p></div>
+            <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Inventory value</p><p className="mt-1 text-xl font-black text-slate-950">${(item.currentStock * item.unitCost).toFixed(2)}</p></div>
+            <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Unit cost</p><p className="mt-1 text-xl font-black text-slate-950">${item.unitCost.toFixed(2)}</p>{priceChange !== 0 && <p className={`text-[10px] font-bold ${priceChange > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{priceChange > 0 ? '+' : ''}{priceChange.toFixed(1)}%</p>}</div>
           </div>
-
-          <div className="h-2 w-full rounded-full bg-gray-200">
+          <div className="mt-3 h-2 w-full rounded-full bg-slate-200">
             <div
               className={`h-2 rounded-full transition-all ${
                 isLowStock ? 'bg-yellow-500' : 'bg-green-500'
@@ -619,52 +592,20 @@ export function InventoryDetail() {
               style={{ width: `${Math.min(stockPercentage, 100)}%` }}
             />
           </div>
-
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <div className="bg-gray-50 rounded p-2">
-              <p className="text-xs text-gray-500">Value</p>
-              <p className="text-lg font-semibold text-gray-900">
-                ${(item.currentStock * item.unitCost).toFixed(2)}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded p-2">
-              <p className="text-xs text-gray-500">Unit Cost</p>
-              <div className="flex items-center space-x-1">
-                <p className="text-lg font-semibold text-gray-900">
-                  ${item.unitCost.toFixed(2)}
-                </p>
-                {priceChange !== 0 && (
-                  <span className={`text-xs ${priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    ({priceChange > 0 ? '+' : ''}{priceChange.toFixed(1)}%)
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
       {isEditing && (
-        <Card>
-          <CardHeader>
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="px-4 py-3">
             <CardTitle className="text-base">Edit Item</CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSaveItem} className="space-y-4">
+          <CardContent className="px-4 pb-4">
+            <form onSubmit={handleSaveItem} className="space-y-3">
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <Label htmlFor="name">Name</Label>
                   <Input id="name" value={editForm.name} onChange={event => setEditForm(prev => ({ ...prev, name: event.target.value }))} />
-                </div>
-                <div>
-                  <Label htmlFor="invoiceAliases">Invoice aliases</Label>
-                  <Input
-                    id="invoiceAliases"
-                    value={editForm.invoiceAliases}
-                    onChange={event => setEditForm(prev => ({ ...prev, invoiceAliases: event.target.value }))}
-                    placeholder="Bella Casara Mozzarella, BC Mozz 2.2 kg"
-                  />
-                  <p className="mt-1 text-xs text-slate-500">Supplier descriptions ZestIQ should recognize as this inventory item. Separate multiple names with commas.</p>
                 </div>
                 <div>
                   <Label htmlFor="supplier">Supplier</Label>
@@ -705,6 +646,11 @@ export function InventoryDetail() {
                 <div>
                   <Label htmlFor="vendorItemCode">Vendor Item Code</Label>
                   <Input id="vendorItemCode" value={editForm.vendorItemCode} onChange={event => setEditForm(prev => ({ ...prev, vendorItemCode: event.target.value }))} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="invoiceAliases">Invoice aliases</Label>
+                  <Input id="invoiceAliases" value={editForm.invoiceAliases} onChange={event => setEditForm(prev => ({ ...prev, invoiceAliases: event.target.value }))} placeholder="e.g. Bella Casara Mozzarella, BC Mozz 2.2 kg" />
+                  <p className="mt-1 text-xs text-slate-500">Supplier descriptions that should match this inventory item. Separate aliases with commas.</p>
                 </div>
                 <div>
                   <Label htmlFor="category">Category</Label>
@@ -807,7 +753,7 @@ export function InventoryDetail() {
                 <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+                <Button type="submit" className="bg-[#303A43] hover:bg-[#1E293B] text-white">
                   Save Changes
                 </Button>
               </div>
@@ -816,11 +762,11 @@ export function InventoryDetail() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base">Item Profile</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <div className="min-w-[860px] rounded-xl border border-gray-200 bg-white shadow-sm">
               <div
@@ -873,36 +819,51 @@ export function InventoryDetail() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base">Purchasing & Inventory</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
+        <CardContent className="space-y-3 px-3 pb-3 sm:px-4 sm:pb-4">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-600">Purchase options</p>
               <Button type="button" variant="outline" size="sm" onClick={() => setIsPurchaseOptionsExpanded(prev => !prev)} className="h-8 px-3 text-xs rounded-full border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
                 {isPurchaseOptionsExpanded ? 'Close' : 'Open'}
               </Button>
             </div>
             {isPurchaseOptionsExpanded && activePurchaseOption && (
-              <div className="space-y-4 p-4 sm:p-5">
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-[#FEFCE8] px-4 py-3 shadow-sm">
-                  <button type="button" className="min-w-0 flex-1 text-left text-sm font-bold text-gray-900 truncate" onClick={() => setIsEditing(prev => !prev)}>
+              <div className="space-y-3 p-3">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-[#FEFCE8] px-3 py-2">
+                  <p className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
                     {activePurchaseOption.productName}
-                  </button>
-                  <Button type="button" size="sm" onClick={saveActivePurchaseOption} className="h-8 rounded-full bg-[#0F172A] px-4 text-white hover:bg-[#1E293B]">
+                  </p>
+                  <Button type="button" size="sm" onClick={saveActivePurchaseOption} className="h-8 rounded-full bg-[#303A43] px-4 text-white hover:bg-[#1E293B]">
                     Save
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm space-y-3">
+                {renderedPurchaseOptions.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Purchase options">
+                    {renderedPurchaseOptions.map((option, index) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => { setSelectedPurchaseOptionId(option.id); setShowPurchaseOptionSettings(false); }}
+                        className={`shrink-0 rounded-lg border px-3 py-1.5 text-left text-xs transition ${activePurchaseOption.id === option.id ? 'border-[#F5D62E] bg-amber-50 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                      >
+                        <span className="block font-black">Option {index + 1}{option.isMain ? ' · Main' : ''}</span>
+                        <span className="block max-w-40 truncate text-[10px]">{option.supplier || 'Choose supplier'}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-3 rounded-xl border border-gray-100 bg-white p-3">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-500">Product description</p>
-                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-400"></Button>
                   </div>
 
-                  <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 space-y-4">
+                  <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-3">
                     <div className="grid gap-3 md:grid-cols-[1.3fr_1.3fr_1fr]">
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Select Supplier *</Label>
@@ -931,7 +892,7 @@ export function InventoryDetail() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 space-y-3">
+                  <div className="space-y-2 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-500">Purchasing case</p>
                     <p className="text-xs text-gray-500">Ordering unit description: {activePurchaseOption.packsPerCase} {activePurchaseOption.packNickname} · {activePurchaseOption.packSize} {activePurchaseOption.packUnit} each</p>
                     <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr]">
@@ -955,9 +916,9 @@ export function InventoryDetail() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 space-y-3">
+                  <div className="space-y-2 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-500">Pricing</p>
-                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                    <div className="grid gap-3 md:grid-cols-2 md:items-end">
                       <div>
                         <Label className="text-xs font-semibold text-gray-700">Price</Label>
                         <div className="mt-1 flex items-center gap-2">
@@ -978,18 +939,39 @@ export function InventoryDetail() {
                           <option>0% tax</option>
                         </select>
                       </div>
-                      <Button type="button" variant="outline" size="sm" className="h-9 rounded-full border-gray-200 bg-white">Add Discount</Button>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" size="sm" className="h-8 rounded-full border-gray-200 bg-white px-3 text-gray-700">Additional settings</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setShowPurchaseOptionSettings(prev => !prev)} aria-expanded={showPurchaseOptionSettings} className="h-8 rounded-lg border-gray-200 bg-white px-3 text-gray-700">
+                      {showPurchaseOptionSettings ? 'Hide additional settings' : 'Additional settings'}
+                    </Button>
                   </div>
+
+                  {showPurchaseOptionSettings && (
+                    <div className="grid gap-2 rounded-xl border border-amber-100 bg-amber-50/60 p-3 sm:grid-cols-3">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                        <input type="radio" name="main-purchase-option" checked={activePurchaseOption.isMain} onChange={() => setMainPurchaseOption(activePurchaseOption.id)} className="accent-[#D6B900]" />
+                        Main purchase option
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                        <input type="checkbox" checked={activePurchaseOption.isLocal} onChange={event => updatePurchaseOption(activePurchaseOption.id, { isLocal: event.target.checked })} className="accent-[#D6B900]" />
+                        Local supplier
+                      </label>
+                      <label className="rounded-lg bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Ordering status
+                        <select value={activePurchaseOption.orderingStatus} onChange={event => updatePurchaseOption(activePurchaseOption.id, { orderingStatus: event.target.value as PurchaseOptionDraft['orderingStatus'] })} className="mt-1 block h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs font-bold normal-case tracking-normal text-slate-800">
+                          <option value="Ready">Ready to order</option>
+                          <option value="OK">Stock OK</option>
+                        </select>
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" className="text-xs rounded-full border-gray-200 bg-white text-gray-700" onClick={addPurchaseOption}>Add new purchase option</Button>
-                  <Button type="button" variant="outline" size="sm" className="text-xs rounded-full border-gray-200 bg-white text-gray-700" onClick={() => removePurchaseOption(activePurchaseOption.id)}>Delete</Button>
+                  <Button type="button" variant="outline" size="sm" className="rounded-lg border-gray-200 bg-white text-xs text-gray-700" onClick={addPurchaseOption}><Plus className="mr-1 h-3.5 w-3.5" />Add purchase option</Button>
+                  <Button type="button" variant="outline" size="sm" className="rounded-lg border-gray-200 bg-white text-xs text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => removePurchaseOption(activePurchaseOption.id)}>Delete option</Button>
                 </div>
               </div>
             )}
@@ -1050,7 +1032,7 @@ export function InventoryDetail() {
                 />
               </div>
               <div className="flex items-end">
-                <Button type="button" onClick={saveQuickInventoryManagement} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+                <Button type="button" onClick={saveQuickInventoryManagement} className="bg-[#303A43] hover:bg-[#1E293B] text-white">
                   Save area
                 </Button>
               </div>
@@ -1111,7 +1093,7 @@ export function InventoryDetail() {
                 </select>
               </div>
               <div className="flex items-end">
-                <Button type="button" onClick={saveQuickUom} className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+                <Button type="button" onClick={saveQuickUom} className="bg-[#303A43] hover:bg-[#1E293B] text-white">
                   Save UOM
                 </Button>
               </div>
@@ -1148,14 +1130,14 @@ export function InventoryDetail() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center">
             <BookOpen className="w-4 h-4 mr-2 text-[#2563EB]" />
             Used In Recipes
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {allRecipeUsage.length === 0 ? (
             <p className="text-sm text-gray-500">This item is not currently linked to any menu or prep recipes.</p>
           ) : (
@@ -1180,14 +1162,14 @@ export function InventoryDetail() {
 
       {/* Usage Breakdown Today */}
       {usageByDish.length > 0 && (
-        <Card>
-          <CardHeader>
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="px-4 py-3">
             <CardTitle className="text-base flex items-center">
               <TrendingDown className="w-4 h-4 mr-2 text-[#2563EB]" />
               Usage Today
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             <div className="space-y-3">
               {usageByDish.map((usage, index) => (
                 <div key={index} className="bg-gray-50 rounded-lg p-3">
@@ -1216,14 +1198,14 @@ export function InventoryDetail() {
       )}
 
       {/* 7-Day Trend */}
-      <Card>
-        <CardHeader>
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center">
             <TrendingUp className="w-4 h-4 mr-2 text-[#2563EB]" />
             Usage Trend (7 Days)
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={last7Days}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -1243,14 +1225,14 @@ export function InventoryDetail() {
       </Card>
 
       {/* Variance Section */}
-      <Card>
-        <CardHeader>
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center">
             <AlertTriangle className="w-4 h-4 mr-2 text-orange-500" />
             Variance Analysis
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-[#FEFCE8] rounded p-2">
@@ -1287,7 +1269,7 @@ export function InventoryDetail() {
       {/* Adjust Inventory Button */}
       <Dialog open={isAdjustDialogOpen} onOpenChange={setIsAdjustDialogOpen}>
         <DialogTrigger asChild>
-          <Button className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white" size="lg">
+          <Button className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white" size="lg">
             🔄 Adjust Inventory
           </Button>
         </DialogTrigger>
@@ -1350,7 +1332,7 @@ export function InventoryDetail() {
               <Button type="button" variant="outline" onClick={() => setIsAdjustDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+              <Button type="submit" className="bg-[#303A43] hover:bg-[#1E293B] text-white">
                 Adjust Inventory
               </Button>
             </div>
@@ -1360,8 +1342,8 @@ export function InventoryDetail() {
 
       {/* History - Combined Stock & Price Changes */}
       {combinedHistory.length > 0 && (
-        <Card>
-          <CardHeader>
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="px-4 py-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center">
                 <Calendar className="w-4 h-4 mr-2 text-[#2563EB]" />
@@ -1374,7 +1356,7 @@ export function InventoryDetail() {
                 onClick={() => setActiveTab('stock')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   activeTab === 'stock'
-                    ? 'bg-[#FEF9C3] text-[#0F172A]'
+                    ? 'bg-[#FEF9C3] text-[#303A43]'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -1392,7 +1374,7 @@ export function InventoryDetail() {
               </button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             <div className="space-y-2">
               {combinedHistory
                 .filter(record => activeTab === 'stock' ? record.type === 'stock' : record.type === 'price')

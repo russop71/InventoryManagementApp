@@ -1,25 +1,16 @@
+import { Suspense } from 'react';
 import { RouterProvider } from 'react-router';
 import { router } from './routes';
-import { InventoryProvider } from './contexts/InventoryContext';
-import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider } from './contexts/AuthContext';
-import { LaborProvider } from './contexts/LaborContext';
-import { WasteProvider } from './contexts/WasteContext';
 import { Toaster } from './components/ui/sonner';
 
 function App() {
   return (
     <AuthProvider>
-      <InventoryProvider>
-        <WasteProvider>
-          <LaborProvider>
-            <ToastProvider>
-              <RouterProvider router={router} />
-              <Toaster />
-            </ToastProvider>
-          </LaborProvider>
-        </WasteProvider>
-      </InventoryProvider>
+      <Suspense fallback={<div className="grid min-h-screen place-items-center bg-[#FBFAF6] font-bold text-[#303A43]">Loading ZestIQ…</div>}>
+        <RouterProvider router={router} />
+      </Suspense>
+      <Toaster />
     </AuthProvider>
   );
 }

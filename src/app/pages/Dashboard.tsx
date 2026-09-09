@@ -22,8 +22,9 @@ import {
 type SalesRangePreset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'last-month' | 'custom';
 
 export function Dashboard() {
+  const systemChartColors = ['#F5D62E', '#303A43', '#D9BC24', '#68747D', '#FFE97A', '#46525B', '#E8C91F', '#8A949B'];
   const navigate = useNavigate();
-  const { user, features } = useAuth();
+  const { user } = useAuth();
   const { inventory, orders, recipes, inventoryCounts } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
   const { employees, targetLaborPercent, laborCostBreakdownForRange } = useLabor();
@@ -36,7 +37,7 @@ export function Dashboard() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
-  const canManageLabor = features.scheduling === true && ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
+  const canManageLabor = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const latestFinalizedInventoryCount = getLatestFinalizedInventoryCount(inventoryCounts);
   const activeInventoryCountDraft = getLatestDraftInventoryCount(inventoryCounts);
   const activeInventoryCountSummary = summarizeInventoryCount(activeInventoryCountDraft);
@@ -201,13 +202,13 @@ export function Dashboard() {
   const handleCategoryClick = (_: any, index: number) => {
     const categoryId = cogsCategoryTotals[index]?.categoryId;
     if (categoryId) {
-      navigate(`/app/cogs?category=${encodeURIComponent(categoryId)}`);
+      navigate(`/app/costs?view=cogs&category=${encodeURIComponent(categoryId)}`);
     }
   };
 
   const handleCategoryCardClick = (categoryId: string) => {
     if (categoryId) {
-      navigate(`/app/cogs?category=${encodeURIComponent(categoryId)}`);
+      navigate(`/app/costs?view=cogs&category=${encodeURIComponent(categoryId)}`);
     }
   };
 
@@ -460,7 +461,7 @@ export function Dashboard() {
       : `${lowStockItems.length || pendingOrdersCount ? `${lowStockItems.length} low-stock item${lowStockItems.length === 1 ? '' : 's'} · ${pendingOrdersCount} order${pendingOrdersCount === 1 ? '' : 's'} pending.` : 'Nothing urgent is waiting right now.'}`;
 
   return (
-    <div className="space-y-4">
+    <div className="zestiq-dashboard space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Dashboard</h2>
@@ -468,10 +469,10 @@ export function Dashboard() {
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white shadow-lg shadow-slate-900/10">
+      <section className="overflow-hidden rounded-3xl bg-[#303A43] p-5 text-white shadow-lg shadow-slate-900/10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F5C10E]">Today at a glance</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F5D62E]">Today at a glance</p>
             <h1 className="mt-2 text-2xl font-black tracking-tight">Good morning, {firstName}.</h1>
             <p className="mt-1 text-sm font-bold text-white">{briefTitle}</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{briefSummary}</p>
@@ -480,19 +481,19 @@ export function Dashboard() {
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {isBohManager ? <>
-            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
-            <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
-            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} waiting to be received</p></Link>
+            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} waiting to be received</p></Link>
           </> : isFohManager ? <>
-            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Sales</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todaysRevenue.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">{todaysCovers} covers · ${todaysAvgCheck.toFixed(0)} average check</p></Link>
-            {canManageLabor ? <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · view schedule</p></Link> : <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? 'Items need attention' : 'No critical items'}</p></Link>}
-            <Link to="/app/beverages" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Bar & beverage</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">${beverageCogs.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">Beverage COGS in the selected period</p></Link>
+            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Sales</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">${todaysRevenue.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">{todaysCovers} covers · ${todaysAvgCheck.toFixed(0)} average check</p></Link>
+            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · view schedule</p></Link>
+            <Link to="/app/beverages" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Bar & beverage</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">${beverageCogs.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">Beverage COGS in the selected period</p></Link>
           </> : <>
-            <Link to="/app/cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">COGS</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
-            {canManageLabor ? <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link> : <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? 'Items need attention' : 'No critical items'}</p></Link>}
-            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5C10E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
+            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">COGS</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link>
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
           </>}
-          <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F5C10E]" /></div><p className="mt-2 text-2xl font-black text-[#F5C10E]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
+          <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F5D62E]" /></div><p className="mt-2 text-2xl font-black text-[#F5D62E]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
         </div>
       </section>
 
@@ -519,7 +520,7 @@ export function Dashboard() {
         {/* Food Cost % */}
         <Card
           className={`border-0 shadow-sm overflow-hidden transition-all duration-200 ${totalRevenue > 0 ? 'cursor-pointer hover:shadow-md' : ''} ${
-            foodCostPercentage > 35 ? 'bg-red-950' : 'bg-[#0F172A]'
+            foodCostPercentage > 35 ? 'bg-red-950' : 'bg-[#303A43]'
           }`}
           onClick={() => totalRevenue > 0 && openBreakdown('cost')}
         >
@@ -562,13 +563,13 @@ export function Dashboard() {
           className={`border-0 shadow-sm overflow-hidden bg-white transition-all duration-200 ${pendingOrdersCount > 0 ? 'cursor-pointer hover:shadow-md' : ''}`}
           onClick={() => pendingOrdersCount > 0 && openBreakdown('orders')}
         >
-          <div className={`h-[3px] ${pendingOrdersCount > 0 ? 'bg-[#F5C10E]' : 'bg-gray-100'}`} />
+          <div className={`h-[3px] ${pendingOrdersCount > 0 ? 'bg-[#F5D62E]' : 'bg-gray-100'}`} />
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Orders</span>
-              <ShoppingCart className={`h-3 w-3 ${pendingOrdersCount > 0 ? 'text-[#F5C10E]' : 'text-gray-200'}`} />
+              <ShoppingCart className={`h-3 w-3 ${pendingOrdersCount > 0 ? 'text-[#F5D62E]' : 'text-gray-200'}`} />
             </div>
-            <div className={`text-2xl font-black tabular-nums leading-none ${pendingOrdersCount > 0 ? 'text-[#0F172A]' : 'text-gray-200'}`} style={{ fontFamily: 'var(--font-mono)' }}>
+            <div className={`text-2xl font-black tabular-nums leading-none ${pendingOrdersCount > 0 ? 'text-[#303A43]' : 'text-gray-200'}`} style={{ fontFamily: 'var(--font-mono)' }}>
               {pendingOrdersCount}
             </div>
             <p className="text-[9px] text-gray-400 mt-1.5 font-semibold leading-tight">
@@ -588,16 +589,16 @@ export function Dashboard() {
       </div>}
 
       <Card className="border-0 shadow-sm overflow-hidden bg-white">
-        <div className="h-[3px] bg-[#F5C10E]" />
+        <div className="h-[3px] bg-[#F5D62E]" />
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 mb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-[#F5C10E]/20 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-lg bg-[#F5D62E]/20 flex items-center justify-center">
                   <DollarSign className="w-4 h-4 text-[#9A7600]" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[#0F172A]">Sales</p>
+                  <p className="text-sm font-bold text-[#303A43]">Sales</p>
                   <p className="text-[10px] text-gray-400 font-medium">Sales window • pick a range to review revenue</p>
                 </div>
               </div>
@@ -634,7 +635,7 @@ export function Dashboard() {
                       setCustomEndDate('');
                     }
                   }}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest transition ${salesRangePreset === value ? 'bg-[#0B1220] text-[#F5C10E]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest transition ${salesRangePreset === value ? 'bg-[#303A43] text-[#F5D62E]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                 >
                   {label}
                 </button>
@@ -678,7 +679,7 @@ export function Dashboard() {
               <div className="grid grid-cols-3 gap-2 mb-4">
                 <div className="rounded-xl border border-gray-100 p-3">
                   <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Revenue</p>
-                  <p className="mt-1 text-lg font-black text-[#0F172A] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <p className="mt-1 text-lg font-black text-[#303A43] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                     ${todaysRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </p>
                   <p className={`text-[10px] mt-1 font-semibold ${revenueDeltaPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -687,14 +688,14 @@ export function Dashboard() {
                 </div>
                 <div className="rounded-xl border border-gray-100 p-3">
                   <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Covers</p>
-                  <p className="mt-1 text-lg font-black text-[#0F172A] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <p className="mt-1 text-lg font-black text-[#303A43] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                     {todaysCovers.toLocaleString('en-US')}
                   </p>
                   <p className="text-[10px] mt-1 text-gray-500 font-semibold">guest count</p>
                 </div>
                 <div className="rounded-xl border border-gray-100 p-3">
                   <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Avg Check</p>
-                  <p className="mt-1 text-lg font-black text-[#0F172A] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <p className="mt-1 text-lg font-black text-[#303A43] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                     ${todaysAvgCheck.toFixed(0)}
                   </p>
                   <p className="text-[10px] mt-1 text-gray-500 font-semibold">per cover</p>
@@ -704,14 +705,14 @@ export function Dashboard() {
               <div className="h-[180px] rounded-xl border border-gray-100 p-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={salesChartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E4DFD2" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={(value) => `$${Math.round(value)}`} tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
                     <Tooltip
                       formatter={(value: number) => [`$${value.toLocaleString('en-US')}`, 'Revenue']}
                       labelFormatter={(label) => `Date: ${label}`}
                     />
-                    <Line type="monotone" dataKey="revenue" stroke="#D9A900" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="revenue" stroke="#F5D62E" strokeWidth={2.5} dot={{ r: 2, fill: '#303A43' }} activeDot={{ r: 4, fill: '#F5D62E', stroke: '#303A43' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -744,15 +745,15 @@ export function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {canManageLabor && <Card className="overflow-hidden border-0 bg-[#0B1220] text-white shadow-sm">
-        <div className="h-[3px] bg-[#F5C10E]" />
+      {canManageLabor && <Card className="overflow-hidden border-0 bg-[#303A43] text-white shadow-sm">
+        <div className="h-[3px] bg-[#F5D62E]" />
         <CardContent className="p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-black">Labour versus sales</p>
               <p className="mt-1 text-xs text-white/45">{salesRangeLabel} · scheduled hourly labour plus prorated active salaries</p>
             </div>
-            <Link to="/app/labor" className="inline-flex w-fit items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#F5C10E]">Open scheduler <ChevronRight className="h-3.5 w-3.5" /></Link>
+            <Link to="/app/labor" className="inline-flex w-fit items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#F5D62E]">Open scheduler <ChevronRight className="h-3.5 w-3.5" /></Link>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
             <LaborSummary label="Sales" value={`$${totalRevenue.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`} detail={`${filteredSalesData.length} day${filteredSalesData.length === 1 ? '' : 's'} in range`} />
@@ -762,7 +763,7 @@ export function Dashboard() {
           </div>
           <div className="mt-4 rounded-2xl bg-white/5 p-3">
             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/40"><span>Labour mix</span><span>{hourlyShare.toFixed(0)}% hourly · {(100 - hourlyShare).toFixed(0)}% salaried</span></div>
-            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#F5C10E]" style={{ width: `${hourlyShare}%` }} /><div className="h-full flex-1 bg-white/35" /></div>
+            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#F5D62E]" style={{ width: `${hourlyShare}%` }} /><div className="h-full flex-1 bg-white/35" /></div>
           </div>
         </CardContent>
       </Card>}
@@ -786,13 +787,13 @@ export function Dashboard() {
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={cogsCategoryTotalsWithPercent} margin={{ top: 10, right: 16, left: -12, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(value) => `$${Math.round(value)}`} tick={{ fontSize: 11, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E4DFD2" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#68747D' }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(value) => `$${Math.round(value)}`} tick={{ fontSize: 11, fill: '#68747D' }} axisLine={false} tickLine={false} />
                 <Tooltip content={renderCogsTooltip} />
                 <Bar dataKey="totalCOGS" radius={[8, 8, 0, 0]} onClick={handleCategoryClick}>
-                  {cogsCategoryTotals.map((entry) => (
-                    <Cell key={`cell-${entry.categoryId}`} fill={entry.color} />
+                  {cogsCategoryTotals.map((entry, index) => (
+                    <Cell key={`cell-${entry.categoryId}`} fill={systemChartColors[index % systemChartColors.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -802,14 +803,14 @@ export function Dashboard() {
 
         <div className="px-4 pb-4">
           <div className="grid grid-cols-2 gap-3 mb-4">
-            {cogsCategoryTotalsWithPercent.map(category => (
+            {cogsCategoryTotalsWithPercent.map((category, index) => (
               <button
                 key={category.categoryId}
                 type="button"
                 onClick={() => handleCategoryCardClick(category.categoryId)}
                 className="rounded-2xl border border-gray-100 p-3 flex items-center gap-3 text-left transition hover:bg-slate-50 cursor-pointer"
               >
-                <span className="w-3 h-3 rounded-full" style={{ background: category.color }} />
+                <span className="w-3 h-3 rounded-full" style={{ background: systemChartColors[index % systemChartColors.length] }} />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate">{category.name}</p>
                   <p className="text-xs text-slate-500">${category.totalCOGS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
@@ -837,15 +838,15 @@ export function Dashboard() {
 
       {/* ── Top Sellers from POS ─────────────────────── */}
       <Card className="border-0 shadow-sm bg-white overflow-hidden">
-        <div className="h-[3px] bg-[#F5C10E]" />
+        <div className="h-[3px] bg-[#F5D62E]" />
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-[#F5C10E]/15 rounded-lg flex items-center justify-center">
-                <Flame className="w-4 h-4 text-[#F5C10E]" />
+              <div className="w-7 h-7 bg-[#F5D62E]/15 rounded-lg flex items-center justify-center">
+                <Flame className="w-4 h-4 text-[#F5D62E]" />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#0F172A]">Top Sellers</p>
+                <p className="text-sm font-bold text-[#303A43]">Top Sellers</p>
                 <p className="text-[10px] text-gray-400 font-medium">Uses the raw item rows from the selected sales window</p>
               </div>
             </div>
@@ -867,7 +868,7 @@ export function Dashboard() {
               {topSellingItems.map((item, idx) => {
                 const maxQty = topSellingItems[0].quantity;
                 const pct = Math.round((item.quantity / maxQty) * 100);
-                const rankColors = ['#F5C10E', '#F5C10E', '#9CA3AF', '#9CA3AF', '#9CA3AF'];
+                const rankColors = ['#F5D62E', '#F5D62E', '#9CA3AF', '#9CA3AF', '#9CA3AF'];
                 return (
                   <button
                     key={item.itemName}
@@ -884,12 +885,12 @@ export function Dashboard() {
                     </span>
                     {/* Name + bar */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold text-[#0F172A] truncate leading-tight">{item.itemName}</p>
+                      <p className="text-[13px] font-bold text-[#303A43] truncate leading-tight">{item.itemName}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all"
-                            style={{ width: `${pct}%`, background: idx < 2 ? '#F5C10E' : '#E5E7EB' }}
+                            style={{ width: `${pct}%`, background: idx < 2 ? '#F5D62E' : '#E5E7EB' }}
                           />
                         </div>
                         <span className="text-[10px] text-gray-400 font-semibold shrink-0 tabular-nums">
@@ -898,7 +899,7 @@ export function Dashboard() {
                       </div>
                     </div>
                     {/* Revenue */}
-                    <span className="text-[12px] font-black text-[#0F172A] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <span className="text-[12px] font-black text-[#303A43] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                       ${item.revenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </span>
                   </button>
@@ -932,14 +933,14 @@ export function Dashboard() {
               <>
                 {itemsByCategory.map(cat => (
                   <div key={cat.category} className="border rounded-lg overflow-hidden">
-                    <div className="bg-[#FEFCE8] border-b border-[#F5C10E]/30 p-3">
+                    <div className="bg-[#FEFCE8] border-b border-[#F5D62E]/30 p-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-semibold text-[#0F172A]">{cat.category}</h3>
+                          <h3 className="font-semibold text-[#303A43]">{cat.category}</h3>
                           <p className="text-xs text-gray-500">{cat.count} items</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-[#0F172A]">
+                          <p className="font-bold text-[#303A43]">
                             ${cat.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                           <p className="text-xs text-gray-500">
@@ -1063,12 +1064,12 @@ export function Dashboard() {
 
             {breakdownType === 'orders' && (
               <>
-                <div className="bg-[#FEFCE8] border border-[#F5C10E]/30 rounded-lg p-3 mb-3">
+                <div className="bg-[#FEFCE8] border border-[#F5D62E]/30 rounded-lg p-3 mb-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-[#0F172A]">
+                    <p className="text-sm font-medium text-[#303A43]">
                       {pendingOrders.length} pending orders
                     </p>
-                    <p className="text-lg font-bold text-[#0F172A]">
+                    <p className="text-lg font-bold text-[#303A43]">
                       ${pendingOrdersValue.toFixed(2)}
                     </p>
                   </div>
@@ -1144,7 +1145,7 @@ export function Dashboard() {
 
       {/* Toast POS Stats */}
       {isConnected && salesData.length > 0 && (
-        <Card className="bg-[#0F172A] border-0 shadow-md">
+        <Card className="bg-[#303A43] border-0 shadow-md">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -1175,7 +1176,7 @@ export function Dashboard() {
 
       {/* Feature shortcuts are available from the main navigation, not repeated on the dashboard. */}
       {false && <><Card className="border-0 shadow-sm overflow-hidden">
-        <div className="h-[3px] bg-[#F5C10E]" />
+        <div className="h-[3px] bg-[#F5D62E]" />
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <div className="bg-[#FEFCE8] rounded-xl p-2.5 shrink-0 mt-0.5">
@@ -1185,7 +1186,7 @@ export function Dashboard() {
               <h3 className="font-bold text-gray-900 text-sm">AI Order Assistant</h3>
               <p className="text-xs text-gray-500 mt-0.5 mb-3">Smart ordering based on sales trends & forecasting</p>
               <Link to="/app/orders">
-                <Button className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white h-9 text-sm">
+                <Button className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white h-9 text-sm">
                   <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                   View AI Suggestions
                 </Button>
@@ -1208,7 +1209,7 @@ export function Dashboard() {
                 {recipes.length} recipes configured • Track ingredient costs
               </p>
               <Link to="/app/recipes">
-                <Button className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white h-9 text-sm">
+                <Button className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white h-9 text-sm">
                   Manage Recipes
                 </Button>
               </Link>
@@ -1228,7 +1229,7 @@ export function Dashboard() {
               <h3 className="font-bold text-gray-900 text-sm">Invoice Scanner</h3>
               <p className="text-xs text-gray-500 mt-0.5 mb-3">Scan invoices with AI • Automatically update inventory</p>
               <Link to="/app/invoice-scanner">
-                <Button className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white h-9 text-sm">
+                <Button className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white h-9 text-sm">
                   <Camera className="w-3.5 h-3.5 mr-1.5" />
                   Scan Invoice
                 </Button>
@@ -1265,7 +1266,7 @@ export function Dashboard() {
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 mb-1">Actual Usage</p>
-                  <p className="text-2xl font-bold text-[#0F172A]">{totalActual.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-[#303A43]">{totalActual.toLocaleString()}</p>
                   <p className="text-xs text-gray-500">units</p>
                 </div>
               </div>
@@ -1407,11 +1408,13 @@ export function Dashboard() {
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={categoryData}>
-                  <CartesianGrid strokeDasharray="3 3" key="grid-bar" />
-                  <XAxis dataKey="category" tick={{ fontSize: 12 }} key="xaxis-bar" />
-                  <YAxis tick={{ fontSize: 12 }} key="yaxis-bar" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E4DFD2" key="grid-bar" />
+                  <XAxis dataKey="category" tick={{ fontSize: 12, fill: '#68747D' }} axisLine={false} tickLine={false} key="xaxis-bar" />
+                  <YAxis tick={{ fontSize: 12, fill: '#68747D' }} axisLine={false} tickLine={false} key="yaxis-bar" />
                   <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} key="tooltip-bar" />
-                  <Bar dataKey="value" fill="#3b82f6" name="Value ($)" key="bar-value" />
+                  <Bar dataKey="value" name="Value ($)" radius={[6, 6, 0, 0]} key="bar-value">
+                    {categoryData.map((entry, index) => <Cell key={`value-${entry.id}`} fill={systemChartColors[index % systemChartColors.length]} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1474,7 +1477,7 @@ export function Dashboard() {
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} key="xaxis-line" />
                   <YAxis tick={{ fontSize: 12 }} key="yaxis-line" />
                   <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} key="tooltip-line" />
-                  <Line dataKey="revenue" fill="#3b82f6" name="Revenue ($)" stroke="#3b82f6" key="line-revenue" />
+                  <Line dataKey="revenue" fill="#F5D62E" name="Revenue ($)" stroke="#F5D62E" strokeWidth={2.5} key="line-revenue" />
                 </LineChart>
               </ResponsiveContainer>
             ) : (

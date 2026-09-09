@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { apiRequest } from '../utils/api';
 import { calculateLaborCostBreakdown } from '../utils/labor.js';
@@ -16,6 +16,9 @@ export interface LaborEmployee {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   clockInNumber?: string;
+  posEmployeeId?: string;
+  posPunchSyncEnabled?: boolean;
+  posMappingVerifiedAt?: string;
   payType: 'hourly' | 'salary';
   hourlyRate: number;
   annualSalary: number;
@@ -70,6 +73,16 @@ export interface LaborOpenShift {
   notes?: string;
 }
 
+export interface EmployeeNotification {
+  id: string;
+  employeeId: string;
+  type: 'schedule-published' | 'general';
+  title: string;
+  message: string;
+  createdAt: string;
+  href?: string;
+}
+
 export interface LaborData {
   employees: LaborEmployee[];
   shifts: LaborShift[];
@@ -80,6 +93,8 @@ export interface LaborData {
   scheduleEvents: LaborScheduleEvent[];
   publishedPositions: string[];
   openShifts: LaborOpenShift[];
+  customPositions: string[];
+  employeeNotifications: EmployeeNotification[];
 }
 
 export interface TimeOffRequest {
@@ -104,8 +119,9 @@ export interface ShiftSwapRequest {
 
 interface LaborContextValue extends LaborData {
   isLaborLoaded: boolean;
+  refreshLabor: () => Promise<void>;
   addEmployee: (employee: Omit<LaborEmployee, 'id'>) => void;
-  inviteEmployee: (employee: Omit<LaborEmployee, 'id' | 'inviteStatus' | 'invitedAt'>) => Promise<LaborEmployee>;
+  inviteEmployee: (employee: Omit<LaborEmployee, 'id' | 'inviteStatus' | 'invitedAt'>) => Promise<{ employee: LaborEmployee; welcomeEmailSent: boolean }>;
   updateMyProfile: (updates: { phone?: string; notificationPreferences?: EmployeeNotificationPreferences }) => Promise<LaborEmployee>;
   updateEmployee: (id: string, updates: Partial<LaborEmployee>) => void;
   removeEmployee: (id: string) => void;
@@ -117,13 +133,13 @@ interface LaborContextValue extends LaborData {
   requestShiftSwap: (request: Omit<ShiftSwapRequest, 'id' | 'status' | 'createdAt'>) => void;
   updateShiftSwapRequest: (id: string, status: ShiftSwapRequest['status']) => void;
   setTargetLaborPercent: (value: number) => void;
-  updateSchedulerSettings: (updates: Partial<Pick<LaborData, 'scheduleTemplates' | 'scheduleEvents' | 'publishedPositions' | 'openShifts'>>) => void;
+  updateSchedulerSettings: (updates: Partial<Pick<LaborData, 'scheduleTemplates' | 'scheduleEvents' | 'publishedPositions' | 'openShifts' | 'customPositions'>>) => void;
   scheduledCostForRange: (startDate: string, endDate: string) => number;
   scheduledHoursForRange: (startDate: string, endDate: string) => number;
   laborCostBreakdownForRange: (startDate: string, endDate: string) => { hourly: number; salaried: number; total: number };
 }
 
-const EMPTY_LABOR: LaborData = { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [], publishedPositions: [], openShifts: [] };
+const EMPTY_LABOR: LaborData = { employees: [], shifts: [], timeOffRequests: [], shiftSwapRequests: [], targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [], publishedPositions: [], openShifts: [], customPositions: [], employeeNotifications: [] };
 const LaborContext = createContext<LaborContextValue | undefined>(undefined);
 
 function shiftHours(shift: LaborShift) {
@@ -150,6 +166,9 @@ function normalizeLaborData(value: Partial<LaborData> | null | undefined): Labor
       annualSalary: Number(employee.annualSalary) || 0,
       inviteStatus: employee.inviteStatus || (employee.email ? 'active' : 'not-invited'),
       clockInNumber: employee.clockInNumber || String(index + 1).padStart(4, '0'),
+      posEmployeeId: employee.posEmployeeId || '',
+      posPunchSyncEnabled: employee.posPunchSyncEnabled === true,
+      posMappingVerifiedAt: employee.posMappingVerifiedAt || undefined,
       notificationPreferences: {
         schedulePublished: employee.notificationPreferences?.schedulePublished !== false,
         scheduleChanged: employee.notificationPreferences?.scheduleChanged !== false,
@@ -165,6 +184,8 @@ function normalizeLaborData(value: Partial<LaborData> | null | undefined): Labor
     scheduleEvents: Array.isArray(value?.scheduleEvents) ? value.scheduleEvents : [],
     publishedPositions: Array.isArray(value?.publishedPositions) ? value.publishedPositions : [],
     openShifts: Array.isArray(value?.openShifts) ? value.openShifts : [],
+    customPositions: Array.isArray(value?.customPositions) ? Array.from(new Set(value.customPositions.map(position => String(position || '').trim()).filter(Boolean))) : [],
+    employeeNotifications: Array.isArray(value?.employeeNotifications) ? value.employeeNotifications : [],
   };
 }
 
@@ -177,11 +198,11 @@ function buildDemoLabor(): LaborData {
     return value.toISOString().slice(0, 10);
   };
   const employees: LaborEmployee[] = [
-    { id: 'demo-labor-maya', name: 'Maya Chen', role: 'Chef de Cuisine', department: 'Back of house', payType: 'salary', hourlyRate: 0, annualSalary: 85000, active: true, email: 'maya@example.test', phone: '416-555-0141', clockInNumber: '1001', inviteStatus: 'active' },
-    { id: 'demo-labor-luca', name: 'Luca Romano', role: 'Line Cook', department: 'Back of house', payType: 'hourly', hourlyRate: 24, annualSalary: 0, active: true, email: 'luca@example.test', phone: '416-555-0142', clockInNumber: '1002', inviteStatus: 'active' },
-    { id: 'demo-labor-priya', name: 'Priya Shah', role: 'Server', department: 'Front of house', payType: 'hourly', hourlyRate: 18.5, annualSalary: 0, active: true, email: 'priya@example.test', phone: '416-555-0143', clockInNumber: '1003', inviteStatus: 'active' },
-    { id: 'demo-labor-noah', name: 'Noah Williams', role: 'Bartender', department: 'Bar', payType: 'hourly', hourlyRate: 21, annualSalary: 0, active: true, email: 'noah@example.test', phone: '416-555-0144', clockInNumber: '1004', inviteStatus: 'active' },
-    { id: 'demo-labor-sofia', name: 'Sofia Martin', role: 'Host', department: 'Front of house', payType: 'hourly', hourlyRate: 17.5, annualSalary: 0, active: true, email: 'sofia@example.test', phone: '416-555-0145', clockInNumber: '1005', inviteStatus: 'active' },
+    { id: 'demo-labor-maya', name: 'Maya Chen', role: 'Chef de Cuisine', department: 'Back of house', payType: 'salary', hourlyRate: 0, annualSalary: 85000, active: true, email: 'maya@example.test', phone: '416-555-0141', clockInNumber: '1001', posEmployeeId: 'toast-1001', posPunchSyncEnabled: true, posMappingVerifiedAt: new Date().toISOString(), inviteStatus: 'active' },
+    { id: 'demo-labor-luca', name: 'Luca Romano', role: 'Line Cook', department: 'Back of house', payType: 'hourly', hourlyRate: 24, annualSalary: 0, active: true, email: 'luca@example.test', phone: '416-555-0142', clockInNumber: '1002', posEmployeeId: 'toast-1002', posPunchSyncEnabled: true, posMappingVerifiedAt: new Date().toISOString(), inviteStatus: 'active' },
+    { id: 'demo-labor-priya', name: 'Priya Shah', role: 'Server', department: 'Front of house', payType: 'hourly', hourlyRate: 18.5, annualSalary: 0, active: true, email: 'priya@example.test', phone: '416-555-0143', clockInNumber: '1003', posEmployeeId: 'toast-1003', posPunchSyncEnabled: true, posMappingVerifiedAt: new Date().toISOString(), inviteStatus: 'active' },
+    { id: 'demo-labor-noah', name: 'Noah Williams', role: 'Bartender', department: 'Bar', payType: 'hourly', hourlyRate: 21, annualSalary: 0, active: true, email: 'noah@example.test', phone: '416-555-0144', clockInNumber: '1004', posEmployeeId: 'toast-1004', posPunchSyncEnabled: true, posMappingVerifiedAt: new Date().toISOString(), inviteStatus: 'active' },
+    { id: 'demo-labor-sofia', name: 'Sofia Martin', role: 'Host', department: 'Front of house', payType: 'hourly', hourlyRate: 17.5, annualSalary: 0, active: true, email: 'sofia@example.test', phone: '416-555-0145', clockInNumber: '1005', posEmployeeId: 'toast-1005', posPunchSyncEnabled: true, posMappingVerifiedAt: new Date().toISOString(), inviteStatus: 'active' },
   ];
   const templates = [
     ['demo-labor-maya', '09:00', '17:00', 30, 'EXPO'], ['demo-labor-luca', '14:00', '22:30', 30, 'PREP'],
@@ -196,22 +217,20 @@ function buildDemoLabor(): LaborData {
   }))).flat();
   return {
     employees, shifts, targetLaborPercent: 30, scheduleTemplates: [], scheduleEvents: [],
-    publishedPositions: Array.from(new Set(employees.map(employee => `${date(0)}::${employee.role}`))), openShifts: [],
+    publishedPositions: Array.from(new Set(employees.map(employee => `${date(0)}::${employee.role}`))), openShifts: [], customPositions: [], employeeNotifications: [],
     timeOffRequests: [{ id: 'demo-timeoff-1', employeeId: 'demo-labor-priya', startDate: date(10), endDate: date(11), reason: 'Family event', status: 'pending', createdAt: new Date().toISOString() }],
     shiftSwapRequests: [{ id: 'demo-swap-1', shiftId: 'demo-shift-5-3', requesterEmployeeId: 'demo-labor-noah', targetEmployeeId: 'demo-labor-priya', note: 'Can cover your next Friday shift in return.', status: 'pending', createdAt: new Date().toISOString() }],
   };
 }
 
 export function LaborProvider({ children }: { children: ReactNode }) {
-  const { accountId, activeLocationId, token, user, features } = useAuth();
+  const { accountId, activeLocationId, token, user } = useAuth();
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
-  const schedulingAvailable = features.scheduling === true;
   const [data, setData] = useState<LaborData>(EMPTY_LABOR);
   const [isLaborLoaded, setIsLaborLoaded] = useState(false);
   const storageKey = accountId && activeLocationId ? locationScopedStorageKey(accountId, activeLocationId, 'labor-v1') : null;
 
   const persist = (next: LaborData) => {
-    if (!schedulingAvailable) return;
     if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
     if (!token || !accountId || !activeLocationId || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor`, {
@@ -236,7 +255,6 @@ export function LaborProvider({ children }: { children: ReactNode }) {
   };
 
   const postLaborRequest = (payload: Record<string, unknown>) => {
-    if (!schedulingAvailable) return;
     if (!token || !accountId || !activeLocationId || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/requests`, {
       method: 'POST', body: JSON.stringify(payload),
@@ -244,7 +262,6 @@ export function LaborProvider({ children }: { children: ReactNode }) {
   };
 
   const patchLaborRequest = (payload: Record<string, unknown>) => {
-    if (!schedulingAvailable) return;
     if (!token || !accountId || !activeLocationId || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/requests`, {
       method: 'PATCH', body: JSON.stringify(payload),
@@ -253,17 +270,17 @@ export function LaborProvider({ children }: { children: ReactNode }) {
 
   const inviteEmployee = async (employee: Omit<LaborEmployee, 'id' | 'inviteStatus' | 'invitedAt'>) => {
     if (token && accountId && activeLocationId && !isDemoAccount) {
-      const response = await apiRequest<{ labor: LaborData; employee: LaborEmployee }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/invite`, {
+      const response = await apiRequest<{ labor: LaborData; employee: LaborEmployee; welcomeEmailSent?: boolean }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor/invite`, {
         method: 'POST', body: JSON.stringify({ employee }),
       });
       const next = normalizeLaborData(response.labor);
       setData(next);
       if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
-      return response.employee;
+      return { employee: response.employee, welcomeEmailSent: response.welcomeEmailSent === true };
     }
     const invited: LaborEmployee = { ...employee, id: `employee-${Date.now()}`, inviteStatus: employee.email ? 'pending' : 'not-invited', invitedAt: employee.email ? new Date().toISOString() : undefined };
     commit(current => ({ ...current, employees: [...current.employees, invited] }));
-    return invited;
+    return { employee: invited, welcomeEmailSent: false };
   };
 
   const updateMyProfile = async (updates: { phone?: string; notificationPreferences?: EmployeeNotificationPreferences }) => {
@@ -275,8 +292,8 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     return response.employee;
   };
 
-  useEffect(() => {
-    if (!accountId || !activeLocationId || !schedulingAvailable) {
+  const refreshLabor = useCallback(async () => {
+    if (!accountId || !activeLocationId) {
       setData(EMPTY_LABOR);
       setIsLaborLoaded(true);
       return;
@@ -289,27 +306,34 @@ export function LaborProvider({ children }: { children: ReactNode }) {
       setIsLaborLoaded(true);
       return;
     }
-    void apiRequest<LaborData>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor`)
-      .then(remote => {
-        const normalizedRemote = normalizeLaborData(remote);
-        const remoteWithDemoPublication = user?.email === 'demo@zestiq.com' && normalizedRemote.employees.length > 0 && normalizedRemote.publishedPositions.length === 0
-          ? { ...normalizedRemote, publishedPositions: Array.from(new Set(normalizedRemote.shifts.map(shift => weekPositionKey(shift.date, normalizedRemote.employees.find(employee => employee.id === shift.employeeId)?.role || '')).filter(key => !key.endsWith('::')))) }
-          : normalizedRemote;
+    try {
+      const remote = await apiRequest<LaborData>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/labor`);
+      const normalizedRemote = normalizeLaborData(remote);
+      const remoteWithDemoPublication = user?.email === 'demo@zestiq.com' && normalizedRemote.employees.length > 0 && normalizedRemote.publishedPositions.length === 0
+        ? { ...normalizedRemote, publishedPositions: Array.from(new Set(normalizedRemote.shifts.map(shift => weekPositionKey(shift.date, normalizedRemote.employees.find(employee => employee.id === shift.employeeId)?.role || '')).filter(key => !key.endsWith('::')))) }
+        : normalizedRemote;
         const demoReadyRemote = user?.email === 'demo@zestiq.com' && normalizedRemote.shifts.length === 0
           ? demo
           : remoteWithDemoPublication;
         const next = demoReadyRemote.employees.length > 0 ? demoReadyRemote : (local.employees.length > 0 ? local : demo);
-        setData(next);
-        if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
-        if (normalizedRemote.employees.length === 0 && next.employees.length > 0) persist(next);
-      })
-      .catch(() => setData(local.employees.length > 0 ? local : demo))
-      .finally(() => setIsLaborLoaded(true));
-  }, [accountId, activeLocationId, token, user?.email, schedulingAvailable, isDemoAccount]);
+      setData(next);
+      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
+      if (normalizedRemote.employees.length === 0 && next.employees.length > 0) persist(next);
+    } catch {
+      setData(local.employees.length > 0 ? local : demo);
+    } finally {
+      setIsLaborLoaded(true);
+    }
+  }, [accountId, activeLocationId, token, user?.email, storageKey, isDemoAccount]);
+
+  useEffect(() => {
+    void refreshLabor();
+  }, [refreshLabor]);
 
   const value = useMemo<LaborContextValue>(() => ({
     ...data,
     isLaborLoaded,
+    refreshLabor,
     addEmployee: employee => commit(current => ({ ...current, employees: [...current.employees, { ...employee, id: `employee-${Date.now()}` }] })),
     inviteEmployee,
     updateMyProfile,
@@ -341,7 +365,7 @@ export function LaborProvider({ children }: { children: ReactNode }) {
     scheduledHoursForRange: (startDate, endDate) => data.shifts.filter(shift => shift.date >= startDate && shift.date <= endDate && shift.status !== 'called-off').reduce((sum, shift) => sum + shiftHours(shift), 0),
     scheduledCostForRange: (startDate, endDate) => calculateLaborCostBreakdown(data, startDate, endDate).total,
     laborCostBreakdownForRange: (startDate, endDate) => calculateLaborCostBreakdown(data, startDate, endDate),
-  }), [data, isLaborLoaded, token, accountId, activeLocationId, storageKey]);
+  }), [data, isLaborLoaded, token, accountId, activeLocationId, storageKey, refreshLabor]);
 
   return <LaborContext.Provider value={value}>{children}</LaborContext.Provider>;
 }

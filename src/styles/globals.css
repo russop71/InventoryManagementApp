@@ -10,3 +10,35 @@ svg,
 canvas {
   max-width: 100%;
 }
+
+.zestiq-app-shell {
+  color: #303a43;
+}
+
+.zestiq-app-shell [data-slot="card"] {
+  border-color: rgba(48, 58, 67, 0.1);
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 30px rgba(48, 58, 67, 0.06);
+}
+
+.zestiq-app-shell input,
+.zestiq-app-shell select,
+.zestiq-app-shell textarea {
+  accent-color: #f5d62e;
+}
+
+@media screen and (min-width: 1024px) {
+  .zestiq-app-shell [data-slot="card"] {
+    background-color: #fffefa;
+  }
+
+  .zestiq-dashboard > section:first-of-type {
+    background-color: #303a43;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.5rem;
+  }
+
+  .zestiq-dashboard > div:first-child h2 {
+    color: #303a43;
+  }
+}

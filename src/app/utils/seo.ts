@@ -10,7 +10,7 @@ function setMeta(selector: string, attribute: 'name' | 'property', key: string, 
   element.content = content;
 }
 
-export function usePageSeo({ title, description, path, image = '/zestiq-share.png' }: { title: string; description: string; path: string; image?: string }) {
+export function usePageSeo({ title, description, path, image = '/zestiq-mark-exact.png' }: { title: string; description: string; path: string; image?: string }) {
   useEffect(() => {
     const canonicalUrl = `https://zestiq.ca${path}`;
     document.title = title;

@@ -17,7 +17,7 @@ export function Help() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const categories = [
-    { name: 'Getting Started', icon: Lightbulb, color: 'bg-[#FEF9C3] text-[#0F172A]', articles: 5, route: '/app/onboarding' },
+    { name: 'Getting Started', icon: Lightbulb, color: 'bg-[#FEF9C3] text-[#303A43]', articles: 5, route: '/app/onboarding' },
     { name: 'Inventory Management', icon: Book, color: 'bg-green-100 text-green-900', articles: 8, route: '/app/inventory' },
     { name: 'AI & Forecasting', icon: Zap, color: 'bg-purple-100 text-purple-900', articles: 6, route: '/app/forecasting' },
     { name: 'Integrations', icon: FileText, color: 'bg-orange-100 text-orange-900', articles: 4, route: '/app/integrations' }
@@ -59,14 +59,14 @@ export function Help() {
       <div className="grid grid-cols-2 gap-3">
         <Card className="cursor-pointer hover:bg-gray-50" onClick={() => navigate('/app/contact')}>
           <CardContent className="pt-4 text-center">
-            <MessageCircle className="w-8 h-8 mx-auto text-[#0F172A] mb-2" />
+            <MessageCircle className="w-8 h-8 mx-auto text-[#303A43] mb-2" />
             <p className="text-sm font-medium">Contact Support</p>
             <p className="text-xs text-gray-500 mt-1">Get help from our team</p>
           </CardContent>
         </Card>
         <Card className="bg-gray-50 opacity-75">
           <CardContent className="pt-4 text-center">
-            <Video className="w-8 h-8 mx-auto text-[#0F172A] mb-2" />
+            <Video className="w-8 h-8 mx-auto text-[#303A43] mb-2" />
             <p className="text-sm font-medium">Video Tutorials</p>
             <p className="text-xs text-gray-500 mt-1">Coming soon</p>
           </CardContent>
@@ -143,7 +143,7 @@ export function Help() {
               <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
               <span className="text-sm">No public status page is available yet</span>
             </div>
-            <button type="button" onClick={() => navigate('/app/contact')} className="text-sm text-[#0F172A] hover:underline">
+            <button type="button" onClick={() => navigate('/app/contact')} className="text-sm text-[#303A43] hover:underline">
               Report an issue
             </button>
           </div>

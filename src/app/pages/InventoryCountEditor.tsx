@@ -13,10 +13,21 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { useAuth } from '../contexts/AuthContext';
 import { useInventory } from '../contexts/InventoryContext';
 import { createInventoryCount, type InventoryCount, type InventoryCountEntry } from '../utils/inventoryCounts';
 import {
+  completeInventoryCountWithZeros,
   getLatestFinalizedInventoryCount,
   isInventoryCountEntryComplete,
   isInventoryCountFinalized,
@@ -24,7 +35,7 @@ import {
 } from '../utils/inventoryCountWorkflow.js';
 import { convertQuantity, formatUnitLabel, getCompatibleUnits } from '../utils/unitConversion';
 
-const Y = '#F5C10E';
+const Y = '#F5D62E';
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function formatCurrency(value: number) {
@@ -67,6 +78,7 @@ export function InventoryCountEditor() {
   const [countInputs, setCountInputs] = useState<Record<string, string>>({});
   const [extraItemId, setExtraItemId] = useState('');
   const [extraStorageArea, setExtraStorageArea] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const canFinalize = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const isFinalized = isInventoryCountFinalized(draft);
@@ -74,7 +86,8 @@ export function InventoryCountEditor() {
   useEffect(() => {
     if (!isLocationLoaded) return;
     const routeKey = countId || 'new';
-    if (initializedRoute.current === routeKey) return;
+    const inventoryArrivedAfterEmptyDraft = routeKey === 'new' && draft?.entries.length === 0 && inventory.length > 0;
+    if (initializedRoute.current === routeKey && !inventoryArrivedAfterEmptyDraft) return;
 
     const existing = inventoryCounts.find(item => item.id === countId);
     const previousCount = getLatestFinalizedInventoryCount(inventoryCounts, existing?.id || '');
@@ -126,7 +139,7 @@ export function InventoryCountEditor() {
     setCountDate(ISO_DATE_PATTERN.test(nextCount.countDate) ? nextCount.countDate : new Date().toISOString().slice(0, 10));
     setCountType(nextCount.countType === 'day-start' ? 'day-start' : 'day-end');
     initializedRoute.current = routeKey;
-  }, [countId, inventory, inventoryCounts, isLocationLoaded, storageAreas]);
+  }, [countId, draft?.entries.length, inventory, inventoryCounts, isLocationLoaded, storageAreas]);
 
   const itemMeta = useMemo(() => new Map(inventory.map(item => [item.id, item])), [inventory]);
   const summary = useMemo(() => summarizeInventoryCount(draft), [draft]);
@@ -264,7 +277,8 @@ export function InventoryCountEditor() {
   const preparedCount = (status: 'draft' | 'finalized'): InventoryCount | null => {
     if (!draft) return null;
     const now = new Date().toISOString();
-    const entries = draft.entries.map(entry => ({
+    const sourceCount = status === 'finalized' ? completeInventoryCountWithZeros(draft) : draft;
+    const entries = sourceCount.entries.map(entry => ({
       ...entry,
       value: entry.counted * entry.unitCost,
       status: entry.counted <= 0 ? 'out-of-stock' as const : entry.counted < entry.parLevel * 0.5 ? 'low-stock' as const : 'in-stock' as const,
@@ -305,11 +319,10 @@ export function InventoryCountEditor() {
       toast.error('An owner, admin, or manager must finalize this count.');
       return;
     }
-    if (summary.remainingItems > 0) {
-      toast.error(`Count the remaining ${summary.remainingItems} item${summary.remainingItems === 1 ? '' : 's'} before finalizing.`);
-      return;
-    }
-    const confirmed = window.confirm(`Finalize this inventory count as ${user?.name || user?.role}? This will update live on-hand inventory and lock the count.`);
+    const blankItemMessage = summary.remainingItems > 0
+      ? ` ${summary.remainingItems} uncounted item${summary.remainingItems === 1 ? '' : 's'} will be recorded as zero.`
+      : '';
+    const confirmed = window.confirm(`Finalize this inventory count as ${user?.name || user?.role}?${blankItemMessage} This will update live on-hand inventory and lock the count.`);
     if (!confirmed) return;
     const nextCount = preparedCount('finalized');
     if (!nextCount) return;
@@ -320,8 +333,8 @@ export function InventoryCountEditor() {
 
   const handleDelete = () => {
     if (!draft || !canFinalize) return;
-    if (!window.confirm(`Delete “${draft.description}”? This count cannot be recovered.`)) return;
     deleteInventoryCount(draft.id);
+    setShowDeleteConfirm(false);
     toast.success('Inventory count deleted');
     navigate('/app/inventory');
   };
@@ -329,14 +342,14 @@ export function InventoryCountEditor() {
   if (!draft) return null;
 
   return (
-    <div className="-mx-4 min-h-screen bg-[#F7F8FA] px-3 py-3 sm:px-5 sm:py-5">
-      <div className="mx-auto max-w-6xl space-y-4">
-        <section className="overflow-hidden rounded-[28px] bg-[#0B1220] text-white shadow-sm">
+    <div className="-mx-4 min-h-screen bg-[#F7F8FA] px-3 py-2 sm:px-5 sm:py-4">
+      <div className="mx-auto max-w-6xl space-y-3">
+        <section className="overflow-hidden rounded-2xl bg-[#303A43] text-white shadow-sm">
           <div className="h-1" style={{ background: Y }} />
-          <div className="p-4 sm:p-6">
+          <div className="p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#F5C10E]">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#F5D62E]">
                   {isFinalized ? <ShieldCheck className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
                   {isFinalized ? 'Finalized count' : 'Count in progress'}
                 </div>
@@ -352,8 +365,8 @@ export function InventoryCountEditor() {
                 {isFinalized ? 'Back' : 'Save & exit'}
               </button>
             </div>
-            <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-[#F5C10E] transition-all" style={{ width: `${summary.progressPercent}%` }} />
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-[#F5D62E] transition-all" style={{ width: `${summary.progressPercent}%` }} />
             </div>
           </div>
         </section>
@@ -365,7 +378,7 @@ export function InventoryCountEditor() {
           <SummaryCard label="Dollar variance" value={`${summary.varianceValue > 0 ? '+' : ''}${formatCurrency(summary.varianceValue)}`} detail={summary.lossValue > 0 ? `${formatCurrency(summary.lossValue)} shortage` : 'No shortage recorded'} warning={summary.varianceValue < 0} />
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <div className="grid gap-3 md:grid-cols-3">
             <label className="text-xs font-bold text-slate-700">
               <span className="mb-1 block text-[10px] uppercase tracking-[0.18em] text-slate-400">Description</span>
@@ -392,13 +405,13 @@ export function InventoryCountEditor() {
             <FilterSelect value={groupFilter} onChange={setGroupFilter} options={groupOptions} allLabel="All categories" />
             <FilterSelect value={supplierFilter} onChange={setSupplierFilter} options={supplierOptions} allLabel="All suppliers" />
           </div>
-          {!isFinalized && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3"><p className="text-xs font-black text-amber-950">Count the same item in another storage area</p><p className="mt-1 text-[11px] leading-4 text-amber-800">Add a second line for a cooler, bar, station, or cellar. ZestIQ totals the lines when you finalize.</p><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><select value={extraItemId} onChange={event => setExtraItemId(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose an item…</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={extraStorageArea} onChange={event => setExtraStorageArea(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose a storage area…</option>{storageAreas.map(area => <option key={area} value={area}>{area}</option>)}</select><button type="button" onClick={addStorageAreaLine} disabled={!extraItemId || !extraStorageArea} className="h-10 rounded-xl bg-[#0B1220] px-4 text-sm font-black text-white disabled:opacity-40">Add count line</button></div></div>}
+          {!isFinalized && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3"><p className="text-xs font-black text-amber-950">Count the same item in another storage area</p><p className="mt-1 text-[11px] leading-4 text-amber-800">Add a second line for a cooler, bar, station, or cellar. ZestIQ totals the lines when you finalize.</p><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><select value={extraItemId} onChange={event => setExtraItemId(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose an item…</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={extraStorageArea} onChange={event => setExtraStorageArea(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose a storage area…</option>{storageAreas.map(area => <option key={area} value={area}>{area}</option>)}</select><button type="button" onClick={addStorageAreaLine} disabled={!extraItemId || !extraStorageArea} className="h-10 rounded-xl bg-[#303A43] px-4 text-sm font-black text-white disabled:opacity-40">Add count line</button></div></div>}
         </section>
 
         {areaGroups.map(({ area, entries }, areaIndex) => {
           const completedInArea = entries.filter(entry => isInventoryCountEntryComplete(entry, draft)).length;
           return (
-            <section key={area} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <section key={area} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2"><MapPin className="h-4 w-4 shrink-0 text-[#B58B00]" /><h2 className="break-words font-black text-slate-900">{area}</h2></div>
@@ -449,7 +462,7 @@ export function InventoryCountEditor() {
                         <div className="text-right">
                           {isFinalized ? <span className="text-sm font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</span> : <div className="flex min-w-[150px] gap-1"><input aria-label={`Count ${entry.name}`} type="number" min="0" step="0.01" value={countInputFor(entry, complete)} onChange={event => updateEntry(entryKey(entry), event.target.value, countUnitFor(entry))} className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={countUnitFor(entry)} onChange={event => changeCountUnit(entry, event.target.value)} className="h-10 max-w-[72px] rounded-xl border border-slate-200 bg-white px-1 text-xs font-bold">{getCompatibleUnits(entry.unit).map(unit => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></div>}
                         </div>
-                        <div className={`text-right text-sm font-black ${!complete ? 'text-slate-300' : dollarVariance < 0 ? 'text-rose-600' : dollarVariance > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>{complete ? <><span className="block">{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit}</span><span className="text-[10px]">{dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span></> : 'Not counted'}</div>
+                        <div className={`text-right text-sm font-black ${!complete ? 'text-slate-400' : dollarVariance < 0 ? 'text-rose-600' : dollarVariance > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>{complete ? <><span className="block">{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit}</span><span className="text-[10px]">{dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span></> : <span className="text-[10px]">Blank → 0 on finalize</span>}</div>
                         <div className="flex justify-end gap-1">{!isFinalized && <><OrderButton label={`Move ${entry.name} up`} disabled={index === 0} onClick={() => moveEntry(area, entryKey(entry), -1)} icon="up" /><OrderButton label={`Move ${entry.name} down`} disabled={index === entries.length - 1} onClick={() => moveEntry(area, entryKey(entry), 1)} icon="down" /></>}</div>
                       </div>
                     );
@@ -462,25 +475,39 @@ export function InventoryCountEditor() {
 
         {areaGroups.length === 0 && <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center"><p className="font-black text-slate-700">No inventory items match these filters.</p><button type="button" onClick={() => { setSearch(''); setStorageFilter('all'); setGroupFilter('all'); setSupplierFilter('all'); }} className="mt-3 text-sm font-bold text-[#9A7600] underline">Clear filters</button></div>}
 
-        <section className="sticky bottom-20 z-20 rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:bottom-4">
+        <section className="sticky bottom-20 z-20 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:bottom-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-slate-500">
-              {isFinalized ? <span className="font-bold text-emerald-700">This count is locked and included in inventory history.</span> : canFinalize ? <span><strong className="text-slate-900">Manager confirmation:</strong> all {summary.totalItems} items must be counted before inventory is updated.</span> : <span><strong className="text-slate-900">Draft mode:</strong> a manager must review and finalize this count.</span>}
+              {isFinalized ? <span className="font-bold text-emerald-700">This count is locked and included in inventory history.</span> : canFinalize ? <span><strong className="text-slate-900">Ready to finalize:</strong> {summary.remainingItems > 0 ? `${summary.remainingItems} blank item${summary.remainingItems === 1 ? '' : 's'} will be recorded as zero.` : `all ${summary.totalItems} items have been counted.`}</span> : <span><strong className="text-slate-900">Draft mode:</strong> a manager must review and finalize this count. Blank items will be recorded as zero.</span>}
+              {!isFinalized && <span className="mt-1 block font-semibold text-slate-600">{saveState}</span>}
             </div>
             <div className="flex flex-wrap gap-2">
-              {canFinalize && <button type="button" onClick={handleDelete} className="inline-flex h-11 items-center justify-center rounded-xl border border-rose-200 px-3 text-sm font-bold text-rose-700"><Trash2 className="mr-2 h-4 w-4" />Delete</button>}
+              {canFinalize && !isFinalized && <button type="button" onClick={() => setShowDeleteConfirm(true)} className="inline-flex h-11 items-center justify-center rounded-xl border border-rose-200 px-3 text-sm font-bold text-rose-700"><Trash2 className="mr-2 h-4 w-4" />Delete</button>}
               {!isFinalized && <button type="button" onClick={() => handleSaveDraft(false)} className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-800 sm:flex-none"><Save className="mr-2 h-4 w-4" />Save draft</button>}
-              {!isFinalized && <button type="button" onClick={handleFinalize} disabled={!canFinalize || summary.remainingItems > 0} className="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-[#0B1220] px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"><CheckCircle2 className="mr-2 h-4 w-4 text-[#F5C10E]" />Finalize count</button>}
+              {!isFinalized && <button type="button" onClick={handleFinalize} disabled={!canFinalize} className="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-[#303A43] px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"><CheckCircle2 className="mr-2 h-4 w-4 text-[#F5D62E]" />Finalize count</button>}
             </div>
           </div>
         </section>
+
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this inventory count?</AlertDialogTitle>
+              <AlertDialogDescription>“{draft.description}” will be permanently removed. This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep count</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-rose-700 text-white hover:bg-rose-800">Delete count</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
 }
 
 function SummaryCard({ label, value, detail, warning = false }: { label: string; value: string; detail: string; warning?: boolean }) {
-  return <div className={`rounded-2xl border bg-white p-3 shadow-sm ${warning ? 'border-rose-200' : 'border-slate-200'}`}><p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p><p className={`mt-1 break-words text-lg font-black ${warning ? 'text-rose-700' : 'text-slate-900'}`}>{value}</p><p className="mt-1 text-[10px] text-slate-500">{detail}</p></div>;
+  return <div className={`rounded-xl border bg-white p-2.5 shadow-sm ${warning ? 'border-rose-200' : 'border-slate-200'}`}><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p><p className={`mt-0.5 break-words text-base font-black sm:text-lg ${warning ? 'text-rose-700' : 'text-slate-900'}`}>{value}</p><p className="mt-0.5 text-[10px] text-slate-500">{detail}</p></div>;
 }
 
 function FilterSelect({ value, onChange, options, allLabel }: { value: string; onChange: (value: string) => void; options: string[]; allLabel: string }) {
@@ -502,6 +529,6 @@ function MobileCountRow({ entry, count, readOnly, onChange, unit, units, value, 
     </div>
     <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Previous count</p><p className="mt-1 font-black text-slate-700">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)} {entry.unit}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Expected now</p><p className="mt-1 font-black text-slate-700">{entry.hypothetical.toFixed(2)} {entry.unit}</p></div></div>
     <label className="mt-3 block"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Actual count</span>{readOnly ? <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xl font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</div> : <div className="mt-1 flex gap-2"><input aria-label={`Count ${entry.name}`} type="number" inputMode="decimal" min="0" step="0.01" value={value} onChange={event => onChange(event.target.value)} placeholder="Enter count" className="h-14 min-w-0 flex-1 rounded-xl border-2 border-slate-200 bg-white px-4 text-xl font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={unit} onChange={event => onUnitChange(event.target.value)} className="h-14 rounded-xl border-2 border-slate-200 bg-white px-2 text-sm font-black text-slate-700">{units.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>}</label>
-    <div className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold ${!complete ? 'bg-slate-50 text-slate-400' : dollarVariance < 0 ? 'bg-rose-50 text-rose-700' : dollarVariance > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'}`}><span>{complete ? 'Variance' : 'Waiting for count'}</span>{complete && <span>{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit} · {dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span>}</div>
+    <div className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold ${!complete ? 'bg-slate-50 text-slate-500' : dollarVariance < 0 ? 'bg-rose-50 text-rose-700' : dollarVariance > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'}`}><span>{complete ? 'Variance' : 'Blank · records as 0 when finalized'}</span>{complete && <span>{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit} · {dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span>}</div>
   </div>;
 }

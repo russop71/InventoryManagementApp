@@ -199,14 +199,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     write('toastConnected', isConnected); write('posProvider', provider); write('posConnectionMode', connectionMode);
     write('toastRestaurantId', restaurantId); write('toastLastSync', lastSync); write('toastCogsCategories', cogsCategories);
     write('toastSalesData', salesData); write('toastMenuItems', menuItems);
-    if (!token || user?.role === 'Ordering' || isDemoAccount) return;
+    if (!token || isDemoAccount) return;
     void apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`, {
       method: 'PUT',
       body: JSON.stringify({ connected: isConnected, provider, connectionMode, restaurantId, salesData, menuItems, cogsCategories, lastSync }),
     }).catch(error => console.error('Failed to save POS integration state', error));
-  }, [accountId, activeLocationId, token, user?.role, isHydrated, isConnected, provider, connectionMode, restaurantId, lastSync, cogsCategories, salesData, menuItems]);
+  }, [accountId, activeLocationId, token, isHydrated, isConnected, provider, connectionMode, restaurantId, lastSync, cogsCategories, salesData, menuItems]);
 
-  const selectPosProvider = (nextProvider: string) => setProvider(isDemoAccount ? 'toast' : (nextProvider || 'generic'));
+  const selectPosProvider = (nextProvider: string) => setProvider(nextProvider || 'generic');
 
   const disconnectToast = () => {
     if (isDemoAccount) {

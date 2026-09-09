@@ -6,14 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
-import { Sparkles, TrendingUp, Calendar, DollarSign, Package, Check, X, AlertCircle, Mail, Copy } from 'lucide-react';
+import { Sparkles, Package, Check, X, AlertCircle, Mail, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { groupBySupplier } from '../utils/invoiceWorkflow';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { resolveSuggestionQuantity } from '../utils/orderSuggestionUtils.js';
-import { getSupplierCcEmails, getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
+import { getSupplierCcEmails, getSupplierEmailAddress, parseEmailList } from '../utils/supplierEmailDraft.js';
 import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils.js';
-import { buildApiUrl } from '../utils/api';
+import { apiRequest } from '../utils/api';
 import { OrderBufferControl } from '../components/OrderBufferControl';
 
 interface OrderSuggestion {
@@ -39,7 +39,7 @@ interface OrderSuggestion {
 interface SupplierEmail {
   supplier: string;
   supplierEmail: string;
-  ccEmails: string[];
+  ccText: string;
   items: OrderSuggestion[];
   totalCost: number;
   emailBody: string;
@@ -112,9 +112,9 @@ function getDefaultOrderDate() {
   return date.toISOString();
 }
 
-function openMailtoDraft(to: string, ccEmails: string[], subject: string, body: string) {
+function openMailtoDraft(to: string, subject: string, body: string, cc: string[] = []) {
   const params = new URLSearchParams({ subject, body });
-  if (ccEmails.length) params.set('cc', ccEmails.join(','));
+  if (cc.length) params.set('cc', cc.join(','));
   const mailtoLink = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
   window.location.href = mailtoLink;
 }
@@ -136,6 +136,7 @@ export function AIOrders() {
   const [wsConnected, setWsConnected] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<OrderSuggestion[] | null>(null);
   const [emailServiceConfigured, setEmailServiceConfigured] = useState<boolean | null>(null);
+  const [supplierEmailCc, setSupplierEmailCc] = useState<string[]>([]);
   const [safetyBufferPercent, setSafetyBufferPercent] = useState(10);
   const restaurantName = useMemo(() => {
     if (accountId) {
@@ -161,7 +162,7 @@ export function AIOrders() {
       return;
     }
     let cancelled = false;
-    void fetch(buildApiUrl('/api/send-supplier-email'))
+    void fetch('/api/send-supplier-email')
       .then(response => response.json())
       .then(payload => {
         if (cancelled) return;
@@ -176,6 +177,19 @@ export function AIOrders() {
       cancelled = true;
     };
   }, [user?.email]);
+
+  useEffect(() => {
+    if (!accountId || user?.email?.trim().toLowerCase() === 'demo@zestiq.com') return;
+    let cancelled = false;
+    void apiRequest<{ onboarding?: { clientProfile?: { supplierEmailCc?: string[] } } }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/onboarding`)
+      .then(payload => {
+        if (!cancelled) setSupplierEmailCc(Array.isArray(payload.onboarding?.clientProfile?.supplierEmailCc) ? payload.onboarding.clientProfile.supplierEmailCc : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSupplierEmailCc([]);
+      });
+    return () => { cancelled = true; };
+  }, [accountId, user?.email]);
 
   // WebSocket connection for live AI suggestions
   useEffect(() => {
@@ -449,7 +463,7 @@ export function AIOrders() {
       emailsToDraft.push({
         supplier,
         supplierEmail: getSupplierEmailAddress(supplier, suppliers),
-        ccEmails: getSupplierCcEmails(supplier, suppliers),
+        ccText: getSupplierCcEmails(supplier, suppliers, supplierEmailCc).join(', '),
         items,
         totalCost,
         emailBody,
@@ -463,21 +477,11 @@ export function AIOrders() {
     setSelectedSuggestions(new Set());
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'bg-red-500';
-      case 'high': return 'bg-orange-500';
-      case 'medium': return 'bg-yellow-500';
-      default: return 'bg-green-500';
-    }
-  };
-
   const getPriorityBadgeColor = (priority: string) => {
     switch (priority) {
-      case 'critical': return 'bg-red-100 text-red-800 border-red-300';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      default: return 'bg-green-100 text-green-800 border-green-300';
+      case 'critical': return 'bg-white text-red-700 border-red-200';
+      case 'high': return 'bg-white text-amber-700 border-amber-200';
+      default: return 'bg-white text-slate-600 border-slate-200';
     }
   };
 
@@ -495,7 +499,7 @@ export function AIOrders() {
       return {
         supplier,
         supplierEmail: getSupplierEmailAddress(supplier, suppliers),
-        ccEmails: getSupplierCcEmails(supplier, suppliers),
+        ccText: getSupplierCcEmails(supplier, suppliers, supplierEmailCc).join(', '),
         items,
         totalCost,
         emailBody,
@@ -514,16 +518,11 @@ export function AIOrders() {
 
   const resetEmailSendStatus = () => setEmailSendStatus({});
 
-  const updateDraftEmailField = (supplier: string, field: 'emailSubject' | 'emailBody', value: string) => {
+  const updateDraftEmailField = (supplier: string, field: 'emailSubject' | 'emailBody' | 'ccText', value: string) => {
     setDraftEmails(prev => prev.map(email => {
       if (email.supplier !== supplier) return email;
       return { ...email, [field]: value };
     }));
-  };
-
-  const updateDraftCcEmails = (supplier: string, value: string) => {
-    const ccEmails = value.split(/[;,\n]/).map(email => email.trim().toLowerCase()).filter(Boolean);
-    setDraftEmails(prev => prev.map(email => email.supplier === supplier ? { ...email, ccEmails } : email));
   };
 
   const updateDraftItemQuantity = (supplier: string, itemId: string, value: string) => {
@@ -563,7 +562,7 @@ export function AIOrders() {
 
     if (emailServiceConfigured === false) {
       setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
-      openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
+      openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody, parseEmailList(email.ccText));
       toast.info('Email service is not configured. Opened your mail app with a draft instead.');
       return;
     }
@@ -572,7 +571,7 @@ export function AIOrders() {
     try {
       await sendSupplierEmail({
         to: email.supplierEmail,
-        cc: email.ccEmails,
+        cc: parseEmailList(email.ccText),
         subject: email.emailSubject,
         text: email.emailBody,
         senderEmail: user?.email,
@@ -583,7 +582,7 @@ export function AIOrders() {
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
         setEmailSendStatus(prev => ({ ...prev, [email.supplier]: 'sent' }));
-        openMailtoDraft(email.supplierEmail, email.ccEmails, email.emailSubject, email.emailBody);
+        openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody, parseEmailList(email.ccText));
         toast.info('Email service not configured. Opened your mail app with a draft instead.');
         return;
       }
@@ -618,7 +617,7 @@ export function AIOrders() {
       try {
         await sendSupplierEmail({
           to: email.supplierEmail,
-          cc: email.ccEmails,
+          cc: parseEmailList(email.ccText),
           subject: email.emailSubject,
           text: email.emailBody,
           senderEmail: user?.email,
@@ -711,7 +710,7 @@ export function AIOrders() {
     const supplierEmailDraft: SupplierEmail = {
       supplier: selectedSupplier,
       supplierEmail: getSupplierEmailAddress(selectedSupplier, suppliers),
-      ccEmails: getSupplierCcEmails(selectedSupplier, suppliers),
+      ccText: getSupplierCcEmails(selectedSupplier, suppliers, supplierEmailCc).join(', '),
       items: itemsForEmail,
       totalCost: manualOrderTotal,
       emailBody,
@@ -726,28 +725,23 @@ export function AIOrders() {
   };
 
   return (
-    <div className="space-y-4 pb-20">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Purchasing</p>
         <div>
-          <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center">
-            <Sparkles className="w-6 h-6 mr-2 text-[#0F172A]" />
-            AI Order Assistant
+          <h2 className="mt-1 flex items-center text-2xl font-extrabold tracking-tight text-slate-950">
+            <Package className="mr-2 h-6 w-6 text-[#303A43]" />
+            Order assistant
           </h2>
-          <p className="text-sm text-gray-600 mt-1">Smart ordering powered by sales forecasting</p>
+          <p className="mt-1 text-sm text-slate-600">Build supplier orders from current stock, par levels, and forecasted demand.</p>
         </div>
-        <Button
-          className="bg-[#0F172A] hover:bg-[#1E293B] text-white"
-          onClick={handleCreateSupplierOrder}
-        >
-          Create Order & Invoice
-        </Button>
       </div>
 
       <div ref={createOrderRef} className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-gray-200">
+        <Card className="border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Supplier Order Builder</CardTitle>
-            <p className="text-sm text-gray-600">Select a supplier and build an order using live on-hand inventory.</p>
+            <CardTitle className="text-lg">Create a supplier order</CardTitle>
+            <p className="text-sm text-slate-600">Choose a supplier, review stock, then enter only the quantities you need.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -756,7 +750,7 @@ export function AIOrders() {
                 id="supplier"
                 value={selectedSupplier}
                 onChange={(event) => setSelectedSupplier(event.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950"
               >
                 <option value="">Select supplier...</option>
                 {supplierOptions.map(name => (
@@ -773,9 +767,9 @@ export function AIOrders() {
 
             {selectedSupplierItems.length > 0 && (
               <div className="space-y-3">
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-slate-50">
                       <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
                         <th className="px-3 py-2">Item</th>
                         <th className="px-3 py-2">Unit</th>
@@ -786,7 +780,7 @@ export function AIOrders() {
                     </thead>
                     <tbody>
                       {selectedSupplierItems.map(item => (
-                        <tr key={item.id} className="border-t border-gray-100">
+                        <tr key={item.id} className="border-t border-slate-100 hover:bg-slate-50/70">
                           <td className="px-3 py-2 font-medium text-gray-900">{item.name}</td>
                           <td className="px-3 py-2 text-gray-700">{item.unit}</td>
                           <td className="px-3 py-2 text-gray-900">{item.currentStock} {item.unit}</td>
@@ -798,7 +792,7 @@ export function AIOrders() {
                               step="1"
                               value={manualOrderQuantities[item.id] ?? 0}
                               onChange={(event) => updateManualOrderQuantity(item.id, event.target.value)}
-                              className="w-24 rounded-md border border-gray-300 px-2 py-1"
+                              className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center"
                             />
                           </td>
                         </tr>
@@ -807,13 +801,12 @@ export function AIOrders() {
                   </table>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
-                  <p className="text-gray-700">{manualOrderLineCount} line items selected</p>
-                  <p className="font-semibold text-gray-900">Order total: ${manualOrderTotal.toFixed(2)}</p>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button className="bg-[#0F172A] hover:bg-[#1E293B] text-white" onClick={handleCreateSupplierOrder}>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                  <div>
+                    <p className="text-sm text-slate-500">{manualOrderLineCount} {manualOrderLineCount === 1 ? 'item' : 'items'} selected</p>
+                    <p className="mt-1 text-lg font-bold text-slate-950">${manualOrderTotal.toFixed(2)}</p>
+                  </div>
+                  <Button className="bg-[#303A43] text-white hover:bg-[#1E293B]" onClick={handleCreateSupplierOrder}>
                     Create Order & Invoice
                   </Button>
                 </div>
@@ -822,37 +815,37 @@ export function AIOrders() {
           </CardContent>
         </Card>
 
-        <Card className="border-gray-200">
+        <Card className="border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Live Inventory Risk</CardTitle>
-            <p className="text-sm text-gray-600">What this supplier is impacting right now.</p>
+            <CardTitle className="text-lg">Inventory status</CardTitle>
+            <p className="text-sm text-slate-600">Items from this supplier that may need attention.</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg bg-red-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-red-700">Critical</p>
-                <p className="text-2xl font-black text-red-700">{supplierLowStockItems.length}</p>
-                <p className="text-xs text-red-600">Below 30% of par</p>
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Critical</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">{supplierLowStockItems.length}</p>
+                <p className="text-xs text-slate-500">Below 30% of par</p>
               </div>
-              <div className="rounded-lg bg-amber-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-amber-700">Below Par</p>
-                <p className="text-2xl font-black text-amber-700">{supplierBelowParItems.length}</p>
-                <p className="text-xs text-amber-600">Need replenishment</p>
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Below par</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">{supplierBelowParItems.length}</p>
+                <p className="text-xs text-slate-500">May need replenishment</p>
               </div>
             </div>
 
-            <div className="rounded-lg border border-gray-200">
-              <div className="border-b border-gray-100 px-3 py-2">
+            <div className="rounded-xl border border-slate-200">
+              <div className="border-b border-slate-100 px-3 py-2">
                 <p className="text-sm font-semibold text-gray-900">At-risk items</p>
               </div>
               <div className="max-h-64 overflow-y-auto p-3 space-y-2">
                 {selectedSupplier ? (
                   supplierBelowParItems.length > 0 ? (
                     supplierBelowParItems.map(item => (
-                      <div key={item.id} className="rounded-md bg-gray-50 p-2">
+                      <div key={item.id} className="border-b border-slate-100 py-2 last:border-0">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                          <Badge className={item.currentStock < item.parLevel * 0.3 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}>
+                          <Badge variant="outline" className={item.currentStock < item.parLevel * 0.3 ? 'border-red-200 text-red-700' : 'border-amber-200 text-amber-700'}>
                             {item.currentStock < item.parLevel * 0.3 ? 'Critical' : 'Low'}
                           </Badge>
                         </div>
@@ -873,51 +866,43 @@ export function AIOrders() {
 
       <OrderBufferControl value={safetyBufferPercent} onChange={setSafetyBufferPercent} />
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-gradient-to-br from-[#0F172A] to-[#1E293B] border-[#0F172A]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-white">Suggestions</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-white mb-2">{effectiveSuggestions.length}</div>
-            <div className="text-xs text-white space-y-1">
-              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'critical').length} critical</p>
-              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'high').length} high</p>
-              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'medium').length} medium</p>
-              <p className="whitespace-nowrap">{effectiveSuggestions.filter(s => s.priority === 'low').length} low</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#0F172A] border-0">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-slate-400">Est. Cost</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-white mb-2">
-              ${effectiveSuggestions.reduce((sum, s) => sum + s.totalCost, 0).toFixed(2)}
-            </div>
-            <p className="text-xs text-slate-400">Total if all approved</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Forecast summary */}
+      <Card className="border-slate-200 shadow-sm">
+        <CardContent className="grid grid-cols-2 gap-y-5 py-4 sm:grid-cols-4">
+          <div className="px-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Suggestions</p>
+            <p className="mt-1 text-2xl font-bold text-slate-950">{effectiveSuggestions.length}</p>
+          </div>
+          <div className="px-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Critical</p>
+            <p className="mt-1 text-2xl font-bold text-slate-950">{effectiveSuggestions.filter(s => s.priority === 'critical').length}</p>
+          </div>
+          <div className="px-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">High priority</p>
+            <p className="mt-1 text-2xl font-bold text-slate-950">{effectiveSuggestions.filter(s => s.priority === 'high').length}</p>
+          </div>
+          <div className="px-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estimated total</p>
+            <p className="mt-1 text-2xl font-bold text-slate-950">${effectiveSuggestions.reduce((sum, s) => sum + s.totalCost, 0).toFixed(2)}</p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Selection Actions */}
       {effectiveSuggestions.length > 0 && (
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+        <Card className="border-slate-200 shadow-sm">
           <CardContent className="pt-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-green-900">
+                  <p className="font-semibold text-slate-950">
                     {selectedCount} items selected
                   </p>
-                  <p className="text-sm text-green-700">
-                    Total: ${totalOrderCost.toFixed(2)}
+                  <p className="text-sm text-slate-500">
+                    Estimated total ${totalOrderCost.toFixed(2)}
                   </p>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -936,51 +921,43 @@ export function AIOrders() {
                   </Button>
                 </div>
               </div>
-              {selectedCount > 0 && (
-                <Button
-                  className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white"
-                  onClick={handleApproveOrders}
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Approve {selectedCount} Orders (${totalOrderCost.toFixed(2)})
+              {selectedCount > 0 && <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="flex-1 bg-[#303A43] text-white hover:bg-[#1E293B]" onClick={handleApproveOrders}>
+                  <Check className="mr-2 h-4 w-4" />
+                  Approve {selectedCount} {selectedCount === 1 ? 'order' : 'orders'}
                 </Button>
-              )}
-              {selectedCount > 0 && (
-                <Button
-                  className="w-full bg-gray-900 hover:bg-gray-950 text-white"
-                  onClick={generateEmails}
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  Generate Emails
+                <Button variant="outline" className="flex-1" onClick={generateEmails}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Prepare supplier emails
                 </Button>
-              )}
+              </div>}
             </div>
           </CardContent>
         </Card>
       )}
 
       {selectedCount > 0 && (
-        <Card className="border-blue-200 bg-blue-50">
+        <Card className="border-slate-200 shadow-sm">
           <CardContent className="pt-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-blue-900">Approval preview</p>
-                <p className="text-xs text-blue-700">These supplier groups will become orders and invoices once you approve them.</p>
+                <p className="text-sm font-semibold text-slate-950">Order review</p>
+                <p className="text-xs text-slate-500">Approval creates one order and invoice for each supplier below.</p>
               </div>
-              <div className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-700">
+              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {selectedApprovalGroups.length} supplier{selectedApprovalGroups.length === 1 ? '' : 's'}
               </div>
             </div>
             <div className="mt-3 space-y-2">
               {selectedApprovalGroups.map(group => (
-                <div key={group.supplier} className="rounded-lg border border-blue-200 bg-white p-3">
+                <div key={group.supplier} className="rounded-lg border border-slate-200 bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-gray-900">{group.supplier}</p>
                     <p className="text-xs font-semibold text-gray-600">{group.itemCount} item{group.itemCount === 1 ? '' : 's'} • ${group.totalCost.toFixed(2)}</p>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {group.items.map(item => (
-                      <span key={item.itemId} className="rounded-full bg-blue-50 px-2 py-1 text-[11px] text-blue-700">
+                      <span key={item.itemId} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">
                         {item.itemName}
                       </span>
                     ))}
@@ -993,29 +970,30 @@ export function AIOrders() {
       )}
 
       {/* Filter Toggle */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-sm font-semibold text-gray-700">
-          {showAllSuggestions ? 'All Suggestions' : 'High Priority Only'}
-        </h3>
+      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div>
+          <h3 className="font-semibold text-slate-950">Recommended orders</h3>
+          <p className="mt-0.5 text-xs text-slate-500">{showAllSuggestions ? 'Showing every forecast suggestion' : 'Showing the items that need attention first'}</p>
+        </div>
         <Button
           size="sm"
           variant="outline"
           onClick={() => setShowAllSuggestions(!showAllSuggestions)}
           className="text-xs"
         >
-          {showAllSuggestions ? 'Show Priority Only' : 'Show All'}
+          {showAllSuggestions ? 'Priority only' : 'Show all'}
         </Button>
       </div>
 
       {/* Order Suggestions List */}
       <div className="space-y-3">
         {displayedSuggestions.length === 0 ? (
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <Card className="border-slate-200 shadow-sm">
             <CardContent className="py-12 text-center">
-              <Check className="w-12 h-12 mx-auto text-green-600 mb-3" />
-              <p className="text-lg font-semibold text-green-900">All Stocked Up!</p>
-              <p className="text-sm text-green-700 mt-1">
-                No urgent orders needed based on current inventory levels
+              <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-slate-100"><Check className="h-5 w-5 text-slate-600" /></div>
+              <p className="text-lg font-semibold text-slate-950">Inventory is on track</p>
+              <p className="mt-1 text-sm text-slate-500">
+                No urgent orders are needed based on current inventory levels.
               </p>
             </CardContent>
           </Card>
@@ -1025,8 +1003,8 @@ export function AIOrders() {
             return (
               <Card
                 key={suggestion.itemId}
-                className={`cursor-pointer transition-all ${
-                  isSelected ? 'ring-2 ring-blue-500 bg-[#FEFCE8]' : ''
+                className={`cursor-pointer border-slate-200 shadow-sm transition-all hover:border-slate-300 ${
+                  isSelected ? 'border-[#303A43] bg-slate-50 ring-1 ring-[#303A43]' : 'bg-white'
                 }`}
                 onClick={() => toggleSelection(suggestion.itemId)}
               >
@@ -1035,15 +1013,12 @@ export function AIOrders() {
                     {/* Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <div
-                            className={`w-3 h-3 rounded-full ${getPriorityColor(suggestion.priority)}`}
-                          />
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-semibold text-gray-900">{suggestion.itemName}</h3>
+                          <Badge className={`${getPriorityBadgeColor(suggestion.priority)} border text-[10px]`}>
+                            {suggestion.priority.toUpperCase()}
+                          </Badge>
                         </div>
-                        <Badge className={`${getPriorityBadgeColor(suggestion.priority)} border text-xs mt-1`}>
-                          {suggestion.priority.toUpperCase()}
-                        </Badge>
                       </div>
                       <div className="text-right">
                         <div className="flex flex-col items-end gap-1">
@@ -1062,13 +1037,13 @@ export function AIOrders() {
                     </div>
 
                     {/* AI Reasoning */}
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                    <div className="rounded-lg bg-slate-50 p-2.5">
                       <div className="flex items-start space-x-2">
-                        <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <Sparkles className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-500" />
                         <div className="flex-1">
-                          <p className="text-xs text-purple-900 font-medium">{suggestion.reasoning}</p>
-                          <p className="text-xs text-purple-700 mt-0.5">
-                            Confidence: {(suggestion.confidence * 100).toFixed(0)}%
+                          <p className="text-xs font-medium text-slate-700">{suggestion.reasoning}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            Forecast confidence {(suggestion.confidence * 100).toFixed(0)}%
                           </p>
                         </div>
                       </div>
@@ -1110,9 +1085,9 @@ export function AIOrders() {
 
                     {/* Days Until Stockout */}
                     {suggestion.daysUntilStockout < 7 && (
-                      <div className="flex items-center space-x-2 bg-red-50 border border-red-200 rounded p-2">
-                        <AlertCircle className="w-4 h-4 text-red-600" />
-                        <p className="text-xs text-red-900 font-medium">
+                      <div className="flex items-center space-x-2 rounded border border-red-200 p-2">
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <p className="text-xs font-medium text-red-800">
                           {suggestion.daysUntilStockout} days until projected stockout
                         </p>
                       </div>
@@ -1120,9 +1095,9 @@ export function AIOrders() {
 
                     {/* Selection Indicator */}
                     {isSelected && (
-                      <div className="flex items-center justify-center space-x-2 bg-[#FEF9C3] border border-[#F5C10E]/50 rounded p-2">
-                        <Check className="w-4 h-4 text-[#1D4ED8]" />
-                        <p className="text-xs font-semibold text-[#0F172A]">Selected for ordering</p>
+                      <div className="flex items-center justify-center space-x-2 rounded bg-[#303A43] p-2 text-white">
+                        <Check className="h-4 w-4" />
+                        <p className="text-xs font-semibold">Selected for ordering</p>
                       </div>
                     )}
                   </div>
@@ -1141,18 +1116,18 @@ export function AIOrders() {
         <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center">
-              <Mail className="w-5 h-5 mr-2 text-[#2563EB]" />
-              Draft Supplier Emails ({draftEmails.length})
+              <Mail className="mr-2 h-5 w-5 text-slate-600" />
+              Supplier email drafts ({draftEmails.length})
             </DialogTitle>
             <DialogDescription>
-              Copy and send these emails to your suppliers
+              Review each draft before sending it to the supplier.
             </DialogDescription>
           </DialogHeader>
           <div className="pt-2">
             <Button
               onClick={sendAllDraftEmails}
               disabled={sendingAllEmails || draftEmails.length === 0}
-              className="w-full bg-[#0F172A] text-white hover:bg-[#1E293B]"
+              className="w-full bg-[#303A43] text-white hover:bg-[#1E293B]"
             >
               <Mail className="w-4 h-4 mr-2" />
               {sendingAllEmails ? 'Sending all...' : 'Send All Emails'}
@@ -1161,7 +1136,7 @@ export function AIOrders() {
           <div className="space-y-4 pt-4">
             {draftEmails.map((email, idx) => (
               <Card key={email.supplier} className="overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-[#FEFCE8] to-[#FEF9C3] pb-3">
+                <CardHeader className="border-b border-slate-200 bg-slate-50 pb-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-base">{email.supplier}</CardTitle>
@@ -1183,7 +1158,7 @@ export function AIOrders() {
                         size="sm"
                         variant="outline"
                         onClick={() => copyToClipboard(email.emailBody)}
-                        className="border-[#0F172A] bg-white font-semibold text-[#0F172A] hover:bg-gray-100"
+                        className="border-[#303A43] bg-white font-semibold text-[#303A43] hover:bg-gray-100"
                       >
                         <Copy className="w-4 h-4 mr-2" />
                         Copy
@@ -1193,7 +1168,7 @@ export function AIOrders() {
                         variant="outline"
                         onClick={() => openEmailClient(email)}
                         disabled={sendingAllEmails}
-                        className="border-[#0F172A] bg-white font-semibold text-[#0F172A] hover:bg-gray-100"
+                        className="border-[#303A43] bg-white font-semibold text-[#303A43] hover:bg-gray-100"
                       >
                         <Mail className="w-4 h-4 mr-2" />
                         Open Email
@@ -1203,15 +1178,15 @@ export function AIOrders() {
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">CC team members</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">CC recipients</label>
                     <input
                       type="text"
-                      value={email.ccEmails.join(', ')}
-                      onChange={(event) => updateDraftCcEmails(email.supplier, event.target.value)}
-                      placeholder="bar.manager@restaurant.com, bartenders@restaurant.com"
+                      value={email.ccText}
+                      onChange={(event) => updateDraftEmailField(email.supplier, 'ccText', event.target.value)}
+                      placeholder="chef@restaurant.ca, manager@restaurant.ca"
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                     />
-                    <p className="text-xs text-gray-500">Defaulted from the supplier record; adjust it for this order if needed.</p>
+                    <p className="text-xs text-gray-500">Supplier defaults are included automatically. Edit this list for this order only.</p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Subject</label>

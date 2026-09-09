@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../utils/api';
 import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
@@ -10,13 +10,13 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Calendar, Plus, TrendingUp, Sparkles, ShoppingBag, DollarSign, Mail, Copy } from 'lucide-react';
 import { toast } from 'sonner';
-import { getSupplierCcEmails, getSupplierEmailAddress } from '../utils/supplierEmailDraft.js';
+import { getSupplierCcEmails, getSupplierEmailAddress, parseEmailList } from '../utils/supplierEmailDraft.js';
 import { useAuth } from '../contexts/AuthContext';
 
 interface SupplierEmail {
   supplier: string;
   supplierEmail: string;
-  ccEmails: string[];
+  ccText: string;
   items: {
     name: string;
     quantity: number;
@@ -114,7 +114,7 @@ async function resolveEventContext(targetDate: string) {
 }
 
 export function Forecasting() {
-  const { accountName, user } = useAuth();
+  const { accountId, accountName, user } = useAuth();
   const restaurantName = accountName?.trim() || 'Your Restaurant';
   const { inventory, forecasts, addForecast, generateDailyOrder, suppliers } = useInventory();
   const { isConnected, salesData, menuItems } = useToast();
@@ -126,7 +126,21 @@ export function Forecasting() {
   const [forecastContext, setForecastContext] = useState<{ weatherSummary: string; confidence: number } | null>(null);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [draftEmails, setDraftEmails] = useState<SupplierEmail[]>([]);
+  const [supplierEmailCc, setSupplierEmailCc] = useState<string[]>([]);
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
+
+  useEffect(() => {
+    if (!accountId || isDemoAccount) return;
+    let cancelled = false;
+    void apiRequest<{ onboarding?: { clientProfile?: { supplierEmailCc?: string[] } } }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/onboarding`)
+      .then(payload => {
+        if (!cancelled) setSupplierEmailCc(Array.isArray(payload.onboarding?.clientProfile?.supplierEmailCc) ? payload.onboarding.clientProfile.supplierEmailCc : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSupplierEmailCc([]);
+      });
+    return () => { cancelled = true; };
+  }, [accountId, isDemoAccount]);
 
   // Calculate predicted item usage based on connected POS sales data
   const handleAutoPredict = async () => {
@@ -350,7 +364,7 @@ Restaurant Operations Team`;
       return {
         supplier,
         supplierEmail: getSupplierEmailAddress(supplier, suppliers),
-        ccEmails: getSupplierCcEmails(supplier, suppliers),
+        ccText: getSupplierCcEmails(supplier, suppliers, supplierEmailCc).join(', '),
         items: emailItems,
         totalCost,
         emailBody,
@@ -370,9 +384,14 @@ Restaurant Operations Team`;
 
   const openEmailClient = (email: SupplierEmail) => {
     const params = new URLSearchParams({ subject: email.emailSubject, body: email.emailBody });
-    if (email.ccEmails.length) params.set('cc', email.ccEmails.join(','));
+    const cc = parseEmailList(email.ccText);
+    if (cc.length) params.set('cc', cc.join(','));
     const mailtoLink = `mailto:${encodeURIComponent(email.supplierEmail)}?${params.toString()}`;
     window.location.href = mailtoLink;
+  };
+
+  const updateDraftCc = (supplier: string, ccText: string) => {
+    setDraftEmails(previous => previous.map(email => email.supplier === supplier ? { ...email, ccText } : email));
   };
 
   // Calculate average revenue from connected POS data for placeholder
@@ -442,7 +461,7 @@ Restaurant Operations Team`;
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="bg-[#0F172A] hover:bg-[#1E293B] text-white">
+            <Button size="sm" className="bg-[#303A43] hover:bg-[#1E293B] text-white">
               <Plus className="w-4 h-4 mr-1" />
               New
             </Button>
@@ -524,7 +543,7 @@ Restaurant Operations Team`;
                 <div className="flex items-center justify-between mb-2">
                   <Label>Ingredient Usage Predictions</Label>
                   {selectedItems.length > 0 && (
-                    <Badge className="bg-[#F5C10E] text-white">
+                    <Badge className="bg-[#F5D62E] text-white">
                       {selectedItems.length} items
                     </Badge>
                   )}
@@ -599,7 +618,7 @@ Restaurant Operations Team`;
                 <Button 
                   type="submit" 
                   disabled={selectedItems.length === 0} 
-                  className="bg-[#0F172A] hover:bg-[#1E293B] text-white disabled:bg-gray-400 disabled:hover:bg-gray-400"
+                  className="bg-[#303A43] hover:bg-[#1E293B] text-white disabled:bg-gray-400 disabled:hover:bg-gray-400"
                 >
                   Create Forecast
                 </Button>
@@ -610,23 +629,23 @@ Restaurant Operations Team`;
       </div>
 
       {salesProjection.length > 0 && (
-        <Card className="overflow-hidden border-[#F5C10E]/40 bg-[#0F172A] text-white">
+        <Card className="overflow-hidden border-[#F5D62E]/40 bg-[#303A43] text-white">
           <CardContent className="p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5C10E]">Sales projection</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5D62E]">Sales projection</p>
                 <h3 className="mt-1 text-2xl font-black">Plan the next seven days.</h3>
                 <p className="mt-1 text-sm text-white/60">Built from {salesData.length} days of POS sales, day-of-week patterns and recent trend.</p>
               </div>
               {isDemoAccount && (
-                <Button onClick={buildDemoForecast} className="bg-[#F5C10E] font-bold text-[#0F172A] hover:bg-[#ffd34a]">
+                <Button onClick={buildDemoForecast} className="bg-[#F5D62E] font-bold text-[#303A43] hover:bg-[#ffd34a]">
                   <Sparkles className="mr-2 h-4 w-4" /> Build tomorrow's forecast
                 </Button>
               )}
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
               {salesProjection.map((day, index) => (
-                <div key={day.date} className={`rounded-xl p-3 ${index === 0 ? 'bg-[#F5C10E] text-[#0F172A]' : 'bg-white/10'}`}>
+                <div key={day.date} className={`rounded-xl p-3 ${index === 0 ? 'bg-[#F5D62E] text-[#303A43]' : 'bg-white/10'}`}>
                   <p className="text-[11px] font-bold opacity-70">{day.label}</p>
                   <p className="mt-2 text-lg font-black">${day.revenue.toLocaleString('en-CA')}</p>
                   <p className="mt-1 text-[11px] font-medium opacity-70">{day.covers} covers</p>
@@ -709,7 +728,7 @@ Restaurant Operations Team`;
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs text-[#1D4ED8]">Expected Revenue</p>
-                        <p className="text-2xl font-bold text-[#0F172A]">
+                        <p className="text-2xl font-bold text-[#303A43]">
                           ${forecast.expectedCovers.toFixed(2)}
                         </p>
                       </div>
@@ -753,7 +772,7 @@ Restaurant Operations Team`;
                       <span className="font-semibold">${totalExpectedUsage.toFixed(2)}</span>
                     </div>
                     <Button 
-                      className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white" 
+                      className="w-full bg-[#303A43] hover:bg-[#1E293B] text-white"
                       onClick={() => handleGenerateOrder(forecast.id)}
                     >
                       Generate Order
@@ -788,13 +807,12 @@ Restaurant Operations Team`;
                       <p className="text-sm text-gray-600 mt-1">
                         {email.items.length} item(s) • ${email.totalCost.toFixed(2)}
                       </p>
-                      {email.ccEmails.length > 0 && <p className="mt-1 text-xs text-gray-500">CC: {email.ccEmails.join(', ')}</p>}
                     </div>
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
                         onClick={() => copyToClipboard(email.emailBody)}
-                        className="bg-[#0F172A] hover:bg-[#1E293B]"
+                        className="bg-[#303A43] hover:bg-[#1E293B]"
                       >
                         <Copy className="w-4 h-4 mr-2" />
                         Copy
@@ -802,7 +820,7 @@ Restaurant Operations Team`;
                       <Button
                         size="sm"
                         onClick={() => openEmailClient(email)}
-                        className="bg-[#0F172A] hover:bg-[#1E293B]"
+                        className="bg-[#303A43] hover:bg-[#1E293B]"
                       >
                         <Mail className="w-4 h-4 mr-2" />
                         Open Email
@@ -811,6 +829,15 @@ Restaurant Operations Team`;
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
+                  <div className="mb-3 space-y-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">CC recipients</label>
+                    <Input
+                      value={email.ccText}
+                      onChange={(event) => updateDraftCc(email.supplier, event.target.value)}
+                      placeholder="chef@restaurant.ca, manager@restaurant.ca"
+                    />
+                    <p className="text-xs text-gray-500">Supplier defaults are included automatically. Edit this list for this order only.</p>
+                  </div>
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
                       {email.emailBody}
@@ -820,7 +847,7 @@ Restaurant Operations Team`;
                     {email.items.map((item, idx) => (
                       <Badge 
                         key={idx} 
-                        className="bg-[#FEF9C3] text-[#1E3A5F] border border-[#F5C10E]/50 text-xs"
+                        className="bg-[#FEF9C3] text-[#1E3A5F] border border-[#F5D62E]/50 text-xs"
                       >
                         {item.name} ({item.quantity} {item.unit})
                       </Badge>

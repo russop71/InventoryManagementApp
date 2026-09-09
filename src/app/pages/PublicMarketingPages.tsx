@@ -1,6 +1,9 @@
-import { Link } from 'react-router';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { ArrowRight, BarChart3, Building2, CalendarClock, Check, FileScan, Flag, Layers3, Mail, PackageSearch, ReceiptText, ShieldCheck, Sparkles, UsersRound, Wine } from 'lucide-react';
+import { toast } from 'sonner';
 import { ZestIQBrand } from '../components/ZestIQBrand';
+import { useAuth } from '../contexts/AuthContext';
 import { usePageSeo } from '../utils/seo';
 
 type PublicPageKey = 'productTour' | 'capabilities' | 'pricing' | 'contact' | 'canadianOwned';
@@ -43,14 +46,14 @@ const pages = {
   pricing: {
     path: '/pricing',
     title: 'ZestIQ Pricing | CAD $249.99 per Month',
-    description: 'ZestIQ Basic costs CAD $249.99 per month for the first location. Additional locations are CAD $199 per month each. Scheduling is a separate CAD $49.99 account add-on.',
+    description: 'ZestIQ Basic costs CAD $249.99 per month for the first location. Additional locations are CAD $199.99 per month each with Scheduling included.',
     eyebrow: 'Clear Canadian pricing',
     heading: 'Start with ZestIQ Basic for CAD $249.99 per month.',
-    intro: 'Basic is CAD $249.99 per month for the first restaurant location and includes the core inventory, costing, purchasing and AI platform. Each additional location is CAD $199 per month. Add Scheduling to the first-location plan for CAD $49.99 per month to cover every location.',
+    intro: 'Basic is CAD $249.99 per month for the first restaurant location and includes the core inventory, costing, purchasing and AI platform. Each additional location is CAD $199.99 per month with Scheduling included.',
     sections: [
-      [Check, 'ZestIQ Basic — CAD $249.99/month', 'Inventory, recipes, food and beverage costing, invoices, purchasing, forecasts, waste, users and AI tools for one location.'],
-      [CalendarClock, 'Scheduling — add CAD $49.99/month', 'Optional account add-on covering employees, shifts, requests, projected labour and sales comparison across every location.'],
-      [Building2, 'Additional locations — CAD $199/month', 'Each additional restaurant location uses the same account. Scheduling is available only when the $49.99 account add-on is selected.'],
+      [Check, 'ZestIQ Basic — CAD $249.99/month', 'Inventory, recipes, food and beverage costing, invoices, purchasing, forecasts, waste, users and AI tools for the first restaurant location.'],
+      [CalendarClock, 'Scheduling — add CAD $49.99/month', 'Optional labour scheduling with employees, shifts, requests, projected labour and sales comparison.'],
+      [Building2, 'Additional locations — CAD $199.99/month', 'Each additional restaurant location includes Scheduling at no separate add-on charge.'],
       [ShieldCheck, 'Subscription terms', 'A 12-month commitment applies. Non-renewal notice is due at least 90 days before the renewal date.'],
       [ReceiptText, 'Acceptance record', 'Checkout records the agreement version, acceptance date and time, and the authorized customer acceptance.'],
     ],
@@ -91,15 +94,38 @@ export function CanadianOwnedPage() { return <PublicMarketingPage pageKey="canad
 
 function PublicMarketingPage({ pageKey }: { pageKey: PublicPageKey }) {
   const page = pages[pageKey];
+  const navigate = useNavigate();
+  const { loginDemo } = useAuth();
+  const [demoLoading, setDemoLoading] = useState(false);
   usePageSeo({ title: page.title, description: page.description, path: page.path });
 
-  return <div className="zestiq-public min-h-screen bg-[#FBFAF6] text-[#0B1220]">
-    <header className="public-header border-b border-black/5 bg-white"><div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8"><ZestIQBrand compact /><div className="flex items-center gap-2"><Link to="/login" className="rounded-xl border border-black/10 px-4 py-2.5 text-sm font-black">Log in</Link><Link to="/book-demo" className="rounded-xl bg-[#0B1220] px-4 py-2.5 text-sm font-black text-white">Book a demo</Link></div></div></header>
+  const openDemoAccount = async () => {
+    if (demoLoading) return;
+    setDemoLoading(true);
+    try {
+      await loginDemo();
+      toast.success('Welcome to the ZestIQ demo');
+      navigate('/app');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to open the demo account');
+      setDemoLoading(false);
+    }
+  };
+
+  return <div className="min-h-screen bg-[#FBFAF6] text-[#303A43]">
+    <header className="border-b border-black/5 bg-white"><div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8"><Link to="/" aria-label="ZestIQ home" className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E]"><ZestIQBrand compact /></Link><div className="flex items-center gap-2"><Link to="/login" className="rounded-xl border border-black/10 px-4 py-2.5 text-sm font-black">Log in</Link><Link to="/book-demo" className="rounded-xl bg-[#303A43] px-4 py-2.5 text-sm font-black text-white">Book a demo</Link></div></div></header>
     <main>
-      <section className="public-hero overflow-hidden bg-[#0B1220] text-white"><div className="mx-auto grid max-w-7xl gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[1fr_.72fr] lg:items-center lg:py-28"><div><p className="text-xs font-black uppercase tracking-[.2em] text-[#D8B85B]">{page.eyebrow}</p><h1 className="mt-5 max-w-4xl text-5xl font-black leading-[.95] tracking-[-.045em] sm:text-6xl">{page.heading}</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-white/65">{page.intro}</p><div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link to="/book-demo" className="public-button-gold inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#D8B85B] px-7 font-black text-[#0B1220]">Book a tailored demo<ArrowRight className="h-4 w-4" /></Link><Link to="/product-tour" className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-7 font-black">Explore the product</Link></div></div><div className="public-geometric-panel hidden lg:block" aria-hidden="true" /></div></section>
-      <section className="public-cream-section mx-auto max-w-7xl px-5 py-20 sm:px-8"><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{page.sections.map(([Icon, title, text]) => <article key={title} className="public-card rounded-3xl border border-black/10 bg-white p-7 shadow-sm"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#EFE2B8]"><Icon className="h-6 w-6" /></div><h2 className="mt-5 text-2xl font-black">{title}</h2><p className="mt-3 leading-7 text-black/55">{text}</p></article>)}</div></section>
-      <section className="public-gold-section bg-[#D8B85B]"><div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-14 sm:px-8 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[.2em] text-black/45">Next step</p><h2 className="mt-2 text-3xl font-black">See how this fits your restaurant.</h2></div><div className="flex flex-col gap-3 sm:flex-row"><a href="mailto:demo@zestiq.ca" className="inline-flex h-12 items-center justify-center rounded-xl border-2 border-[#0B1220] px-6 font-black">Email ZestIQ</a><Link to="/book-demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#0B1220] px-6 font-black text-white">Book a demo<ArrowRight className="h-4 w-4" /></Link></div></div></section>
+      <section className="overflow-hidden bg-[#303A43] text-white"><div className="mx-auto grid max-w-7xl gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[1fr_.82fr] lg:items-center lg:py-28"><div><p className="text-xs font-black uppercase tracking-[.2em] text-[#F5D62E]">{page.eyebrow}</p><h1 className="mt-5 max-w-4xl text-5xl font-black leading-[.95] tracking-[-.045em] sm:text-6xl">{page.heading}</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-white/65">{page.intro}</p><div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link to="/book-demo" className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5D62E] px-7 font-black text-[#303A43]">Book a tailored demo<ArrowRight className="h-4 w-4" /></Link><button type="button" onClick={openDemoAccount} disabled={demoLoading} className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-7 font-black transition hover:border-[#F5D62E]/60 hover:bg-white/5 disabled:cursor-wait disabled:opacity-60">{demoLoading ? 'Opening demo…' : 'Explore the product'}</button></div></div><HeroVisual pageKey={pageKey} /></div></section>
+      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8"><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{page.sections.map(([Icon, title, text]) => <article key={title} className="rounded-3xl border border-black/10 bg-white p-7 shadow-sm"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#FFF2B5]"><Icon className="h-6 w-6" /></div><h2 className="mt-5 text-2xl font-black">{title}</h2><p className="mt-3 leading-7 text-black/55">{text}</p></article>)}</div></section>
+      <section className="bg-[#F5D62E]"><div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-14 sm:px-8 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[.2em] text-black/45">Next step</p><h2 className="mt-2 text-3xl font-black">See how this fits your restaurant.</h2></div><div className="flex flex-col gap-3 sm:flex-row"><a href="mailto:demo@zestiq.ca" className="inline-flex h-12 items-center justify-center rounded-xl border-2 border-[#303A43] px-6 font-black">Email ZestIQ</a><Link to="/book-demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#303A43] px-6 font-black text-white">Book a demo<ArrowRight className="h-4 w-4" /></Link></div></div></section>
     </main>
-    <footer className="public-footer bg-[#0B1220] text-white"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-10 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8"><ZestIQBrand className="text-white" /><div className="flex flex-wrap gap-x-5 gap-y-2 text-white/65"><Link to="/capabilities">Capabilities</Link><Link to="/pricing">Pricing</Link><Link to="/contact">Contact</Link><Link to="/legal">Legal centre</Link><Link to="/">Home</Link></div></div></footer>
+    <footer className="bg-[#303A43] text-white"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-10 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8"><Link to="/" aria-label="ZestIQ home"><ZestIQBrand className="text-white" /></Link><div className="flex flex-wrap gap-x-5 gap-y-2 text-white/65"><Link to="/restaurant-inventory-management-guide">Inventory guide</Link><Link to="/restaurant-food-cost-calculator">Food-cost calculator</Link><Link to="/capabilities">Capabilities</Link><Link to="/pricing">Pricing</Link><Link to="/contact">Contact</Link><Link to="/legal">Legal centre</Link><Link to="/">Home</Link></div></div></footer>
+  </div>;
+}
+
+function HeroVisual({ pageKey }: { pageKey: PublicPageKey }) {
+  return <div className="relative hidden place-items-center lg:grid">
+    <div className="absolute h-72 w-72 rounded-full bg-[#F5D62E]/15 blur-3xl" />
+    <img src="/zestiq-mark-exact.png" alt="ZestIQ logo" className="relative w-full max-w-[340px] drop-shadow-[0_24px_35px_rgba(0,0,0,0.28)]" data-page={pageKey} />
   </div>;
 }

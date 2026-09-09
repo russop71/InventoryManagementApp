@@ -1,10 +1,21 @@
 import { useInventory } from '../contexts/InventoryContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { useSearchParams } from 'react-router';
+import { COGSBreakdown } from './COGSBreakdown';
 
 export function CostBreakdown() {
   const { inventory, orders, forecasts } = useInventory();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeView = searchParams.get('view') === 'cogs' ? 'cogs' : 'inventory';
+
+  const setActiveView = (view: 'inventory' | 'cogs') => {
+    const next = new URLSearchParams(searchParams);
+    if (view === 'cogs') next.set('view', 'cogs');
+    else next.delete('view');
+    setSearchParams(next, { replace: true });
+  };
 
   // Calculate total inventory value
   const totalInventoryValue = inventory.reduce(
@@ -70,14 +81,40 @@ export function CostBreakdown() {
     return acc;
   }, [] as { supplier: string; value: number; items: number }[]);
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  const categoryTotal = categoryData.reduce((sum, category) => sum + category.value, 0);
+  const sortedCategoryData = [...categoryData].sort((left, right) => right.value - left.value);
+  const COLORS = ['#F5D62E', '#303A43', '#D9BC24', '#68747D', '#FFE97A', '#46525B', '#E8C91F', '#8A949B'];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Cost Breakdown</h2>
-        <p className="text-sm text-gray-600 mt-1">Analyze your costs</p>
+        <h2 className="text-2xl font-semibold text-gray-900">Cost &amp; COGS Reports</h2>
+        <p className="text-sm text-gray-600 mt-1">Inventory value, purchasing costs and menu-item COGS in one place.</p>
       </div>
+
+      <div className="inline-flex w-full rounded-2xl border border-[#DDD8CA] bg-white p-1.5 shadow-sm sm:w-auto">
+        <button
+          type="button"
+          onClick={() => setActiveView('inventory')}
+          className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition sm:flex-none"
+          style={activeView === 'inventory' ? { background: '#303A43', color: '#FFFFFF' } : { color: '#68747D' }}
+        >
+          Inventory &amp; purchasing
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveView('cogs')}
+          className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition sm:flex-none"
+          style={activeView === 'cogs' ? { background: '#F5D62E', color: '#303A43' } : { color: '#68747D' }}
+        >
+          Menu COGS
+        </button>
+      </div>
+
+      {activeView === 'cogs' ? (
+        <COGSBreakdown embedded />
+      ) : (
+      <div className="space-y-4">
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-3">
@@ -130,26 +167,46 @@ export function CostBreakdown() {
             <CardTitle className="text-base">Cost by Category</CardTitle>
           </CardHeader>
           <CardContent>
-            {categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
-                </PieChart>
-              </ResponsiveContainer>
+            {sortedCategoryData.length > 0 ? (
+              <div className="grid gap-5 lg:grid-cols-[minmax(260px,.8fr)_1.2fr] lg:items-center">
+                <div className="h-[240px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={sortedCategoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={54}
+                        outerRadius={88}
+                        paddingAngle={2}
+                        stroke="#FFFEFA"
+                        strokeWidth={3}
+                        dataKey="value"
+                      >
+                        {sortedCategoryData.map((entry, index) => (
+                          <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 gap-x-5 gap-y-2">
+                  {sortedCategoryData.map((category, index) => {
+                    const percentage = categoryTotal > 0 ? (category.value / categoryTotal) * 100 : 0;
+                    return (
+                      <div key={category.name} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-slate-800">{category.name}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">${category.value.toFixed(2)}</p>
+                        </div>
+                        <span className="shrink-0 text-xs font-black text-slate-700">{percentage.toFixed(0)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             ) : (
               <div className="h-[250px] flex items-center justify-center text-gray-500 text-sm">
                 No data available
@@ -166,11 +223,11 @@ export function CostBreakdown() {
             {ordersByMonth.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={ordersByMonth}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E4DFD2" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#68747D' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#68747D' }} axisLine={false} tickLine={false} />
                   <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
-                  <Bar dataKey="value" fill="#3b82f6" name="Cost ($)" />
+                  <Bar dataKey="value" fill="#F5D62E" radius={[6, 6, 0, 0]} name="Cost ($)" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -198,7 +255,7 @@ export function CostBreakdown() {
                   <div key={item.id} className="bg-gray-50 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-start flex-1">
-                        <div className="w-6 h-6 rounded-full bg-[#FEF9C3] text-[#2563EB] flex items-center justify-center text-xs font-medium mr-2 flex-shrink-0 mt-0.5">
+                        <div className="w-6 h-6 rounded-full bg-[#F5D62E] text-[#303A43] flex items-center justify-center text-xs font-black mr-2 flex-shrink-0 mt-0.5">
                           {index + 1}
                         </div>
                         <div className="flex-1">
@@ -258,6 +315,8 @@ export function CostBreakdown() {
           </CardContent>
         </Card>
       </div>
+      </div>
+      )}
     </div>
   );
 }

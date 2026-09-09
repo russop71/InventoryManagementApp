@@ -15,7 +15,6 @@ import {
   FileScan,
   KeyRound,
   LockKeyhole,
-  Menu,
   MessageCircle,
   PackageSearch,
   ReceiptText,
@@ -28,7 +27,6 @@ import {
   UsersRound,
   Warehouse,
   Wine,
-  X,
   Zap,
 } from 'lucide-react';
 import { usePageSeo } from '../utils/seo';
@@ -40,10 +38,10 @@ const features = [
   [PackageSearch, 'Live inventory control', 'Count stock, track variance, transfers and low-stock items without spreadsheet chaos.'],
   [ReceiptText, 'Food cost & recipe intelligence', 'Use current inventory prices to see recipe cost, margin and ingredient price changes.'],
   [FileScan, 'AI document scanning', 'Capture invoice images or PDFs and handwritten recipe cards with less manual entry.'],
-  [BarChart3, 'Ordering & forecasting', 'Use inventory, pars and sales patterns to tighten orders and reduce over-buying.'],
+  [BarChart3, 'Item-level ordering forecasts', 'Turn forecasted menu-item sales into ingredient demand, with a 5–10% safety buffer and live stock deducted.'],
   [Warehouse, 'Multi-location operations', 'Standardize counts, costs and ordering while keeping location-level visibility.'],
   [ShieldCheck, 'Operational controls', 'Protect invoice integrity, user roles and supplier purchasing data in one system.'],
-  [MessageCircle, 'Company-aware AI assistant', 'Ask about your operation and get help using only your authorized company data.'],
+  [MessageCircle, 'Company-aware AI assistant', 'Ask why an item is recommended, what may run short and which inputs need attention—using only your authorized company data.'],
   [CalendarClock, 'Labour & scheduling', 'Build weekly schedules and compare planned labour cost with sales before payroll closes.'],
   [Wine, 'Liquor, wine & beer costing', 'Track bottle and case stock, pour yields, drink cost and beverage margin.'],
 ];
@@ -79,7 +77,10 @@ const capabilityGroups = [
     description: 'Give operators and owners the visibility to act earlier.',
     items: [
       'Recipe margins and food-cost breakdowns',
-      'Forecast-assisted daily ordering',
+      'Menu-item sales forecasts from POS history',
+      'Recipe-to-ingredient demand calculations',
+      '5–10% safety buffers tuned for perishability',
+      'Supplier order drafts with missing-item warnings',
       'Supplier and invoice history',
       'POS integration workflows',
       'Location, user and role management',
@@ -141,8 +142,8 @@ function Product() {
 
   return (
     <motion.div initial={reduceMotion ? false : { opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="relative rounded-[28px] border border-white/10 bg-[#111A2B] p-3 shadow-2xl">
-      <motion.div aria-hidden="true" className="absolute -right-8 -top-8 h-28 w-28 rounded-full border border-[#F5C10E]/25" animate={reduceMotion ? undefined : { rotate: 360, scale: [1, 1.08, 1] }} transition={{ rotate: { duration: 18, repeat: Infinity, ease: 'linear' }, scale: { duration: 4, repeat: Infinity } }} />
-      <div className="rounded-[22px] bg-[#F7F8FA] p-5 text-[#0B1220]">
+      <motion.div aria-hidden="true" className="absolute -right-8 -top-8 h-28 w-28 rounded-full border border-[#F5D62E]/25" animate={reduceMotion ? undefined : { rotate: 360, scale: [1, 1.08, 1] }} transition={{ rotate: { duration: 18, repeat: Infinity, ease: 'linear' }, scale: { duration: 4, repeat: Infinity } }} />
+      <div className="rounded-[22px] bg-[#F7F8FA] p-5 text-[#303A43]">
         <div className="flex justify-between border-b border-black/10 pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[.18em] text-black/40">Operations overview</p>
@@ -151,7 +152,7 @@ function Product() {
           <span className="h-fit rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-800">Live</span>
         </div>
         <div className="mt-4 flex gap-2 overflow-x-auto">
-          {views.map((view, index) => <button key={view.label} type="button" onClick={() => setActiveView(index)} className={`relative shrink-0 rounded-full px-3 py-2 text-xs font-black transition ${activeView === index ? 'bg-[#0B1220] text-white' : 'bg-white text-black/45 hover:text-black'}`}>{view.label}{activeView === index && <motion.span layoutId="product-tab" className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-[#F5C10E]" />}</button>)}
+          {views.map((view, index) => <button key={view.label} type="button" onClick={() => setActiveView(index)} className={`relative shrink-0 rounded-full px-3 py-2 text-xs font-black transition ${activeView === index ? 'bg-[#303A43] text-white' : 'bg-white text-black/45 hover:text-black'}`}>{view.label}{activeView === index && <motion.span layoutId="product-tab" className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-[#F5D62E]" />}</button>)}
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
@@ -173,16 +174,16 @@ function Product() {
             <div className="flex items-center justify-between gap-3"><p className="font-black">{active.label} signal</p><span className="rounded-full bg-[#FFF2B5] px-2 py-1 text-[10px] font-black">{active.status}</span></div>
             <div className="mt-6 flex h-28 items-end gap-2">
               {active.bars.map((height, index) => (
-                <motion.div key={`${active.label}-${index}`} initial={reduceMotion ? false : { height: 0 }} animate={{ height: `${height}%` }} transition={{ delay: index * 0.025, duration: 0.35 }} className="flex-1 rounded-t bg-[#F5C10E]" />
+                <motion.div key={`${active.label}-${index}`} initial={reduceMotion ? false : { height: 0 }} animate={{ height: `${height}%` }} transition={{ delay: index * 0.025, duration: 0.35 }} className="flex-1 rounded-t bg-[#F5D62E]" />
               ))}
             </div>
           </div>
-          <div className="rounded-2xl bg-[#0B1220] p-4 text-white">
+          <div className="rounded-2xl bg-[#303A43] p-4 text-white">
             <p className="text-xs font-bold uppercase text-white/40">Needs attention</p>
             {active.attention.map(([name, insight], index) => (
               <motion.div initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + index * 0.06 }} key={name} className="mt-3 rounded-xl bg-white/10 p-3">
                 <p className="text-sm font-bold">{name}</p>
-                <p className="text-xs text-[#F5C10E]">{insight}</p>
+                <p className="text-xs text-[#F5D62E]">{insight}</p>
               </motion.div>
             ))}
           </div>
@@ -208,10 +209,10 @@ function ForecastToOrderShowcase() {
   const money = (value: number) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(value);
 
   return (
-    <section className="overflow-hidden bg-[#0B1220] text-white">
+    <section className="overflow-hidden bg-[#303A43] text-white">
       <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[.82fr_1.18fr] lg:items-center lg:py-28">
         <div>
-          <p className="text-sm font-black uppercase tracking-[.2em] text-[#F5C10E]">Forecast-to-order intelligence</p>
+          <p className="text-sm font-black uppercase tracking-[.2em] text-[#F5D62E]">Forecast-to-order intelligence</p>
           <h2 className="mt-3 text-4xl font-black leading-tight tracking-[-.035em] sm:text-5xl">
             Turn menu demand into a safer, reviewable supplier order.
           </h2>
@@ -220,20 +221,20 @@ function ForecastToOrderShowcase() {
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
             {[
-              [TrendingDown, '1. Forecast demand', 'Estimate menu-item sales using POS history and operating signals.'],
-              [ClipboardCheck, '2. Calculate ingredients', 'Convert forecast dishes into ingredient demand through linked recipes.'],
-              [ShieldCheck, '3. Apply your buffer', 'Choose 5%, 10% or 15% before quantities are finalized.'],
-              [ShoppingCart, '4. Review the order', 'Deduct usable stock, group by supplier and approve before sending.'],
+              [TrendingDown, 'Forecast demand', 'Estimate menu-item sales using POS history and operating signals.'],
+              [ClipboardCheck, 'Calculate ingredients', 'Convert forecast dishes into ingredient demand through linked recipes.'],
+              [ShieldCheck, 'Apply your buffer', 'Choose 5%, 10% or 15% before quantities are finalized.'],
+              [ShoppingCart, 'Review the order', 'Deduct usable stock, group by supplier and approve before sending.'],
             ].map(([Icon, title, text]: any) => (
-              <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <Icon className="h-5 w-5 text-[#F5C10E]" />
+              <div key={title} className="rounded-2xl border border-white/15 bg-white/5 p-4">
+                <Icon className="h-5 w-5 text-[#F5D62E]" />
                 <p className="mt-3 text-sm font-black">{title}</p>
                 <p className="mt-1 text-xs leading-5 text-white/50">{text}</p>
               </div>
             ))}
           </div>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link to={DEMO_URL} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">
+            <Link to={DEMO_URL} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5D62E] px-6 font-black text-[#303A43]">
               See it with your menu <ArrowRight className="h-4 w-4" />
             </Link>
             <Link to="/product-tour" className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-6 font-bold">
@@ -243,8 +244,8 @@ function ForecastToOrderShowcase() {
         </div>
 
         <div className="relative">
-          <div aria-hidden="true" className="absolute -inset-10 rounded-full bg-[#F5C10E]/15 blur-3xl" />
-          <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[#F7F8FA] text-[#0B1220] shadow-2xl">
+          <div aria-hidden="true" className="absolute -inset-10 rounded-full bg-[#F5D62E]/15 blur-3xl" />
+          <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[#FBFAF6] text-[#303A43] shadow-2xl">
             <div className="flex flex-col gap-4 border-b border-black/10 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
               <div>
                 <p className="text-xs font-black uppercase tracking-[.18em] text-black/40">Example order preview</p>
@@ -257,7 +258,7 @@ function ForecastToOrderShowcase() {
                     type="button"
                     aria-pressed={bufferPercent === option}
                     onClick={() => setBufferPercent(option)}
-                    className={`rounded-lg px-3 py-2 text-xs font-black transition ${bufferPercent === option ? 'bg-[#0B1220] text-white' : 'text-black/50 hover:bg-black/5'}`}
+                    className={`rounded-lg px-3 py-2 text-xs font-black transition ${bufferPercent === option ? 'bg-[#303A43] text-white' : 'text-black/50 hover:bg-black/5'}`}
                   >
                     {option}%
                   </button>
@@ -284,9 +285,9 @@ function ForecastToOrderShowcase() {
               ))}
             </div>
 
-            <div className="flex items-center justify-between gap-4 bg-[#F5C10E] px-5 py-4 sm:px-6">
+            <div className="flex items-center justify-between gap-4 bg-[#F5D62E] px-5 py-4 sm:px-6">
               <div><p className="text-xs font-black uppercase tracking-wider text-black/45">Suggested total</p><p className="mt-1 text-2xl font-black">{money(orderTotal)}</p></div>
-              <span className="rounded-full bg-[#0B1220] px-4 py-2 text-xs font-black text-white">Review required</span>
+              <span className="rounded-full bg-[#303A43] px-4 py-2 text-xs font-black text-white">Review required</span>
             </div>
             <p className="px-5 py-3 text-[11px] leading-5 text-black/40 sm:px-6">
               Illustrative quantities only. Actual suggestions depend on your recipes, units, supplier packs, stock accuracy and forecast inputs.
@@ -323,9 +324,9 @@ function SavingsCalculator() {
             <div className="rounded-2xl bg-[#FBFAF6] p-4"><p className="text-[10px] font-black uppercase tracking-wider text-black/40">Labour opportunity</p><p className="mt-2 text-2xl font-black">{laborImprovement}%</p></div>
           </div>
         </div>
-        <div className="overflow-hidden rounded-[32px] bg-[#0B1220] text-white shadow-2xl">
+        <div className="overflow-hidden rounded-[32px] bg-[#303A43] text-white shadow-2xl">
           <div className="border-b border-white/10 p-6 sm:p-8">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs font-black uppercase tracking-[.18em] text-white/45">Estimated opportunity</p><output className="mt-2 block text-4xl font-black text-[#F5C10E] sm:text-5xl">{money(monthlyOpportunity)}<span className="text-base text-white/45"> / month</span></output></div><div className="rounded-2xl bg-white/10 px-4 py-3"><p className="text-[10px] uppercase tracking-wider text-white/45">Annualized</p><p className="mt-1 text-xl font-black">{money(monthlyOpportunity * 12)}</p></div></div>
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs font-black uppercase tracking-[.18em] text-white/45">Estimated opportunity</p><output className="mt-2 block text-4xl font-black text-[#F5D62E] sm:text-5xl">{money(monthlyOpportunity)}<span className="text-base text-white/45"> / month</span></output></div><div className="rounded-2xl bg-white/10 px-4 py-3"><p className="text-[10px] uppercase tracking-wider text-white/45">Annualized</p><p className="mt-1 text-xl font-black">{money(monthlyOpportunity * 12)}</p></div></div>
           </div>
           <div className="grid gap-6 p-6 sm:grid-cols-2 sm:p-8">
             <Slider label="Monthly sales" value={monthlySales} min={30000} max={500000} step={5000} display={money(monthlySales)} onChange={setMonthlySales} />
@@ -342,16 +343,16 @@ function SavingsCalculator() {
 
 function Slider({ label, value, min, max, step, display, onChange }: { label: string; value: number; min: number; max: number; step: number; display: string; onChange: (value: number) => void }) {
   return (
-    <label className="block min-w-0"><span className="flex items-center justify-between gap-3 text-xs font-bold text-white/55"><span>{label}</span><span className="shrink-0 font-black text-white">{display}</span></span><input aria-label={label} type="range" value={value} min={min} max={max} step={step} onChange={event => onChange(Number(event.target.value))} className="mt-3 w-full accent-[#F5C10E]" /></label>
+    <label className="block min-w-0"><span className="flex items-center justify-between gap-3 text-xs font-bold text-white/55"><span>{label}</span><span className="shrink-0 font-black text-white">{display}</span></span><input aria-label={label} type="range" value={value} min={min} max={max} step={step} onChange={event => onChange(Number(event.target.value))} className="mt-3 w-full accent-[#F5D62E]" /></label>
   );
 }
 
 function PhoneShowcase() {
   const reduceMotion = useReducedMotion();
   return (
-    <section className="overflow-hidden bg-[#F5C10E]">
+    <section className="overflow-hidden bg-[#F5D62E]">
       <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:py-28">
-        <div><p className="text-sm font-black uppercase tracking-[.2em] text-black/45">One website. Two apps.</p><h2 className="mt-3 text-4xl font-black tracking-[-.035em] sm:text-5xl">The office and the floor stay connected.</h2><p className="mt-5 text-lg leading-8 text-black/60">Managers run the operation in ZestIQ. Employees carry ZestEmployee for schedules, swaps and time off. Both use the same protected restaurant and location data.</p><div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#0B1220] px-5 font-black text-white">Open ZestIQ<ArrowRight className="h-4 w-4" /></Link><Link to="/login?returnTo=/employee" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-[#0B1220] px-5 font-black">Open ZestEmployee<ArrowRight className="h-4 w-4" /></Link></div></div>
+        <div><p className="text-sm font-black uppercase tracking-[.2em] text-black/45">One website. Two apps.</p><h2 className="mt-3 text-4xl font-black tracking-[-.035em] sm:text-5xl">The office and the floor stay connected.</h2><p className="mt-5 text-lg leading-8 text-black/60">Managers run the operation in ZestIQ. Employees carry ZestEmployee for schedules, swaps and time off. Both use the same protected restaurant and location data.</p><div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#303A43] px-5 font-black text-white">Open ZestIQ<ArrowRight className="h-4 w-4" /></Link><Link to="/login?returnTo=/employee" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-[#303A43] px-5 font-black">Open ZestEmployee<ArrowRight className="h-4 w-4" /></Link></div></div>
         <div className="relative mx-auto flex w-full max-w-2xl items-end justify-center gap-3 sm:gap-7">
           <motion.div animate={reduceMotion ? undefined : { y: [0, -9, 0], rotate: [-1.5, 0, -1.5] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} className="w-[47%] max-w-[270px]"><ManagementPhone /></motion.div>
           <motion.div animate={reduceMotion ? undefined : { y: [-5, 5, -5], rotate: [1.5, 0, 1.5] }} transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }} className="w-[47%] max-w-[270px]"><EmployeePhone /></motion.div>
@@ -379,13 +380,13 @@ function LiveProductTour() {
 
   const active = screens[activeScreen];
   return <section id="product-tour" className="overflow-hidden bg-[#EEF1F5]">
-    <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+    <div className="mx-auto max-w-7xl px-5 pb-20 pt-10 sm:px-8 lg:pb-28 lg:pt-14">
       <div className="max-w-3xl"><p className="text-sm font-black uppercase tracking-[.2em] text-[#9A7600]">The working product</p><h2 className="mt-3 text-4xl font-black tracking-[-.035em] sm:text-6xl">A restaurant workspace—not a concept screen.</h2><p className="mt-5 text-lg leading-8 text-black/60">Explore ZestIQ workflows through Zestaurant, a realistic restaurant workspace with inventory, recipes, sales and labour activity already in motion.</p></div>
       <div className="mt-12 grid gap-7 lg:grid-cols-[.72fr_1.28fr] lg:items-center">
-        <div className="space-y-3">{screens.map((screen, index) => <button key={screen.label} type="button" onClick={() => setActiveScreen(index)} className={`w-full rounded-3xl border p-5 text-left transition ${activeScreen === index ? 'border-[#0B1220] bg-[#0B1220] text-white shadow-xl' : 'border-black/10 bg-white hover:-translate-y-0.5 hover:shadow-md'}`}><div className="flex items-center justify-between gap-3"><span className={`text-xs font-black uppercase tracking-[.18em] ${activeScreen === index ? 'text-[#F5C10E]' : 'text-[#9A7600]'}`}>{screen.label}</span><span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-black ${activeScreen === index ? 'bg-[#F5C10E] text-[#0B1220]' : 'bg-black/5'}`}>0{index + 1}</span></div><h3 className="mt-3 text-xl font-black">{screen.title}</h3><p className={`mt-2 text-sm leading-6 ${activeScreen === index ? 'text-white/55' : 'text-black/50'}`}>{screen.text}</p></button>)}</div>
+        <div className="space-y-3">{screens.map((screen, index) => <button key={screen.label} type="button" onClick={() => setActiveScreen(index)} className={`w-full rounded-3xl border p-5 text-left transition ${activeScreen === index ? 'border-[#303A43] bg-[#303A43] text-white shadow-xl' : 'border-black/10 bg-white hover:-translate-y-0.5 hover:shadow-md'}`}><div className="flex items-center justify-between gap-3"><span className={`text-xs font-black uppercase tracking-[.18em] ${activeScreen === index ? 'text-[#F5D62E]' : 'text-[#9A7600]'}`}>{screen.label}</span><span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-black ${activeScreen === index ? 'bg-[#F5D62E] text-[#303A43]' : 'bg-black/5'}`}>0{index + 1}</span></div><h3 className="mt-3 text-xl font-black">{screen.title}</h3><p className={`mt-2 text-sm leading-6 ${activeScreen === index ? 'text-white/55' : 'text-black/50'}`}>{screen.text}</p></button>)}</div>
         <div className="relative min-w-0">
-          <motion.div aria-hidden="true" className="absolute -inset-8 rounded-full bg-[#F5C10E]/20 blur-3xl" animate={reduceMotion ? undefined : { scale: [0.92, 1.04, 0.92], rotate: [0, 8, 0] }} transition={{ duration: 7, repeat: Infinity }} />
-          <div className="relative overflow-hidden rounded-[30px] border-[8px] border-[#0B1220] bg-[#0B1220] shadow-2xl"><div className="flex h-8 items-center gap-1.5 bg-[#0B1220] px-3"><span className="h-2.5 w-2.5 rounded-full bg-red-400" /><span className="h-2.5 w-2.5 rounded-full bg-[#F5C10E]" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span className="ml-3 truncate text-[10px] font-bold text-white/35">app.zestiq.ca · Main Location</span></div><AnimatePresence mode="wait"><motion.img key={active.image} src={active.image} alt={active.alt} initial={reduceMotion ? false : { opacity: 0, x: 35, scale: .98 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={reduceMotion ? undefined : { opacity: 0, x: -35 }} transition={{ duration: .38 }} className="block aspect-video w-full bg-white object-cover object-top" /></AnimatePresence></div>
+          <motion.div aria-hidden="true" className="absolute -inset-8 rounded-full bg-[#F5D62E]/20 blur-3xl" animate={reduceMotion ? undefined : { scale: [0.92, 1.04, 0.92], rotate: [0, 8, 0] }} transition={{ duration: 7, repeat: Infinity }} />
+          <div className="relative overflow-hidden rounded-[30px] border-[8px] border-[#303A43] bg-[#303A43] shadow-2xl"><div className="flex h-8 items-center gap-1.5 bg-[#303A43] px-3"><span className="h-2.5 w-2.5 rounded-full bg-red-400" /><span className="h-2.5 w-2.5 rounded-full bg-[#F5D62E]" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span className="ml-3 truncate text-[10px] font-bold text-white/35">app.zestiq.ca · Main Location</span></div><AnimatePresence mode="wait"><motion.img key={active.image} src={active.image} alt={active.alt} initial={reduceMotion ? false : { opacity: 0, x: 35, scale: .98 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={reduceMotion ? undefined : { opacity: 0, x: -35 }} transition={{ duration: .38 }} className="block aspect-video w-full bg-white object-cover object-top" /></AnimatePresence></div>
         </div>
       </div>
     </div>
@@ -393,73 +394,61 @@ function LiveProductTour() {
 }
 
 function PhoneFrame({ children, label }: { children: React.ReactNode; label: string }) {
-  return <div className="rounded-[36px] border-[7px] border-[#0B1220] bg-[#0B1220] p-1 shadow-2xl"><div className="relative aspect-[9/18.5] overflow-hidden rounded-[25px] bg-[#F4F5F7]"><div className="absolute left-1/2 top-1.5 z-10 h-4 w-20 -translate-x-1/2 rounded-full bg-[#0B1220]" /><span className="sr-only">{label}</span>{children}</div></div>;
+  return <div className="rounded-[36px] border-[7px] border-[#303A43] bg-[#303A43] p-1 shadow-2xl"><div className="relative aspect-[9/18.5] overflow-hidden rounded-[25px] bg-[#F4F5F7]"><div className="absolute left-1/2 top-1.5 z-10 h-4 w-20 -translate-x-1/2 rounded-full bg-[#303A43]" /><span className="sr-only">{label}</span>{children}</div></div>;
 }
 
 function ManagementPhone() {
-  return <PhoneFrame label="ZestIQ management app screen"><div className="bg-[#0B1220] px-3 pb-4 pt-8 text-white"><ZestIQBrand className="gap-1.5 text-white" markClassName="h-6 w-6 rounded-lg" wordmarkClassName="text-sm" /><p className="mt-5 text-[8px] font-black uppercase tracking-wider text-white/40">Today at King Street</p><h3 className="mt-1 text-lg font-black">Protect the margin.</h3></div><div className="space-y-2 p-3"><div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Food cost</p><p className="mt-1 text-sm font-black text-emerald-600">28.4%</p></div><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Labour</p><p className="mt-1 text-sm font-black text-violet-600">29.7%</p></div></div><div className="rounded-xl bg-white p-3 shadow-sm"><div className="flex items-center justify-between"><p className="text-[9px] font-black">Needs attention</p><span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[6px] font-black text-red-600">3</span></div>{[['Salmon', '+8.4% cost'], ['Friday labour', '$312 over'], ['Pinot Grigio', 'Below par']].map(([name, value]) => <div key={name} className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2"><p className="text-[8px] font-bold">{name}</p><p className="text-[7px] font-black text-amber-700">{value}</p></div>)}</div><div className="rounded-xl bg-[#FFF7D1] p-3"><p className="text-[7px] font-black uppercase text-amber-700">AI order suggestion</p><p className="mt-1 text-[9px] font-black">$366 across 2 suppliers</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full w-3/4 rounded-full bg-[#F5C10E]" /></div></div></div><PhoneNav items={[[BarChart3, 'Today'], [PackageSearch, 'Stock'], [Wine, 'Beverage']]} /></PhoneFrame>;
+  return <PhoneFrame label="ZestIQ management app screen"><div className="bg-[#303A43] px-3 pb-4 pt-8 text-white"><ZestIQBrand className="gap-2.5 text-white" markClassName="h-12 w-12 rounded-none bg-transparent" wordmarkClassName="text-2xl" /><p className="mt-5 text-[8px] font-black uppercase tracking-wider text-white/40">Today at King Street</p><h3 className="mt-1 text-lg font-black">Protect the margin.</h3></div><div className="space-y-2 p-3"><div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Food cost</p><p className="mt-1 text-sm font-black text-emerald-600">28.4%</p></div><div className="rounded-xl bg-white p-2 shadow-sm"><p className="text-[7px] font-black uppercase text-slate-400">Labour</p><p className="mt-1 text-sm font-black text-violet-600">29.7%</p></div></div><div className="rounded-xl bg-white p-3 shadow-sm"><div className="flex items-center justify-between"><p className="text-[9px] font-black">Needs attention</p><span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[6px] font-black text-red-600">3</span></div>{[['Salmon', '+8.4% cost'], ['Friday labour', '$312 over'], ['Pinot Grigio', 'Below par']].map(([name, value]) => <div key={name} className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2"><p className="text-[8px] font-bold">{name}</p><p className="text-[7px] font-black text-amber-700">{value}</p></div>)}</div><div className="rounded-xl bg-[#FFF7D1] p-3"><p className="text-[7px] font-black uppercase text-amber-700">AI order suggestion</p><p className="mt-1 text-[9px] font-black">$366 across 2 suppliers</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full w-3/4 rounded-full bg-[#F5D62E]" /></div></div></div><PhoneNav items={[[BarChart3, 'Today'], [PackageSearch, 'Stock'], [Wine, 'Beverage']]} /></PhoneFrame>;
 }
 
 function EmployeePhone() {
-  return <PhoneFrame label="ZestEmployee schedule app screen"><div className="bg-[#0B1220] px-3 pb-4 pt-8 text-white"><div className="flex items-center gap-1.5 text-sm font-black"><span className="grid h-6 w-6 place-items-center rounded-lg bg-[#F5C10E] text-[11px] text-[#0B1220]">Z</span>Zest<span className="text-[#F5C10E]">Employee</span></div><p className="mt-5 text-[8px] font-black uppercase tracking-wider text-white/40">Your week</p><h3 className="mt-1 text-lg font-black">Hi, team member.</h3></div><div className="space-y-2 p-3"><p className="text-[8px] font-black uppercase tracking-wider text-slate-400">Upcoming shifts</p>{[['FRI', '22', '4:00–11:00', 'Server'], ['SAT', '23', '3:30–11:30', 'Server']].map(([day, date, time, role]) => <div key={date} className="flex items-center gap-2 rounded-xl bg-white p-2 shadow-sm"><div className="w-9 rounded-lg bg-amber-50 py-1 text-center"><p className="text-[6px] font-black text-amber-700">{day}</p><p className="text-sm font-black">{date}</p></div><div><p className="text-[9px] font-black">{time}</p><p className="text-[7px] text-slate-400">{role}</p></div><span className="ml-auto rounded-full bg-emerald-50 px-1.5 py-1 text-[6px] font-black text-emerald-700">CONFIRMED</span></div>)}<div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-white p-2 text-center shadow-sm"><ArrowLeftRight className="mx-auto h-4 w-4 text-[#B58B00]" /><p className="mt-1 text-[7px] font-black">Swap a shift</p></div><div className="rounded-xl bg-white p-2 text-center shadow-sm"><CalendarDays className="mx-auto h-4 w-4 text-[#B58B00]" /><p className="mt-1 text-[7px] font-black">Request time off</p></div></div><div className="rounded-xl border border-amber-100 bg-amber-50 p-2"><p className="text-[7px] font-black text-amber-800">Time off · Pending</p><p className="mt-1 text-[7px] text-amber-700">Sep 1–2 · Family event</p></div></div><PhoneNav items={[[CalendarDays, 'Schedule'], [ArrowLeftRight, 'Swaps'], [UsersRound, 'Profile']]} /></PhoneFrame>;
+  return <PhoneFrame label="ZestEmployee schedule app screen"><div className="bg-[#303A43] px-3 pb-4 pt-8 text-white"><div className="flex items-center gap-2.5 text-xl font-black"><img src="/zestiq-mark-exact.png" alt="" aria-hidden="true" className="h-12 w-12 shrink-0 bg-transparent object-contain" /><span>Zest <span className="text-[#F5D62E]">Employee</span></span></div><p className="mt-5 text-[8px] font-black uppercase tracking-wider text-white/40">Your week</p><h3 className="mt-1 text-lg font-black">Hi, team member.</h3></div><div className="space-y-2 p-3"><p className="text-[8px] font-black uppercase tracking-wider text-slate-400">Upcoming shifts</p>{[['FRI', '22', '4:00–11:00', 'Server'], ['SAT', '23', '3:30–11:30', 'Server']].map(([day, date, time, role]) => <div key={date} className="flex items-center gap-2 rounded-xl bg-white p-2 shadow-sm"><div className="w-9 rounded-lg bg-amber-50 py-1 text-center"><p className="text-[6px] font-black text-amber-700">{day}</p><p className="text-sm font-black">{date}</p></div><div><p className="text-[9px] font-black">{time}</p><p className="text-[7px] text-slate-400">{role}</p></div><span className="ml-auto rounded-full bg-emerald-50 px-1.5 py-1 text-[6px] font-black text-emerald-700">CONFIRMED</span></div>)}<div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-white p-2 text-center shadow-sm"><ArrowLeftRight className="mx-auto h-4 w-4 text-[#B58B00]" /><p className="mt-1 text-[7px] font-black">Swap a shift</p></div><div className="rounded-xl bg-white p-2 text-center shadow-sm"><CalendarDays className="mx-auto h-4 w-4 text-[#B58B00]" /><p className="mt-1 text-[7px] font-black">Request time off</p></div></div><div className="rounded-xl border border-amber-100 bg-amber-50 p-2"><p className="text-[7px] font-black text-amber-800">Time off · Pending</p><p className="mt-1 text-[7px] text-amber-700">Sep 1–2 · Family event</p></div></div><PhoneNav items={[[CalendarDays, 'Schedule'], [ArrowLeftRight, 'Swaps'], [UsersRound, 'Profile']]} /></PhoneFrame>;
 }
 
 function PhoneNav({ items }: { items: Array<[typeof Smartphone, string]> }) {
-  return <div className="absolute inset-x-0 bottom-0 grid grid-cols-3 border-t border-slate-100 bg-white px-1 py-2">{items.map(([Icon, label], index) => <div key={label} className={`flex flex-col items-center gap-0.5 text-[6px] font-black ${index === 0 ? 'text-[#0B1220]' : 'text-slate-300'}`}><Icon className="h-3.5 w-3.5" />{label}</div>)}</div>;
+  return <div className="absolute inset-x-0 bottom-0 grid grid-cols-3 border-t border-slate-100 bg-white px-1 py-2">{items.map(([Icon, label], index) => <div key={label} className={`flex flex-col items-center gap-0.5 text-[6px] font-black ${index === 0 ? 'text-[#303A43]' : 'text-slate-300'}`}><Icon className="h-3.5 w-3.5" />{label}</div>)}</div>;
 }
 
 export function Landing() {
-  const [menuOpen, setMenuOpen] = useState(false);
   usePageSeo({
-    title: 'Restaurant Inventory Management Software | ZestIQ',
-    description: 'ZestIQ is restaurant inventory management software for counts, food and beverage cost, invoice scanning, purchasing, labour and multi-location operations.',
+    title: 'Restaurant Operations Software Canada | ZestIQ',
+    description: 'ZestIQ connects restaurant inventory, food and beverage cost, invoice scanning, purchasing, forecasting, labour and multi-location operations in one Canadian platform.',
     path: '/',
   });
   return (
-    <div className="zestiq-public min-h-screen bg-[#FBFAF6] text-[#0B1220]">
-      <header className="public-header sticky top-0 z-40 border-b border-black/5 bg-[#FBFAF6]/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
-          <ZestIQBrand compact className="shrink-0" />
-          <nav className="hidden items-center gap-6 whitespace-nowrap text-sm font-bold xl:flex">
+    <div className="min-h-screen bg-[#FBFAF6] text-[#303A43]">
+      <header className="sticky top-0 z-40 border-b border-black/5 bg-[#FBFAF6]/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-20 max-w-7xl items-center gap-3 px-4 sm:px-5 lg:h-24 lg:gap-6 lg:px-8">
+          <Link to="/" aria-label="ZestIQ home" className="shrink-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E]"><ZestIQBrand className="gap-2 xl:gap-3" markClassName="h-12 w-12 rounded-none xl:h-16 xl:w-16" wordmarkClassName="text-[30px] md:hidden xl:inline xl:text-[38px]" /></Link>
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-3 text-xs font-bold md:flex md:[&>a]:whitespace-nowrap lg:gap-5 lg:text-sm xl:gap-7">
             <a href="#platform">Platform</a>
             <Link to="/product-tour">Product tour</Link>
             <Link to="/capabilities">Capabilities</Link>
             <a href="#how">How it works</a>
             <Link to="/pricing">Pricing</Link>
           </nav>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link className="hidden whitespace-nowrap rounded-xl border border-[#0B1220]/15 bg-white px-3 py-2.5 text-sm font-black text-[#0B1220] shadow-sm transition hover:border-[#0B1220]/35 sm:inline-flex sm:px-5 sm:py-3" to="/login">Log in</Link>
-            <Link className="whitespace-nowrap rounded-xl bg-[#0B1220] px-3 py-2.5 text-sm font-black text-white sm:px-5 sm:py-3" to={DEMO_URL}>Book a demo</Link>
-            <button type="button" onClick={() => setMenuOpen(open => !open)} aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#0B1220]/15 bg-white text-[#0B1220] shadow-sm xl:hidden">
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+          <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
+            <Link className="whitespace-nowrap rounded-xl border border-[#303A43]/15 bg-white px-3 py-2.5 text-sm font-black text-[#303A43] shadow-sm transition hover:border-[#303A43]/35 lg:px-5 lg:py-3" to="/login">Log in</Link>
+            <Link className="whitespace-nowrap rounded-xl bg-[#303A43] px-3 py-2.5 text-sm font-black text-white lg:px-5 lg:py-3" to={DEMO_URL}>Book a demo</Link>
           </div>
         </div>
-        {menuOpen && <nav className="absolute inset-x-0 top-full grid gap-1 border-b border-black/10 bg-[#FBFAF6] px-5 py-4 text-sm font-bold shadow-lg xl:hidden">
-          <a href="#platform" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Platform</a>
-          <Link to="/product-tour" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Product tour</Link>
-          <Link to="/capabilities" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Capabilities</Link>
-          <a href="#how" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">How it works</a>
-          <Link to="/pricing" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5">Pricing</Link>
-          <Link to="/login" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-black/5 sm:hidden">Log in</Link>
-        </nav>}
       </header>
 
       <main>
-        <section className="public-hero bg-[#0B1220] text-white">
+        <section className="bg-[#303A43] text-white">
           <div className="mx-auto grid max-w-7xl gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:py-28">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[.18em] text-white/70">
-                <Sparkles className="h-4 w-4 text-[#F5C10E]" /> AI-powered restaurant control
+                <Sparkles className="h-4 w-4 text-[#F5D62E]" /> AI-powered restaurant control
               </div>
               <h1 className="mt-7 text-5xl font-black leading-[.95] tracking-[-.045em] sm:text-6xl xl:text-7xl">
-                Know what you have.<br /><span className="text-[#F5C10E]">Know what it costs.</span><br />Know what to order.
+                Know what you have.<br /><span className="text-[#F5D62E]">Know what it costs.</span><br />Know what to order.
               </h1>
               <p className="mt-7 max-w-xl text-lg leading-8 text-white/65">
                 ZestIQ is AI-powered restaurant inventory management software for food and beverage cost, labour, purchasing and forecasting—so operators can protect margin without living in spreadsheets.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link to={DEMO_URL} className="public-button-gold inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-7 font-black text-[#0B1220]">
+                <Link to={DEMO_URL} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F5D62E] px-7 font-black text-[#303A43]">
                   Book a demo <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link to="/capabilities" className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-7 font-bold">See every capability</Link>
@@ -474,7 +463,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="public-highlight-strip border-y border-black/10 bg-[#F5C10E]">
+        <section className="border-y border-black/10 bg-[#F5D62E]">
           <div className="mx-auto grid max-w-7xl gap-px bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
             {[
               [FileScan, 'Capture faster', 'Invoices, PDFs and handwritten recipes'],
@@ -482,7 +471,7 @@ export function Landing() {
               [TrendingDown, 'Protect margin', 'Current costs, variance and forecasting'],
               [LockKeyhole, 'Stay separated', 'One protected workspace per company'],
             ].map(([Icon, title, text]: any) => (
-              <div key={title} className="flex gap-3 bg-transparent px-6 py-6">
+              <div key={title} className="flex gap-3 bg-[#F5D62E] px-6 py-6">
                 <Icon className="mt-0.5 h-6 w-6 shrink-0" />
                 <div>
                   <p className="font-black">{title}</p>
@@ -498,13 +487,13 @@ export function Landing() {
         <LiveProductTour />
         <PhoneShowcase />
 
-        <section id="platform" className="public-cream-section mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+        <section id="platform" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
           <p className="text-sm font-black uppercase tracking-[.2em] text-[#9A7600]">The platform</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-black tracking-[-.035em] sm:text-5xl">Restaurant control without the operational clutter.</h2>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60">Every feature answers a practical question: What do we have? What did it cost? What changed? What should we buy next?</p>
           <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {features.map(([Icon, title, text]: any) => (
-              <article key={title} className="public-card rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+              <article key={title} className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#FFF2B5]"><Icon className="h-5 w-5" /></div>
                 <h3 className="mt-5 text-xl font-black">{title}</h3>
                 <p className="mt-2 leading-7 text-black/55">{text}</p>
@@ -513,10 +502,10 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="public-dark-section overflow-hidden bg-[#0B1220] text-white">
+        <section className="overflow-hidden bg-[#303A43] text-white">
           <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2 lg:items-center lg:py-28">
             <div>
-              <p className="text-sm font-black uppercase tracking-[.2em] text-[#F5C10E]">Built-in AI</p>
+              <p className="text-sm font-black uppercase tracking-[.2em] text-[#F5D62E]">Built-in AI</p>
               <h2 className="mt-3 text-4xl font-black tracking-[-.035em] sm:text-5xl">Less typing. Better answers. Costs you can trust.</h2>
               <p className="mt-5 text-lg leading-8 text-white/60">
                 ZestIQ reads operational documents and helps your team understand the business—while inventory prices and company permissions remain authoritative.
@@ -529,7 +518,7 @@ export function Landing() {
                   ['Ask', 'Chat with zestIQ about costs, stock, invoices and how to use the app.'],
                 ].map(([title, text], index) => (
                   <div key={title} className="flex gap-4">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F5C10E] text-sm font-black text-[#0B1220]">{index + 1}</span>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F5D62E] text-sm font-black text-[#303A43]">{index + 1}</span>
                     <div>
                       <p className="font-black">{title}</p>
                       <p className="mt-1 text-sm leading-6 text-white/55">{text}</p>
@@ -539,16 +528,16 @@ export function Landing() {
               </div>
             </div>
             <div className="relative">
-              <div className="absolute -inset-8 rounded-full bg-[#F5C10E]/10 blur-3xl" />
+              <div className="absolute -inset-8 rounded-full bg-[#F5D62E]/10 blur-3xl" />
               <div className="relative rounded-[30px] border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur">
                 <div className="flex items-center gap-3 border-b border-white/10 p-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5C10E] text-[#0B1220]"><Bot className="h-5 w-5" /></span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5D62E] text-[#303A43]"><Bot className="h-5 w-5" /></span>
                   <div><p className="font-black">zestIQ AI Assistant</p><p className="text-xs text-white/45">Authorized company data only</p></div>
                   <span className="ml-auto h-2.5 w-2.5 animate-pulse rounded-full bg-green-400" />
                 </div>
                 <div className="space-y-4 p-3">
-                  <div className="ml-auto max-w-[82%] rounded-2xl rounded-br-sm bg-[#F5C10E] px-4 py-3 text-sm font-medium text-[#0B1220]">What needs my attention before tomorrow’s order?</div>
-                  <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white px-4 py-4 text-sm leading-6 text-[#0B1220] shadow-xl">
+                  <div className="ml-auto max-w-[82%] rounded-2xl rounded-br-sm bg-[#F5D62E] px-4 py-3 text-sm font-medium text-[#303A43]">What needs my attention before tomorrow’s order?</div>
+                  <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white px-4 py-4 text-sm leading-6 text-[#303A43] shadow-xl">
                     <p className="font-black">Three items stand out:</p>
                     <p className="mt-2">• Salmon is below par and its latest cost increased.</p>
                     <p>• Olive oil is projected to run short.</p>
@@ -561,7 +550,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section id="capabilities" className="public-paper-section bg-white">
+        <section id="capabilities" className="bg-white">
           <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
             <div className="max-w-3xl">
               <p className="text-sm font-black uppercase tracking-[.2em] text-[#9A7600]">Capabilities</p>
@@ -572,8 +561,8 @@ export function Landing() {
               {capabilityGroups.map(group => {
                 const Icon = group.icon;
                 return (
-                  <article key={group.title} className="public-card rounded-3xl border border-black/10 bg-[#FBFAF6] p-7">
-                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#0B1220] text-[#F5C10E]"><Icon className="h-6 w-6" /></div>
+                  <article key={group.title} className="rounded-3xl border border-black/10 bg-[#FBFAF6] p-7">
+                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#303A43] text-[#F5D62E]"><Icon className="h-6 w-6" /></div>
                     <h3 className="mt-5 text-2xl font-black">{group.title}</h3>
                     <p className="mt-2 leading-7 text-black/55">{group.description}</p>
                     <ul className="mt-6 space-y-3">
@@ -588,35 +577,34 @@ export function Landing() {
                 );
               })}
             </div>
-            <div className="mt-6 flex flex-col gap-3 rounded-3xl bg-[#0B1220] p-6 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-6 flex flex-col gap-3 rounded-3xl bg-[#303A43] p-6 text-white sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
-                <Building2 className="mt-1 h-5 w-5 text-[#F5C10E]" />
+                <Building2 className="mt-1 h-5 w-5 text-[#F5D62E]" />
                 <div>
                   <p className="font-black">Designed for operators, managers and company owners</p>
                   <p className="mt-1 text-sm text-white/60">Role-based access keeps day-to-day work focused while owners retain company-level oversight.</p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 text-sm font-bold text-[#F5C10E]"><Users className="h-4 w-4" /> Team-ready</div>
-                <div className="flex items-center gap-2 text-sm font-bold text-[#F5C10E]"><KeyRound className="h-4 w-4" /> Owner-controlled</div>
+                <div className="flex items-center gap-2 text-sm font-bold text-[#F5D62E]"><Users className="h-4 w-4" /> Team-ready</div>
+                <div className="flex items-center gap-2 text-sm font-bold text-[#F5D62E]"><KeyRound className="h-4 w-4" /> Owner-controlled</div>
               </div>
             </div>
           </div>
         </section>
 
-        <section id="how" className="public-gold-section bg-[#F5C10E]">
+        <section id="how" className="bg-[#F5D62E]">
           <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8">
             <p className="text-sm font-black uppercase tracking-[.2em] text-black/45">How it works</p>
             <h2 className="mt-3 max-w-3xl text-4xl font-black sm:text-5xl">From count to decision, without the spreadsheet relay race.</h2>
             <div className="mt-10 grid gap-4 lg:grid-cols-3">
               {[
-                ['01', 'Capture', 'Bring inventory, invoices, handwritten recipes and purchasing into one system.'],
-                ['02', 'Understand', 'Turn operating data into food-cost, variance and stock visibility.'],
-                ['03', 'Act', 'Know what to order, where margin is leaking and what needs attention next.'],
-              ].map(([number, title, description]) => (
-                <div key={number} className="rounded-3xl bg-[#0B1220] p-7 text-white">
-                  <p className="font-black text-[#F5C10E]">{number}</p>
-                  <h3 className="mt-8 text-2xl font-black">{title}</h3>
+                ['Capture', 'Bring inventory, invoices, handwritten recipes and purchasing into one system.'],
+                ['Understand', 'Turn operating data into food-cost, variance and stock visibility.'],
+                ['Act', 'Know what to order, where margin is leaking and what needs attention next.'],
+              ].map(([title, description]) => (
+                <div key={title} className="rounded-3xl bg-[#303A43] p-7 text-white">
+                  <h3 className="text-2xl font-black">{title}</h3>
                   <p className="mt-3 leading-7 text-white/60">{description}</p>
                 </div>
               ))}
@@ -624,65 +612,70 @@ export function Landing() {
           </div>
         </section>
 
-        <section id="pricing" className="public-paper-section bg-white px-5 py-20 sm:px-8">
-          <div className="public-card mx-auto grid max-w-5xl gap-8 rounded-[36px] border border-black/10 bg-[#FBFAF6] p-7 shadow-sm md:grid-cols-[1fr_.8fr] md:items-center md:p-12">
+        <section id="pricing" className="bg-white px-5 py-20 sm:px-8">
+          <div className="mx-auto grid max-w-5xl gap-8 rounded-[36px] border border-black/10 bg-[#FBFAF6] p-7 shadow-sm md:grid-cols-[1fr_.8fr] md:items-center md:p-12">
             <div>
               <p className="text-sm font-black uppercase tracking-[.2em] text-black/45">Simple pricing</p>
               <h2 className="mt-3 text-4xl font-black sm:text-5xl">ZestIQ Basic</h2>
               <p className="mt-5 max-w-xl text-lg leading-8 text-black/60">Inventory, purchasing, recipe costing, AI scanning, forecasting, owner controls, users and billing in one subscription. Add labour scheduling only when your team needs it.</p>
               <div className="mt-6 space-y-3 text-sm font-semibold text-black/70">
-                {['First location: CAD $249.99/month', 'Additional locations: CAD $199/month each', 'Scheduling: add CAD $49.99/month for all locations', 'No free trial', 'Stripe-secured monthly billing'].map(item => (
+                {['First location: CAD $249.99/month', 'Additional locations: CAD $199.99/month each', 'Scheduling included with additional locations', 'No free trial', 'Stripe-secured monthly billing'].map(item => (
                   <p key={item} className="flex items-center gap-2"><Check className="h-4 w-4 text-[#A16207]" />{item}</p>
                 ))}
               </div>
             </div>
-            <div className="rounded-3xl bg-[#0B1220] p-7 text-white">
+            <div className="rounded-3xl bg-[#303A43] p-7 text-white">
               <p className="text-sm font-bold uppercase tracking-[.18em] text-white/45">ZestIQ Basic</p>
-              <p className="mt-5 text-5xl font-black text-[#F5C10E]">$249.99</p>
+              <p className="mt-5 text-5xl font-black text-[#F5D62E]">$249.99</p>
               <p className="mt-2 font-bold">CAD per month for the first location</p>
               <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="flex items-center gap-2 font-black text-white"><CalendarClock className="h-5 w-5 text-[#F5C10E]" />Add Scheduling</p>
-                <p className="mt-1 text-2xl font-black text-[#F5C10E]">+$49.99 <span className="text-sm text-white/55">CAD/month</span></p>
+                <p className="flex items-center gap-2 font-black text-white"><CalendarClock className="h-5 w-5 text-[#F5D62E]" />Add Scheduling</p>
+                <p className="mt-1 text-2xl font-black text-[#F5D62E]">+$49.99 <span className="text-sm text-white/55">CAD/month</span></p>
               </div>
-              <p className="mt-4 text-sm leading-6 text-white/55">Each additional location is CAD $199/month. Scheduling is not automatic: add it to the first-location plan for CAD $49.99/month and it will cover every location on the account. A 12-month commitment applies.</p>
-              <Link to={DEMO_URL} className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">
-                Book a demo <ArrowRight className="h-4 w-4" />
+              <p className="mt-4 text-sm leading-6 text-white/55">Each additional location is CAD $199.99/month and includes Scheduling. Single-location accounts can add Scheduling for CAD $49.99/month. A 12-month commitment applies.</p>
+              <div className="mt-6 grid grid-cols-3 gap-2 text-center text-[11px] font-bold text-white/65">
+                <span className="rounded-xl bg-white/5 px-2 py-3"><strong className="block text-[#F5D62E]">1</strong>Create account</span>
+                <span className="rounded-xl bg-white/5 px-2 py-3"><strong className="block text-[#F5D62E]">2</strong>Secure payment</span>
+                <span className="rounded-xl bg-white/5 px-2 py-3"><strong className="block text-[#F5D62E]">3</strong>Approval process</span>
+              </div>
+              <Link to="/login?mode=signup&plan=basic" className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#F5D62E] px-6 font-black text-[#303A43]">
+                Sign up now <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link to={DEMO_URL} className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/20 px-6 text-sm font-black text-white">
+                Book a demo
               </Link>
             </div>
           </div>
         </section>
 
         <section className="px-5 py-20 sm:px-8">
-          <div className="mx-auto max-w-7xl rounded-[36px] bg-[#0B1220] px-6 py-14 text-center text-white">
+          <div className="mx-auto max-w-7xl rounded-[36px] bg-[#303A43] px-6 py-14 text-center text-white">
             <h2 className="mx-auto max-w-3xl text-4xl font-black sm:text-5xl">See what ZestIQ can do with your operation.</h2>
             <p className="mx-auto mt-5 max-w-2xl text-lg text-white/60">Inventory, AI, food cost, labour, purchasing, recipes and forecasting—connected in one operating system.</p>
-            <div className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-[#F5C10E]"><Smartphone className="h-4 w-4" /> Mobile-ready web experience · native iOS and Android next</div>
-            <Link to={DEMO_URL} className="mt-8 inline-flex h-14 items-center gap-2 rounded-xl bg-[#F5C10E] px-8 font-black text-[#0B1220]">
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-[#F5D62E]"><Smartphone className="h-4 w-4" /> Mobile-ready web experience · native iOS and Android next</div>
+            <Link to={DEMO_URL} className="mt-8 inline-flex h-14 items-center gap-2 rounded-xl bg-[#F5D62E] px-8 font-black text-[#303A43]">
               Book a demo <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </section>
       </main>
 
-      <footer className="public-footer overflow-hidden bg-[#0B1220] text-white">
+      <footer className="overflow-hidden bg-[#303A43] text-white">
         <div className="mx-auto max-w-7xl px-5 pb-8 pt-14 sm:px-8 sm:pt-20">
-          <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><ZestIQBrand className="text-white" /><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5C10E] px-6 font-black text-[#0B1220]">Book a demo</Link></div></div>
-          <nav aria-label="Footer" className="grid gap-9 py-12 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between"><div><Link to="/" aria-label="ZestIQ home"><ZestIQBrand className="text-white" markClassName="h-14 w-14 rounded-none" wordmarkClassName="text-3xl" /></Link><p className="mt-4 max-w-md text-sm leading-6 text-white/45">Restaurant inventory, food and beverage cost, purchasing, labour and AI—connected for operators.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Link to="/login" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-6 font-black">Log in</Link><Link to="/book-demo" className="inline-flex h-12 items-center justify-center rounded-xl bg-[#F5D62E] px-6 font-black text-[#303A43]">Book a demo</Link></div></div>
+          <nav aria-label="Footer" className="grid gap-9 py-12 sm:grid-cols-2 lg:grid-cols-6">
             <FooterGroup title="Product" links={[["Product tour", "/product-tour"], ["Capabilities", "/capabilities"], ["Pricing", "/pricing"], ["Demo account", "/login"]]} />
-            <FooterGroup title="Operations" links={[["Inventory software", "/restaurant-inventory-management-software"], ["Food cost software", "/restaurant-food-cost-software"], ["Invoice scanner", "/restaurant-invoice-scanner"], ["Labour & scheduling", "/restaurant-labour-scheduling-software"], ["Beverage costing", "/restaurant-beverage-costing-software"]]} />
+            <FooterGroup title="Operations" links={[["Restaurant inventory software", "/restaurant-inventory-management-software"], ["Food & recipe costing software", "/restaurant-food-cost-software"], ["Restaurant invoice scanner", "/restaurant-invoice-scanner"], ["Labour & scheduling", "/restaurant-labour-scheduling-software"], ["Beverage costing", "/restaurant-beverage-costing-software"]]} />
             <FooterGroup title="Platform" links={[["AI & data", "/ai-transparency"], ["Subprocessors", "/subprocessors"], ["Security & privacy", "/privacy"], ["Multi-location", "/multi-location-restaurant-software"], ["POS integrations", "/restaurant-pos-integrations"]]} />
+            <FooterGroup title="Resources" links={[["Inventory guide", "/restaurant-inventory-management-guide"], ["2026 buyer’s guide", "/best-restaurant-inventory-management-software-canada"], ["Food-cost calculator", "/restaurant-food-cost-calculator"]]} />
             <FooterGroup title="Company" links={[["Book a demo", "/book-demo"], ["Contact", "/contact"], ["Canadian owned", "/canadian-owned"], ["Legal centre", "/legal"]]} />
             <FooterGroup title="Legal" links={[["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"], ["Cookie Policy", "/cookies"], ["AI Transparency", "/ai-transparency"]]} />
           </nav>
           <div id="canadian-owned" className="flex flex-col gap-4 border-t border-white/10 py-6 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 ZestIQ. All rights reserved.</p><p className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-bold text-white/70"><span aria-hidden="true">🇨🇦</span>Proudly Canadian owned &amp; operated</p></div>
-          <div aria-hidden="true" className="pointer-events-none -mb-[.17em] mt-2 flex items-end justify-between gap-5 overflow-hidden">
-            <p className="whitespace-nowrap text-[18vw] font-black leading-[.78] tracking-[-.08em] text-[#F5C10E] opacity-95">zestIQ</p>
-            <img src="/zestiq-lemon.svg" alt="" className="mb-[.12em] h-[20vw] max-h-64 min-h-24 w-[20vw] min-w-24 shrink-0 rotate-[-8deg] object-contain" />
-          </div>
         </div>
       </footer>
     </div>
   );
 }
 
-function FooterGroup({ title, links }: { title: string; links: string[][] }) { return <div><p className="text-xs font-black uppercase tracking-[.18em] text-[#F5C10E]">{title}</p><ul className="mt-4 space-y-3">{links.map(([label, href]) => <li key={`${label}-${href}`}>{href.startsWith('mailto:') ? <a href={href} className="text-sm font-bold text-white/70 hover:text-white">{label}</a> : <Link to={href} className="text-sm font-bold text-white/70 hover:text-white">{label}</Link>}</li>)}</ul></div>; }
+function FooterGroup({ title, links }: { title: string; links: string[][] }) { return <div><p className="text-xs font-black uppercase tracking-[.18em] text-[#F5D62E]">{title}</p><ul className="mt-4 space-y-3">{links.map(([label, href]) => <li key={`${label}-${href}`}>{href.startsWith('mailto:') ? <a href={href} className="text-sm font-bold text-white/70 hover:text-white">{label}</a> : <Link to={href} className="text-sm font-bold text-white/70 hover:text-white">{label}</Link>}</li>)}</ul></div>; }

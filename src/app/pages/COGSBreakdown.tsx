@@ -4,8 +4,8 @@ import { useToast } from '../contexts/ToastContext';
 import { useLocation, useNavigate } from 'react-router';
 import { ChevronLeft, ChevronDown, ChevronRight, TrendingDown, DollarSign, ShoppingBag, Filter, Calendar } from 'lucide-react';
 
-const Y = '#F5C10E';
-const D = '#0F172A';
+const Y = '#F5D62E';
+const D = '#303A43';
 
 function fmt(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -24,7 +24,7 @@ function fmtRangeLabel(startDate: string, endDate: string) {
   return `${formatter.format(new Date(startDate))} - ${formatter.format(new Date(endDate))}`;
 }
 
-export function COGSBreakdown() {
+export function COGSBreakdown({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { inventory } = useInventory();
@@ -131,16 +131,20 @@ export function COGSBreakdown() {
   const hasSalesData = visibleSalesData.length > 0 && menuItems.length > 0;
 
   return (
-    <div className="-mx-4 min-h-screen bg-[#F4F5F7]">
+    <div className={embedded ? "overflow-hidden rounded-3xl border border-[#E4DFD2] bg-[#F4F5F7]" : "-mx-4 min-h-screen bg-[#F4F5F7]"}>
 
       {/* ── Page header ──────────────────────────────── */}
-      <div className="bg-white px-4 pt-3 pb-5 border-b border-gray-100">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm font-semibold text-gray-500 mb-3">
-          <ChevronLeft className="w-4 h-4" />
-          Dashboard
-        </button>
-        <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: D }}>COGS Report</h1>
-        <p className="text-xs text-gray-400 mt-0.5 font-semibold uppercase tracking-wider">
+      <div className="bg-white px-4 pt-4 pb-5 border-b border-gray-100 md:px-6">
+        {!embedded && (
+          <>
+            <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm font-semibold text-gray-500 mb-3">
+              <ChevronLeft className="w-4 h-4" />
+              Dashboard
+            </button>
+            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: D }}>COGS Report</h1>
+          </>
+        )}
+        <p className={`${embedded ? '' : 'mt-0.5'} text-xs font-semibold uppercase tracking-wider text-gray-400`}>
           Cost of Goods Sold · {visibleSalesData.length} day{visibleSalesData.length !== 1 ? 's' : ''} · {fmtRangeLabel(appliedDateRange.start, appliedDateRange.end)}
         </p>
 

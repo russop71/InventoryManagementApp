@@ -7,6 +7,10 @@
     "build": "vite build && node scripts/generate-static-routes.mjs",
     "build:ios": "VITE_API_URL=https://zestiq.ca npm run build && npx cap sync ios",
     "ios:open": "npx cap open ios",
+    "build:employee": "VITE_API_URL=https://zestiq.ca VITE_APP_VARIANT=employee vite build --outDir dist-employee",
+    "employee:sync": "npm run build:employee && cd native/zestemployee && ../../node_modules/.bin/cap sync ios && ../../node_modules/.bin/cap sync android",
+    "employee:ios:open": "cd native/zestemployee && ../../node_modules/.bin/cap open ios",
+    "employee:android:open": "cd native/zestemployee && ../../node_modules/.bin/cap open android",
     "dev": "vite",
     "server": "node server/api-server.js",
     "test": "node --test",
@@ -15,9 +19,11 @@
     "backup:verify": "node scripts/verify-backup.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
+    "@capacitor/push-notifications": "^8.1.2",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@mui/icons-material": "7.3.5",

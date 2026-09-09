@@ -86,7 +86,7 @@ export function WasteProvider({ children }: { children: ReactNode }) {
         return entry;
       }
       const response = await apiRequest<{ waste: { entries: WasteEntry[] }; entry: WasteEntry }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/waste`, { method: 'POST', body: JSON.stringify(input) });
-      setEntries(current => {
+      setEntries(() => {
         const next = response.waste.entries;
         if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
         return next;

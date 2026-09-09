@@ -4,14 +4,29 @@ export function getSupplierEmailAddress(supplierName, suppliers = []) {
   return matchedSupplier?.email?.trim() || '';
 }
 
-export function getSupplierCcEmails(supplierName, suppliers = []) {
-  const normalized = String(supplierName || '').trim().toLowerCase();
-  const matchedSupplier = suppliers.find(supplier => supplier.name.trim().toLowerCase() === normalized);
-  const values = Array.isArray(matchedSupplier?.ccEmails) ? matchedSupplier.ccEmails : [];
-  return [...new Set(values.map(email => String(email).trim().toLowerCase()).filter(Boolean))];
+export function parseEmailList(value) {
+  const values = Array.isArray(value) ? value : String(value || '').split(/[;,\n]/);
+  return values
+    .map(email => String(email || '').trim().toLowerCase())
+    .filter((email, index, emails) => /^\S+@\S+\.\S+$/.test(email) && emails.indexOf(email) === index);
 }
 
-export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [] }) {
+export function getInvalidEmailListEntries(value) {
+  return String(value || '')
+    .split(/[;,\n]/)
+    .map(email => email.trim())
+    .filter(email => email && !/^\S+@\S+\.\S+$/.test(email));
+}
+
+export function getSupplierCcEmails(supplierName, suppliers = [], defaultCc = []) {
+  const normalized = String(supplierName || '').trim().toLowerCase();
+  const matchedSupplier = suppliers.find(supplier => supplier.name.trim().toLowerCase() === normalized);
+  const primaryEmail = matchedSupplier?.email?.trim().toLowerCase() || '';
+  return parseEmailList([...(Array.isArray(defaultCc) ? defaultCc : []), ...(matchedSupplier?.ccEmails || [])])
+    .filter(email => email !== primaryEmail);
+}
+
+export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [], defaultCc = [] }) {
   const supplierGroups = suggestions.reduce((groups, suggestion) => {
     const supplier = suggestion.supplier || 'Supplier';
     if (!groups[supplier]) groups[supplier] = [];
@@ -33,7 +48,7 @@ export function buildSupplierEmailDrafts({ restaurantName, suggestions, supplier
     return {
       supplier,
       supplierEmail,
-      ccEmails: getSupplierCcEmails(supplier, suppliers),
+      ccEmails: getSupplierCcEmails(supplier, suppliers, defaultCc),
       canSend: Boolean(supplierEmail),
       items,
       totalCost,
