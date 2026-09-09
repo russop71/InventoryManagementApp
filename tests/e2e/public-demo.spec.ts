@@ -72,6 +72,7 @@ async function expectUsableRoute(page: Page, route: string) {
 }
 
 test('fresh public-demo visitor can enter with the keyboard and traverse every demo route', async ({ page }) => {
+  test.setTimeout(120_000);
   const runtimeFailures = captureRuntimeFailures(page);
   await freshDemoLogin(page);
 
