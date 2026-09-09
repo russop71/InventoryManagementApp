@@ -8,6 +8,9 @@ const pages = [
   ['/pricing', 'ZestIQ Pricing | CAD $249.99 per Month', 'ZestIQ Basic costs CAD $249.99 per month for the first location. Additional locations are CAD $199 per month each. Add Scheduling for CAD $49.99 per account to cover every location.'],
   ['/contact', 'Contact ZestIQ | Restaurant Software Canada', 'Contact ZestIQ about restaurant inventory, food and beverage cost, labour, integrations, security, billing or a demonstration.'],
   ['/canadian-owned', 'Canadian-Owned Restaurant Software | ZestIQ', 'ZestIQ is a Canadian-owned restaurant operations software company building inventory, cost, labour and AI tools.'],
+  ['/best-restaurant-inventory-management-software-canada', 'Best Restaurant Inventory Software in Canada: 2026 Buyer’s Guide', 'A practical 2026 guide to choosing restaurant inventory management software in Canada. Compare counting, food cost, invoices, ordering, POS, labour and multi-location requirements.'],
+  ['/restaurant-inventory-management-guide', 'Restaurant Inventory Management Guide: Counts, Food Cost & Ordering', 'A practical restaurant inventory management guide covering count sheets, units, recipe costing, invoice prices, waste, variance, pars and ordering.'],
+  ['/restaurant-food-cost-calculator', 'Free Restaurant Food Cost Calculator | Food Cost Percentage', 'Calculate restaurant food cost percentage, gross profit and target menu price. Includes the formula and practical guidance for recipe and menu costing.'],
   ['/restaurant-inventory-management-software', 'Restaurant Inventory Management Software | ZestIQ', 'Restaurant inventory software for counts, pars, purchasing, recipe costs, supplier pricing and multi-location visibility.'],
   ['/restaurant-food-cost-software', 'Restaurant Food Cost & Recipe Costing Software | ZestIQ', 'Restaurant food cost software linking recipes to current ingredient prices, menu margins, beverages and supplier changes.'],
   ['/restaurant-invoice-scanner', 'AI Restaurant Invoice Scanner for PDF & Photos | ZestIQ', 'Scan restaurant invoices from PDF, image or camera and review extracted supplier, items, units and prices.'],
@@ -24,12 +27,71 @@ const pages = [
   ['/subprocessors', 'Subprocessors | ZestIQ', 'Core providers that help ZestIQ host, secure, bill and deliver its restaurant operations software.'],
 ];
 
+const resourceContent = {
+  '/best-restaurant-inventory-management-software-canada': {
+    label: '2026 Canadian restaurant software buyer’s guide',
+    heading: 'How to choose the best restaurant inventory software for your operation.',
+    intro: 'Compare restaurant inventory systems by the workflows operators actually need: mobile counts, invoice capture, live recipe cost, waste, ordering, forecasting, POS data and multi-location control.',
+    modified: '2026-09-09',
+    sections: [
+      ['Start with the operating problem', 'Document who counts inventory, how products are received and stored, which units the team uses, how invoices arrive and who approves an order. The best software fits that operating rhythm instead of creating another administrative task.'],
+      ['Test real restaurant workflows', 'Test mobile counts, unit conversions, invoice scanning with review, live recipe and beverage costing, suggested ordering, waste and variance reporting, and protected location-level permissions.'],
+      ['Compare the complete Canadian cost', 'Confirm Canadian-dollar pricing, onboarding fees, additional-location costs, invoice limits, POS connections, scheduling, support, tax handling and contract terms.'],
+    ],
+    faqs: [
+      ['What is restaurant inventory management software?', 'It helps restaurants count stock, value on-hand inventory, organize suppliers, calculate recipe cost, monitor waste and make replenishment decisions.'],
+      ['How much does restaurant inventory software cost in Canada?', 'Pricing varies by location count, feature set, invoice volume, integrations and onboarding. Compare the complete monthly cost in Canadian dollars.'],
+    ],
+  },
+  '/restaurant-inventory-management-guide': {
+    label: 'Complete restaurant inventory management guide',
+    heading: 'Restaurant inventory management: from weekly count to daily decision.',
+    intro: 'A practical restaurant inventory guide covering item setup, storage-area counts, supplier invoices, recipe usage, variance, waste, pars and ordering.',
+    modified: '2026-09-09',
+    sections: [
+      ['Build one clean inventory item list', 'Give every ingredient and beverage a clear name, category, base unit, purchase unit, supplier and storage location. Document conversions between cases, kilograms, bottles, ounces, portions and individual units.'],
+      ['Design a count people can finish', 'Arrange count sheets in the physical order the team walks each storage area. Use a consistent cut-off time, assign ownership and complete weekly full counts with daily spot counts for high-value products.'],
+      ['Connect invoices, recipes and sales', 'Current supplier prices should flow into inventory value and recipe cost. Linking POS menu items to recipes creates theoretical usage that can be compared with actual stock movement.'],
+      ['Turn variance into action', 'Review the highest-dollar variances first, separate price variance from usage variance, verify unit conversions, log waste consistently and adjust pars using demand and lead time.'],
+    ],
+    faqs: [
+      ['How often should a restaurant count inventory?', 'Many restaurants complete a full count weekly and daily spot counts for expensive, fast-moving or high-variance products.'],
+      ['What is restaurant inventory variance?', 'It is the difference between expected usage or stock and the actual count, expressed in units or dollars.'],
+      ['How do pars improve restaurant ordering?', 'Comparing target stock with current stock, incoming orders and expected demand creates a more defensible order quantity.'],
+    ],
+  },
+  '/restaurant-food-cost-calculator': {
+    label: 'Free restaurant food-cost calculator',
+    heading: 'Calculate restaurant food-cost percentage, gross profit and target menu price.',
+    intro: 'Use the free ZestIQ food-cost calculator to compare current ingredient cost with menu price and estimate the price required to reach a target food-cost percentage.',
+    modified: '2026-09-09',
+    sections: [
+      ['Restaurant food-cost formula', 'Food cost percentage equals ingredient cost divided by menu price, multiplied by 100. A dish with $6.40 of ingredients and a $24 menu price has a food cost of 26.7 percent.'],
+      ['Use current supplier prices', 'A one-time calculation becomes outdated as purchase prices change. Connect invoice prices to ingredient units and recipes, then review menu items that move outside their target margin.'],
+    ],
+    faqs: [
+      ['What is a good food cost percentage for a restaurant?', 'There is no universal percentage. Operators should use category-specific targets and consider contribution margin, labour, waste and menu demand.'],
+      ['Should food cost include waste?', 'Recipe cost measures expected ingredients. Actual food cost is also affected by waste, over-portioning, receiving errors and count accuracy.'],
+    ],
+  },
+};
+
 const template = await readFile('dist/index.html', 'utf8');
 const escapeHtml = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 for (const [path, title, description] of pages) {
   const url = `https://zestiq.ca${path}`;
-  const schema = { '@context': 'https://schema.org', '@type': 'WebPage', name: title, description, url, isPartOf: { '@type': 'WebSite', name: 'ZestIQ', url: 'https://zestiq.ca/' }, breadcrumb: { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'ZestIQ', item: 'https://zestiq.ca/' }, { '@type': 'ListItem', position: 2, name: title, item: url }] } };
+  const content = resourceContent[path];
+  const graph = [
+    { '@type': 'WebPage', '@id': `${url}#webpage`, name: title, description, url, inLanguage: 'en-CA', isPartOf: { '@type': 'WebSite', name: 'ZestIQ', url: 'https://zestiq.ca/' } },
+    { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'ZestIQ', item: 'https://zestiq.ca/' }, { '@type': 'ListItem', position: 2, name: title, item: url }] },
+  ];
+  if (content) {
+    graph.push({ '@type': path.endsWith('calculator') ? 'WebApplication' : 'Article', headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', mainEntityOfPage: { '@id': `${url}#webpage` } });
+    graph.push({ '@type': 'FAQPage', mainEntity: content.faqs.map(([question, answer]) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) });
+  }
+  const schema = { '@context': 'https://schema.org', '@graph': graph };
+  const crawlableContent = content ? `<main id="zestiq-crawlable-content"><article><p>${escapeHtml(content.label)}</p><h1>${escapeHtml(content.heading)}</h1><p>${escapeHtml(content.intro)}</p>${content.sections.map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(body)}</p></section>`).join('')}<section><h2>Frequently asked questions</h2>${content.faqs.map(([question, answer]) => `<h3>${escapeHtml(question)}</h3><p>${escapeHtml(answer)}</p>`).join('')}</section><nav aria-label="Related restaurant resources"><a href="/restaurant-inventory-management-software">Restaurant inventory software</a> · <a href="/restaurant-inventory-management-guide">Inventory guide</a> · <a href="/restaurant-food-cost-calculator">Food-cost calculator</a> · <a href="/book-demo">Book a ZestIQ demo</a></nav></article></main>` : '';
   let html = template
     .replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(title)}</title>`)
     .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/s, `<meta name="description" content="${escapeHtml(description)}" />`)
@@ -40,7 +102,8 @@ for (const [path, title, description] of pages) {
     .replace(/<meta name="twitter:description" content="[^"]*"\s*\/>/s, `<meta name="twitter:description" content="${escapeHtml(description)}" />`)
     .replace(/<link rel="canonical" href="[^"]*"\s*\/>/s, `<link rel="canonical" href="${url}" />`)
     .replace(/\s*<script id="zestiq-home-schema" type="application\/ld\+json">.*?<\/script>/s, '')
-    .replace('</head>', `    <script type="application/ld+json">${JSON.stringify(schema)}</script>\n  </head>`);
+    .replace('</head>', `    <script type="application/ld+json">${JSON.stringify(schema)}</script>\n  </head>`)
+    .replace(/<div id="root">.*?<\/div>/s, `<div id="root">${crawlableContent}</div>`);
   const destination = join('dist', path.slice(1));
   await mkdir(destination, { recursive: true });
   await writeFile(join(destination, 'index.html'), html);
