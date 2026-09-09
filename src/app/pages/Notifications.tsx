@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { Bell, Mail, MessageSquare, AlertTriangle, TrendingUp, Package } from 'lucide-react';
+import { Bell, Mail, MessageSquare, AlertTriangle, TrendingUp, Package, CalendarClock, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { useInventory } from '../contexts/InventoryContext';
 import { locationScopedStorageKey } from '../utils/storageScope';
 
 interface NotificationSetting {
@@ -25,7 +27,15 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSetting[] = [
 ];
 
 export function Notifications() {
-  const { accountId, activeLocationId } = useAuth();
+  const { accountId, activeLocationId, user } = useAuth();
+  const { inventory } = useInventory();
+  const canReceiveManagerDigest = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
+  const priceChanges = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return inventory.flatMap(item => (item.priceHistory || []).map(change => ({ item, change })))
+      .filter(({ change }) => new Date(change.date).getTime() >= cutoff && change.oldPrice !== change.newPrice)
+      .sort((left, right) => new Date(right.change.date).getTime() - new Date(left.change.date).getTime());
+  }, [inventory]);
   const [settings, setSettings] = useState<NotificationSetting[]>(DEFAULT_NOTIFICATION_SETTINGS);
   const storageKey = accountId && activeLocationId ? locationScopedStorageKey(accountId, activeLocationId, 'notificationPreferences') : null;
 
@@ -61,6 +71,35 @@ export function Notifications() {
         <h2 className="text-2xl font-semibold text-gray-900">Notification Settings</h2>
         <p className="text-sm text-gray-600 mt-1">Manage how you receive alerts and updates</p>
       </div>
+
+      {canReceiveManagerDigest && (
+        <Card className="overflow-hidden border-amber-200 bg-gradient-to-r from-[#303A43] to-[#202A33] text-white">
+          <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#F5D62E] text-[#303A43]"><CalendarClock className="h-6 w-6" /></div>
+            <div className="flex-1">
+              <p className="font-black">Weekly manager attention update</p>
+              <p className="mt-1 text-sm text-white/65">Every Monday, active owners and managers receive one email covering price changes, low stock, overdue counts, open invoices and pending orders.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-3"><span>Recent price changes</span><span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-800">{priceChanges.length}</span></CardTitle>
+          <CardDescription>Supplier-cost changes recorded during the last 30 days. Recipe and margin calculations use the current item cost.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {priceChanges.length ? <div className="divide-y divide-slate-100">{priceChanges.slice(0, 20).map(({ item, change }) => {
+            const percent = change.oldPrice > 0 ? ((change.newPrice - change.oldPrice) / change.oldPrice) * 100 : null;
+            const increased = change.newPrice > change.oldPrice;
+            return <Link key={`${item.id}:${change.date}:${change.newPrice}`} to={`/app/inventory/${item.id}`} className="flex flex-col gap-2 py-3 transition hover:bg-slate-50 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1"><p className="font-bold text-slate-900">{item.name}</p><p className="mt-0.5 text-xs text-slate-500">{item.supplier || 'Supplier not set'} · {new Date(change.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}{change.reason ? ` · ${change.reason}` : ''}</p></div>
+              <div className="flex items-center gap-3"><span className="text-sm text-slate-500">${change.oldPrice.toFixed(2)} → <strong className={increased ? 'text-red-600' : 'text-emerald-700'}>${change.newPrice.toFixed(2)}</strong></span>{percent !== null && <span className={`rounded-full px-2.5 py-1 text-xs font-black ${increased ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{percent >= 0 ? '+' : ''}{percent.toFixed(1)}%</span>}<ArrowRight className="h-4 w-4 text-slate-400" /></div>
+            </Link>;
+          })}</div> : <div className="rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">No ingredient price changes were recorded in the last 30 days.</div>}
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">

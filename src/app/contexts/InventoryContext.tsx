@@ -725,6 +725,30 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [accountId, activeLocationId, token, isDemoAccount]);
 
   useEffect(() => {
+    if (!isLocationLoaded || !accountId || !activeLocationId || !user?.email) return;
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentChanges = inventory.flatMap(item => (item.priceHistory || []).map(change => ({ item, change })))
+      .filter(({ change }) => {
+        const changedAt = new Date(change.date).getTime();
+        return Number.isFinite(changedAt) && changedAt >= cutoff && change.oldPrice !== change.newPrice;
+      })
+      .sort((left, right) => new Date(right.change.date).getTime() - new Date(left.change.date).getTime());
+    if (!recentChanges.length) return;
+    const seenKey = locationScopedStorageKey(accountId, activeLocationId, `seen-price-alerts:${user.email.toLowerCase()}`);
+    const seen = new Set(readScopedJson<string[]>(seenKey, []));
+    const unseen = recentChanges.filter(({ item, change }) => !seen.has(`${item.id}:${change.date}:${change.newPrice}`));
+    if (!unseen.length) return;
+    const latest = unseen[0];
+    const percent = latest.change.oldPrice > 0 ? ((latest.change.newPrice - latest.change.oldPrice) / latest.change.oldPrice) * 100 : null;
+    toast.warning(`${latest.item.name} price ${latest.change.newPrice > latest.change.oldPrice ? 'increased' : 'decreased'}`, {
+      description: `$${latest.change.oldPrice.toFixed(2)} → $${latest.change.newPrice.toFixed(2)}${percent === null ? '' : ` (${percent >= 0 ? '+' : ''}${percent.toFixed(1)}%)`} · Review Notifications for the weekly summary.`,
+      duration: 9000,
+    });
+    const nextSeen = [...new Set([...seen, ...recentChanges.map(({ item, change }) => `${item.id}:${change.date}:${change.newPrice}`)])].slice(-500);
+    localStorage.setItem(seenKey, JSON.stringify(nextSeen));
+  }, [inventory, isLocationLoaded, accountId, activeLocationId, user?.email]);
+
+  useEffect(() => {
     const key = localKey('forecasts');
     if (!key) return;
     localStorage.setItem(key, JSON.stringify(forecasts));

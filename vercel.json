@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
+  "crons": [
+    { "path": "/api/weekly-manager-digest", "schedule": "0 13 * * 1" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
