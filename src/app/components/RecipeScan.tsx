@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Loader2, Upload, X } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { convertQuantity } from '../utils/unitConversion';
@@ -56,6 +56,10 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+
+  useEffect(() => () => {
+    stream?.getTracks().forEach(track => track.stop());
+  }, [stream]);
 
   const stopCamera = () => {
     stream?.getTracks().forEach(track => track.stop());
@@ -125,12 +129,18 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
   };
 
   const capturePhoto = () => {
-    if (!videoRef.current || videoRef.current.videoWidth === 0) return;
+    if (!videoRef.current || videoRef.current.videoWidth === 0) {
+      setErrorMessage('The camera is still starting. Wait a moment, then capture the recipe again.');
+      return;
+    }
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     const context = canvas.getContext('2d');
-    if (!context) return;
+    if (!context) {
+      setErrorMessage('This browser could not capture the photo. Upload a recipe image instead.');
+      return;
+    }
     context.drawImage(videoRef.current, 0, 0);
     const imageData = canvas.toDataURL('image/jpeg', 0.9);
     setImage(imageData);
@@ -181,6 +191,19 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
             matchedInventoryItemName: selectedItem?.name || '',
             matchConfidence: selectedItem ? 1 : 0,
           }
+        : ingredient),
+    });
+  };
+
+  const updateIngredient = (
+    ingredientIndex: number,
+    changes: Partial<Pick<ScannedRecipeIngredient, 'name' | 'quantity' | 'unit'>>,
+  ) => {
+    if (!extractedData) return;
+    setExtractedData({
+      ...extractedData,
+      ingredients: extractedData.ingredients.map((ingredient, index) => index === ingredientIndex
+        ? { ...ingredient, ...changes }
         : ingredient),
     });
   };
@@ -326,19 +349,54 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
                           <p className="mt-2 text-sm font-bold text-slate-950">{cost === null ? 'Not costed' : `$${cost.toFixed(2)}`}</p>
                         </div>
                       </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_100px_100px]">
+                        <div>
+                          <Label htmlFor={`recipe-inventory-match-${index}`} className="text-xs">Inventory item</Label>
+                          <select
+                            id={`recipe-inventory-match-${index}`}
+                            value={ingredient.matchedInventoryItemId}
+                            onChange={event => updateIngredientInventoryMatch(index, event.target.value)}
+                            className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#E0B400] focus:ring-2 focus:ring-[#E0B400]/20"
+                          >
+                            <option value="">Choose an inventory item…</option>
+                            {inventory.map(item => (
+                              <option key={item.id} value={item.id}>{item.name} · {item.supplier}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`recipe-quantity-${index}`} className="text-xs">Quantity</Label>
+                          <Input
+                            id={`recipe-quantity-${index}`}
+                            aria-label={`Quantity for scanned ingredient ${index + 1}`}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={ingredient.quantity}
+                            onChange={event => updateIngredient(index, { quantity: Number(event.target.value) })}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`recipe-unit-${index}`} className="text-xs">Unit</Label>
+                          <Input
+                            id={`recipe-unit-${index}`}
+                            aria-label={`Unit for scanned ingredient ${index + 1}`}
+                            value={ingredient.unit}
+                            onChange={event => updateIngredient(index, { unit: event.target.value })}
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
                       <div className="mt-3">
-                        <Label htmlFor={`recipe-inventory-match-${index}`} className="text-xs">Inventory item</Label>
-                        <select
-                          id={`recipe-inventory-match-${index}`}
-                          value={ingredient.matchedInventoryItemId}
-                          onChange={event => updateIngredientInventoryMatch(index, event.target.value)}
-                          className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#E0B400] focus:ring-2 focus:ring-[#E0B400]/20"
-                        >
-                          <option value="">Choose an inventory item…</option>
-                          {inventory.map(item => (
-                            <option key={item.id} value={item.id}>{item.name} · {item.supplier}</option>
-                          ))}
-                        </select>
+                        <Label htmlFor={`recipe-name-${index}`} className="text-xs">Scanned ingredient text</Label>
+                        <Input
+                          id={`recipe-name-${index}`}
+                          aria-label={`Scanned ingredient text ${index + 1}`}
+                          value={ingredient.name}
+                          onChange={event => updateIngredient(index, { name: event.target.value })}
+                          className="mt-1"
+                        />
                       </div>
                     </div>
                   );

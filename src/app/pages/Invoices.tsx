@@ -369,6 +369,15 @@ export function Invoices() {
                               </div>
                             </div>
 
+                            {(invoice.taxAmount || invoice.creditAmount) ? (
+                              <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
+                                <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{fmtMoney(invoice.subtotalAmount ?? invoice.items.reduce((sum, item) => sum + item.cost, 0))}</span></div>
+                                <div className="mt-1 flex justify-between text-gray-600"><span>Tax</span><span>{fmtMoney(invoice.taxAmount || 0)}</span></div>
+                                <div className="mt-1 flex justify-between text-gray-600"><span>Credits / allowances</span><span>-{fmtMoney(invoice.creditAmount || 0)}</span></div>
+                                <div className="mt-2 flex justify-between border-t border-gray-200 pt-2 font-bold text-gray-900"><span>Invoice total</span><span>{fmtMoney(invoice.totalAmount)}</span></div>
+                              </div>
+                            ) : null}
+
                             <div className="mt-4 overflow-hidden rounded-xl border border-gray-200">
                               <table className="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead className="bg-gray-50">

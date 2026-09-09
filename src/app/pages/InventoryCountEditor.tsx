@@ -253,10 +253,14 @@ export function InventoryCountEditor() {
 
   const addStorageAreaLine = () => {
     if (!draft || isFinalized || !extraItemId || !extraStorageArea) return;
-    const source = draft.entries.find(entry => entry.itemId === extraItemId);
     const lineId = `${extraItemId}::${extraStorageArea}`;
-    if (!source || draft.entries.some(entry => entryKey(entry) === lineId)) return toast.error('That item already has a count line in this storage area.');
-    setDraft(current => current ? { ...current, storageAreaOrder: Array.from(new Set([...(current.storageAreaOrder || []), extraStorageArea])), entries: [...current.entries, { ...source, entryId: lineId, storageArea: extraStorageArea, hypothetical: 0, previousCounted: 0, counted: 0, value: 0, isCounted: false, shelfOrder: 999 }] } : current);
+    if (draft.entries.some(entry => entryKey(entry) === lineId)) return toast.error('That item already has a count line in this storage area.');
+    setDraft(current => {
+      if (!current) return current;
+      const source = current.entries.find(entry => entry.itemId === extraItemId);
+      if (!source) return current;
+      return { ...current, storageAreaOrder: Array.from(new Set([...(current.storageAreaOrder || []), extraStorageArea])), entries: [...current.entries, { ...source, entryId: lineId, storageArea: extraStorageArea, hypothetical: 0, previousCounted: 0, counted: 0, value: 0, isCounted: false, shelfOrder: 999 }] };
+    });
     setExtraItemId('');
     setExtraStorageArea('');
     setSaveState('Unsaved changes');
@@ -405,7 +409,7 @@ export function InventoryCountEditor() {
             <FilterSelect value={groupFilter} onChange={setGroupFilter} options={groupOptions} allLabel="All categories" />
             <FilterSelect value={supplierFilter} onChange={setSupplierFilter} options={supplierOptions} allLabel="All suppliers" />
           </div>
-          {!isFinalized && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3"><p className="text-xs font-black text-amber-950">Count the same item in another storage area</p><p className="mt-1 text-[11px] leading-4 text-amber-800">Add a second line for a cooler, bar, station, or cellar. ZestIQ totals the lines when you finalize.</p><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><select value={extraItemId} onChange={event => setExtraItemId(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose an item…</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={extraStorageArea} onChange={event => setExtraStorageArea(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose a storage area…</option>{storageAreas.map(area => <option key={area} value={area}>{area}</option>)}</select><button type="button" onClick={addStorageAreaLine} disabled={!extraItemId || !extraStorageArea} className="h-10 rounded-xl bg-[#303A43] px-4 text-sm font-black text-white disabled:opacity-40">Add count line</button></div></div>}
+          {!isFinalized && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3"><p className="text-xs font-black text-amber-950">Count the same item in another storage area</p><p className="mt-1 text-[11px] leading-4 text-amber-800">Add a second line for a cooler, bar, station, or cellar. ZestIQ totals the lines when you finalize.</p><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><select aria-label="Additional count item" value={extraItemId} onChange={event => setExtraItemId(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose an item…</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select aria-label="Additional count storage area" value={extraStorageArea} onChange={event => setExtraStorageArea(event.target.value)} className="h-10 rounded-xl border border-amber-200 bg-white px-3 text-sm"><option value="">Choose a storage area…</option>{storageAreas.map(area => <option key={area} value={area}>{area}</option>)}</select><button type="button" onClick={addStorageAreaLine} disabled={!extraItemId || !extraStorageArea} className="h-10 rounded-xl bg-[#303A43] px-4 text-sm font-black text-white disabled:opacity-40">Add count line</button></div></div>}
         </section>
 
         {areaGroups.map(({ area, entries }, areaIndex) => {

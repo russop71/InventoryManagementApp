@@ -69,6 +69,7 @@ export function Inventory() {
   const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock'>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '', supplier: '', unit: 'ea', parLevel: '10', currentStock: '0', unitCost: '0' });
+  const [newItemError, setNewItemError] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<'last-month' | 'this-month' | 'last-7-days' | 'today' | 'custom'>('last-month');
   const [showRangeMenu, setShowRangeMenu] = useState(false);
@@ -92,7 +93,15 @@ export function Inventory() {
 
   const handleAddItem = () => {
     const trimmedName = newItem.name.trim();
-    if (!trimmedName) return;
+    if (!trimmedName) {
+      setNewItemError('Enter an item name before saving.');
+      return;
+    }
+    const numericValues = [newItem.currentStock, newItem.parLevel, newItem.unitCost].map(Number);
+    if (numericValues.some(value => !Number.isFinite(value) || value < 0)) {
+      setNewItemError('On hand, par level, and unit cost must be zero or greater.');
+      return;
+    }
 
     addInventoryItem({
       name: trimmedName,
@@ -106,6 +115,7 @@ export function Inventory() {
     });
 
     setNewItem({ name: '', category: '', supplier: '', unit: 'ea', parLevel: '10', currentStock: '0', unitCost: '0' });
+    setNewItemError('');
     setShowAddDialog(false);
   };
 
@@ -508,7 +518,7 @@ export function Inventory() {
             <Filter className="h-4 w-4 text-gray-600" />
             {activeFilterCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#303A43] px-1 text-[10px] font-black text-white">{activeFilterCount}</span>}
           </button>
-          <button onClick={() => setShowAddDialog(true)} className="flex h-10 items-center gap-1.5 rounded-xl px-4 text-sm font-bold shrink-0" style={{ background: Y, color: D }}>
+          <button onClick={() => { setNewItemError(''); setShowAddDialog(true); }} className="flex h-10 items-center gap-1.5 rounded-xl px-4 text-sm font-bold shrink-0" style={{ background: Y, color: D }}>
             <Plus className="h-4 w-4" />
             Add Item
           </button>
@@ -694,18 +704,19 @@ export function Inventory() {
       {showAddDialog && (
         <div className="mx-4 mb-4 rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
           <div className="grid gap-3 md:grid-cols-2">
-            <input value={newItem.name} onChange={event => setNewItem(prev => ({ ...prev, name: event.target.value }))} placeholder="Item name" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input value={newItem.category} onChange={event => setNewItem(prev => ({ ...prev, category: event.target.value }))} placeholder="Category" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input value={newItem.supplier} onChange={event => setNewItem(prev => ({ ...prev, supplier: event.target.value }))} placeholder="Supplier" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input value={newItem.unit} onChange={event => setNewItem(prev => ({ ...prev, unit: event.target.value }))} placeholder="Unit" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input type="number" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} placeholder="On hand" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input type="number" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} placeholder="Par level" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input type="number" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} placeholder="Unit cost" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
+            <input aria-label="Item name" value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Item name" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
+            <input aria-label="Category" value={newItem.category} onChange={event => setNewItem(prev => ({ ...prev, category: event.target.value }))} placeholder="Category" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
+            <input aria-label="Supplier" value={newItem.supplier} onChange={event => setNewItem(prev => ({ ...prev, supplier: event.target.value }))} placeholder="Supplier" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
+            <input aria-label="Unit" value={newItem.unit} onChange={event => setNewItem(prev => ({ ...prev, unit: event.target.value }))} placeholder="Unit" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
+            <input aria-label="On hand" type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} placeholder="On hand" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
+            <input aria-label="Par level" type="number" min="0" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} placeholder="Par level" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
+            <input aria-label="Unit cost" type="number" min="0" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} placeholder="Unit cost" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
           </div>
+          {newItemError && <p role="alert" className="mt-2 text-sm font-semibold text-red-700">{newItemError}</p>}
           {importError && <p className="mt-2 text-sm text-red-600">{importError}</p>}
           <div className="mt-3 flex gap-2">
             <button onClick={handleAddItem} className="rounded-xl bg-[#303A43] px-4 py-2 text-sm font-semibold text-white">Save item</button>
-            <button onClick={() => setShowAddDialog(false)} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button>
+            <button onClick={() => { setShowAddDialog(false); setNewItemError(''); }} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button>
           </div>
         </div>
       )}

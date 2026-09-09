@@ -8,7 +8,7 @@ const SUPPORTED_DOCUMENT_DATA_URL = /^data:(?:image\/(?:jpeg|png|webp)|applicati
 const invoiceSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['vendor', 'invoiceNumber', 'date', 'items', 'total'],
+  required: ['vendor', 'invoiceNumber', 'date', 'items', 'subtotal', 'tax', 'credits', 'total', 'confidence'],
   properties: {
     vendor: { type: 'string' },
     invoiceNumber: { type: 'string' },
@@ -18,7 +18,7 @@ const invoiceSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'quantity', 'unit', 'packSize', 'packCount', 'unitCost', 'totalCost', 'category'],
+        required: ['name', 'quantity', 'unit', 'packSize', 'packCount', 'unitCost', 'totalCost', 'category', 'confidence'],
         properties: {
           name: { type: 'string' },
           quantity: { type: 'number' },
@@ -28,10 +28,15 @@ const invoiceSchema = {
           unitCost: { type: 'number' },
           totalCost: { type: 'number' },
           category: { type: 'string' },
+          confidence: { type: 'number', description: 'Extraction confidence from 0 to 1.' },
         },
       },
     },
+    subtotal: { type: 'number' },
+    tax: { type: 'number' },
+    credits: { type: 'number', description: 'Positive amount deducted from the invoice, including credits or allowances.' },
     total: { type: 'number' },
+    confidence: { type: 'number', description: 'Overall extraction confidence from 0 to 1.' },
   },
 };
 
@@ -68,6 +73,7 @@ export function normalizeInvoice(payload) {
         const safeUnitCost = Number.isFinite(unitCost) && unitCost >= 0 ? unitCost : 0;
         const packSize = Number(item?.packSize);
         const packCount = Number(item?.packCount);
+        const confidence = Number(item?.confidence);
         return {
           name: String(item?.name || 'Unknown item').trim() || 'Unknown item',
           quantity: safeQuantity,
@@ -77,19 +83,32 @@ export function normalizeInvoice(payload) {
           unitCost: safeUnitCost,
           totalCost: Number.isFinite(totalCost) && totalCost >= 0 ? totalCost : safeQuantity * safeUnitCost,
           category: String(item?.category || 'Uncategorized').trim() || 'Uncategorized',
+          confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
         };
       })
     : [];
 
   const statedTotal = Number(source.total);
   const calculatedTotal = items.reduce((sum, item) => sum + item.totalCost, 0);
+  const statedSubtotal = Number(source.subtotal);
+  const statedTax = Number(source.tax);
+  const statedCredits = Number(source.credits);
+  const confidence = Number(source.confidence);
+  const subtotal = Number.isFinite(statedSubtotal) && statedSubtotal >= 0 ? statedSubtotal : calculatedTotal;
+  const tax = Number.isFinite(statedTax) && statedTax >= 0 ? statedTax : 0;
+  const credits = Number.isFinite(statedCredits) && statedCredits >= 0 ? statedCredits : 0;
+  const derivedTotal = Math.max(0, subtotal + tax - credits);
 
   return {
     vendor: String(source.vendor || 'Unknown supplier').trim() || 'Unknown supplier',
     invoiceNumber: String(source.invoiceNumber || '').trim(),
     date: /^\d{4}-\d{2}-\d{2}$/.test(String(source.date || '')) ? String(source.date) : '',
     items,
-    total: Number.isFinite(statedTotal) && statedTotal >= 0 ? statedTotal : calculatedTotal,
+    subtotal,
+    tax,
+    credits,
+    total: Number.isFinite(statedTotal) && statedTotal >= 0 ? statedTotal : derivedTotal,
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
     aiUsed: true,
     method: 'openai-vision',
   };
@@ -121,6 +140,8 @@ async function extractInvoice(imageData, apiKey) {
               'Quantity is the TOTAL physical stock amount being received in that unit, not the number of packages. For example, one 300 g bag must be quantity 300, unit g, packSize 300 and packCount 1. Two 300 g bags must be quantity 600, unit g, packSize 300 and packCount 2.',
               'UnitCost must be the cost PER physical stock unit. Divide the line total by quantity. TotalCost remains the full line total.',
               'Choose a practical restaurant inventory category for each item.',
+              'Return subtotal, tax, credits or allowances as positive amounts, and the final invoice total.',
+              'Give each line and the overall extraction a confidence from 0 to 1. Use a low value when text is unclear; never guess.',
             ].join('\n'),
           },
           documentInput,

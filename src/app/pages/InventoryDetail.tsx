@@ -987,6 +987,7 @@ export function InventoryDetail() {
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Storage area</p>
                 <select
+                  aria-label="Storage area"
                   value={quickStorageArea}
                   onChange={(event) => selectQuickStorageArea(event.target.value)}
                   className="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm"
@@ -999,6 +1000,7 @@ export function InventoryDetail() {
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">New area (optional)</p>
                 <Input
+                  aria-label="New storage area"
                   value={quickCustomStorageArea}
                   onChange={(event) => {
                     if (!quickCustomStorageArea && event.target.value) {
@@ -1014,6 +1016,7 @@ export function InventoryDetail() {
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">On hand</p>
                 <Input
+                  aria-label="Storage area on hand"
                   type="number"
                   step="0.01"
                   value={quickCurrentStock}
@@ -1024,6 +1027,7 @@ export function InventoryDetail() {
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Par</p>
                 <Input
+                  aria-label="Storage area par"
                   type="number"
                   step="0.01"
                   value={quickParLevel}

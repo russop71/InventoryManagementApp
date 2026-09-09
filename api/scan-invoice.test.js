@@ -22,7 +22,32 @@ test('normalizeInvoice sanitizes numbers and calculates missing line totals', ()
   assert.equal(invoice.vendor, 'Example Seafood');
   assert.equal(invoice.items[0].totalCost, 91);
   assert.equal(invoice.total, 91);
+  assert.equal(invoice.subtotal, 91);
+  assert.equal(invoice.tax, 0);
+  assert.equal(invoice.credits, 0);
+  assert.equal(invoice.confidence, 0);
   assert.equal(invoice.aiUsed, true);
+});
+
+test('normalizeInvoice preserves tax, credits, and bounded extraction confidence', () => {
+  const invoice = normalizeInvoice({
+    vendor: 'Example Foods',
+    invoiceNumber: 'INV-TAX-1',
+    date: '2026-09-09',
+    subtotal: 100,
+    tax: 13,
+    credits: 5,
+    total: 108,
+    confidence: 1.4,
+    items: [{ name: 'Tomatoes', quantity: 10, unit: 'kg', unitCost: 10, totalCost: 100, category: 'Produce', confidence: -0.2 }],
+  });
+
+  assert.equal(invoice.subtotal, 100);
+  assert.equal(invoice.tax, 13);
+  assert.equal(invoice.credits, 5);
+  assert.equal(invoice.total, 108);
+  assert.equal(invoice.confidence, 1);
+  assert.equal(invoice.items[0].confidence, 0);
 });
 
 test('normalizeInvoice retains package detail for stock updates', () => {
