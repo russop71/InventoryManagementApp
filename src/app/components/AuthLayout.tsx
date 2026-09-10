@@ -6,6 +6,7 @@ export function AuthLayout() {
   const location = useLocation();
   const { isAuthenticated, user, productAccess, onboarding, mfaRequired } = useAuth();
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
+  const isShowcaseAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.ca';
 
   // Loading state
   if (isAuthenticated === null) {
@@ -27,7 +28,7 @@ export function AuthLayout() {
     return <Navigate to="/employee" replace />;
   }
 
-  if (!productAccess && !isDemoAccount) {
+  if (!productAccess && !isDemoAccount && !isShowcaseAccount) {
     const ownerBillingRoute = user?.role === 'Owner' && ['/app/payment-method', '/app/account'].includes(location.pathname);
     if (user?.role === 'Owner' && !ownerBillingRoute) return <Navigate to="/app/payment-method" replace />;
     if (user?.role !== 'Owner') {
@@ -45,7 +46,7 @@ export function AuthLayout() {
 
   const onboardingNeeded = !user?.platformAdmin && ['Owner', 'Admin'].includes(user?.role || '') && ['not_started', 'in_progress'].includes(onboarding.status);
   const onboardingExempt = ['/app/onboarding', '/app/payment-method', '/app/account'].includes(location.pathname);
-  if (!isDemoAccount && productAccess && onboardingNeeded && !onboardingExempt) return <Navigate to="/app/onboarding" replace />;
+  if (!isDemoAccount && !isShowcaseAccount && productAccess && onboardingNeeded && !onboardingExempt) return <Navigate to="/app/onboarding" replace />;
 
   // Render protected routes
   return <Outlet />;
