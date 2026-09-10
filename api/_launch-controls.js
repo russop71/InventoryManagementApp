@@ -14,6 +14,12 @@ export function isDemoAccount(account) {
   return String(account?.slug || '').trim().toLowerCase() === 'demo-zestiq-com';
 }
 
+export function isShowcaseAccount(account) {
+  const slug = String(account?.slug || '').trim().toLowerCase();
+  const name = String(account?.name || '').trim().toLowerCase();
+  return slug === 'demo-zestiq-ca' || slug === 'zestiq-showcase' || name === 'zestiq showcase';
+}
+
 export function isDemoAdministrativeMutation(account, segments = [], method = 'GET') {
   if (!isDemoAccount(account) || String(method).toUpperCase() === 'GET') return false;
   const area = segments[2];
@@ -28,7 +34,7 @@ export function hasActiveSubscription(account) {
 
 export function hasProductAccess({ account, authUser, platformAdminEmails, billingBypassAccountIds } = {}) {
   if (!account) return false;
-  if (isDemoAccount(account)) return true;
+  if (isDemoAccount(account) || isShowcaseAccount(account)) return true;
   if (isPlatformAdminEmail(authUser?.email, platformAdminEmails)) return true;
   const bypassIds = configuredValues(billingBypassAccountIds ?? process.env.ZESTIQ_BILLING_BYPASS_ACCOUNT_IDS);
   if (bypassIds.has(String(account.id || '').trim().toLowerCase())) return true;

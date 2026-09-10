@@ -1,12 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAdministrativeMutation, validateFinalizedCounts } from './_launch-controls.js';
+import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAdministrativeMutation, isShowcaseAccount, validateFinalizedCounts } from './_launch-controls.js';
 
 test('new clients are gated until the CAD Premium subscription is active', () => {
   const account = { id: 'company-a', slug: 'company-a', billing_status: 'not_configured' };
   assert.equal(hasProductAccess({ account, authUser: { email: 'owner@company-a.ca' }, platformAdminEmails: '', billingBypassAccountIds: '' }), false);
   assert.equal(hasProductAccess({ account: { ...account, billing_status: 'active' }, authUser: { email: 'owner@company-a.ca' }, platformAdminEmails: '', billingBypassAccountIds: '' }), true);
   assert.equal(hasProductAccess({ account, authUser: { email: 'admin@zestiq.ca' }, platformAdminEmails: 'admin@zestiq.ca', billingBypassAccountIds: '' }), true);
+});
+
+test('ZestIQ Showcase has product access without a paid subscription', () => {
+  const showcase = { slug: 'demo-zestiq-ca', name: 'ZestIQ Showcase', billing_status: 'not_configured' };
+  assert.equal(isShowcaseAccount(showcase), true);
+  assert.equal(hasProductAccess({ account: showcase, authUser: { email: 'demo@zestiq.ca' }, platformAdminEmails: '', billingBypassAccountIds: '' }), true);
+  assert.equal(isDemoAdministrativeMutation(showcase, ['accounts', 'id', 'locations'], 'POST'), false);
 });
 
 test('manager permissions do not give staff access to company operations', () => {
