@@ -55,8 +55,8 @@ Legend: `[x]` completed and verified locally; `[ ]` still requires work or live 
 
 ## External production configuration discovered during release
 
-- [ ] Configure the missing Vercel production Stripe values: secret key, Basic price, additional-location price, Scheduling price, and webhook secret. `/api/health` remains intentionally not-ready until these values exist.
-- [ ] Reconcile the Supabase migration history reported by the GitHub Supabase Preview check; remote migration versions are currently absent from the repository’s local migration directory.
+- [ ] Configure the missing Vercel production Stripe values: secret key, Basic price, additional-location price, Scheduling price, and webhook secret. Deferred by the founder until the business bank account is ready; `/api/health` remains intentionally not-ready until these values exist.
+- [x] Reconcile the Supabase migration history. Restored the two original foundation migrations and aligned the additional-location and onboarding filenames with the exact migration versions recorded by the production Supabase project.
 
 ## Full product function audit — 2026-09-09
 
