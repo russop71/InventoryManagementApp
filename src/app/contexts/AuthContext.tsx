@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { apiRequest } from '../utils/api';
+import { apiRequest, clearPlatformReauth } from '../utils/api';
 import { clearAllAccountScopedData } from '../utils/storageScope';
 import { clearDemoSessionReset } from '../utils/demoSession.js';
 
@@ -257,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     void apiRequest<{ success: boolean }>('/api/v1/auth/logout', { method: 'POST' }).catch(() => {});
     if (authState.accountId) clearAllAccountScopedData(authState.accountId);
+    clearPlatformReauth();
     clearStoredSession();
     setAuthState(signedOutState());
   };

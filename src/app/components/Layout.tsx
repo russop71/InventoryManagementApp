@@ -134,6 +134,7 @@ export function Layout() {
           <p className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[0.22em] text-white/40">Workspace</p>
           <nav className="space-y-1">
             <Link to="/app" className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${location.pathname === '/app' || location.pathname === '/app/dashboard' ? 'bg-[#F5D62E] text-[#303A43] shadow-lg shadow-black/10' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}><LayoutDashboard className="h-[18px] w-[18px] shrink-0" /><span>Dashboard</span></Link>
+            {user?.platformAdmin && <Link to="/app/platform" className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${location.pathname === '/app/platform' ? 'bg-[#F5D62E] text-[#303A43] shadow-lg shadow-black/10' : 'border border-[#F5D62E]/30 bg-[#F5D62E]/10 text-[#F5D62E] hover:bg-[#F5D62E]/20'}`}><Building2 className="h-[18px] w-[18px] shrink-0" /><span>CEO Control Center</span></Link>}
           </nav>
 
           {topMenuGroups.map(group => <div key={`desktop-group-${group.label}`} className="mt-5"><div className="mb-2 h-px bg-white/10" /><p className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[0.22em] text-white/40">{group.label}</p><nav className="space-y-1">{group.items.map(({ label, path, icon: Icon }) => {
@@ -185,7 +186,7 @@ export function Layout() {
             <DropdownMenuContent align="start" className="mt-1 w-56 rounded-2xl border-0 bg-white shadow-2xl">
               <div className="border-b border-gray-100 px-3 py-3"><p className="text-sm font-bold text-gray-900">{accountName || 'zestIQ Account'}</p><p className="mt-0.5 text-xs text-gray-400">{user?.name || 'Team Member'}</p></div>
               <div className="py-1">
-                {user?.platformAdmin && <DropdownMenuItem onClick={() => navigate('/app/platform')} className="mx-1 rounded-lg bg-[#FEF9C3]/60 font-semibold"><Building2 className="mr-2.5 h-4 w-4 text-[#A16207]" />ZestIQ Admin</DropdownMenuItem>}
+                {user?.platformAdmin && <DropdownMenuItem onClick={() => navigate('/app/platform')} className="mx-1 rounded-lg bg-[#FEF9C3]/60 font-semibold"><Building2 className="mr-2.5 h-4 w-4 text-[#A16207]" />CEO Control Center</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => navigate('/app/account')} className="mx-1 rounded-lg"><User className="mr-2.5 h-4 w-4 text-gray-400" />Account</DropdownMenuItem>
                 {user?.role === 'Owner' && <><DropdownMenuItem onClick={() => navigate('/app/users')} className="mx-1 rounded-lg"><Users className="mr-2.5 h-4 w-4 text-gray-400" />Users & Usage</DropdownMenuItem><DropdownMenuItem onClick={() => navigate('/app/payment-method')} className="mx-1 rounded-lg"><CreditCard className="mr-2.5 h-4 w-4 text-gray-400" />Subscription & Billing</DropdownMenuItem></>}
               </div>
@@ -258,7 +259,7 @@ export function Layout() {
               </div>
               <div className="py-1">
                 {user?.platformAdmin && (
-                  <DropdownMenuItem onClick={() => navigate('/app/platform')} className="rounded-lg mx-1 bg-[#FEF9C3]/60 font-semibold"><Building2 className="w-4 h-4 mr-2.5 text-[#A16207]" />ZestIQ Admin</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/app/platform')} className="rounded-lg mx-1 bg-[#FEF9C3]/60 font-semibold"><Building2 className="w-4 h-4 mr-2.5 text-[#A16207]" />CEO Control Center</DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => navigate('/app/account')}      className="rounded-lg mx-1"><User     className="w-4 h-4 mr-2.5 text-gray-400" />Account</DropdownMenuItem>
                 {user?.role === 'Owner' && (

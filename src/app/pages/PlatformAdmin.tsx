@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Building2, CheckCircle2, ClipboardCheck, CreditCard, ExternalLink, Loader2, MapPin, Plus, RefreshCw, ShieldCheck, Trash2, TrendingUp, UserCheck, Users } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, CheckCircle2, ClipboardCheck, CreditCard, ExternalLink, Loader2, LockKeyhole, MapPin, Plus, RefreshCw, ShieldCheck, Trash2, TrendingUp, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -10,7 +10,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { useAuth } from '../contexts/AuthContext';
-import { apiRequest } from '../utils/api';
+import { apiRequest, clearPlatformReauth, readPlatformReauth, storePlatformReauth } from '../utils/api';
 
 type BillingPlan = 'monthly';
 
@@ -146,23 +146,48 @@ export function PlatformAdmin() {
   const [commitmentConfirmed, setCommitmentConfirmed] = useState(false);
   const [isEditingClient, setIsEditingClient] = useState(false);
   const [selectedClientUser, setSelectedClientUser] = useState<ClientDetail['users'][number] | null>(null);
+  const [platformUnlocked, setPlatformUnlocked] = useState(() => Boolean(readPlatformReauth()));
+  const [platformPassword, setPlatformPassword] = useState('');
+  const [isUnlockingPlatform, setIsUnlockingPlatform] = useState(false);
 
   const loadClients = useCallback(async () => {
-    if (!user?.platformAdmin) return;
+    if (!user?.platformAdmin || !platformUnlocked) return;
     setIsLoading(true);
     try {
       const result = await apiRequest<{ clients: ClientSummary[] }>('/api/v1/platform/accounts');
       setClients(result.clients || []);
     } catch (error) {
+      if (error instanceof Error && error.message.includes('Confirm your password')) {
+        clearPlatformReauth();
+        setPlatformUnlocked(false);
+      }
       toast.error(error instanceof Error ? error.message : 'Unable to load client accounts');
     } finally {
       setIsLoading(false);
     }
-  }, [user?.platformAdmin]);
+  }, [platformUnlocked, user?.platformAdmin]);
 
   useEffect(() => {
     void loadClients();
   }, [loadClients]);
+
+  const unlockPlatform = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsUnlockingPlatform(true);
+    try {
+      const result = await apiRequest<{ token: string; expiresAt: number }>('/api/v1/auth/reauth', {
+        method: 'POST',
+        body: JSON.stringify({ password: platformPassword }),
+      });
+      storePlatformReauth(result);
+      setPlatformPassword('');
+      setPlatformUnlocked(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to verify your password');
+    } finally {
+      setIsUnlockingPlatform(false);
+    }
+  };
 
   const metrics = useMemo(() => ({
     companies: clients.length,
@@ -448,6 +473,26 @@ export function PlatformAdmin() {
     );
   }
 
+  if (!platformUnlocked) {
+    return (
+      <Card className="mx-auto max-w-lg border-[#E7D88A] shadow-sm">
+        <CardContent className="p-6 sm:p-8">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#303A43] text-[#F5D62E]"><LockKeyhole className="h-6 w-6" /></div>
+          <h2 className="mt-5 text-2xl font-extrabold text-slate-950">CEO Control Center</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Confirm the password for <strong>{user.email}</strong> to view client accounts, billing and platform controls.</p>
+          <form className="mt-6 space-y-4" onSubmit={unlockPlatform}>
+            <Label htmlFor="platform-password">Password</Label>
+            <Input id="platform-password" type="password" autoComplete="current-password" value={platformPassword} onChange={event => setPlatformPassword(event.target.value)} autoFocus required />
+            <Button type="submit" disabled={isUnlockingPlatform || !platformPassword} className="w-full bg-[#303A43] text-white hover:bg-[#1E293B]">
+              {isUnlockingPlatform ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />} Unlock CEO access
+            </Button>
+          </form>
+          <p className="mt-4 text-xs text-slate-500">The password is verified securely and never stored. Access automatically locks again after 15 minutes or when you sign out.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const selectedClientAccess = selectedClient?.onboarding.accountAccess;
   const selectedClientAccessDisabled = selectedClientAccess?.disabled === true
     || (!selectedClientAccess && selectedClient?.onboarding.accountDeletion?.accessRemoved === true);
@@ -542,28 +587,18 @@ export function PlatformAdmin() {
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2"><CardHeader><CardTitle>Client health & product adoption</CardTitle><p className="text-sm text-slate-500">A practical health signal based on subscription state, active users, recent use and last activity.</p></CardHeader><CardContent className="space-y-2">
-          {executive.health.length ? executive.health.sort((a, b) => a.score - b.score).map(item => (
-            <button type="button" key={item.client.id} onClick={() => void openClient(item.client.id)} className="grid w-full gap-3 rounded-2xl border border-slate-200 p-3 text-left transition hover:border-[#F5D62E] sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-              <div><p className="font-semibold text-slate-950">{item.client.name}</p><p className="mt-1 text-xs text-slate-500">{item.client.activeUserCount}/{item.client.userCount} active users · {item.client.actionCount30Days} actions in 30 days · {item.inactiveDays === Infinity ? 'No recent activity' : `active ${item.inactiveDays === 0 ? 'today' : `${item.inactiveDays}d ago`}`}</p></div>
-              <Badge className={item.tone}>{item.label}</Badge><span className="text-sm font-bold text-slate-700">{item.score}/100</span>
-            </button>
-          )) : <p className="py-6 text-sm text-slate-500">Client health will appear as soon as accounts are created.</p>}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card><CardHeader><CardTitle className="text-base">Growth & activation</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
+          <div className="flex justify-between"><span className="text-slate-500">New client companies</span><span className="font-bold">{executive.recentClients} <span className="font-normal text-slate-400">last 30 days</span></span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Ready for activation</span><span className="font-bold">{executive.readyForActivation}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Paying subscriptions</span><span className="font-bold">{metrics.activeSubscriptions}</span></div>
+          <p className="rounded-xl bg-[#FEF9C3] p-3 text-xs text-slate-700">Use this area to see where clients are in the journey: created, checkout sent, paid and actively using ZestIQ.</p>
         </CardContent></Card>
-        <div className="space-y-4">
-          <Card><CardHeader><CardTitle className="text-base">Growth & activation</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between"><span className="text-slate-500">New client companies</span><span className="font-bold">{executive.recentClients} <span className="font-normal text-slate-400">last 30 days</span></span></div>
-            <div className="flex justify-between"><span className="text-slate-500">Ready for activation</span><span className="font-bold">{executive.readyForActivation}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">Paying subscriptions</span><span className="font-bold">{metrics.activeSubscriptions}</span></div>
-            <p className="rounded-xl bg-[#FEF9C3] p-3 text-xs text-slate-700">Use this area to see where clients are in the journey: created, checkout sent, paid and actively using ZestIQ.</p>
-          </CardContent></Card>
-          <Card><CardHeader><CardTitle className="text-base">Security & platform safeguards</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-slate-600">
-            <p className="flex gap-2"><ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" /><span>Client workspaces are isolated by company account.</span></p>
-            <p className="flex gap-2"><CreditCard className="h-4 w-4 shrink-0 text-emerald-600" /><span>Card details stay in Stripe; ZestIQ only displays safe payment metadata.</span></p>
-            <p className="flex gap-2"><UserCheck className="h-4 w-4 shrink-0 text-emerald-600" /><span>CEO access is separate from restaurant manager access.</span></p>
-          </CardContent></Card>
-        </div>
+        <Card><CardHeader><CardTitle className="text-base">Security & platform safeguards</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-slate-600">
+          <p className="flex gap-2"><ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" /><span>Client workspaces are isolated by company account.</span></p>
+          <p className="flex gap-2"><CreditCard className="h-4 w-4 shrink-0 text-emerald-600" /><span>Card details stay in Stripe; ZestIQ only displays safe payment metadata.</span></p>
+          <p className="flex gap-2"><UserCheck className="h-4 w-4 shrink-0 text-emerald-600" /><span>CEO access is separate from restaurant manager access.</span></p>
+        </CardContent></Card>
       </div>
 
       <Card>
@@ -577,14 +612,13 @@ export function PlatformAdmin() {
             <button key={client.id} type="button" onClick={() => void openClient(client.id)} className="w-full rounded-2xl border border-slate-200 p-4 text-left transition hover:border-[#F5D62E] hover:bg-[#FEFCE8]/40">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><p className="font-bold text-slate-950">{client.name}</p><p className="mt-1 text-sm text-slate-500">{client.owner ? `${client.owner.name} · ${client.owner.email}` : 'No client owner assigned'}</p></div>
-                <div className="flex flex-wrap gap-2">{client.accessDisabled && <Badge className="bg-red-100 text-red-800">Access disabled</Badge>}<Badge className={`capitalize ${billingStatusClass(client.billing.status)}`}>{client.billing.status.replaceAll('_', ' ')}</Badge></div>
+                <div className="flex flex-wrap gap-2">{client.accessDisabled && <Badge className="bg-red-100 text-red-800">Access disabled</Badge>}<Badge className={healthFor(client).tone}>{healthFor(client).label} · {healthFor(client).score}/100</Badge><Badge className={`capitalize ${billingStatusClass(client.billing.status)}`}>{client.billing.status.replaceAll('_', ' ')}</Badge></div>
               </div>
-              <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-5">
+              <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-4">
                 <span>{client.activeUserCount}/{client.userCount} active users</span>
                 <span>{client.locationCount} locations</span>
                 <span>{client.actionCount30Days} actions / 30 days</span>
                 <span>Last active: {formatDate(client.lastActive)}</span>
-                <span className="font-semibold">Health: {healthFor(client).score}/100</span>
               </div>
             </button>
           ))}

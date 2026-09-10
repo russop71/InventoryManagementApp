@@ -1,5 +1,34 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const AUTH_SESSION_KEY = 'zestiq:auth:session';
+const PLATFORM_REAUTH_SESSION_KEY = 'zestiq:platform:reauth';
+
+interface PlatformReauthSession {
+  token: string;
+  expiresAt: number;
+}
+
+export function readPlatformReauth(): PlatformReauthSession | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(PLATFORM_REAUTH_SESSION_KEY) || 'null') as PlatformReauthSession | null;
+    if (!stored?.token || !Number.isFinite(stored.expiresAt) || stored.expiresAt <= Date.now()) {
+      sessionStorage.removeItem(PLATFORM_REAUTH_SESSION_KEY);
+      return null;
+    }
+    return stored;
+  } catch {
+    sessionStorage.removeItem(PLATFORM_REAUTH_SESSION_KEY);
+    return null;
+  }
+}
+
+export function storePlatformReauth(session: PlatformReauthSession) {
+  sessionStorage.setItem(PLATFORM_REAUTH_SESSION_KEY, JSON.stringify(session));
+}
+
+export function clearPlatformReauth() {
+  if (typeof window !== 'undefined') sessionStorage.removeItem(PLATFORM_REAUTH_SESSION_KEY);
+}
 
 interface StoredSession {
   token: string;
@@ -40,11 +69,13 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit | undefined, allowRefresh: boolean): Promise<T> {
   const session = readSession();
+  const platformReauth = path.startsWith('/api/v1/platform') ? readPlatformReauth() : null;
   const response = await fetch(buildUrl(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',
       ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
+      ...(platformReauth?.token ? { 'X-ZestIQ-Platform-Reauth': platformReauth.token } : {}),
       ...(init?.headers || {}),
     },
   });

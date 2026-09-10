@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizePosImportPayload } from '../../server/pos-import.js';
 import { extractResponseText } from '../scan.js';
 import { enforceAiQuota, recordAiUsage } from '../_ai-quota.js';
@@ -25,6 +26,7 @@ const PREMIUM_MONTHLY_CAD_CENTS = 24999;
 const ADDITIONAL_LOCATION_CAD_CENTS = 19900;
 const SCHEDULING_CAD_CENTS = 4999;
 const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
+const PLATFORM_REAUTH_TTL_MS = 15 * 60 * 1000;
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -727,6 +729,37 @@ function bearerToken(req) {
   return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
 }
 
+function platformReauthSecret() {
+  if (!SUPABASE_SECRET_KEY) throw Object.assign(new Error('Platform security is not configured'), { status: 503 });
+  return SUPABASE_SECRET_KEY;
+}
+
+function createPlatformReauthToken(authUser) {
+  const expiresAt = Date.now() + PLATFORM_REAUTH_TTL_MS;
+  const payload = Buffer.from(JSON.stringify({ sub: authUser.id, exp: expiresAt }), 'utf8').toString('base64url');
+  const signature = createHmac('sha256', platformReauthSecret()).update(payload).digest('base64url');
+  return { token: `${payload}.${signature}`, expiresAt };
+}
+
+function requirePlatformReauth(req, authUser) {
+  const token = String(req.headers?.['x-zestiq-platform-reauth'] || '').trim();
+  const [payload, signature] = token.split('.');
+  const fail = () => {
+    throw Object.assign(new Error('Confirm your password to access the CEO Control Center'), { status: 428, code: 'PLATFORM_REAUTH_REQUIRED' });
+  };
+  if (!payload || !signature) return fail();
+  const expected = createHmac('sha256', platformReauthSecret()).update(payload).digest('base64url');
+  const receivedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (receivedBuffer.length !== expectedBuffer.length || !timingSafeEqual(receivedBuffer, expectedBuffer)) return fail();
+  try {
+    const value = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (value.sub !== authUser.id || !Number.isFinite(value.exp) || value.exp <= Date.now()) return fail();
+  } catch {
+    return fail();
+  }
+}
+
 function jwtAssuranceLevel(token = '') {
   try {
     const payload = String(token).split('.')[1];
@@ -953,6 +986,18 @@ export default async function handler(req, res) {
       return json(res, 200, await sessionPayload(tokenPayload));
     }
 
+    if (segments[0] === 'auth' && segments[1] === 'reauth' && method === 'POST') {
+      enforceRateLimit(req, res, 'auth-reauth', { limit: 8, windowMs: 15 * 60 * 1000 });
+      const auth = await getAuthContext(req);
+      ensureMfa(auth);
+      if (!isPlatformAdmin(auth.authUser)) return json(res, 403, { error: 'ZestIQ platform administrator access is required' });
+      const password = String(req.body?.password || '');
+      if (!password) return json(res, 400, { error: 'Enter your password' });
+      const verified = await signInWithPassword(String(auth.authUser.email || '').trim().toLowerCase(), password);
+      if (verified?.user?.id !== auth.authUser.id) return json(res, 403, { error: 'Unable to verify this account' });
+      return json(res, 200, createPlatformReauthToken(auth.authUser));
+    }
+
     if (segments[0] === 'auth' && segments[1] === 'demo' && method === 'POST') {
       enforceRateLimit(req, res, 'auth-demo', { limit: 20, windowMs: 60 * 60 * 1000 });
       return json(res, 200, await sessionPayload(await ensureDemoLogin()));
@@ -1061,6 +1106,7 @@ export default async function handler(req, res) {
       if (!isPlatformAdmin(auth.authUser)) {
         return json(res, 403, { error: 'ZestIQ platform administrator access is required' });
       }
+      requirePlatformReauth(req, auth.authUser);
 
       if (segments[1] === 'readiness' && method === 'GET') {
         const readiness = launchReadiness();
