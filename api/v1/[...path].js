@@ -26,7 +26,7 @@ const PREMIUM_MONTHLY_CAD_CENTS = 24999;
 const ADDITIONAL_LOCATION_CAD_CENTS = 19900;
 const SCHEDULING_CAD_CENTS = 4999;
 const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
-const PLATFORM_REAUTH_TTL_MS = 15 * 60 * 1000;
+const PLATFORM_REAUTH_TTL_MS = 60 * 60 * 1000;
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -1265,6 +1265,40 @@ export default async function handler(req, res) {
           await supabase(`accounts?id=eq.${clientAccount.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { name: companyName, onboarding_state: { ...currentOnboarding, clientProfile: { ...(currentOnboarding.clientProfile || {}), ...onboardingDetails }, updatedAt: now }, updated_at: now } });
           if (owner && (ownerName || ownerEmail)) await supabase(`app_users?id=eq.${owner.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { ...(ownerName ? { name: ownerName } : {}), ...(ownerEmail ? { email: ownerEmail } : {}) } });
           return json(res, 200, { success: true });
+        }
+
+        if (segments[3] === 'locations') {
+          const locationId = segments[4];
+          const name = String(req.body?.name || '').trim();
+          if (name.length < 2 || name.length > 120) {
+            return json(res, 400, { error: 'Location name must be between 2 and 120 characters' });
+          }
+
+          if (!locationId && method === 'POST') {
+            const slug = normalizeSlug(name);
+            const duplicate = await supabase(`locations?account_id=eq.${clientAccount.id}&slug=eq.${encodeURIComponent(slug)}&select=id&limit=1`);
+            if (duplicate.length) return json(res, 409, { error: 'A location with that name already exists' });
+            const created = await supabase('locations?select=*', {
+              method: 'POST',
+              prefer: 'return=representation',
+              body: { account_id: clientAccount.id, slug, name, timezone: 'America/Toronto' },
+            });
+            await supabase('location_data', { method: 'POST', prefer: 'return=minimal', body: { location_id: created[0].id } });
+            const all = await listLocations(clientAccount.id);
+            return json(res, 201, { locations: all.map(mapLocation) });
+          }
+
+          if (locationId && method === 'PATCH') {
+            const location = await ensureLocationBelongsToAccount(clientAccount.id, locationId);
+            if (!location) return json(res, 404, { error: 'Location not found' });
+            await supabase(`locations?id=eq.${location.id}&account_id=eq.${clientAccount.id}`, {
+              method: 'PATCH',
+              prefer: 'return=minimal',
+              body: { name, updated_at: new Date().toISOString() },
+            });
+            const all = await listLocations(clientAccount.id);
+            return json(res, 200, { locations: all.map(mapLocation) });
+          }
         }
 
         if (segments[3] === 'users') {

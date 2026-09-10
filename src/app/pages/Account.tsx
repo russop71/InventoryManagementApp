@@ -3,17 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { User, Mail, Building, Phone, MapPin, KeyRound } from 'lucide-react';
+import { User, Mail, Building, Phone, MapPin, KeyRound, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { clearLocationScopedData } from '../utils/storageScope';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
 export function Account() {
-  const { user, accountId, accountName, locations, addLocation, logout, changePassword, updateLocalAccountProfile } = useAuth();
+  const { user, accountId, accountName, locations, addLocation, updateLocation, logout, changePassword, updateLocalAccountProfile } = useAuth();
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const [isEditing, setIsEditing] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
+  const [locationNames, setLocationNames] = useState<Record<string, string>>({});
+  const [savingLocationId, setSavingLocationId] = useState<string | null>(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -39,6 +41,10 @@ export function Account() {
       // Ignore malformed profile payloads.
     }
   }, [isDemoAccount, profileStorageKey]);
+
+  useEffect(() => {
+    setLocationNames(Object.fromEntries(locations.map(location => [location.id, location.name])));
+  }, [locations]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +77,23 @@ export function Account() {
       toast.success('Location added');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to add location');
+    }
+  };
+
+  const handleRenameLocation = async (locationId: string) => {
+    const locationName = String(locationNames[locationId] || '').trim();
+    if (locationName.length < 2) {
+      toast.error('Enter a location name with at least 2 characters');
+      return;
+    }
+    setSavingLocationId(locationId);
+    try {
+      await updateLocation(locationId, locationName);
+      toast.success('Location name updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to rename location');
+    } finally {
+      setSavingLocationId(null);
     }
   };
 
@@ -310,9 +333,26 @@ export function Account() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             {locations.map(location => (
-              <div key={location.id} className="rounded-lg border border-gray-100 px-3 py-2">
-                <p className="text-sm font-medium text-gray-800">{location.name}</p>
-                <p className="text-xs text-gray-400">ID: {location.id}</p>
+              <div key={location.id} className="rounded-xl border border-gray-100 p-3">
+                <Label htmlFor={`location-${location.id}`} className="text-xs text-slate-500">Location name</Label>
+                <div className="mt-2 flex gap-2">
+                  <Input
+                    id={`location-${location.id}`}
+                    value={locationNames[location.id] ?? location.name}
+                    onChange={event => setLocationNames(current => ({ ...current, [location.id]: event.target.value }))}
+                    onKeyDown={event => { if (event.key === 'Enter') void handleRenameLocation(location.id); }}
+                    aria-label={`Rename ${location.name}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={savingLocationId === location.id || (locationNames[location.id] ?? location.name).trim() === location.name}
+                    onClick={() => void handleRenameLocation(location.id)}
+                  >
+                    <Save className="mr-2 h-4 w-4" /> {savingLocationId === location.id ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-gray-400">Inventory and reporting stay connected when a location is renamed.</p>
               </div>
             ))}
           </div>

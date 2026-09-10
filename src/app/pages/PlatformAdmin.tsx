@@ -149,6 +149,8 @@ export function PlatformAdmin() {
   const [platformUnlocked, setPlatformUnlocked] = useState(() => Boolean(readPlatformReauth()));
   const [platformPassword, setPlatformPassword] = useState('');
   const [isUnlockingPlatform, setIsUnlockingPlatform] = useState(false);
+  const [newClientLocationName, setNewClientLocationName] = useState('');
+  const [clientLocationNames, setClientLocationNames] = useState<Record<string, string>>({});
 
   const loadClients = useCallback(async () => {
     if (!user?.platformAdmin || !platformUnlocked) return;
@@ -236,6 +238,8 @@ export function PlatformAdmin() {
     try {
       const result = await apiRequest<{ client: ClientDetail }>(`/api/v1/platform/accounts/${encodeURIComponent(clientId)}`);
       setSelectedClient(result.client);
+      setNewClientLocationName('');
+      setClientLocationNames(Object.fromEntries(result.client.locations.map(location => [location.id, location.name])));
       setBillableLocationCount(Math.max(1, result.client.locations.length, 1 + Number(result.client.billing.additionalLocationQuantity || 0)));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to load the client account');
@@ -284,6 +288,50 @@ export function PlatformAdmin() {
       await loadClients();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to create client company');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addClientLocation = async () => {
+    if (!selectedClient || newClientLocationName.trim().length < 2) {
+      toast.error('Enter a location name');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/locations`, {
+        method: 'POST',
+        body: JSON.stringify({ name: newClientLocationName.trim() }),
+      });
+      toast.success('Location added');
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to add location');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renameClientLocation = async (locationId: string) => {
+    if (!selectedClient) return;
+    const name = String(clientLocationNames[locationId] || '').trim();
+    if (name.length < 2) {
+      toast.error('Enter a location name');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await apiRequest(`/api/v1/platform/accounts/${encodeURIComponent(selectedClient.id)}/locations/${encodeURIComponent(locationId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      });
+      toast.success('Location name updated');
+      await openClient(selectedClient.id);
+      await loadClients();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to rename location');
     } finally {
       setIsLoading(false);
     }
@@ -487,7 +535,7 @@ export function PlatformAdmin() {
               {isUnlockingPlatform ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />} Unlock CEO access
             </Button>
           </form>
-          <p className="mt-4 text-xs text-slate-500">The password is verified securely and never stored. Access automatically locks again after 15 minutes or when you sign out.</p>
+          <p className="mt-4 text-xs text-slate-500">The password is verified securely and never stored. Access automatically locks again after 1 hour or when you sign out.</p>
         </CardContent>
       </Card>
     );
@@ -506,6 +554,9 @@ export function PlatformAdmin() {
           <p className="mt-1 text-sm text-slate-600">Your operating view of growth, client health, revenue and platform risk. Client passwords and full card details are never exposed.</p>
         </div>
         <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={() => { clearPlatformReauth(); setPlatformUnlocked(false); setClients([]); setSelectedClient(null); }}>
+            <LockKeyhole className="mr-2 h-4 w-4" /> Lock
+          </Button>
           <Button type="button" variant="outline" disabled={isLoading} onClick={() => void loadClients()}>
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
           </Button>
@@ -712,7 +763,19 @@ export function PlatformAdmin() {
                 </div>
                 <div className="rounded-2xl border border-slate-200 p-4">
                   <p className="flex items-center gap-2 font-semibold"><MapPin className="h-4 w-4" /> Locations</p>
-                  <div className="mt-3 space-y-2">{selectedClient.locations.map(location => <div key={location.id} className="rounded-xl bg-slate-50 p-3 text-sm font-medium">{location.name}</div>)}</div>
+                  <div className="mt-3 space-y-2">
+                    {selectedClient.locations.map(location => (
+                      <div key={location.id} className="flex gap-2 rounded-xl bg-slate-50 p-2">
+                        <Input value={clientLocationNames[location.id] ?? location.name} onChange={event => setClientLocationNames(current => ({ ...current, [location.id]: event.target.value }))} aria-label={`Rename ${location.name}`} />
+                        <Button type="button" size="sm" variant="outline" disabled={isLoading || (clientLocationNames[location.id] ?? location.name).trim() === location.name} onClick={() => void renameClientLocation(location.id)}>Save</Button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Input value={newClientLocationName} onChange={event => setNewClientLocationName(event.target.value)} placeholder="Add another location" />
+                    <Button type="button" size="sm" disabled={isLoading || newClientLocationName.trim().length < 2} onClick={() => void addClientLocation()} className="bg-[#303A43] text-white">Add</Button>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">Owners and admins can also rename every location—including the original Main Location—from Account Settings.</p>
                 </div>
               </div>
 
