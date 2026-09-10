@@ -18,13 +18,15 @@ const invoiceSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'quantity', 'unit', 'packSize', 'packCount', 'unitCost', 'totalCost', 'category', 'confidence'],
+        required: ['name', 'quantity', 'unit', 'packSize', 'packCount', 'unitsPerPack', 'innerUnit', 'unitCost', 'totalCost', 'category', 'confidence'],
         properties: {
           name: { type: 'string' },
           quantity: { type: 'number' },
           unit: { type: 'string' },
-          packSize: { type: 'number', description: 'Amount in one purchased package, expressed in unit.' },
-          packCount: { type: 'number', description: 'Number of purchased packages on this line.' },
+          packSize: { type: 'number', description: 'Amount in each inner container, expressed in unit.' },
+          packCount: { type: 'number', description: 'Number of purchased outer packages or cases on this invoice line.' },
+          unitsPerPack: { type: 'number', description: 'Number of inner containers in each outer package or case.' },
+          innerUnit: { type: 'string', description: 'Singular inner container name such as can, bottle, bag, or each.' },
           unitCost: { type: 'number' },
           totalCost: { type: 'number' },
           category: { type: 'string' },
@@ -73,6 +75,7 @@ export function normalizeInvoice(payload) {
         const safeUnitCost = Number.isFinite(unitCost) && unitCost >= 0 ? unitCost : 0;
         const packSize = Number(item?.packSize);
         const packCount = Number(item?.packCount);
+        const unitsPerPack = Number(item?.unitsPerPack);
         const confidence = Number(item?.confidence);
         return {
           name: String(item?.name || 'Unknown item').trim() || 'Unknown item',
@@ -80,6 +83,8 @@ export function normalizeInvoice(payload) {
           unit: String(item?.unit || 'ea').trim() || 'ea',
           packSize: Number.isFinite(packSize) && packSize > 0 ? packSize : safeQuantity,
           packCount: Number.isFinite(packCount) && packCount > 0 ? packCount : 1,
+          unitsPerPack: Number.isFinite(unitsPerPack) && unitsPerPack > 0 ? unitsPerPack : 1,
+          innerUnit: String(item?.innerUnit || 'each').trim() || 'each',
           unitCost: safeUnitCost,
           totalCost: Number.isFinite(totalCost) && totalCost >= 0 ? totalCost : safeQuantity * safeUnitCost,
           category: String(item?.category || 'Uncategorized').trim() || 'Uncategorized',
@@ -137,7 +142,8 @@ async function extractInvoice(imageData, apiKey) {
               'Copy printed values; do not invent missing line items.',
               'Use an empty string when invoice number or date is unreadable.',
               'Normalize units to concise labels such as ea, kg, g, lb, L, or mL.',
-              'Quantity is the TOTAL physical stock amount being received in that unit, not the number of packages. For example, one 300 g bag must be quantity 300, unit g, packSize 300 and packCount 1. Two 300 g bags must be quantity 600, unit g, packSize 300 and packCount 2.',
+              'Separate outer packages from their inner containers and measurement. packCount is the number of cases or outer packages purchased; unitsPerPack is the number of inner cans, bottles, bags, or each in one outer package; innerUnit is that singular container name; packSize is the amount in each inner container; unit is the measurement for packSize.',
+              'Quantity is the TOTAL physical stock amount received: packCount × unitsPerPack × packSize. For example, one case containing 6 cans of 8 oz is quantity 48, unit oz, packSize 8, packCount 1, unitsPerPack 6, innerUnit can. Two 300 g bags are quantity 600, unit g, packSize 300, packCount 2, unitsPerPack 1, innerUnit bag.',
               'UnitCost must be the cost PER physical stock unit. Divide the line total by quantity. TotalCost remains the full line total.',
               'Choose a practical restaurant inventory category for each item.',
               'Return subtotal, tax, credits or allowances as positive amounts, and the final invoice total.',

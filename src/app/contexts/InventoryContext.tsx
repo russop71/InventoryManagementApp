@@ -9,7 +9,7 @@ import { markDemoSessionReset, shouldResetDemoSession } from '../utils/demoSessi
 import { mergeLocationData } from '../utils/locationDataMerge.js';
 import { hasDuplicateInvoiceNumber, inventoryItemMatchesInvoiceName, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
 import { findBestSupplierMatch, mergeDuplicateSuppliers, normalizeSupplierName } from '../utils/supplierMatching.js';
-import { convertQuantity, normalizeUnit } from '../utils/unitConversion';
+import { convertIngredientQuantity, convertQuantity, normalizeUnit } from '../utils/unitConversion';
 import type { InventoryCount } from '../utils/inventoryCounts';
 
 const DEFAULT_STORAGE_AREAS = ['Walk-In Cooler', 'Dry Storage', 'Freezer', 'Bar', 'Wine Cellar', 'Unassigned'] as const;
@@ -73,6 +73,7 @@ export interface InventoryItem {
   packSize?: number;
   packUnit?: string;
   unitsPerPack?: number;
+  packNickname?: string;
   unitCost: number;
   taxRate?: number;
   taxValue?: number;
@@ -219,6 +220,8 @@ export interface ScannedInvoiceItem {
   unit: string;
   packSize?: number;
   packCount?: number;
+  unitsPerPack?: number;
+  innerUnit?: string;
   unitCost: number;
   totalCost: number;
   category: string;
@@ -1289,11 +1292,21 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const rawQuantity = Math.max(0, Number(scannedItem.quantity) || 0);
       const packSize = Math.max(0, Number(scannedItem.packSize) || rawQuantity || 1);
       const packCount = Math.max(1, Number(scannedItem.packCount) || 1);
+      const unitsPerPack = Math.max(1, Number(scannedItem.unitsPerPack) || 1);
+      const innerUnit = String(scannedItem.innerUnit || 'each').trim().toLowerCase() || 'each';
       const totalCost = Math.max(0, Number(scannedItem.totalCost) || rawQuantity * Math.max(0, Number(scannedItem.unitCost) || 0));
 
       if (itemIndex >= 0) {
         const existingItem = nextInventory[itemIndex];
-        const quantity = convertQuantity(rawQuantity, scannedUnit, existingItem.unit);
+        const quantity = convertIngredientQuantity(existingItem, rawQuantity, scannedUnit, existingItem.unit)
+          ?? convertIngredientQuantity({
+            ...existingItem,
+            packSize,
+            packUnit: scannedUnit,
+            unitsPerPack,
+            packNickname: innerUnit,
+            purchaseOptions: undefined,
+          }, rawQuantity, scannedUnit, existingItem.unit);
         if (quantity === null) {
           return { success: false, error: `${scannedItem.name} is already stocked in ${existingItem.unit}. Change the scanned unit to a compatible unit before saving so ZestIQ does not create a duplicate.` };
         }
@@ -1321,7 +1334,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           productCode: matchingOption?.productCode || '',
           packSize,
           packUnit: scannedUnit,
-          packsPerCase: packCount,
+          packNickname: innerUnit,
+          packsPerCase: unitsPerPack,
           unitPrice: totalCost / packCount,
           orderingStatus: matchingOption?.orderingStatus,
           isMain: isPrimarySupplier,
@@ -1352,6 +1366,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           currentStock: newStock,
           supplier: isPrimarySupplier ? supplierName : existingItem.supplier,
           unitCost: isPrimarySupplier ? unitCost : existingItem.unitCost,
+          packSize: isPrimarySupplier ? packSize : existingItem.packSize,
+          packUnit: isPrimarySupplier ? scannedUnit : existingItem.packUnit,
+          unitsPerPack: isPrimarySupplier ? unitsPerPack : existingItem.unitsPerPack,
+          packNickname: isPrimarySupplier ? innerUnit : existingItem.packNickname,
           purchaseOptions,
           priceHistory: nextPriceHistory,
           lastUpdated: now,
@@ -1381,7 +1399,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         unit: scannedUnit,
         packSize,
         packUnit: scannedUnit,
-        unitsPerPack: packCount,
+        unitsPerPack,
+        packNickname: innerUnit,
         unitCost,
         parLevel: quantity * 2,
         supplier: supplierName,
@@ -1402,7 +1421,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           productCode: '',
           packSize,
           packUnit: scannedUnit,
-          packsPerCase: packCount,
+          packNickname: innerUnit,
+          packsPerCase: unitsPerPack,
           unitPrice: totalCost / packCount,
           isMain: true,
           isLocal: true,

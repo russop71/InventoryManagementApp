@@ -62,7 +62,24 @@ test('normalizeInvoice retains package detail for stock updates', () => {
   assert.equal(invoice.items[0].unit, 'g');
   assert.equal(invoice.items[0].packSize, 300);
   assert.equal(invoice.items[0].packCount, 1);
+  assert.equal(invoice.items[0].unitsPerPack, 1);
+  assert.equal(invoice.items[0].innerUnit, 'each');
   assert.equal(invoice.items[0].totalCost, 12);
+});
+
+test('normalizeInvoice retains nested case and container detail', () => {
+  const invoice = normalizeInvoice({
+    vendor: 'Example Beverage Supplier',
+    invoiceNumber: 'INV-6X8',
+    date: '2026-09-10',
+    items: [{ name: 'Tomato cans 6 x 8 oz', quantity: 48, unit: 'oz', packSize: 8, packCount: 1, unitsPerPack: 6, innerUnit: 'can', unitCost: 1, totalCost: 48, category: 'Canned Goods' }],
+  });
+
+  assert.equal(invoice.items[0].packCount, 1);
+  assert.equal(invoice.items[0].unitsPerPack, 6);
+  assert.equal(invoice.items[0].innerUnit, 'can');
+  assert.equal(invoice.items[0].packSize, 8);
+  assert.equal(invoice.items[0].unit, 'oz');
 });
 
 test('mapInvoiceExtractionError distinguishes exhausted quota from a temporary rate limit', () => {

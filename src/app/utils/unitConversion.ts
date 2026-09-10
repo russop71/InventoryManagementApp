@@ -138,9 +138,13 @@ export type PackagedUnitItem = {
   unit: string;
   packSize?: number;
   packUnit?: string;
+  unitsPerPack?: number;
+  packNickname?: string;
   purchaseOptions?: Array<{
     packSize: number;
     packUnit: string;
+    packNickname?: string;
+    packsPerCase?: number;
     isMain: boolean;
   }>;
 };
@@ -149,6 +153,8 @@ function packagedUnitDefinition(item: PackagedUnitItem) {
   const mainPurchaseOption = item.purchaseOptions?.find(option => option.isMain) || item.purchaseOptions?.[0];
   let size = Number(item.packSize ?? mainPurchaseOption?.packSize);
   let unit = item.packUnit ?? mainPurchaseOption?.packUnit;
+  const packsPerContainer = Math.max(1, Number(mainPurchaseOption?.packsPerCase ?? item.unitsPerPack ?? 1) || 1);
+  const innerUnit = String(mainPurchaseOption?.packNickname ?? item.packNickname ?? '').trim();
 
   // Older bottle records may only carry their capacity in the product name.
   if ((!size || !unit) && normalizeUnit(item.unit) === 'bottle') {
@@ -162,7 +168,9 @@ function packagedUnitDefinition(item: PackagedUnitItem) {
   if (!Number.isFinite(size) || size <= 0 || !unit) return null;
   return {
     containerUnit: normalizeUnit(item.unit),
-    containedQuantity: size,
+    innerCount: packsPerContainer,
+    innerUnit: innerUnit ? normalizeUnit(innerUnit) : null,
+    containedQuantityPerInner: size,
     containedUnit: normalizeUnit(unit),
   };
 }
@@ -177,6 +185,9 @@ export function getIngredientCompatibleUnits(item: PackagedUnitItem) {
     : getCompatibleUnits(packaged.containedUnit);
   const options = [
     { value: packaged.containerUnit, label: formatUnitLabel(item.unit) },
+    ...(packaged.innerUnit && packaged.innerUnit !== packaged.containerUnit && packaged.innerCount > 1
+      ? [{ value: packaged.innerUnit, label: formatUnitLabel(packaged.innerUnit) }]
+      : []),
     ...containedOptions,
   ];
   return options.filter((option, index) => options.findIndex(candidate => candidate.value === option.value) === index);
@@ -197,15 +208,18 @@ export function convertIngredientQuantity(
   const from = normalizeUnit(fromUnit);
   const to = normalizeUnit(toUnit);
 
-  if (from === packaged.containerUnit) {
-    const containedQuantity = quantity * packaged.containedQuantity;
-    return convertQuantity(containedQuantity, packaged.containedUnit, toUnit);
-  }
+  const quantityInContainedUnit = from === packaged.containerUnit
+    ? quantity * packaged.innerCount * packaged.containedQuantityPerInner
+    : packaged.innerUnit && from === packaged.innerUnit
+      ? quantity * packaged.containedQuantityPerInner
+      : convertQuantity(quantity, fromUnit, packaged.containedUnit);
+  if (quantityInContainedUnit === null) return null;
 
   if (to === packaged.containerUnit) {
-    const quantityInContainedUnit = convertQuantity(quantity, fromUnit, packaged.containedUnit);
-    return quantityInContainedUnit === null ? null : quantityInContainedUnit / packaged.containedQuantity;
+    return quantityInContainedUnit / (packaged.innerCount * packaged.containedQuantityPerInner);
   }
-
-  return null;
+  if (packaged.innerUnit && to === packaged.innerUnit) {
+    return quantityInContainedUnit / packaged.containedQuantityPerInner;
+  }
+  return convertQuantity(quantityInContainedUnit, packaged.containedUnit, toUnit);
 }

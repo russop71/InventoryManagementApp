@@ -17,6 +17,8 @@ interface InvoiceItem {
   unit: string;
   packSize?: number;
   packCount?: number;
+  unitsPerPack?: number;
+  innerUnit?: string;
   unitCost: number;
   totalCost: number;
   category: string;
@@ -151,6 +153,8 @@ export function InvoiceScanner() {
             unit: it.unit || 'ea',
             packSize: Number(it.packSize) || Number(it.quantity) || 1,
             packCount: Number(it.packCount) || 1,
+            unitsPerPack: Number(it.unitsPerPack) || 1,
+            innerUnit: String(it.innerUnit || 'each').trim() || 'each',
             unitCost: Number(it.unitCost) || Number(it.price) || 0,
             totalCost: Number(it.totalCost) || (Number(it.quantity) || 0) * (Number(it.unitCost) || 0),
             category: it.category || 'Uncategorized',
@@ -213,10 +217,12 @@ export function InvoiceScanner() {
     const updated = [...editedItems];
     updated[index] = { ...updated[index], [field]: value };
 
-    if (field === 'packSize' || field === 'packCount') {
-      updated[index].quantity = Number(updated[index].packSize || 0) * Number(updated[index].packCount || 0);
+    if (field === 'packSize' || field === 'packCount' || field === 'unitsPerPack') {
+      updated[index].quantity = Number(updated[index].packSize || 0)
+        * Number(updated[index].unitsPerPack || 1)
+        * Number(updated[index].packCount || 0);
     }
-    if (field === 'quantity' || field === 'unitCost' || field === 'packSize' || field === 'packCount') {
+    if (field === 'quantity' || field === 'unitCost' || field === 'packSize' || field === 'packCount' || field === 'unitsPerPack') {
       updated[index].totalCost = updated[index].quantity * updated[index].unitCost;
     }
 
@@ -511,14 +517,22 @@ export function InvoiceScanner() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div>
-                      <Label htmlFor={`invoice-item-pack-size-${index}`} className="text-xs text-gray-600">Pack size</Label>
-                      <Input id={`invoice-item-pack-size-${index}`} type="number" min="0" step="0.01" value={item.packSize ?? item.quantity} onChange={(e) => handleItemEdit(index, 'packSize', parseFloat(e.target.value) || 0)} className="mt-1" />
+                      <Label htmlFor={`invoice-item-pack-count-${index}`} className="text-xs text-gray-600">Cases / packages</Label>
+                      <Input id={`invoice-item-pack-count-${index}`} type="number" min="1" step="1" value={item.packCount ?? 1} onChange={(e) => handleItemEdit(index, 'packCount', parseFloat(e.target.value) || 1)} className="mt-1" />
                     </div>
                     <div>
-                      <Label htmlFor={`invoice-item-pack-count-${index}`} className="text-xs text-gray-600">Packages on invoice</Label>
-                      <Input id={`invoice-item-pack-count-${index}`} type="number" min="1" step="1" value={item.packCount ?? 1} onChange={(e) => handleItemEdit(index, 'packCount', parseFloat(e.target.value) || 1)} className="mt-1" />
+                      <Label htmlFor={`invoice-item-units-per-pack-${index}`} className="text-xs text-gray-600">Units per case</Label>
+                      <Input id={`invoice-item-units-per-pack-${index}`} type="number" min="1" step="1" value={item.unitsPerPack ?? 1} onChange={(e) => handleItemEdit(index, 'unitsPerPack', parseFloat(e.target.value) || 1)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label htmlFor={`invoice-item-inner-unit-${index}`} className="text-xs text-gray-600">Inner unit</Label>
+                      <Input id={`invoice-item-inner-unit-${index}`} value={item.innerUnit ?? 'each'} onChange={(e) => handleItemEdit(index, 'innerUnit', e.target.value)} className="mt-1" placeholder="can, bottle, bag" />
+                    </div>
+                    <div>
+                      <Label htmlFor={`invoice-item-pack-size-${index}`} className="text-xs text-gray-600">Size per unit</Label>
+                      <Input id={`invoice-item-pack-size-${index}`} type="number" min="0" step="0.01" value={item.packSize ?? item.quantity} onChange={(e) => handleItemEdit(index, 'packSize', parseFloat(e.target.value) || 0)} className="mt-1" />
                     </div>
                   </div>
 

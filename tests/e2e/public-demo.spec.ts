@@ -468,7 +468,7 @@ test('recipes support validated create, costing, unit conversion, editing, persi
   const lagerUnit = dialog.getByLabel('Unit for Local Lager 24-pack');
   await expect(dialog.getByLabel('Quantity for Local Lager 24-pack')).toHaveValue('1');
   await expect(lagerUnit).toHaveValue('ea');
-  await expect(lagerUnit.locator('option')).toHaveText(['case', 'each']);
+  await expect(lagerUnit.locator('option')).toHaveText(['case', 'can', 'each']);
   await expect(dialog.getByText('$2.25', { exact: true }).first()).toBeVisible();
   await lagerUnit.selectOption('case');
   await expect(dialog.getByText('$2.25', { exact: true }).first()).toBeVisible();
