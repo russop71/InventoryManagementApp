@@ -124,6 +124,22 @@ export function Onboarding() {
     }
   };
 
+  const saveAndExit = async () => {
+    setSaving(true);
+    try {
+      await updateOnboarding({
+        status: 'dismissed',
+        currentStep: currentStep.id,
+        startedAt: onboarding.startedAt || new Date().toISOString(),
+      });
+      navigate('/app');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Setup progress could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveRestaurant = (event: FormEvent) => {
     event.preventDefault();
     if (!restaurantName.trim()) return toast.error('Enter your restaurant name.');
@@ -204,7 +220,7 @@ export function Onboarding() {
     <div className="mx-auto max-w-6xl py-3 sm:py-6">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#9A7600]">Launch your workspace</p><p className="mt-1 text-sm text-slate-500">Connect the restaurant data that powers ZestIQ.</p></div>
-        <button type="button" onClick={() => navigate('/app')} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">Save & exit</button>
+        <button type="button" disabled={saving} onClick={() => void saveAndExit()} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : 'Save & exit'}</button>
       </div>
       <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
         <SetupProgress currentStep={currentStep.id} completedSteps={completedSteps} />
