@@ -83,6 +83,15 @@ export function RestaurantInventoryManagementGuide() {
       <p>Arrange count sheets in the physical order the team walks each storage area. Use a consistent cut-off time, assign ownership and avoid receiving or transferring product during the count whenever possible. Weekly counting is common for full inventory, while high-value or high-variance products may deserve daily spot counts.</p>
       <p>Consistency matters more than false precision. A count completed the same way every week creates a useful trend; a complicated count that is skipped or rushed does not.</p>
     </GuideSection>
+    <GuideSection title="A practical weekly restaurant inventory routine">
+      <p><strong>Every day:</strong> review deliveries against purchase orders, post approved invoice prices, log waste when it happens and spot-count expensive or fast-moving items.</p>
+      <p><strong>On count day:</strong> choose a cut-off time, finish receiving first, count each storage area in physical walking order and require every line to be completed—even when the quantity is zero.</p>
+      <p><strong>The next morning:</strong> compare actual and theoretical usage, investigate the largest dollar variances, review supplier price changes and approve replenishment by supplier. Monthly, audit units, yields, recipe mappings and inactive items.</p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <Link to="/restaurant-invoice-scanner" className="guide-secondary">Capture current invoice prices</Link>
+        <Link to="/restaurant-ordering-forecasting-software" className="guide-secondary">Review suggested restaurant orders</Link>
+      </div>
+    </GuideSection>
     <GuideSection title="3. Keep purchase prices current">
       <p>Invoice prices are the bridge between physical inventory and financial insight. Capture supplier, item, quantity, unit and price, then review matches before posting. Current purchase cost should flow into on-hand value and affected recipes so operators can see margin movement earlier.</p>
     </GuideSection>
@@ -93,6 +102,23 @@ export function RestaurantInventoryManagementGuide() {
       <Checklist items={['Review the highest-dollar variances first.', 'Separate price variance from usage variance.', 'Check unit conversions and duplicate items before blaming operations.', 'Log waste with a consistent reason and responsible area.', 'Adjust pars using demand and lead time—not habit.', 'Review suggested orders before sending anything to a supplier.']} />
       <p className="mt-5">The goal is not to explain every gram. It is to identify repeatable causes that change purchasing, prep, portioning or menu decisions.</p>
       <Link to="/restaurant-inventory-management-software" className="guide-primary mt-6">Explore restaurant inventory management software<ArrowRight className="h-4 w-4" /></Link>
+    </GuideSection>
+    <GuideSection title="Four restaurant inventory formulas worth tracking">
+      <div className="overflow-x-auto rounded-2xl border border-black/10">
+        <table className="min-w-[680px] w-full border-collapse text-left text-sm">
+          <thead className="bg-[#303A43] text-white"><tr><th className="p-4 font-black">Metric</th><th className="p-4 font-black">Formula</th><th className="p-4 font-black">What it tells you</th></tr></thead>
+          <tbody className="divide-y divide-black/10 bg-[#FBFAF6]">
+            {[
+              ['Actual usage', 'Beginning inventory + purchases − ending inventory', 'How much inventory left the restaurant during the period.'],
+              ['Actual food cost %', 'Actual food usage cost ÷ food sales × 100', 'The share of food revenue consumed by ingredients.'],
+              ['Usage variance', 'Actual usage − theoretical usage', 'Where counted consumption differs from recipe-linked sales.'],
+              ['Days on hand', 'Ending inventory value ÷ average daily COGS', 'How long current stock may last at the recent usage rate.'],
+            ].map(([metric, formula, meaning]) => <tr key={metric}><th scope="row" className="p-4 font-black text-[#303A43]">{metric}</th><td className="p-4 font-semibold text-black/70">{formula}</td><td className="p-4 leading-6 text-black/60">{meaning}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <p>Use the same date range and valuation method when comparing periods. A formula is only as trustworthy as the counts, purchase units, invoice prices and POS-to-recipe links underneath it.</p>
+      <Link to="/restaurant-food-cost-calculator" className="guide-secondary mt-5">Use the free restaurant food-cost calculator</Link>
     </GuideSection>
     <Faq items={[
       ['How often should a restaurant count inventory?', 'Many restaurants complete a full count weekly and use daily spot counts for expensive, fast-moving or high-variance products. The right cadence depends on product value and operating volume.'],

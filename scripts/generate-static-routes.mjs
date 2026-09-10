@@ -47,12 +47,14 @@ const resourceContent = {
     label: 'Complete restaurant inventory management guide',
     heading: 'Restaurant inventory management: from weekly count to daily decision.',
     intro: 'A practical restaurant inventory guide covering item setup, storage-area counts, supplier invoices, recipe usage, variance, waste, pars and ordering.',
-    modified: '2026-09-09',
+    modified: '2026-09-10',
     sections: [
       ['Build one clean inventory item list', 'Give every ingredient and beverage a clear name, category, base unit, purchase unit, supplier and storage location. Document conversions between cases, kilograms, bottles, ounces, portions and individual units.'],
       ['Design a count people can finish', 'Arrange count sheets in the physical order the team walks each storage area. Use a consistent cut-off time, assign ownership and complete weekly full counts with daily spot counts for high-value products.'],
+      ['Use a weekly restaurant inventory routine', 'Every day, review deliveries, post approved invoice prices, log waste and spot-count critical items. On count day, finish receiving, count storage areas in walking order and complete every line. The next morning, investigate dollar variance, review price changes and approve replenishment by supplier.'],
       ['Connect invoices, recipes and sales', 'Current supplier prices should flow into inventory value and recipe cost. Linking POS menu items to recipes creates theoretical usage that can be compared with actual stock movement.'],
       ['Turn variance into action', 'Review the highest-dollar variances first, separate price variance from usage variance, verify unit conversions, log waste consistently and adjust pars using demand and lead time.'],
+      ['Track four practical inventory formulas', 'Actual usage equals beginning inventory plus purchases minus ending inventory. Actual food cost percentage divides actual food usage cost by food sales. Usage variance compares actual with theoretical usage. Days on hand divides ending inventory value by average daily cost of goods sold.'],
     ],
     faqs: [
       ['How often should a restaurant count inventory?', 'Many restaurants complete a full count weekly and daily spot counts for expensive, fast-moving or high-variance products.'],
