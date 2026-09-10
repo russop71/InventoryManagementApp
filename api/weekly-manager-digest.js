@@ -25,11 +25,12 @@ export default async function handler(req, res) {
     const since = new Date(now);
     since.setUTCDate(since.getUTCDate() - 7);
     const digestKey = weekKey(now);
-    const [accounts, locations, locationRows, users] = await Promise.all([
+    const [accounts, locations, locationRows, users, locationAssignments] = await Promise.all([
       database('accounts?select=id,name'),
       database('locations?select=id,account_id,name'),
       database('location_data?select=location_id,inventory,invoices,orders'),
       database('app_users?status=eq.Active&select=id,account_id,name,email,role,status'),
+      database('app_user_locations?select=user_id,location_id,account_id'),
     ]);
     const dataByLocation = new Map(locationRows.map(row => [row.location_id, row]));
     const outcomes = [];
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
       if (!recipients.length) continue;
       const summaries = locations
         .filter(location => location.account_id === account.id)
-        .map(location => summarizeLocationAttention({ ...dataByLocation.get(location.id), name: location.name }, since))
+        .map(location => ({ id: location.id, ...summarizeLocationAttention({ ...dataByLocation.get(location.id), name: location.name }, since) }))
         .filter(hasAttention);
       if (!summaries.length) continue;
       const existing = await database(`app_usage_events?account_id=eq.${encodeURIComponent(account.id)}&event_name=eq.weekly_manager_digest_sent&metadata-%3E%3Eweek_key=eq.${encodeURIComponent(digestKey)}&select=id&limit=1`);
@@ -50,7 +51,11 @@ export default async function handler(req, res) {
       const managers = recipients.map(email => accountUsers.find(user => String(user.email).trim().toLowerCase() === email)).filter(Boolean);
       const results = [];
       for (const manager of managers) {
-        results.push(await sendWeeklyManagerDigest({ recipients: [manager.email], recipientName: manager.name, accountName: account.name, locations: summaries, periodStart: since, periodEnd: now }));
+        const managerLocations = ['Owner', 'Admin'].includes(manager.role)
+          ? summaries
+          : summaries.filter(location => locationAssignments.some(assignment => assignment.user_id === manager.id && assignment.location_id === location.id));
+        if (!managerLocations.length) continue;
+        results.push(await sendWeeklyManagerDigest({ recipients: [manager.email], recipientName: manager.name, accountName: account.name, locations: managerLocations, periodStart: since, periodEnd: now }));
       }
       const allSent = results.length > 0 && results.every(result => result.sent);
       if (allSent) {

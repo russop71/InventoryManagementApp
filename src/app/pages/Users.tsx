@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Activity, CreditCard, Edit, KeyRound, Mail, Plus, Shield, Trash2, UserCheck, Users as UsersIcon } from 'lucide-react';
+import { Activity, CreditCard, Edit, KeyRound, Mail, MapPin, Plus, Shield, Trash2, UserCheck, Users as UsersIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -24,6 +24,7 @@ interface CompanyUser {
   role: 'Owner' | 'Admin' | 'Manager' | 'BOH Manager' | 'FOH Manager' | 'Staff';
   status: 'Active' | 'Inactive';
   lastLogin: string;
+  locationIds: string[];
   usage?: UserUsage;
 }
 
@@ -42,16 +43,16 @@ function roleBadgeClass(role: CompanyUser['role']) {
 
 const accessLevels: Array<{ role: CompanyUser['role']; title: string; detail: string }> = [
   { role: 'Owner', title: 'Owner', detail: 'Full company access, including users, billing, locations and all operational areas.' },
-  { role: 'Admin', title: 'Admin', detail: 'Runs day-to-day operations, setup and reporting, without subscription ownership.' },
-  { role: 'Manager', title: 'Manager', detail: 'Works across restaurant operations, including inventory, purchasing, reports and scheduling.' },
-  { role: 'BOH Manager', title: 'BOH management', detail: 'Chef-focused operational access for food inventory, recipes, ordering, invoices and kitchen labour.' },
-  { role: 'FOH Manager', title: 'FOH management', detail: 'Front-of-house access for beverage operations, sales reporting and labour scheduling.' },
-  { role: 'Staff', title: 'Employee', detail: 'ZestEmployee access only: personal schedule, shift swaps and time-off requests.' },
+  { role: 'Admin', title: 'Admin', detail: 'Full operational access across every location, without subscription ownership.' },
+  { role: 'Manager', title: 'Manager', detail: 'Inventory, purchasing, reports and scheduling for assigned locations only.' },
+  { role: 'BOH Manager', title: 'BOH management', detail: 'Food inventory, recipes, ordering, invoices and kitchen labour for assigned locations only.' },
+  { role: 'FOH Manager', title: 'FOH management', detail: 'Beverage operations, sales reporting and labour scheduling for assigned locations only.' },
+  { role: 'Staff', title: 'Employee', detail: 'ZestEmployee access for the assigned location only.' },
 ];
 
 export function Users() {
   const navigate = useNavigate();
-  const { user: currentUser, accountId, accountName } = useAuth();
+  const { user: currentUser, accountId, accountName, locations, activeLocationId } = useAuth();
   const isOwner = currentUser?.role === 'Owner';
   const isSuperAdmin = Boolean(currentUser?.platformAdmin);
   const isDemoAccount = currentUser?.email?.trim().toLowerCase() === 'demo@zestiq.com';
@@ -118,6 +119,7 @@ export function Users() {
       email: String(formData.get('email') || '').trim(),
       role: String(formData.get('role') || 'Staff') as CompanyUser['role'],
       status: String(formData.get('status') || 'Active') as CompanyUser['status'],
+      locationIds: formData.getAll('locationIds').map(String),
     };
 
     setIsLoading(true);
@@ -292,6 +294,25 @@ export function Users() {
                     <p className="mt-2 border-t border-slate-200 pt-2"><span className="font-semibold text-violet-800">ZestIQ Super Admin:</span> platform-level access across client accounts. It is configured only by ZestIQ and cannot be assigned from a restaurant’s user list.</p>
                   </div>
                 </div>
+                <div>
+                  <Label>Restaurant locations</Label>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Owners and admins automatically see every location. All other users see only the locations selected here.</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {locations.map(location => (
+                      <label key={location.id} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          name="locationIds"
+                          value={location.id}
+                          defaultChecked={selectedUser ? (selectedUser.locationIds || []).includes(location.id) : location.id === activeLocationId}
+                          className="h-4 w-4 accent-[#F5D62E]"
+                        />
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        {location.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 {editingUserId && (
                   <div>
                     <Label htmlFor="team-status">Access status</Label>
@@ -400,6 +421,7 @@ export function Users() {
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-950">{user.name}</p>
                     <p className="flex items-center gap-1 truncate text-sm text-slate-500"><Mail className="h-3.5 w-3.5" /> {user.email}</p>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3.5 w-3.5" />{['Owner', 'Admin'].includes(user.role) ? 'All locations' : (locations.filter(location => (user.locationIds || []).includes(location.id)).map(location => location.name).join(', ') || 'No location assigned')}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">

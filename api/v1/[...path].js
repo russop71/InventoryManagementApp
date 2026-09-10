@@ -474,7 +474,7 @@ function buildAssistantContext(account, location, data, liveContext = {}) {
   };
 }
 
-function mapUser(row) {
+function mapUser(row, locationIds = []) {
   return {
     id: row.id,
     name: row.name,
@@ -482,6 +482,7 @@ function mapUser(row) {
     role: row.role,
     status: row.status,
     lastLogin: row.last_login || 'Never',
+    locationIds,
   };
 }
 
@@ -685,6 +686,58 @@ async function listLocations(accountId) {
   return supabase(`locations?account_id=eq.${encodeURIComponent(accountId)}&select=*&order=created_at.asc`);
 }
 
+function hasAllLocationAccess(appUser, authUser) {
+  return isPlatformAdmin(authUser) || ['Owner', 'Admin'].includes(appUser?.role);
+}
+
+async function listUserLocationIds(appUser) {
+  if (!appUser?.id) return [];
+  const rows = await supabase(`app_user_locations?user_id=eq.${encodeURIComponent(appUser.id)}&account_id=eq.${encodeURIComponent(appUser.account_id)}&select=location_id`);
+  return rows.map(row => row.location_id);
+}
+
+async function listAccessibleLocations(accountId, appUser, authUser) {
+  const locations = await listLocations(accountId);
+  if (hasAllLocationAccess(appUser, authUser)) return locations;
+  const allowedIds = new Set(await listUserLocationIds(appUser));
+  return locations.filter(location => allowedIds.has(location.id));
+}
+
+async function replaceUserLocationAssignments(accountId, userId, locationIds) {
+  await supabase(`app_user_locations?user_id=eq.${encodeURIComponent(userId)}&account_id=eq.${encodeURIComponent(accountId)}`, {
+    method: 'DELETE',
+    prefer: 'return=minimal',
+  });
+  if (!locationIds.length) return;
+  await supabase('app_user_locations', {
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: locationIds.map(locationId => ({ user_id: userId, location_id: locationId, account_id: accountId })),
+  });
+}
+
+async function mapUsersWithLocationAssignments(accountId, users) {
+  const rows = await supabase(`app_user_locations?account_id=eq.${encodeURIComponent(accountId)}&select=user_id,location_id`);
+  const assignments = rows.reduce((result, row) => {
+    if (!result[row.user_id]) result[row.user_id] = [];
+    result[row.user_id].push(row.location_id);
+    return result;
+  }, {});
+  return users.map(user => mapUser(user, assignments[user.id] || []));
+}
+
+async function validatedLocationAssignments(accountId, role, requestedLocationIds) {
+  if (['Owner', 'Admin'].includes(role)) return [];
+  const uniqueIds = [...new Set((Array.isArray(requestedLocationIds) ? requestedLocationIds : []).map(String).filter(Boolean))];
+  if (!uniqueIds.length) throw Object.assign(new Error('Assign at least one restaurant location'), { status: 400 });
+  const locations = await listLocations(accountId);
+  const accountLocationIds = new Set(locations.map(location => location.id));
+  if (uniqueIds.some(locationId => !accountLocationIds.has(locationId))) {
+    throw Object.assign(new Error('One or more location assignments are invalid'), { status: 400 });
+  }
+  return uniqueIds;
+}
+
 async function ensureAccountForEmail(email, requestedName) {
   const slug = accountSlugFromEmail(email);
   let accounts = await supabase(`accounts?slug=eq.${encodeURIComponent(slug)}&select=*`);
@@ -722,6 +775,17 @@ async function ensureLocationBelongsToAccount(accountId, locationIdentifier) {
   const filter = identifierFilter('id', 'slug', locationIdentifier);
   const rows = await supabase(`locations?${filter}&account_id=eq.${encodeURIComponent(accountId)}&select=*`);
   return rows?.[0] || null;
+}
+
+async function ensureLocationAccess(accountId, locationIdentifier, appUser, authUser) {
+  const location = await ensureLocationBelongsToAccount(accountId, locationIdentifier);
+  if (!location) return null;
+  if (hasAllLocationAccess(appUser, authUser)) return location;
+  const allowedIds = await listUserLocationIds(appUser);
+  if (!allowedIds.includes(location.id)) {
+    throw Object.assign(new Error('You do not have access to this restaurant location'), { status: 403 });
+  }
+  return location;
 }
 
 function bearerToken(req) {
@@ -860,7 +924,8 @@ async function sessionPayload(tokenPayload) {
   });
   appUser = updated[0] || appUser;
   const account = await getAccount(appUser.account_id);
-  const locations = await listLocations(appUser.account_id);
+  const locations = await listAccessibleLocations(appUser.account_id, appUser, authUser);
+  if (!locations.length) throw Object.assign(new Error('This user has not been assigned to a restaurant location'), { status: 403 });
   return {
     token: tokenPayload.access_token,
     refreshToken: tokenPayload.refresh_token,
@@ -1016,7 +1081,8 @@ export default async function handler(req, res) {
     if (segments[0] === 'auth' && segments[1] === 'session' && method === 'GET') {
       const auth = await getAuthContext(req);
       const account = await getAccount(auth.appUser.account_id);
-      const locations = await listLocations(account.id);
+      const locations = await listAccessibleLocations(account.id, auth.appUser, auth.authUser);
+      if (!locations.length) return json(res, 403, { error: 'This user has not been assigned to a restaurant location' });
       return json(res, 200, {
         token: auth.token,
         refreshToken: null,
@@ -1239,7 +1305,7 @@ export default async function handler(req, res) {
               slug: clientAccount.slug,
               createdAt: clientAccount.created_at,
               onboarding: clientAccount.onboarding_state || {},
-              users: users.map(mapUser),
+              users: await mapUsersWithLocationAssignments(clientAccount.id, users),
               locations: locations.map(mapLocation),
               billing: mapBilling(clientAccount, billingDetails),
             },
@@ -1321,6 +1387,7 @@ export default async function handler(req, res) {
             const role = req.body?.role === undefined ? target.role : String(req.body.role);
             const status = req.body?.status === undefined ? target.status : String(req.body.status);
             if (!name || !email || !/^\S+@\S+\.\S+$/.test(email) || !VALID_ROLES.has(role) || !VALID_STATUSES.has(status)) return json(res, 400, { error: 'Enter a valid name, email, role and status' });
+            const locationIds = await validatedLocationAssignments(clientAccount.id, role, req.body?.locationIds);
             if (role === 'Staff' && target.role !== 'Staff' && !schedulingEnabled(clientAccount)) return json(res, 409, { error: 'Employee-only accounts require the Labour & Scheduling module' });
             if (target.role === 'Owner' && (role !== 'Owner' || status !== 'Active')) {
               const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=id`);
@@ -1331,6 +1398,7 @@ export default async function handler(req, res) {
               if (duplicate.length) return json(res, 409, { error: 'That email already belongs to another ZestIQ user' });
             }
             await supabase(`app_users?id=eq.${encodeURIComponent(userId)}&account_id=eq.${clientAccount.id}`, { method: 'PATCH', prefer: 'return=minimal', body: { name, email, role, status, updated_at: new Date().toISOString() } });
+            await replaceUserLocationAssignments(clientAccount.id, userId, locationIds);
             if (target.auth_user_id && email !== target.email) await supabaseAuth(`admin/users/${encodeURIComponent(target.auth_user_id)}`, { method: 'PUT', body: { email } });
             return json(res, 200, { success: true });
           }
@@ -1514,10 +1582,10 @@ export default async function handler(req, res) {
     if (segments[2] === 'assistant' && method === 'POST') {
       const message = String(req.body?.message || '').trim().slice(0, 4000);
       if (!message) return json(res, 400, { error: 'A message is required' });
-      const locations = await listLocations(accountId);
+      const locations = await listAccessibleLocations(accountId, access.appUser, access.authUser);
       const requestedLocation = String(req.body?.locationId || '');
       const location = requestedLocation
-        ? await ensureLocationBelongsToAccount(accountId, requestedLocation)
+        ? await ensureLocationAccess(accountId, requestedLocation, access.appUser, access.authUser)
         : locations[0];
       if (!location) return json(res, 404, { error: 'location not found' });
       const rows = await supabase(`location_data?location_id=eq.${location.id}&select=*`);
@@ -1554,7 +1622,8 @@ export default async function handler(req, res) {
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const events = await supabase(`app_usage_events?account_id=eq.${accountId}&created_at=gte.${encodeURIComponent(since)}&select=user_id,event_name,path,created_at&order=created_at.desc&limit=5000`);
         const usage = summarizeUsage(rows, events);
-        return json(res, 200, { users: rows.map(row => ({ ...mapUser(row), usage: usage[row.id] })) });
+        const mappedUsers = await mapUsersWithLocationAssignments(accountId, rows);
+        return json(res, 200, { users: mappedUsers.map(row => ({ ...row, usage: usage[row.id] })) });
       }
       if (segments.length === 3 && method === 'POST') {
         if (!canAdministerAccount(access.appUser.role)) return json(res, 403, { error: 'Owner or admin access is required to add locations' });
@@ -1562,6 +1631,7 @@ export default async function handler(req, res) {
         const email = String(req.body?.email || '').trim().toLowerCase();
         const role = String(req.body?.role || 'Staff');
         if (!name || !email || !VALID_ROLES.has(role)) return json(res, 400, { error: 'valid name, email and role are required' });
+        const locationIds = await validatedLocationAssignments(accountId, role, req.body?.locationIds);
         if (role === 'Staff' && !schedulingEnabled(account)) return json(res, 409, { error: 'Employee-only accounts require the Labour & Scheduling module' });
         const existing = await supabase(`app_users?email=eq.${encodeURIComponent(email)}&select=id`);
         if (existing.length) return json(res, 409, { error: 'That email already belongs to a user' });
@@ -1570,13 +1640,14 @@ export default async function handler(req, res) {
           method: 'POST',
           body: { email, data: { name, account_id: accountId, role } },
         });
-        await supabase('app_users', {
+        const createdUsers = await supabase('app_users?select=*', {
           method: 'POST',
-          prefer: 'return=minimal',
+          prefer: 'return=representation',
           body: { account_id: accountId, auth_user_id: invited.id, name, email, role, status: 'Active' },
         });
+        await replaceUserLocationAssignments(accountId, createdUsers[0].id, locationIds);
         const rows = await supabase(`app_users?account_id=eq.${accountId}&select=*&order=name.asc`);
-        return json(res, 201, { users: rows.map(mapUser), inviteSent: true });
+        return json(res, 201, { users: await mapUsersWithLocationAssignments(accountId, rows), inviteSent: true });
       }
 
       const userId = segments[3];
@@ -1601,6 +1672,7 @@ export default async function handler(req, res) {
         const role = req.body?.role === undefined ? target.role : String(req.body.role);
         const status = req.body?.status === undefined ? target.status : String(req.body.status);
         if (!name || !email || !VALID_ROLES.has(role) || !VALID_STATUSES.has(status)) return json(res, 400, { error: 'valid name, email, role and status are required' });
+        const locationIds = await validatedLocationAssignments(accountId, role, req.body?.locationIds);
         if (role === 'Staff' && target.role !== 'Staff' && !schedulingEnabled(account)) return json(res, 409, { error: 'Employee-only accounts require the Labour & Scheduling module' });
         if (target.role === 'Owner' && role !== 'Owner') {
           const owners = await supabase(`app_users?account_id=eq.${accountId}&role=eq.Owner&status=eq.Active&select=id`);
@@ -1611,11 +1683,12 @@ export default async function handler(req, res) {
           prefer: 'return=minimal',
           body: { name, email, role, status, updated_at: new Date().toISOString() },
         });
+        await replaceUserLocationAssignments(accountId, userId, locationIds);
         if (target.auth_user_id && target.email !== email) {
           await supabaseAuth(`admin/users/${encodeURIComponent(target.auth_user_id)}`, { method: 'PUT', body: { email } });
         }
         const all = await supabase(`app_users?account_id=eq.${accountId}&select=*&order=name.asc`);
-        return json(res, 200, { users: all.map(mapUser) });
+        return json(res, 200, { users: await mapUsersWithLocationAssignments(accountId, all) });
       }
 
       if (userId && method === 'DELETE') {
@@ -1630,7 +1703,7 @@ export default async function handler(req, res) {
         if (target.auth_user_id) await supabaseAuth(`admin/users/${encodeURIComponent(target.auth_user_id)}`, { method: 'DELETE' });
         else await supabase(`app_users?id=eq.${encodeURIComponent(userId)}&account_id=eq.${accountId}`, { method: 'DELETE', prefer: 'return=minimal' });
         const all = await supabase(`app_users?account_id=eq.${accountId}&select=*&order=name.asc`);
-        return json(res, 200, { users: all.map(mapUser) });
+        return json(res, 200, { users: await mapUsersWithLocationAssignments(accountId, all) });
       }
     }
 
@@ -1729,10 +1802,11 @@ export default async function handler(req, res) {
 
     if (segments[2] === 'locations') {
       if (segments.length === 3 && method === 'GET') {
-        const rows = await listLocations(accountId);
+        const rows = await listAccessibleLocations(accountId, access.appUser, access.authUser);
         return json(res, 200, { locations: rows.map(mapLocation) });
       }
       if (segments.length === 3 && method === 'POST') {
+        if (!canAdministerAccount(access.appUser.role)) return json(res, 403, { error: 'Owner or admin access is required to add locations' });
         const name = String(req.body?.name || '').trim();
         if (!name) return json(res, 400, { error: 'location name is required' });
         const slug = normalizeSlug(name);
@@ -1754,7 +1828,7 @@ export default async function handler(req, res) {
 
       const requestedLocationId = segments[3];
       if (!requestedLocationId) return json(res, 404, { error: 'location not found' });
-      const location = await ensureLocationBelongsToAccount(accountId, requestedLocationId);
+      const location = await ensureLocationAccess(accountId, requestedLocationId, access.appUser, access.authUser);
       if (!location) return json(res, 404, { error: 'location not found' });
       const locationId = location.id;
 
