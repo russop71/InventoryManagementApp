@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound, Trash2 } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, TrendingUp, ChefHat, Sparkles, Camera, TrendingDown, Activity, ChevronDown, ChevronRight, Clock3, Flame, Wine, Beer, GlassWater, Coffee, DollarSign, UsersRound, Trash2, CheckCircle2, Circle, PackagePlus, Truck, ClipboardCheck } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useState } from 'react';
 import {
@@ -25,7 +25,7 @@ export function Dashboard() {
   const systemChartColors = ['#F5D62E', '#303A43', '#D9BC24', '#68747D', '#FFE97A', '#46525B', '#E8C91F', '#8A949B'];
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { inventory, orders, recipes, inventoryCounts } = useInventory();
+  const { inventory, orders, recipes, inventoryCounts, suppliers } = useInventory();
   const { isConnected, salesData, menuItems, cogsCategories, addCogsCategory } = useToast();
   const { employees, targetLaborPercent, laborCostBreakdownForRange } = useLabor();
   const { entries: wasteEntries } = useWaste();
@@ -38,10 +38,18 @@ export function Dashboard() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
   const canManageLabor = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
+  const canConfigureWorkspace = ['Owner', 'Admin'].includes(user?.role || '');
   const latestFinalizedInventoryCount = getLatestFinalizedInventoryCount(inventoryCounts);
   const activeInventoryCountDraft = getLatestDraftInventoryCount(inventoryCounts);
   const activeInventoryCountSummary = summarizeInventoryCount(activeInventoryCountDraft);
   const inventoryLossAlert = getUnusualInventoryLosses(latestFinalizedInventoryCount);
+  const optionalSetup = [
+    { title: 'Add suppliers', detail: 'Connect the vendors used for invoices and orders.', complete: suppliers.length > 0, path: '/app/suppliers', icon: Truck },
+    { title: 'Add inventory', detail: 'Create the ingredients your team buys and counts.', complete: inventory.length > 0, path: '/app/inventory', icon: PackagePlus },
+    { title: 'Build recipes', detail: 'Connect menu prices to live ingredient costs.', complete: recipes.length > 0, path: '/app/recipes', icon: ChefHat },
+    { title: 'Complete a count', detail: 'Set an opening inventory baseline when ready.', complete: Boolean(latestFinalizedInventoryCount), path: '/app/inventory/counts/new', icon: ClipboardCheck },
+  ];
+  const optionalSetupComplete = optionalSetup.filter(item => item.complete).length;
 
   const lowStockItems = inventory.filter(
     item => item.currentStock < item.parLevel * 0.3
@@ -496,6 +504,34 @@ export function Dashboard() {
           <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F5D62E]" /></div><p className="mt-2 text-2xl font-black text-[#F5D62E]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
         </div>
       </section>
+
+      {canConfigureWorkspace && optionalSetupComplete < optionalSetup.length && (
+        <section className="rounded-3xl border border-amber-200 bg-[#FFFCED] p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9A7600]">Optional setup</p>
+              <h2 className="mt-1 text-lg font-black text-[#303A43]">Finish setting up when you’re ready</h2>
+              <p className="mt-1 text-sm text-slate-600">The dashboard is fully available. These steps help ZestIQ produce more useful insights.</p>
+            </div>
+            <Badge className="bg-[#303A43] px-3 py-1.5 text-white">{optionalSetupComplete}/{optionalSetup.length} complete</Badge>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {optionalSetup.map(item => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.title} to={item.path} className={`rounded-2xl border p-4 transition ${item.complete ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white hover:border-[#F5D62E] hover:shadow-sm'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-[#FFF4A3] text-[#303A43]'}`}><Icon className="h-4 w-4" /></span>
+                    {item.complete ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-5 w-5 text-slate-300" />}
+                  </div>
+                  <p className="mt-3 text-sm font-black text-slate-900">{item.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {inventoryLossAlert.isUnusual && latestFinalizedInventoryCount && (
         <Link to={`/app/inventory/counts/${latestFinalizedInventoryCount.id}`} className="block rounded-2xl bg-rose-700 p-4 text-white shadow-lg shadow-rose-900/15 transition hover:bg-rose-800">
