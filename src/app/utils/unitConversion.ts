@@ -76,7 +76,7 @@ const UNITS: Record<string, UnitDef> = {
   oz: { family: 'weight', toBase: 28.3495, label: 'oz' },
   lb: { family: 'weight', toBase: 453.592, label: 'lb' },
 
-  ea: { family: 'count', toBase: 1, label: 'ea' },
+  ea: { family: 'count', toBase: 1, label: 'each' },
   batch: { family: 'count', toBase: 1, label: 'batch' },
 };
 
@@ -131,4 +131,81 @@ export function convertQuantity(quantity: number, fromUnit: string, toUnit: stri
 
   const inBase = quantity * fromDef.toBase;
   return inBase / toDef.toBase;
+}
+
+export type PackagedUnitItem = {
+  name: string;
+  unit: string;
+  packSize?: number;
+  packUnit?: string;
+  purchaseOptions?: Array<{
+    packSize: number;
+    packUnit: string;
+    isMain: boolean;
+  }>;
+};
+
+function packagedUnitDefinition(item: PackagedUnitItem) {
+  const mainPurchaseOption = item.purchaseOptions?.find(option => option.isMain) || item.purchaseOptions?.[0];
+  let size = Number(item.packSize ?? mainPurchaseOption?.packSize);
+  let unit = item.packUnit ?? mainPurchaseOption?.packUnit;
+
+  // Older bottle records may only carry their capacity in the product name.
+  if ((!size || !unit) && normalizeUnit(item.unit) === 'bottle') {
+    const namedCapacity = item.name.match(/(\d+(?:\.\d+)?)\s*(ml|l)\b/i);
+    if (namedCapacity) {
+      size = Number(namedCapacity[1]);
+      unit = namedCapacity[2];
+    }
+  }
+
+  if (!Number.isFinite(size) || size <= 0 || !unit) return null;
+  return {
+    containerUnit: normalizeUnit(item.unit),
+    containedQuantity: size,
+    containedUnit: normalizeUnit(unit),
+  };
+}
+
+/** Units that can be used when an inventory container has a configured inner size. */
+export function getIngredientCompatibleUnits(item: PackagedUnitItem) {
+  const packaged = packagedUnitDefinition(item);
+  if (!packaged) return getCompatibleUnits(item.unit);
+
+  const containedOptions = getUnitFamily(packaged.containedUnit) === 'count'
+    ? [{ value: packaged.containedUnit, label: formatUnitLabel(packaged.containedUnit) }]
+    : getCompatibleUnits(packaged.containedUnit);
+  const options = [
+    { value: packaged.containerUnit, label: formatUnitLabel(item.unit) },
+    ...containedOptions,
+  ];
+  return options.filter((option, index) => options.findIndex(candidate => candidate.value === option.value) === index);
+}
+
+/** Convert recipe quantities through a package, such as 1 case = 24 each. */
+export function convertIngredientQuantity(
+  item: PackagedUnitItem,
+  quantity: number,
+  fromUnit: string,
+  toUnit: string,
+) {
+  const direct = convertQuantity(quantity, fromUnit, toUnit);
+  if (direct !== null) return direct;
+
+  const packaged = packagedUnitDefinition(item);
+  if (!packaged) return null;
+  const from = normalizeUnit(fromUnit);
+  const to = normalizeUnit(toUnit);
+
+  if (from === packaged.containerUnit) {
+    const containedQuantity = quantity * packaged.containedQuantity;
+    return convertQuantity(containedQuantity, packaged.containedUnit, toUnit);
+  }
+
+  if (to === packaged.containerUnit) {
+    const quantityInContainedUnit = convertQuantity(quantity, fromUnit, packaged.containedUnit);
+    return quantityInContainedUnit === null ? null : quantityInContainedUnit / packaged.containedQuantity;
+  }
+
+  return null;
 }

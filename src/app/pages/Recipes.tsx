@@ -12,49 +12,9 @@ import { Badge } from '../components/ui/badge';
 import { Plus, ChefHat, Trash2, Edit, RefreshCw, Camera } from 'lucide-react';
 import { toast as showToast } from 'sonner';
 import { RecipeScan, type ScannedRecipeData } from '../components/RecipeScan';
-import { convertQuantity, formatUnitLabel, getCompatibleUnits, getUnitFamily, normalizeUnit } from '../utils/unitConversion';
+import { convertIngredientQuantity, formatUnitLabel, getIngredientCompatibleUnits, normalizeUnit } from '../utils/unitConversion';
 
 type IngredientSelection = { inventoryItemId: string; quantity: number; unit: string };
-
-function bottleCapacityInMl(item: InventoryItem) {
-  if (normalizeUnit(item.unit) !== 'bottle') return null;
-
-  const mainPurchaseOption = item.purchaseOptions?.find(option => option.isMain) || item.purchaseOptions?.[0];
-  const size = item.packSize ?? mainPurchaseOption?.packSize;
-  const unit = item.packUnit ?? mainPurchaseOption?.packUnit;
-  const configuredCapacity = size && unit && getUnitFamily(unit) === 'volume'
-    ? convertQuantity(size, unit, 'ml')
-    : null;
-  if (configuredCapacity && configuredCapacity > 0) return configuredCapacity;
-
-  const namedCapacity = item.name.match(/(\d+(?:\.\d+)?)\s*(ml|l)\b/i);
-  return namedCapacity ? convertQuantity(Number(namedCapacity[1]), namedCapacity[2], 'ml') : null;
-}
-
-function ingredientCompatibleUnits(item: InventoryItem) {
-  if (bottleCapacityInMl(item) === null) return getCompatibleUnits(item.unit);
-  return [
-    { value: 'bottle', label: 'bottle' },
-    ...getCompatibleUnits('ml'),
-  ];
-}
-
-function convertIngredientQuantity(item: InventoryItem, quantity: number, fromUnit: string, toUnit: string) {
-  const directConversion = convertQuantity(quantity, fromUnit, toUnit);
-  if (directConversion !== null) return directConversion;
-
-  const bottleCapacity = bottleCapacityInMl(item);
-  if (!bottleCapacity) return null;
-
-  if (normalizeUnit(fromUnit) === 'bottle' && getUnitFamily(toUnit) === 'volume') {
-    return convertQuantity(quantity * bottleCapacity, 'ml', toUnit);
-  }
-  if (getUnitFamily(fromUnit) === 'volume' && normalizeUnit(toUnit) === 'bottle') {
-    const millilitres = convertQuantity(quantity, fromUnit, 'ml');
-    return millilitres === null ? null : millilitres / bottleCapacity;
-  }
-  return null;
-}
 
 function IngredientAutocomplete({
   inventory,
@@ -371,7 +331,7 @@ export function Recipes() {
           {ingredients.map((ingredient) => {
             const item = inventory.find((inventoryItem) => inventoryItem.id === ingredient.inventoryItemId);
             if (!item) return null;
-            const compatibleUnits = ingredientCompatibleUnits(item);
+            const compatibleUnits = getIngredientCompatibleUnits(item);
             const normalizedIngredientUnit = normalizeUnit(ingredient.unit || item.unit);
             const availableUnits = compatibleUnits.some((unitOption) => unitOption.value === normalizedIngredientUnit)
               ? compatibleUnits

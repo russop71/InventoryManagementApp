@@ -7,41 +7,12 @@ import { buildDemoLocationData } from '../utils/demoData';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
-import { convertQuantity, formatUnitLabel, getCompatibleUnits, getUnitFamily, normalizeUnit } from '../utils/unitConversion';
+import { convertIngredientQuantity, formatUnitLabel, getIngredientCompatibleUnits, normalizeUnit } from '../utils/unitConversion';
 
 const BEVERAGE_WORDS = ['beverage', 'wine', 'beer', 'liquor', 'spirit', 'cocktail', 'bar'];
 const isBeverage = (value = '') => BEVERAGE_WORDS.some(word => value.toLowerCase().includes(word));
 type IngredientSelection = { inventoryItemId: string; quantity: number; unit: string };
 const DEMO_COST_INVENTORY = buildDemoLocationData().inventory as unknown as InventoryItem[];
-
-function bottleCapacityInMl(item: InventoryItem) {
-  if (normalizeUnit(item.unit) !== 'bottle') return null;
-  const mainPurchaseOption = item.purchaseOptions?.find(option => option.isMain) || item.purchaseOptions?.[0];
-  const size = item.packSize ?? mainPurchaseOption?.packSize;
-  const unit = item.packUnit ?? mainPurchaseOption?.packUnit;
-  const configuredCapacity = size && unit && getUnitFamily(unit) === 'volume' ? convertQuantity(size, unit, 'ml') : null;
-  if (configuredCapacity && configuredCapacity > 0) return configuredCapacity;
-  const namedCapacity = item.name.match(/(\d+(?:\.\d+)?)\s*(ml|l)\b/i);
-  return namedCapacity ? convertQuantity(Number(namedCapacity[1]), namedCapacity[2], 'ml') : null;
-}
-
-function compatibleIngredientUnits(item: InventoryItem) {
-  if (bottleCapacityInMl(item) === null) return getCompatibleUnits(item.unit);
-  return [{ value: 'bottle', label: 'bottle' }, ...getCompatibleUnits('ml')];
-}
-
-function convertIngredientQuantity(item: InventoryItem, quantity: number, fromUnit: string, toUnit: string) {
-  const direct = convertQuantity(quantity, fromUnit, toUnit);
-  if (direct !== null) return direct;
-  const bottleCapacity = bottleCapacityInMl(item);
-  if (!bottleCapacity) return null;
-  if (normalizeUnit(fromUnit) === 'bottle' && getUnitFamily(toUnit) === 'volume') return convertQuantity(quantity * bottleCapacity, 'ml', toUnit);
-  if (getUnitFamily(fromUnit) === 'volume' && normalizeUnit(toUnit) === 'bottle') {
-    const millilitres = convertQuantity(quantity, fromUnit, 'ml');
-    return millilitres === null ? null : millilitres / bottleCapacity;
-  }
-  return null;
-}
 
 export function BeverageCosting() {
   const { inventory, recipes, updateRecipe } = useInventory();
@@ -187,7 +158,7 @@ export function BeverageCosting() {
                     const item = inventory.find(candidate => candidate.id === ingredient.inventoryItemId);
                     if (!item) return null;
                     const normalizedUnit = normalizeUnit(ingredient.unit || item.unit);
-                    const unitOptions = compatibleIngredientUnits(item);
+                    const unitOptions = getIngredientCompatibleUnits(item);
                     const availableUnits = unitOptions.some(option => option.value === normalizedUnit) ? unitOptions : [...unitOptions, { value: normalizedUnit, label: formatUnitLabel(normalizedUnit) }];
                     return (
                       <div key={ingredient.inventoryItemId} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-[minmax(180px,1.4fr)_110px_130px_100px_44px] md:items-end">

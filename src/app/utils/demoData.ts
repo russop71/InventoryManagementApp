@@ -29,7 +29,7 @@ export interface DemoLocationData {
   invoices: Array<Record<string, unknown>>;
 }
 
-export const DEMO_DATA_VERSION = '2026-09-08-demo-trust-and-costing-v7';
+export const DEMO_DATA_VERSION = '2026-09-10-lager-pack-conversion-v8';
 
 export function buildDemoLocationData(): DemoLocationData {
   const inventory = [
@@ -88,7 +88,7 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-wine', name: 'House Pinot Grigio', category: 'Beverage', storageArea: 'Wine Cellar', currentStock: 16, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 13.9, parLevel: 24, supplier: 'Cellar Door Imports' },
       { id: 'demo-vodka', name: 'Premium Vodka 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 9, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 29.5, parLevel: 12, supplier: 'Ontario Beverage Retail' },
       { id: 'demo-gin', name: 'London Dry Gin 750ml', category: 'Liquor', storageArea: 'Bar', currentStock: 7, unit: 'bottle', packSize: 750, packUnit: 'ml', unitCost: 33.25, parLevel: 10, supplier: 'Ontario Beverage Retail' },
-      { id: 'demo-lager', name: 'Local Lager 24-pack', category: 'Beer', storageArea: 'Bar', currentStock: 5, unit: 'case', unitCost: 54, parLevel: 8, supplier: 'Ontario Beer Supply' },
+      { id: 'demo-lager', name: 'Local Lager 24-pack', category: 'Beer', storageArea: 'Bar', currentStock: 5, unit: 'case', packSize: 24, packUnit: 'each', unitsPerPack: 24, unitCost: 54, parLevel: 8, supplier: 'Ontario Beer Supply' },
       { id: 'demo-eggs', name: 'Large Eggs', category: 'Dairy', storageArea: 'Walk-In Cooler', currentStock: 96, unit: 'each', unitCost: 0.38, parLevel: 144, supplier: 'Maple Foodservice' },
       { id: 'demo-bacon', name: 'Smoked Bacon', category: 'Proteins', storageArea: 'Walk-In Cooler', currentStock: 12, unit: 'lb', unitCost: 7.9, parLevel: 18, supplier: 'Lakeside Meats' },
       { id: 'demo-sourdough', name: 'Sourdough Loaf', category: 'Bakery', storageArea: 'Dry Storage', currentStock: 14, unit: 'loaf', unitCost: 5.6, parLevel: 20, supplier: 'Maple Foodservice' },
@@ -148,7 +148,7 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-wine-glass', menuItemName: 'Pinot Grigio · 5oz', category: 'Wine', price: 14, ingredients: [{ inventoryItemId: 'demo-wine', quantity: 0.2, unit: 'bottle' }] },
       { id: 'demo-martini', menuItemName: 'House Martini', category: 'Cocktail', price: 18, ingredients: [{ inventoryItemId: 'demo-gin', quantity: 0.08, unit: 'bottle' }] },
       { id: 'demo-vodka-soda', menuItemName: 'Vodka Soda', category: 'Cocktail', price: 13, ingredients: [{ inventoryItemId: 'demo-vodka', quantity: 0.06, unit: 'bottle' }] },
-      { id: 'demo-lager-pint', menuItemName: 'Local Lager', category: 'Beer', price: 9, ingredients: [{ inventoryItemId: 'demo-lager', quantity: 0.0417, unit: 'case' }] },
+      { id: 'demo-lager-pint', menuItemName: 'Local Lager', category: 'Beer', price: 9, ingredients: [{ inventoryItemId: 'demo-lager', quantity: 1, unit: 'each' }] },
       { id: 'demo-avocado-tartine', menuItemName: 'Garden Avocado Tartine', category: 'Brunch', price: 18, ingredients: [{ inventoryItemId: 'demo-sourdough', quantity: 0.2, unit: 'loaf' }, { inventoryItemId: 'demo-avocado', quantity: 1, unit: 'each' }, { inventoryItemId: 'demo-eggs', quantity: 1, unit: 'each' }, { inventoryItemId: 'demo-olive-oil', quantity: 0.01, unit: 'L' }] },
       { id: 'demo-breakfast-plate', menuItemName: 'Sunrise Breakfast Plate', category: 'Brunch', price: 21, ingredients: [{ inventoryItemId: 'demo-eggs', quantity: 2, unit: 'each' }, { inventoryItemId: 'demo-bacon', quantity: 0.25, unit: 'lb' }, { inventoryItemId: 'demo-potatoes', quantity: 0.45, unit: 'lb' }, { inventoryItemId: 'demo-butter', quantity: 0.04, unit: 'lb' }] },
       { id: 'demo-crispy-chicken', menuItemName: 'Crispy Chicken Club', category: 'Sandwich', price: 22, ingredients: [{ inventoryItemId: 'demo-chicken-breast', quantity: 0.45, unit: 'lb' }, { inventoryItemId: 'demo-flour', quantity: 0.06, unit: 'kg' }, { inventoryItemId: 'demo-brioche', quantity: 1, unit: 'each' }, { inventoryItemId: 'demo-arugula', quantity: 0.06, unit: 'lb' }] },
