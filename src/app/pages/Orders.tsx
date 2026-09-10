@@ -29,7 +29,7 @@ type OrderSort = 'newest' | 'oldest' | 'total-desc' | 'total-asc' | 'supplier';
 
 const STATUS_CFG: Record<OrderStatus, { label: string; bg: string; color: string }> = {
   pending:   { label: 'Open',       bg: `${Y}25`,  color: '#7A5E00' },
-  ordered:   { label: 'In Transit', bg: '#DBEAFE', color: '#1E40AF' },
+  ordered:   { label: 'Open',       bg: `${Y}25`,  color: '#7A5E00' },
   received:  { label: 'Received',   bg: '#DCFCE7', color: '#166534' },
   cancelled: { label: 'Cancelled',  bg: '#F3F4F6', color: '#6B7280' },
 };
@@ -140,8 +140,7 @@ export function Orders() {
   const [orderSort, setOrderSort] = useState<OrderSort>('newest');
   const [safetyBufferPercent, setSafetyBufferPercent] = useState(10);
 
-  const open      = orders.filter(o => o.status === 'pending');
-  const inTransit = orders.filter(o => o.status === 'ordered');
+  const open      = orders.filter(o => o.status === 'pending' || o.status === 'ordered');
   const received  = orders.filter(o => o.status === 'received');
   const cancelled = orders.filter(o => o.status === 'cancelled');
 
@@ -576,11 +575,6 @@ export function Orders() {
     }
   };
 
-  const handleStatus = (id: string, status: OrderStatus) => {
-    updateOrderStatus(id, status as any);
-    toast.success(`Order marked as ${STATUS_CFG[status].label}`);
-  };
-
   const handleSaveLineEdits = (orderId: string) => {
     const order = orders.find(entry => entry.id === orderId);
     if (!order) return;
@@ -603,6 +597,21 @@ export function Orders() {
     }
 
     toast.success('Order lines updated');
+  };
+
+  const handleReceiveOrder = (orderId: string) => {
+    const order = orders.find(entry => entry.id === orderId);
+    if (!order) return;
+    const nextItems = order.items.map(item => ({
+      ...item,
+      quantity: editableItems[item.itemId]?.quantity ?? item.quantity,
+      cost: editableItems[item.itemId]?.cost ?? item.cost,
+    }));
+    const totalCost = nextItems.reduce((sum, item) => sum + item.cost, 0);
+    const supplierDates = { ...(order.supplierDates || {}), ...supplierDateOverrides };
+    updateOrderStatus(orderId, 'received', { items: nextItems, totalCost, supplierDates });
+    toast.success('Order received and invoice saved');
+    setDetailOrder(null);
   };
 
   const updateEditableItem = (itemId: string, field: 'quantity' | 'cost', value: number) => {
@@ -636,7 +645,6 @@ export function Orders() {
   const TABS = [
     { key: 'all',       label: 'All Orders', count: orders.length },
     { key: 'pending',   label: 'Open',       count: open.length },
-    { key: 'ordered',   label: 'In Transit', count: inTransit.length },
     { key: 'received',  label: 'Received',   count: received.length },
     { key: 'cancelled', label: 'Cancelled',  count: cancelled.length },
   ] as const;
@@ -671,12 +679,11 @@ export function Orders() {
         </div>
 
         {/* Stat strip */}
-        <div className="grid grid-cols-4 gap-2 mt-5">
+        <div className="grid grid-cols-3 gap-2 mt-5">
           {[
             { label: 'Open Orders',      count: open.length,      val: open.reduce((s,o)=>s+o.totalCost,0),      dotBg: `${Y}30`,  dotColor: '#7A5E00' },
-            { label: 'In Transit',       count: inTransit.length, val: inTransit.reduce((s,o)=>s+o.totalCost,0), dotBg: '#DBEAFE', dotColor: '#1E40AF' },
             { label: 'Received',         count: received.length,  val: received.reduce((s,o)=>s+o.totalCost,0),  dotBg: '#DCFCE7', dotColor: '#166534' },
-            { label: 'Pending Approval', count: cancelled.length, val: cancelled.reduce((s,o)=>s+o.totalCost,0), dotBg: '#F3F4F6', dotColor: '#6B7280' },
+            { label: 'Cancelled',        count: cancelled.length, val: cancelled.reduce((s,o)=>s+o.totalCost,0), dotBg: '#F3F4F6', dotColor: '#6B7280' },
           ].map(({ label, count, val, dotBg, dotColor }) => (
             <div key={label} className="flex flex-col items-center text-center">
               <div
@@ -1232,16 +1239,10 @@ export function Orders() {
                   <Button variant="outline" className="flex-1 font-bold" onClick={() => handleSaveLineEdits(detailOrder.id)}>
                     Save Changes
                   </Button>
-                  {detailOrder.status === 'pending' && (
-                    <Button className="flex-1 font-bold" style={{ background: D, color: '#fff' }}
-                      onClick={() => { handleStatus(detailOrder.id, 'ordered'); setDetailOrder(null); }}>
-                      <Truck className="w-4 h-4 mr-1.5" /> Mark In Transit
-                    </Button>
-                  )}
-                  {detailOrder.status === 'ordered' && (
+                  {(detailOrder.status === 'pending' || detailOrder.status === 'ordered') && (
                     <Button className="flex-1 font-bold" style={{ background: '#166534', color: '#fff' }}
-                      onClick={() => { handleStatus(detailOrder.id, 'received'); setDetailOrder(null); }}>
-                      <CheckCircle2 className="w-4 h-4 mr-1.5" /> Mark Received
+                      onClick={() => handleReceiveOrder(detailOrder.id)}>
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" /> Receive &amp; save invoice
                     </Button>
                   )}
                   {detailOrder.status === 'received' && (

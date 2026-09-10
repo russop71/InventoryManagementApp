@@ -270,7 +270,7 @@ interface InventoryContextType {
   generateDailyOrder: (forecastId: string) => void;
   placeOrder: (order: { date: string; items: OrderItem[]; supplier: string; totalCost: number; status?: DailyOrder['status']; supplierDates?: Record<string, string>; }) => void;
   updateOrder: (orderId: string, updates: Partial<Omit<DailyOrder, 'id'>>) => void;
-  updateOrderStatus: (orderId: string, status: DailyOrder['status']) => void;
+  updateOrderStatus: (orderId: string, status: DailyOrder['status'], updates?: Partial<Omit<DailyOrder, 'id' | 'status'>>) => void;
   addInvoice: (invoice: Omit<InvoiceRecord, 'id'>) => InvoiceRecord;
   updateInvoice: (invoiceId: string, updates: Partial<InvoiceRecord>) => InvoiceMutationResult;
   deleteInvoice: (invoiceId: string) => void;
@@ -1151,15 +1151,16 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     saveLocationData(inventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
   };
 
-  const updateOrderStatus = (orderId: string, status: DailyOrder['status']) => {
+  const updateOrderStatus = (orderId: string, status: DailyOrder['status'], updates: Partial<Omit<DailyOrder, 'id' | 'status'>> = {}) => {
     const order = orders.find(entry => entry.id === orderId);
     if (!order) return;
 
-    const nextOrders = orders.map(entry => (entry.id === orderId ? { ...entry, status } : entry));
+    const updatedOrder = { ...order, ...updates, status };
+    const nextOrders = orders.map(entry => (entry.id === orderId ? updatedOrder : entry));
     const isFirstReceipt = status === 'received' && order.status !== 'received';
     const nextInventory = isFirstReceipt
       ? inventory.map(item => {
-          const matchingItem = order.items.find(entry => entry.itemId === item.id);
+          const matchingItem = updatedOrder.items.find(entry => entry.itemId === item.id);
           if (!matchingItem) return item;
           return {
             ...item,
@@ -1174,14 +1175,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       .find(Boolean) || 'Supplier';
     const nextInvoices = status === 'received'
       ? linkedInvoice
-        ? invoices.map(invoice => invoice.orderId === orderId ? { ...invoice, status: 'received' } : invoice)
+        ? invoices.map(invoice => invoice.orderId === orderId ? { ...invoice, items: updatedOrder.items, totalAmount: updatedOrder.totalCost, supplier: primarySupplier, status: 'received' } : invoice)
         : [...invoices, {
             id: `${Date.now()}-invoice`,
             date: new Date().toISOString(),
             invoiceNumber: `PO-${order.id.slice(-8).toUpperCase()}`,
             supplier: primarySupplier,
-            items: order.items,
-            totalAmount: order.totalCost,
+            items: updatedOrder.items,
+            totalAmount: updatedOrder.totalCost,
             status: 'received' as const,
             orderId,
           }]
