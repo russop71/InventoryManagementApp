@@ -10,6 +10,51 @@ import { Truck, Plus, Pencil, Trash2, Mail, Phone, MapPin, ChevronDown, ChevronR
 import { toast } from 'sonner';
 import { getInvalidEmailListEntries, parseEmailList } from '../utils/supplierEmailDraft.js';
 
+const DEFAULT_SUPPLIER_CATEGORIES = ['Proteins', 'Produce', 'Dairy', 'Dry Goods', 'Beverages', 'Pantry', 'Seafood'];
+
+function SupplierCategoryField({ initialValue = '', options }: { initialValue?: string; options: string[] }) {
+  const [category, setCategory] = useState(initialValue);
+  const [isCustom, setIsCustom] = useState(Boolean(initialValue && !options.includes(initialValue)));
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="category-choice">Category *</Label>
+      <input type="hidden" name="category" value={category} />
+      <select
+        id="category-choice"
+        value={isCustom ? '__custom__' : category}
+        onChange={event => {
+          if (event.target.value === '__custom__') {
+            setCategory('');
+            setIsCustom(true);
+            return;
+          }
+          setCategory(event.target.value);
+          setIsCustom(false);
+        }}
+        className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm"
+        aria-required="true"
+      >
+        <option value="">Select category...</option>
+        {options.map(option => <option key={option} value={option}>{option}</option>)}
+        <option value="__custom__">+ Add custom category...</option>
+      </select>
+      {isCustom && (
+        <Input
+          id="category"
+          value={category}
+          onChange={event => setCategory(event.target.value)}
+          placeholder="Enter a new category"
+          autoFocus
+          required
+          className="border-[#F5D62E] bg-[#FFFBE7]"
+        />
+      )}
+      <p className="text-xs text-gray-500">Choose an existing category or add one that fits this supplier.</p>
+    </div>
+  );
+}
+
 export function Suppliers() {
   const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useInventory();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -20,6 +65,11 @@ export function Suppliers() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const ccEmailValue = formData.get('ccEmails') as string;
+    const category = String(formData.get('category') || '').trim();
+    if (!category) {
+      toast.error('Choose or add a supplier category');
+      return;
+    }
     const invalidCcEmails = getInvalidEmailListEntries(ccEmailValue);
     if (invalidCcEmails.length > 0) {
       toast.error(`Check the CC email${invalidCcEmails.length === 1 ? '' : 's'}: ${invalidCcEmails.join(', ')}`);
@@ -33,7 +83,7 @@ export function Suppliers() {
       ccEmails: parseEmailList(ccEmailValue),
       phone: formData.get('phone') as string,
       address: formData.get('address') as string,
-      category: formData.get('category') as string,
+      category,
       paymentTerms: formData.get('paymentTerms') as string,
       notes: formData.get('notes') as string,
     };
@@ -70,6 +120,10 @@ export function Suppliers() {
   const editingSupplierData = editingSupplier 
     ? suppliers.find(s => s.id === editingSupplier)
     : null;
+  const supplierCategoryOptions = Array.from(new Set([
+    ...DEFAULT_SUPPLIER_CATEGORIES,
+    ...suppliers.map(supplier => supplier.category?.trim()).filter((category): category is string => Boolean(category)),
+  ]));
   return (
     <div className="space-y-3 pb-20">
       <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#303A43] px-4 py-3 shadow-sm">
@@ -110,20 +164,7 @@ export function Suppliers() {
                     <Label htmlFor="name">Supplier name *</Label>
                     <Input id="name" name="name" required defaultValue={editingSupplierData?.name} placeholder="US Foods" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="category">Category *</Label>
-                    <select id="category" name="category" required defaultValue={editingSupplierData?.category || ''} className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm">
-                      <option value="">Select category...</option>
-                      <option value="Proteins">Proteins</option>
-                      <option value="Produce">Produce</option>
-                      <option value="Dairy">Dairy</option>
-                      <option value="Dry Goods">Dry Goods</option>
-                      <option value="Beverages">Beverages</option>
-                      <option value="Pantry">Pantry</option>
-                      <option value="Seafood">Seafood</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
+                  <SupplierCategoryField initialValue={editingSupplierData?.category} options={supplierCategoryOptions} />
                   <div className="space-y-1.5">
                     <Label htmlFor="paymentTerms">Payment terms</Label>
                     <Input id="paymentTerms" name="paymentTerms" defaultValue={editingSupplierData?.paymentTerms} placeholder="Net 30" />
