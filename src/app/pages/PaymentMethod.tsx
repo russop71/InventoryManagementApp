@@ -16,6 +16,7 @@ interface BillingDetails {
   configured: boolean;
   additionalLocationPriceConfigured: boolean;
   schedulingPriceConfigured: boolean;
+  additionalLocationSchedulingPriceConfigured: boolean;
   schedulingEnabled: boolean;
   customerCreated: boolean;
   customerEmail?: string | null;
@@ -59,6 +60,7 @@ const PLANS: Array<{ id: BillingPlan; name: string; price: string; detail: strin
 const BASE_MONTHLY_PRICE = 249.99;
 const ADDITIONAL_LOCATION_PRICE = 199.99;
 const ZEST_EMPLOYEE_PRICE = 49.99;
+const ADDITIONAL_LOCATION_SCHEDULING_PRICE = 24.99;
 
 function formatDate(value: string | null) {
   if (!value) return 'Not available';
@@ -100,11 +102,10 @@ export function PaymentMethod() {
   const [locationCount, setLocationCount] = useState(Math.max(1, locations.length));
   const [zestEmployeeEnabled, setZestEmployeeEnabled] = useState(false);
   const [commitmentAccepted, setCommitmentAccepted] = useState(false);
-  const zestEmployeeIncluded = locationCount > 1;
-  const includeZestEmployee = zestEmployeeIncluded || zestEmployeeEnabled;
+  const includeZestEmployee = zestEmployeeEnabled;
   const monthlyTotal = BASE_MONTHLY_PRICE
     + Math.max(0, locationCount - 1) * ADDITIONAL_LOCATION_PRICE
-    + (locationCount === 1 && zestEmployeeEnabled ? ZEST_EMPLOYEE_PRICE : 0);
+    + (zestEmployeeEnabled ? ZEST_EMPLOYEE_PRICE + Math.max(0, locationCount - 1) * ADDITIONAL_LOCATION_SCHEDULING_PRICE : 0);
   const billingNeedsAttention = ['past_due', 'unpaid', 'incomplete', 'canceled'].includes(billing?.status || '');
   const expiredPaymentMethod = (billing?.paymentMethods || []).some(paymentMethodExpired);
 
@@ -333,25 +334,24 @@ export function PaymentMethod() {
                     onChange={event => setLocationCount(Math.max(Math.max(1, locations.length), Math.min(100, Number(event.target.value) || 1)))}
                     disabled={current}
                   />
-                  <p className="mt-2 text-xs text-slate-500">The first location is CAD $249.99/month. Each additional location is CAD $199.99/month and includes Zest Employee.</p>
+                  <p className="mt-2 text-xs text-slate-500">The first location is CAD $249.99/month. Each additional location is CAD $199.99/month.</p>
                 </div>
-                <label className={`mt-3 flex items-start gap-3 rounded-xl border-2 p-4 transition-colors ${includeZestEmployee ? 'border-[#F5D62E] bg-[#FFFCED]' : 'border-slate-200 bg-white'} ${current || zestEmployeeIncluded ? 'cursor-default' : 'cursor-pointer'}`}>
+                <label className={`mt-3 flex items-start gap-3 rounded-xl border-2 p-4 transition-colors ${includeZestEmployee ? 'border-[#F5D62E] bg-[#FFFCED]' : 'border-slate-200 bg-white'} ${current ? 'cursor-default' : 'cursor-pointer'}`}>
                   <Checkbox
                     checked={includeZestEmployee}
                     onCheckedChange={checked => setZestEmployeeEnabled(checked === true)}
-                    disabled={current || zestEmployeeIncluded}
+                    disabled={current}
                     className="mt-1 border-slate-400 data-[state=checked]:border-[#303A43] data-[state=checked]:bg-[#303A43]"
                   />
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2 font-bold text-slate-950">
                       <UsersRound className="h-5 w-5 text-[#B88A00]" />
-                      Add Zest Employee
-                      {zestEmployeeIncluded && <Badge className="bg-[#F5D62E] text-[#303A43]">Included</Badge>}
+                      Add Labour &amp; Scheduling
                     </span>
                     <span className="mt-1 block text-sm leading-5 text-slate-600">Employee schedules, shifts, availability and time-off requests.</span>
                     <span className="mt-2 flex items-center gap-1.5 text-sm font-bold text-slate-950">
                       <CalendarClock className="h-4 w-4 text-[#B88A00]" />
-                      {zestEmployeeIncluded ? 'Included with additional locations' : 'CAD $49.99/month'}
+                      CAD $49.99/month for the first location{locationCount > 1 ? ` + $24.99 × ${locationCount - 1} additional` : ''}
                     </span>
                   </span>
                 </label>
@@ -373,13 +373,13 @@ export function PaymentMethod() {
                 <Button
                   type="button"
                   className="mt-4 w-full bg-[#303A43] text-white hover:bg-[#1E293B]"
-                  disabled={isLoading || current || !commitmentAccepted || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured) || (locationCount === 1 && zestEmployeeEnabled && !billing?.schedulingPriceConfigured)}
+                  disabled={isLoading || current || !commitmentAccepted || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured) || (zestEmployeeEnabled && !billing?.schedulingPriceConfigured) || (locationCount > 1 && zestEmployeeEnabled && !billing?.additionalLocationSchedulingPriceConfigured)}
                   onClick={() => void openCheckout(plan.id)}
                 >
                   {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${monthlyTotal.toFixed(2)}/month`}
                 </Button>
-                {locationCount === 1 && zestEmployeeEnabled && !billing?.schedulingPriceConfigured && (
-                  <p className="mt-2 text-xs font-medium text-amber-700">Zest Employee checkout will be available once its Stripe price is connected.</p>
+                {zestEmployeeEnabled && (!billing?.schedulingPriceConfigured || (locationCount > 1 && !billing?.additionalLocationSchedulingPriceConfigured)) && (
+                  <p className="mt-2 text-xs font-medium text-amber-700">Scheduling checkout will be available once its Stripe price{locationCount > 1 ? 's are' : ' is'} connected.</p>
                 )}
               </div>
             );

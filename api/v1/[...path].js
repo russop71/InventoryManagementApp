@@ -6,6 +6,7 @@ import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAcco
 import { enforceRateLimit } from '../_request-guard.js';
 import { launchReadiness } from '../_launch-readiness.js';
 import { reportServerError } from '../_observability.js';
+import { addCheckoutLineItems, checkoutLineItems, SUBSCRIPTION_PRICES_CAD_CENTS } from '../_subscription-pricing.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -21,10 +22,12 @@ const BILLING_PRICE_IDS = {
 };
 const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION;
 const STRIPE_PRICE_SCHEDULING = process.env.STRIPE_PRICE_SCHEDULING;
+const STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING;
 const STRIPE_BILLING_PORTAL_CONFIGURATION_ID = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID;
-const PREMIUM_MONTHLY_CAD_CENTS = 24999;
-const ADDITIONAL_LOCATION_CAD_CENTS = 19900;
-const SCHEDULING_CAD_CENTS = 4999;
+const PREMIUM_MONTHLY_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.firstLocation;
+const ADDITIONAL_LOCATION_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.additionalLocation;
+const SCHEDULING_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.schedulingFirstLocation;
+const ADDITIONAL_LOCATION_SCHEDULING_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.schedulingAdditionalLocation;
 const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
 const PLATFORM_REAUTH_TTL_MS = 60 * 60 * 1000;
 
@@ -387,6 +390,10 @@ async function validateCheckoutPricing(locationCount, includeScheduling = false)
   if (includeScheduling) {
     if (!STRIPE_PRICE_SCHEDULING) throw Object.assign(new Error('The Stripe Scheduling add-on price is not configured'), { status: 503 });
     await validateStripePrice(STRIPE_PRICE_SCHEDULING, SCHEDULING_CAD_CENTS, 'The Scheduling add-on');
+    if (locationCount > 1) {
+      if (!STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING) throw Object.assign(new Error('The additional-location Scheduling price is not configured'), { status: 503 });
+      await validateStripePrice(STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING, ADDITIONAL_LOCATION_SCHEDULING_CAD_CENTS, 'The additional-location Scheduling add-on');
+    }
   }
 }
 
@@ -564,6 +571,7 @@ function mapBilling(account, details = {}) {
     configured: Boolean(STRIPE_SECRET_KEY && BILLING_PRICE_IDS.monthly),
     additionalLocationPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION),
     schedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_SCHEDULING),
+    additionalLocationSchedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING),
     schedulingEnabled: schedulingEnabled(account),
     customerCreated: Boolean(account.stripe_customer_id),
     plan: account.billing_plan || null,
@@ -596,6 +604,7 @@ async function getStripeBillingDetails(account) {
   const recurring = subscription?.items?.data?.[0]?.price?.recurring || null;
   const additionalLocationItem = subscription?.items?.data?.find(item => item.price?.id === STRIPE_PRICE_ADDITIONAL_LOCATION);
   const schedulingItem = subscription?.items?.data?.find(item => item.price?.id === STRIPE_PRICE_SCHEDULING);
+  const additionalLocationSchedulingItem = subscription?.items?.data?.find(item => item.price?.id === STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING);
   const currentPeriodEnd = subscription?.current_period_end
     || subscription?.items?.data?.[0]?.current_period_end
     || null;
@@ -604,7 +613,7 @@ async function getStripeBillingDetails(account) {
     status: subscription?.status || account.billing_status || 'not_configured',
     plan: subscription?.metadata?.plan || account.billing_plan || null,
     additionalLocationQuantity: Number(additionalLocationItem?.quantity || account.additional_location_quantity || 0),
-    schedulingEnabled: Boolean(schedulingItem) || schedulingEnabled(account),
+    schedulingEnabled: Boolean(schedulingItem || additionalLocationSchedulingItem) || schedulingEnabled(account),
     subscriptionStartedAt: stripeDate(subscription?.start_date || subscription?.created),
     currentPeriodEnd: stripeDate(currentPeriodEnd) || account.current_period_end || null,
     billingFrequency: recurring ? {
@@ -1178,7 +1187,7 @@ export default async function handler(req, res) {
         const readiness = launchReadiness();
         const checks = [...readiness.checks];
         try {
-          await validateCheckoutPricing(2);
+          await validateCheckoutPricing(2, true);
           checks.push({ name: 'stripePriceValidation', ok: true });
         } catch (error) {
           checks.push({ name: 'stripePriceValidation', ok: false, detail: error.message });
@@ -1215,6 +1224,7 @@ export default async function handler(req, res) {
               configured: Boolean(STRIPE_SECRET_KEY && BILLING_PRICE_IDS.monthly),
               additionalLocationPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION),
               schedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_SCHEDULING),
+              additionalLocationSchedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING),
               schedulingEnabled: schedulingEnabled(account),
               customerCreated: Boolean(account.stripe_customer_id),
               plan: account.billing_plan || null,
@@ -1427,10 +1437,8 @@ export default async function handler(req, res) {
           await validateCheckoutPricing(locationCount, includeScheduling);
           const owners = await supabase(`app_users?account_id=eq.${clientAccount.id}&role=eq.Owner&status=eq.Active&select=email&order=created_at.asc&limit=1`);
           if (!owners[0]?.email) return json(res, 409, { error: 'Add an active client owner before creating checkout' });
-          const form = {
+          const form = addCheckoutLineItems({
             mode: 'subscription',
-            'line_items[0][price]': priceId,
-            'line_items[0][quantity]': '1',
             client_reference_id: clientAccount.id,
             'metadata[account_id]': clientAccount.id,
             'metadata[plan]': plan,
@@ -1451,16 +1459,14 @@ export default async function handler(req, res) {
             allow_promotion_codes: 'true',
             'consent_collection[terms_of_service]': 'required',
             'custom_text[submit][message]': 'By subscribing, you agree to a 12-month initial commitment billed monthly. The subscription renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.',
-          };
-          if (locationCount > 1) {
-            form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
-            form['line_items[1][quantity]'] = String(locationCount - 1);
-          }
-          if (includeScheduling) {
-            const lineIndex = locationCount > 1 ? 2 : 1;
-            form[`line_items[${lineIndex}][price]`] = STRIPE_PRICE_SCHEDULING;
-            form[`line_items[${lineIndex}][quantity]`] = '1';
-          }
+          }, checkoutLineItems({
+            basePriceId: priceId,
+            additionalLocationPriceId: STRIPE_PRICE_ADDITIONAL_LOCATION,
+            schedulingPriceId: STRIPE_PRICE_SCHEDULING,
+            additionalLocationSchedulingPriceId: STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING,
+            locationCount,
+            schedulingEnabled: includeScheduling,
+          }));
           if (clientAccount.stripe_customer_id) form.customer = clientAccount.stripe_customer_id;
           else form.customer_email = owners[0].email;
           const session = await stripe('checkout/sessions', form);
@@ -1729,10 +1735,8 @@ export default async function handler(req, res) {
         const includeScheduling = req.body?.schedulingEnabled === true;
         await validateCheckoutPricing(locationCount, includeScheduling);
         const origin = appOrigin(req);
-        const form = {
+        const form = addCheckoutLineItems({
           mode: 'subscription',
-          'line_items[0][price]': priceId,
-          'line_items[0][quantity]': '1',
           client_reference_id: accountId,
           'metadata[account_id]': accountId,
           'metadata[plan]': plan,
@@ -1753,16 +1757,14 @@ export default async function handler(req, res) {
           allow_promotion_codes: 'true',
           'consent_collection[terms_of_service]': 'required',
           'custom_text[submit][message]': 'By subscribing, you agree to a 12-month initial commitment billed monthly. The subscription renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.',
-        };
-        if (locationCount > 1) {
-          form['line_items[1][price]'] = STRIPE_PRICE_ADDITIONAL_LOCATION;
-          form['line_items[1][quantity]'] = String(locationCount - 1);
-        }
-        if (includeScheduling) {
-          const lineIndex = locationCount > 1 ? 2 : 1;
-          form[`line_items[${lineIndex}][price]`] = STRIPE_PRICE_SCHEDULING;
-          form[`line_items[${lineIndex}][quantity]`] = '1';
-        }
+        }, checkoutLineItems({
+          basePriceId: priceId,
+          additionalLocationPriceId: STRIPE_PRICE_ADDITIONAL_LOCATION,
+          schedulingPriceId: STRIPE_PRICE_SCHEDULING,
+          additionalLocationSchedulingPriceId: STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING,
+          locationCount,
+          schedulingEnabled: includeScheduling,
+        }));
         if (account.stripe_customer_id) form.customer = account.stripe_customer_id;
         else form.customer_email = access.appUser.email;
         const session = await stripe('checkout/sessions', form);

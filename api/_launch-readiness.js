@@ -5,6 +5,8 @@ export function launchReadiness(env = process.env) {
     ['stripeSecret', Boolean(env.STRIPE_SECRET_KEY)],
     ['stripePremiumPrice', Boolean(env.STRIPE_PRICE_MONTHLY)],
     ['stripeLocationPrice', Boolean(env.STRIPE_PRICE_ADDITIONAL_LOCATION)],
+    ['stripeSchedulingPrice', Boolean(env.STRIPE_PRICE_SCHEDULING)],
+    ['stripeAdditionalLocationSchedulingPrice', Boolean(env.STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING)],
     ['stripeWebhookSecret', Boolean(env.STRIPE_WEBHOOK_SECRET)],
     ['openAi', Boolean(env.OPENAI_API_KEY)],
     ['platformAdmins', Boolean(String(env.ZESTIQ_PLATFORM_ADMIN_EMAILS || '').trim())],

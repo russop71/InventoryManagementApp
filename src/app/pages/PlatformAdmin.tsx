@@ -30,6 +30,7 @@ interface ClientSummary {
     configured: boolean;
     additionalLocationPriceConfigured: boolean;
     schedulingPriceConfigured: boolean;
+    additionalLocationSchedulingPriceConfigured: boolean;
     schedulingEnabled: boolean;
     customerCreated: boolean;
     plan: BillingPlan | null;
@@ -204,7 +205,7 @@ export function PlatformAdmin() {
     const activeOrCollecting = clients.filter(client => ['active', 'past_due', 'unpaid'].includes(client.billing.status));
     const estimatedMrr = activeOrCollecting.reduce((total, client) => {
       const locationCount = Math.max(1, client.locationCount);
-      const schedulingCharge = locationCount === 1 && client.billing.schedulingEnabled ? 49.99 : 0;
+      const schedulingCharge = client.billing.schedulingEnabled ? 49.99 + Math.max(0, locationCount - 1) * 24.99 : 0;
       return total + 249.99 + Math.max(0, locationCount - 1) * 199.99 + schedulingCharge;
     }, 0);
     const health = clients.map(client => ({ client, ...healthFor(client) }));
@@ -593,7 +594,7 @@ export function PlatformAdmin() {
                 </div>
                   <div><Label htmlFor="client-ordering">Ordering days</Label><Input id="client-ordering" name="orderingDays" placeholder="e.g. Monday, Thursday" /></div>
                   <div><Label htmlFor="client-imports">Data import status</Label><Input id="client-imports" name="importStatus" placeholder="Inventory, recipes, menu, sales history…" /></div>
-                  <label className="flex items-start gap-3 rounded-xl border border-[#F5D62E] bg-[#FEF9C3] p-3 text-sm sm:col-span-2"><Checkbox name="schedulingEnabled" className="mt-0.5" /><span><span className="block font-bold text-slate-950">Add Labour & Scheduling — CAD $49.99/month</span><span className="mt-1 block text-slate-600">Optional module. Leave it off for ZestIQ Basic; it can be enabled later from this client account.</span></span></label>
+                  <label className="flex items-start gap-3 rounded-xl border border-[#F5D62E] bg-[#FEF9C3] p-3 text-sm sm:col-span-2"><Checkbox name="schedulingEnabled" className="mt-0.5" /><span><span className="block font-bold text-slate-950">Add Labour & Scheduling — CAD $49.99/month</span><span className="mt-1 block text-slate-600">Optional for the first location, plus CAD $24.99/month for each additional location. It can be enabled later.</span></span></label>
                 <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="privacyAccepted" /> Privacy acknowledgement received</label>
                 <label className="flex gap-2 text-sm text-slate-700"><Checkbox name="termsAccepted" /> Agreement and 12-month billing terms discussed</label>
                 <Button type="submit" disabled={isLoading} className="w-full bg-[#303A43] text-white hover:bg-[#1E293B]">
@@ -705,7 +706,7 @@ export function PlatformAdmin() {
 
               <div className="rounded-2xl border border-[#F5D62E] bg-[#FFFCED] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><p className="font-semibold text-slate-950">Labour &amp; Scheduling module</p><p className="mt-1 text-sm text-slate-600">Optional add-on: CAD $49.99/month. When off, Labour tools are hidden and unavailable to this client.</p></div>
+                  <div><p className="font-semibold text-slate-950">Labour &amp; Scheduling module</p><p className="mt-1 text-sm text-slate-600">CAD $49.99/month for the first location, plus CAD $24.99/month per additional location. When off, Labour tools are hidden.</p></div>
                   <Badge className={selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}>{selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'Enabled' : 'Not included'}</Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -717,7 +718,7 @@ export function PlatformAdmin() {
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="font-semibold text-slate-950">Secure billing setup</p>
-                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for the first location. Each additional location is CAD $199.99/month and includes Scheduling. Single-location Scheduling is an optional CAD $49.99/month add-on. There is no free trial.</p>
+                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for the first location. Each additional location is CAD $199.99/month. Scheduling is optional at CAD $49.99/month for the first location and CAD $24.99/month for each additional location. There is no free trial.</p>
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
                   <p className="font-semibold text-slate-950">Contract term disclosure</p>
                   <p className="mt-1">Billed monthly with a 12-month initial commitment. The subscription renews for another 12-month term unless written non-renewal notice is received at least 90 days before term end.</p>
@@ -737,16 +738,17 @@ export function PlatformAdmin() {
                     value={billableLocationCount}
                     onChange={event => setBillableLocationCount(Math.max(Math.max(1, selectedClient.locations.length), Math.min(100, Number(event.target.value) || 1)))}
                   />
-                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 199.99 + (billableLocationCount === 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 49.99 : 0)).toFixed(2)}/month</p>
-                  <p className="mt-1 text-xs text-slate-500">Additional locations are CAD $199.99/month each with Scheduling included.</p>
-                  <p className="mt-1 text-xs text-slate-500">Scheduling: {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 'included at CAD $49.99/month' : 'not included'}</p>
+                  <p className="mt-2 font-bold text-slate-950">CAD ${(249.99 + Math.max(0, billableLocationCount - 1) * 199.99 + (selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? 49.99 + Math.max(0, billableLocationCount - 1) * 24.99 : 0)).toFixed(2)}/month</p>
+                  <p className="mt-1 text-xs text-slate-500">Additional locations are CAD $199.99/month each.</p>
+                  <p className="mt-1 text-xs text-slate-500">Scheduling: {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false ? `CAD $49.99 + $24.99 × ${Math.max(0, billableLocationCount - 1)} additional location${billableLocationCount - 1 === 1 ? '' : 's'}` : 'not included'}</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured) || (billableLocationCount === 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
+                  {PLANS.map(plan => <Button key={plan.id} type="button" size="sm" variant="outline" disabled={isLoading || !commitmentConfirmed || !selectedClient.billing.configured || selectedClient.billing.customerCreated || (billableLocationCount > 1 && !selectedClient.billing.additionalLocationPriceConfigured) || (selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured) || (billableLocationCount > 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.additionalLocationSchedulingPriceConfigured)} onClick={() => void createPaymentLink(plan.id)}>{plan.label}</Button>)}
                 </div>
                 {selectedClient.billing.customerCreated && <p className="mt-3 text-xs text-slate-500">This client already has Stripe billing. Use Stripe to manage its existing subscription rather than creating a duplicate.</p>}
                 {!selectedClient.billing.configured && <p className="mt-3 text-xs text-amber-700">Connect Stripe keys and price IDs before creating payment links.</p>}
                 {selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.schedulingPriceConfigured && <p className="mt-3 text-xs text-amber-700">Add the CAD $49.99 monthly Scheduling price ID in Stripe/Vercel before creating this checkout link.</p>}
+                {billableLocationCount > 1 && selectedClient.onboarding?.clientProfile?.schedulingEnabled !== false && !selectedClient.billing.additionalLocationSchedulingPriceConfigured && <p className="mt-3 text-xs text-amber-700">Add the CAD $24.99 additional-location Scheduling price ID in Stripe/Vercel before creating this checkout link.</p>}
                 {paymentLink && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button type="button" size="sm" onClick={() => void copyPaymentLink()} className="bg-[#303A43] text-white hover:bg-[#1E293B]">Copy client payment link</Button>

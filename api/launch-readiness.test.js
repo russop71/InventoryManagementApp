@@ -11,6 +11,8 @@ test('launch readiness fails closed when billing, AI, or admin configuration is 
     STRIPE_SECRET_KEY: 'configured',
     STRIPE_PRICE_MONTHLY: 'price_monthly',
     STRIPE_PRICE_ADDITIONAL_LOCATION: 'price_location',
+    STRIPE_PRICE_SCHEDULING: 'price_scheduling',
+    STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING: 'price_additional_location_scheduling',
     STRIPE_WEBHOOK_SECRET: 'configured',
     OPENAI_API_KEY: 'configured',
     ZESTIQ_PLATFORM_ADMIN_EMAILS: 'admin@zestiq.ca',
