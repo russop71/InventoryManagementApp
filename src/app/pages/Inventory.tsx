@@ -36,6 +36,13 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
   getLatestDraftInventoryCount,
   isInventoryCountFinalized,
   summarizeInventoryCount,
@@ -716,25 +723,45 @@ export function Inventory() {
         )}
       </div>
 
-      {showAddDialog && (
-        <div className="mx-4 mb-4 rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-2">
-            <input aria-label="Item name" value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Item name" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input aria-label="Category" value={newItem.category} onChange={event => setNewItem(prev => ({ ...prev, category: event.target.value }))} placeholder="Category" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input aria-label="Supplier" value={newItem.supplier} onChange={event => setNewItem(prev => ({ ...prev, supplier: event.target.value }))} placeholder="Supplier" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input aria-label="Unit" value={newItem.unit} onChange={event => setNewItem(prev => ({ ...prev, unit: event.target.value }))} placeholder="Unit" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input aria-label="On hand" type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} placeholder="On hand" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input aria-label="Par level" type="number" min="0" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} placeholder="Par level" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-            <input aria-label="Unit cost" type="number" min="0" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} placeholder="Unit cost" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm" />
-          </div>
-          {newItemError && <p role="alert" className="mt-2 text-sm font-semibold text-red-700">{newItemError}</p>}
-          {importError && <p className="mt-2 text-sm text-red-600">{importError}</p>}
-          <div className="mt-3 flex gap-2">
-            <button onClick={handleAddItem} className="rounded-xl bg-[#303A43] px-4 py-2 text-sm font-semibold text-white">Save item</button>
-            <button onClick={() => { setShowAddDialog(false); setNewItemError(''); }} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button>
-          </div>
-        </div>
-      )}
+      <Dialog open={showAddDialog} onOpenChange={open => { setShowAddDialog(open); if (!open) setNewItemError(''); }}>
+        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Add inventory item</DialogTitle>
+            <DialogDescription>Add the item’s basic counting and costing information. You can add more details after saving.</DialogDescription>
+          </DialogHeader>
+          <form noValidate onSubmit={event => { event.preventDefault(); handleAddItem(); }} className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-bold text-slate-700 sm:col-span-2">Item name
+                <input autoFocus value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Example: Fresh basil" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Category
+                <input value={newItem.category} onChange={event => setNewItem(prev => ({ ...prev, category: event.target.value }))} placeholder="Example: Produce" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Supplier
+                <input value={newItem.supplier} onChange={event => setNewItem(prev => ({ ...prev, supplier: event.target.value }))} placeholder="Supplier name" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Unit
+                <input value={newItem.unit} onChange={event => setNewItem(prev => ({ ...prev, unit: event.target.value }))} placeholder="Example: lb" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">On hand
+                <input type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Par level
+                <input type="number" min="0" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Unit cost
+                <input type="number" min="0" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+            </div>
+            {newItemError && <p role="alert" className="text-sm font-semibold text-red-700">{newItemError}</p>}
+            {importError && <p className="text-sm text-red-600">{importError}</p>}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => { setShowAddDialog(false); setNewItemError(''); }} className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700">Cancel</button>
+              <button type="submit" className="h-11 rounded-xl bg-[#303A43] px-5 text-sm font-semibold text-white">Save item</button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={Boolean(countPendingDelete)} onOpenChange={open => { if (!open) setCountPendingDelete(null); }}>
         <AlertDialogContent>
