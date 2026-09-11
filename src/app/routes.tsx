@@ -1,5 +1,6 @@
 import { lazy } from "react";
 import { createBrowserRouter, Navigate, useLocation } from "react-router";
+import { RouteError } from "./components/RouteError";
 
 const Landing = lazy(() => import("./pages/Landing").then(module => ({ default: module.Landing })));
 const Login = lazy(() => import("./pages/Login").then(module => ({ default: module.Login })));
@@ -194,6 +195,7 @@ export const router = createBrowserRouter([
   {
     path: "/app",
     Component: AuthLayout,
+    ErrorBoundary: RouteError,
     children: [
       {
         Component: PrivateAppProviders,

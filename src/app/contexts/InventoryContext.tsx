@@ -19,8 +19,8 @@ function normalizeStorageArea(storageArea?: string) {
   return trimmed && trimmed.length > 0 ? trimmed : 'Unassigned';
 }
 
-function sortUniqueStorageAreas(storageAreas: string[]) {
-  return Array.from(new Set(storageAreas.map(area => area.trim()).filter(Boolean))).sort((left, right) => left.localeCompare(right));
+function sortUniqueStorageAreas(storageAreas: Array<string | null | undefined>) {
+  return Array.from(new Set(storageAreas.map(area => String(area ?? '').trim()).filter(Boolean))).sort((left, right) => left.localeCompare(right));
 }
 
 export interface InventoryStorageLocation {

@@ -237,8 +237,8 @@ export function InventoryDetail() {
     if (!salesDay) return total;
     const ingredient = recipe.ingredients.find(entry => entry.inventoryItemId === id);
     if (!ingredient) return total;
-    const soldCount = salesDay.topItems.find(entry => entry.itemName.trim().toLowerCase() === recipe.menuItemName.trim().toLowerCase())?.quantity || 0;
-    const quantityPerDish = convertQuantity(ingredient.quantity, ingredient.unit, item.unit) ?? ingredient.quantity;
+    const soldCount = salesDay.topItems.find(entry => String(entry.itemName || '').trim().toLowerCase() === String(recipe.menuItemName || '').trim().toLowerCase())?.quantity || 0;
+    const quantityPerDish = convertQuantity(ingredient.quantity, ingredient.unit || item.unit, item.unit) ?? ingredient.quantity;
     return total + quantityPerDish * soldCount;
   }, 0);
 
@@ -247,8 +247,8 @@ export function InventoryDetail() {
     .map(recipe => {
       const ingredient = recipe.ingredients.find(ing => ing.inventoryItemId === id);
       if (!ingredient) return null;
-      const soldCount = latestSalesDay?.topItems.find(entry => entry.itemName.trim().toLowerCase() === recipe.menuItemName.trim().toLowerCase())?.quantity || 0;
-      const quantityPerDish = convertQuantity(ingredient.quantity, ingredient.unit, item.unit) ?? ingredient.quantity;
+      const soldCount = latestSalesDay?.topItems.find(entry => String(entry.itemName || '').trim().toLowerCase() === String(recipe.menuItemName || '').trim().toLowerCase())?.quantity || 0;
+      const quantityPerDish = convertQuantity(ingredient.quantity, ingredient.unit || item.unit, item.unit) ?? ingredient.quantity;
 
       return {
         dishName: recipe.menuItemName,

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { buildDemoLocationData } from '../../src/app/utils/demoData';
 
 const demoRoutes = [
   '/app',
@@ -29,6 +30,8 @@ const demoRoutes = [
   '/app/waste',
   '/app/beverages',
 ] as const;
+
+const demoInventoryItems = buildDemoLocationData().inventory;
 
 function captureRuntimeFailures(page: Page) {
   const failures: string[] = [];
@@ -72,6 +75,17 @@ async function expectUsableRoute(page: Page, route: string) {
   expect(overflow.body, `${route} body horizontal overflow`).toBeLessThanOrEqual(2);
   expect(overflow.document, `${route} document horizontal overflow`).toBeLessThanOrEqual(2);
 }
+
+test('every demo inventory item detail opens without an application error', async ({ page }) => {
+  test.setTimeout(120_000);
+  await freshDemoLogin(page);
+
+  for (const item of demoInventoryItems) {
+    await page.goto(`/app/inventory/${item.id}`);
+    await expect(page.getByRole('heading', { name: item.name, exact: true })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/Unexpected Application Error|Cannot read properties of undefined/i);
+  }
+});
 
 const scannedRecipeResponse = {
   menuItemName: 'Classic Tomato Basil Sauce',

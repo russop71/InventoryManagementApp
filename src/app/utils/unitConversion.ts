@@ -86,27 +86,30 @@ const FAMILY_UNITS: Record<Exclude<UnitFamily, 'unknown'>, string[]> = {
   count: ['ea', 'batch'],
 };
 
-function cleanUnit(unit: string) {
-  return unit.trim().toLowerCase().replace(/\s+/g, ' ');
+type UnitInput = string | null | undefined;
+
+function cleanUnit(unit: UnitInput) {
+  return String(unit ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-export function normalizeUnit(unit: string) {
+export function normalizeUnit(unit: UnitInput) {
   const cleaned = cleanUnit(unit);
   return UNIT_ALIASES[cleaned] || cleaned;
 }
 
-export function getUnitFamily(unit: string): UnitFamily {
+export function getUnitFamily(unit: UnitInput): UnitFamily {
   const normalized = normalizeUnit(unit);
   return UNITS[normalized]?.family || 'unknown';
 }
 
-export function formatUnitLabel(unit: string) {
+export function formatUnitLabel(unit: UnitInput) {
   const normalized = normalizeUnit(unit);
-  return UNITS[normalized]?.label || unit;
+  return UNITS[normalized]?.label || normalized;
 }
 
-export function getCompatibleUnits(unit: string) {
+export function getCompatibleUnits(unit: UnitInput) {
   const normalized = normalizeUnit(unit);
+  if (!normalized) return [];
   const family = getUnitFamily(normalized);
   if (family === 'unknown') {
     return [{ value: normalized, label: formatUnitLabel(normalized) }];
@@ -118,9 +121,10 @@ export function getCompatibleUnits(unit: string) {
   }));
 }
 
-export function convertQuantity(quantity: number, fromUnit: string, toUnit: string): number | null {
+export function convertQuantity(quantity: number, fromUnit: UnitInput, toUnit: UnitInput): number | null {
   const from = normalizeUnit(fromUnit);
   const to = normalizeUnit(toUnit);
+  if (!from || !to) return null;
   if (from === to) return quantity;
   const fromDef = UNITS[from];
   const toDef = UNITS[to];
