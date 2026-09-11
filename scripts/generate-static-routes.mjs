@@ -28,6 +28,25 @@ const pages = [
 ];
 
 const resourceContent = {
+  '/restaurant-inventory-management-software': {
+    label: 'Restaurant inventory management software for Canadian operators',
+    heading: 'Know what is on hand, what it costs and what to order next.',
+    intro: 'ZestIQ connects restaurant inventory counts, supplier invoices, recipe cost, waste, pars, purchasing and sales signals in one location-aware operating system.',
+    modified: '2026-09-11',
+    schemaType: 'SoftwareApplication',
+    sections: [
+      ['Count restaurant inventory by storage area', 'Organize mobile-friendly counts in the physical order the team walks the freezer, walk-in, dry storage and bar. Track cases, kilograms, bottles, pours, portions and other restaurant units.'],
+      ['Keep inventory value and recipe cost current', 'Review supplier invoice prices before they update ingredient cost, on-hand inventory value and affected food or beverage recipes. Price history helps managers find margin changes earlier.'],
+      ['Turn counts and demand into suggested orders', 'Compare on-hand stock, pars, incoming purchases, supplier pack sizes and recent demand. ZestIQ produces reviewable ordering recommendations that an authorized manager approves before sending.'],
+      ['Separate every restaurant location', 'Each location keeps its own inventory, COGS, invoices, orders, waste, forecasts and labour records. Managers see assigned locations while authorized company owners retain cross-location oversight.'],
+      ['Use inventory data to investigate variance', 'Compare actual stock movement with recipe-linked sales and purchases, then focus on high-dollar exceptions caused by unit errors, waste, over-portioning, receiving mistakes or other operational issues.'],
+    ],
+    faqs: [
+      ['What should restaurant inventory management software include?', 'It should support restaurant units and pack sizes, mobile counts, supplier prices, invoice review, recipe costing, waste, variance, pars, purchasing and location-level permissions.'],
+      ['How often should a restaurant count inventory?', 'Many restaurants complete a full count weekly and use daily spot counts for expensive, fast-moving or high-variance products. Consistent timing and process matter more than false precision.'],
+      ['Can restaurant inventory software use POS sales?', 'Yes. POS menu-item and sales data can support theoretical usage, food cost, labour comparison, forecasting and suggested ordering when a supported connection or structured import is available.'],
+    ],
+  },
   '/best-restaurant-inventory-management-software-canada': {
     label: '2026 Canadian restaurant software buyer’s guide',
     heading: 'How to choose the best restaurant inventory software for your operation.',
@@ -89,7 +108,10 @@ for (const [path, title, description] of pages) {
     { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'ZestIQ', item: 'https://zestiq.ca/' }, { '@type': 'ListItem', position: 2, name: title, item: url }] },
   ];
   if (content) {
-    graph.push({ '@type': path.endsWith('calculator') ? 'WebApplication' : 'Article', headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', mainEntityOfPage: { '@id': `${url}#webpage` } });
+    const contentType = content.schemaType || (path.endsWith('calculator') ? 'WebApplication' : 'Article');
+    graph.push(contentType === 'SoftwareApplication'
+      ? { '@type': contentType, name: 'ZestIQ', headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', applicationCategory: 'BusinessApplication', operatingSystem: 'Web', offers: { '@type': 'Offer', price: '249.99', priceCurrency: 'CAD', url: 'https://zestiq.ca/pricing' }, mainEntityOfPage: { '@id': `${url}#webpage` } }
+      : { '@type': contentType, headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', mainEntityOfPage: { '@id': `${url}#webpage` } });
     graph.push({ '@type': 'FAQPage', mainEntity: content.faqs.map(([question, answer]) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) });
   }
   const schema = { '@context': 'https://schema.org', '@graph': graph };
