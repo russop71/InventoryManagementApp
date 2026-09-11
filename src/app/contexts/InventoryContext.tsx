@@ -302,7 +302,7 @@ interface InventoryContextType {
   deletePreppedRecipe: (id: string) => void;
   addSupplier: (supplier: Omit<Supplier, 'id' | 'dateAdded'>) => void;
   updateSupplier: (id: string, supplier: Partial<Supplier>) => void;
-  deleteSupplier: (id: string) => void;
+  deleteSupplier: (id: string) => Promise<void>;
   addCategory: (category: Omit<CategoryDefinition, 'id'>) => void;
   updateCategory: (id: string, updates: Partial<Omit<CategoryDefinition, 'id'>>) => void;
   deleteCategory: (id: string) => { success: boolean; error?: string };
@@ -405,7 +405,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
     nextInventoryCounts: InventoryCount[] = inventoryCounts,
-    options: { allowEmptyInventory?: boolean; allowEmptyInventoryCounts?: boolean; categories?: CategoryDefinition[] } = {},
+    options: { allowEmptyInventory?: boolean; allowEmptyInventoryCounts?: boolean; allowEmptySuppliers?: boolean; categories?: CategoryDefinition[] } = {},
   ) => {
     if (!accountId || !activeLocationId) return Promise.resolve();
     const currentLocalInventory = readScopedJson<InventoryItem[]>(localKey('inventory'), []);
@@ -433,7 +433,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const effectiveInvoices = nextInvoices.length === 0 && currentLocalInvoices.length > 0
       ? currentLocalInvoices
       : nextInvoices;
-    const effectiveSuppliers = nextSuppliers.length === 0 && currentLocalSuppliers.length > 0
+    const effectiveSuppliers = !options.allowEmptySuppliers && nextSuppliers.length === 0 && currentLocalSuppliers.length > 0
       ? currentLocalSuppliers
       : nextSuppliers;
     const effectivePreppedRecipes = nextPreppedRecipes.length === 0 && currentLocalPreppedRecipes.length > 0
@@ -1580,10 +1580,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes, inventoryCounts, { categories: nextCategories });
   };
 
-  const deleteSupplier = (id: string) => {
+  const deleteSupplier = async (id: string) => {
     const nextSuppliers = suppliers.filter(supplier => supplier.id !== id);
     setSuppliers(nextSuppliers);
-    saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes);
+    await saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes, inventoryCounts, { allowEmptySuppliers: true });
   };
 
   const addCategory = (category: Omit<CategoryDefinition, 'id'>) => {

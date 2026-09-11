@@ -60,6 +60,7 @@ export function Suppliers() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<string | null>(null);
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
+  const [deletingSupplierId, setDeletingSupplierId] = useState<string | null>(null);
 
   const handleAddSupplier = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -106,10 +107,17 @@ export function Suppliers() {
     setIsAddDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this supplier?')) {
-      deleteSupplier(id);
-      toast.success('Supplier deleted');
+  const handleDelete = async (id: string) => {
+    const supplier = suppliers.find(item => item.id === id);
+    if (confirm(`Delete ${supplier?.name || 'this supplier'}? Existing inventory and invoice history will be kept.`)) {
+      setDeletingSupplierId(id);
+      try {
+        await deleteSupplier(id);
+        setExpandedSupplier(current => current === id ? null : current);
+        toast.success('Supplier deleted and saved');
+      } finally {
+        setDeletingSupplierId(null);
+      }
     }
   };
 
@@ -284,10 +292,11 @@ export function Suppliers() {
                         size="sm"
                         variant="outline"
                         aria-label={`Delete ${supplier.name}`}
+                        disabled={deletingSupplierId === supplier.id}
                         className="h-9 w-9 rounded-lg p-0"
                         onClick={() => handleDelete(supplier.id)}
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                        {deletingSupplierId === supplier.id ? <span className="text-[10px] font-bold text-gray-500">…</span> : <Trash2 className="h-3.5 w-3.5 text-red-600" />}
                       </Button>
                   </div>
                 </div>
