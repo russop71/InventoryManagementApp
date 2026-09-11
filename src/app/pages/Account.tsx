@@ -13,6 +13,9 @@ import { apiRequest } from '../utils/api';
 export function Account() {
   const { user, accountId, accountName, locations, addLocation, updateLocation, logout, changePassword, updateLocalAccountProfile } = useAuth();
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
+  const isShowcaseAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.ca'
+    || accountName?.trim().toLowerCase() === 'zestiq showcase';
+  const canResetAccountData = user?.role === 'Owner';
   const [isEditing, setIsEditing] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
   const [locationNames, setLocationNames] = useState<Record<string, string>>({});
@@ -34,7 +37,8 @@ export function Account() {
 
   const handleResetAppData = async () => {
     if (!accountId || isResettingData) return;
-    if (!confirm('Reset all restaurant operating data for this account? Inventory, recipes, suppliers, orders, invoices, forecasts, counts, imported POS data, waste and schedules will be removed. Users, roles, location access, billing and connected access points will remain.')) return;
+    const resetLabel = isShowcaseAccount ? 'Clear all Showcase operating data?' : 'Reset all restaurant operating data for this account?';
+    if (!confirm(`${resetLabel} Inventory, recipes, suppliers, orders, invoices, forecasts, counts, imported POS data, waste and schedules will be removed. Users, roles, location access, billing and connected access points will remain.`)) return;
 
     setIsResettingData(true);
     try {
@@ -43,7 +47,9 @@ export function Account() {
         body: JSON.stringify({ confirmation: 'RESET' }),
       });
       locations.forEach(location => clearLocationScopedData(accountId, location.id));
-      toast.success('Restaurant data reset. Your users and access settings were preserved.');
+      toast.success(isShowcaseAccount
+        ? 'Showcase data cleared. Your users and access settings were preserved.'
+        : 'Restaurant data reset. Your users and access settings were preserved.');
       setTimeout(() => logout(), 800);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The account data could not be reset');
@@ -390,21 +396,30 @@ export function Account() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-red-600">Danger Zone</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="outline"
-            className="w-full text-red-600 border-red-300 mb-3 hover:bg-red-50"
-            disabled={isResettingData}
-            onClick={() => void handleResetAppData()}
-          >
-            {isResettingData ? 'Resetting account data…' : 'Reset App Data'}
-          </Button>
-        </CardContent>
-      </Card>
+      {canResetAccountData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-600">Danger Zone</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-sm text-slate-600">
+              {isShowcaseAccount
+                ? 'Clear the Showcase operating data whenever you want a fresh presentation. Account access and configuration stay in place.'
+                : 'Remove this account’s operating data while preserving users, permissions, locations, billing and connected access points.'}
+            </p>
+            <Button
+              variant="outline"
+              className="w-full text-red-600 border-red-300 hover:bg-red-50"
+              disabled={isResettingData}
+              onClick={() => void handleResetAppData()}
+            >
+              {isResettingData
+                ? (isShowcaseAccount ? 'Clearing Showcase data…' : 'Resetting account data…')
+                : (isShowcaseAccount ? 'Clear Showcase Data' : 'Reset App Data')}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

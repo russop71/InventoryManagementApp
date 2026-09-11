@@ -15,6 +15,8 @@ test('ZestIQ Showcase has product access without a paid subscription', () => {
   assert.equal(hasProductAccess({ account: showcase, authUser: { email: 'demo@zestiq.ca' }, platformAdminEmails: '', billingBypassAccountIds: '' }), true);
   assert.equal(hasSchedulingAccess(showcase), true);
   assert.equal(isDemoAdministrativeMutation(showcase, ['accounts', 'id', 'locations'], 'POST'), false);
+  assert.equal(isDemoAdministrativeMutation(showcase, ['accounts', 'id', 'reset-data'], 'POST'), false);
+  assert.equal(isDemoAdministrativeMutation(showcase, ['accounts', 'id', 'locations', 'main', 'data'], 'PUT'), false);
 });
 
 test('Scheduling remains opt-in for non-showcase accounts', () => {
