@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useInventory } from '../contexts/InventoryContext';
+import { useToast } from '../contexts/ToastContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { DollarSign, TrendingUp, TrendingDown, Settings2, Plus, Pencil, Trash2, Search, Info } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Settings2, Plus, Pencil, Trash2, Search, Info, Link2, Check } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useSearchParams } from 'react-router';
 import { COGSBreakdown } from './COGSBreakdown';
@@ -13,13 +14,26 @@ import { toast } from 'sonner';
 
 function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { categories, inventory, suppliers, addCategory, updateCategory, deleteCategory } = useInventory();
+  const { provider, isConnected, menuItems, cogsCategories, addCogsCategory, updateCogsCategoryMappings } = useToast();
+  const [activeSection, setActiveSection] = useState<'categories' | 'mapping'>('categories');
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [name, setName] = useState('');
   const [expenseAccount, setExpenseAccount] = useState('');
+  const [newReportingGroup, setNewReportingGroup] = useState('');
+  const [mappingDraft, setMappingDraft] = useState<Record<string, { inventoryCategoryIds: string[]; posCategoryNames: string[] }>>({});
   const normalizedSearch = search.trim().toLowerCase();
   const visibleCategories = categories.filter(category => !normalizedSearch || category.name.toLowerCase().includes(normalizedSearch) || category.expenseAccount.toLowerCase().includes(normalizedSearch));
+  const posCategories = [...new Set(menuItems.map(item => item.category.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+
+  useEffect(() => {
+    if (!open) return;
+    setMappingDraft(Object.fromEntries(cogsCategories.map(category => [category.id, {
+      inventoryCategoryIds: category.inventoryCategoryIds || [],
+      posCategoryNames: category.posCategoryNames || [],
+    }])));
+  }, [open, cogsCategories]);
 
   const resetEditor = () => {
     setEditingId(null);
@@ -43,14 +57,47 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
     resetEditor();
   };
 
+  const toggleMapping = (groupId: string, key: 'inventoryCategoryIds' | 'posCategoryNames', value: string) => {
+    setMappingDraft(previous => {
+      const selected = previous[groupId]?.[key]?.includes(value);
+      const next = Object.fromEntries(Object.entries(previous).map(([id, mapping]) => [id, {
+        ...mapping,
+        [key]: mapping[key].filter(item => item !== value),
+      }]));
+      if (!selected) next[groupId] = { ...next[groupId], [key]: [...(next[groupId]?.[key] || []), value] };
+      return next;
+    });
+  };
+
+  const saveMappings = () => {
+    cogsCategories.forEach(category => updateCogsCategoryMappings(category.id, mappingDraft[category.id] || { inventoryCategoryIds: [], posCategoryNames: [] }));
+    toast.success('COGS category mappings saved');
+  };
+
+  const createReportingGroup = (event: React.FormEvent) => {
+    event.preventDefault();
+    const nextName = newReportingGroup.trim();
+    if (!nextName) return;
+    if (cogsCategories.some(category => category.name.toLowerCase() === nextName.toLowerCase())) return toast.error('That reporting group already exists');
+    addCogsCategory(nextName);
+    setNewReportingGroup('');
+    toast.success('Reporting group added');
+  };
+
   return (
     <Dialog open={open} onOpenChange={value => { onOpenChange(value); if (!value) resetEditor(); }}>
       <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-5 sm:max-w-4xl sm:p-7">
         <DialogHeader>
           <DialogTitle>Category configuration</DialogTitle>
-          <DialogDescription>Organize inventory and suppliers into consistent COGS categories.</DialogDescription>
+          <DialogDescription>Manage categories and connect inventory with the categories imported from your POS.</DialogDescription>
         </DialogHeader>
 
+        <div className="grid grid-cols-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+          <button type="button" onClick={() => setActiveSection('categories')} className={`rounded-xl px-3 py-2.5 text-sm font-black transition ${activeSection === 'categories' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Inventory categories</button>
+          <button type="button" onClick={() => setActiveSection('mapping')} className={`rounded-xl px-3 py-2.5 text-sm font-black transition ${activeSection === 'mapping' ? 'bg-[#303A43] text-white shadow-sm' : 'text-slate-500'}`}>POS category mapping</button>
+        </div>
+
+        {activeSection === 'categories' ? <>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block flex-1 sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -96,6 +143,68 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
             {visibleCategories.length === 0 && <p className="px-4 py-10 text-center text-sm text-slate-500">No categories match your search.</p>}
           </div>
         </div>
+        </> : (
+          <div className="space-y-4">
+            <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-slate-700">
+              <Link2 className="mt-0.5 h-5 w-5 shrink-0 text-[#B58B00]" />
+              <p>Place inventory categories and matching POS categories under one ZestIQ reporting group. Each category can belong to only one group, preventing duplicated COGS.</p>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-black text-slate-900">POS source</p>
+                <p className="text-sm text-slate-500">{isConnected ? `${provider === 'generic' ? 'Imported POS' : provider} connected · ${posCategories.length} categories found` : 'Connect or import POS data to discover its categories.'}</p>
+              </div>
+              <form onSubmit={createReportingGroup} className="flex gap-2">
+                <Input value={newReportingGroup} onChange={event => setNewReportingGroup(event.target.value)} placeholder="New group, e.g. Wine" aria-label="New COGS reporting group" />
+                <Button type="submit" className="shrink-0 bg-[#303A43] text-white"><Plus className="mr-1.5 h-4 w-4" />Add</Button>
+              </form>
+            </div>
+
+            {cogsCategories.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 px-5 py-10 text-center">
+                <p className="font-black text-slate-900">Create your first reporting group</p>
+                <p className="mt-1 text-sm text-slate-500">Start with groups such as Food, Beverage, Wine, Liquor, or Retail.</p>
+              </div>
+            ) : cogsCategories.map(group => {
+              const draft = mappingDraft[group.id] || { inventoryCategoryIds: [], posCategoryNames: [] };
+              return (
+                <section key={group.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: group.color }} />
+                    <div><h3 className="font-black text-slate-900">{group.name}</h3><p className="text-xs text-slate-500">{draft.inventoryCategoryIds.length} inventory · {draft.posCategoryNames.length} POS categories</p></div>
+                  </div>
+                  <div className="grid gap-5 p-4 md:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-xs font-black uppercase tracking-[0.15em] text-slate-500">Inventory categories</p>
+                      <div className="flex flex-wrap gap-2">
+                        {categories.map(category => {
+                          const selected = draft.inventoryCategoryIds.includes(category.id);
+                          return <button key={category.id} type="button" onClick={() => toggleMapping(group.id, 'inventoryCategoryIds', category.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${selected ? 'border-[#F5D62E] bg-[#FFF6BF] text-slate-900' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>{selected && <Check className="h-3.5 w-3.5" />}{category.name}</button>;
+                        })}
+                        {categories.length === 0 && <p className="text-sm text-slate-400">No inventory categories yet.</p>}
+                      </div>
+                    </div>
+                    <div className="md:border-l md:border-slate-200 md:pl-5">
+                      <p className="mb-2 text-xs font-black uppercase tracking-[0.15em] text-slate-500">POS categories</p>
+                      <div className="flex flex-wrap gap-2">
+                        {posCategories.map(posCategory => {
+                          const selected = draft.posCategoryNames.includes(posCategory);
+                          return <button key={posCategory} type="button" onClick={() => toggleMapping(group.id, 'posCategoryNames', posCategory)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${selected ? 'border-slate-700 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>{selected && <Check className="h-3.5 w-3.5" />}{posCategory}</button>;
+                        })}
+                        {posCategories.length === 0 && <p className="text-sm text-slate-400">No POS categories imported yet.</p>}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+
+            <div className="sticky bottom-0 flex justify-end border-t border-slate-200 bg-white/95 pt-4 backdrop-blur">
+              <Button type="button" onClick={saveMappings} disabled={cogsCategories.length === 0} className="w-full bg-[#F5D62E] font-black text-[#303A43] hover:bg-[#E8C514] sm:w-auto"><Check className="mr-2 h-4 w-4" />Save category mappings</Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

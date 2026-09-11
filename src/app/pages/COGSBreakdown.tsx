@@ -3,6 +3,7 @@ import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { useLocation, useNavigate } from 'react-router';
 import { ChevronLeft, ChevronDown, ChevronRight, TrendingDown, DollarSign, ShoppingBag, Filter, Calendar } from 'lucide-react';
+import { resolveCogsCategory } from '../utils/cogsCategoryMapping.js';
 
 const Y = '#F5D62E';
 const D = '#303A43';
@@ -59,6 +60,7 @@ export function COGSBreakdown({ embedded = false }: { embedded?: boolean }) {
 
   // ── Cost per menu item + total COGS ────────────────────────────────────────
   const menuItemCosts = menuItems.map(mi => {
+    const effectiveCogsCategory = resolveCogsCategory(cogsCategories, mi.category, mi.cogsCategoryId);
     const ingredientBreakdown = mi.ingredients.map(ing => {
       const invItem = inventory.find(i => i.id === ing.inventoryItemId);
       return {
@@ -81,10 +83,8 @@ export function COGSBreakdown({ embedded = false }: { embedded?: boolean }) {
       id: mi.id,
       name: mi.name,
       category: mi.category,
-      cogsCategoryId: mi.cogsCategoryId || 'uncategorized',
-      cogsCategoryName: mi.cogsCategoryId
-        ? cogsCategories.find(cat => cat.id === mi.cogsCategoryId)?.name ?? 'Uncategorized'
-        : 'Uncategorized',
+      cogsCategoryId: effectiveCogsCategory.id,
+      cogsCategoryName: effectiveCogsCategory.name,
       costPerItem,
       sold,
       totalCOGS,

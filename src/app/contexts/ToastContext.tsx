@@ -20,7 +20,13 @@ export interface ToastMenuItem {
   ingredients: { inventoryItemId: string; quantity: number }[];
 }
 
-export interface CogsCategory { id: string; name: string; color: string }
+export interface CogsCategory {
+  id: string;
+  name: string;
+  color: string;
+  inventoryCategoryIds?: string[];
+  posCategoryNames?: string[];
+}
 
 export interface PosImportPayload {
   provider?: string;
@@ -62,6 +68,7 @@ interface ToastContextType {
   importSalesData: (payload: PosImportPayload) => Promise<void>;
   addCogsCategory: (name: string) => void;
   updateCogsCategory: (id: string, name: string) => void;
+  updateCogsCategoryMappings: (id: string, mappings: Pick<CogsCategory, 'inventoryCategoryIds' | 'posCategoryNames'>) => void;
   deleteCogsCategory: (id: string) => void;
   assignMenuItemCogsCategory: (itemId: string, categoryId: string) => void;
   lastSync: string | null;
@@ -70,8 +77,8 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 const DEMO_COGS_CATEGORIES: CogsCategory[] = [
-  { id: 'demo-food', name: 'Food', color: '#F59E0B' },
-  { id: 'demo-beverage', name: 'Beverage', color: '#8B5CF6' },
+  { id: 'demo-food', name: 'Food', color: '#F59E0B', inventoryCategoryIds: [], posCategoryNames: ['Food'] },
+  { id: 'demo-beverage', name: 'Beverage', color: '#8B5CF6', inventoryCategoryIds: [], posCategoryNames: ['Cocktail', 'Wine', 'Beer', 'Beverage'] },
 ];
 
 function demoCogsCategory(category: string) {
@@ -246,13 +253,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setCogsCategories(previous => [...previous, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: normalized, color: ['#F59E0B', '#8B5CF6', '#DC2626', '#0EA5E9', '#14B8A6', '#F97316'][previous.length % 6] }]);
   };
   const updateCogsCategory = (id: string, name: string) => setCogsCategories(previous => previous.map(category => category.id === id ? { ...category, name: name.trim() || category.name } : category));
+  const updateCogsCategoryMappings = (id: string, mappings: Pick<CogsCategory, 'inventoryCategoryIds' | 'posCategoryNames'>) => {
+    setCogsCategories(previous => previous.map(category => category.id === id ? {
+      ...category,
+      inventoryCategoryIds: [...new Set(mappings.inventoryCategoryIds || [])],
+      posCategoryNames: [...new Set(mappings.posCategoryNames || [])],
+    } : category));
+  };
   const deleteCogsCategory = (id: string) => {
     setCogsCategories(previous => previous.filter(category => category.id !== id));
     setMenuItems(previous => previous.map(item => item.cogsCategoryId === id ? { ...item, cogsCategoryId: undefined } : item));
   };
   const assignMenuItemCogsCategory = (itemId: string, categoryId: string) => setMenuItems(previous => previous.map(item => item.id === itemId ? { ...item, cogsCategoryId: categoryId } : item));
 
-  return <ToastContext.Provider value={{ isConnected, provider, connectionMode, restaurantId, salesData, menuItems, cogsCategories, selectPosProvider, disconnectToast, syncData, importSalesData, addCogsCategory, updateCogsCategory, deleteCogsCategory, assignMenuItemCogsCategory, lastSync }}>{children}</ToastContext.Provider>;
+  return <ToastContext.Provider value={{ isConnected, provider, connectionMode, restaurantId, salesData, menuItems, cogsCategories, selectPosProvider, disconnectToast, syncData, importSalesData, addCogsCategory, updateCogsCategory, updateCogsCategoryMappings, deleteCogsCategory, assignMenuItemCogsCategory, lastSync }}>{children}</ToastContext.Provider>;
 }
 
 export function useToast() {
