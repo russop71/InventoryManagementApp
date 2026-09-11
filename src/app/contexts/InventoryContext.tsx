@@ -199,6 +199,27 @@ export interface Supplier {
   source?: 'manual' | 'invoice';
 }
 
+export interface CategoryDefinition {
+  id: string;
+  name: string;
+  expenseAccount: string;
+}
+
+const DEFAULT_CATEGORY_NAMES = ['Proteins', 'Produce', 'Dairy', 'Dry Goods', 'Beverages', 'Pantry', 'Seafood'];
+
+function buildCategories(inventory: InventoryItem[], suppliers: Supplier[], saved: CategoryDefinition[] = []) {
+  const savedByName = new Map(saved.map(category => [category.name.trim().toLowerCase(), category]));
+  const seedNames = saved.length === 0 && inventory.length === 0 && suppliers.length === 0 ? DEFAULT_CATEGORY_NAMES : [];
+  const names = [...seedNames, ...inventory.map(item => item.category), ...suppliers.map(supplier => supplier.category), ...saved.map(category => category.name)];
+  const categoriesByName = new Map<string, CategoryDefinition>();
+  names.map(name => String(name || '').trim()).filter(Boolean).forEach(name => {
+    const key = name.toLowerCase();
+    if (categoriesByName.has(key)) return;
+    categoriesByName.set(key, savedByName.get(key) || { id: `category-${key.replace(/[^a-z0-9]+/g, '-')}`, name, expenseAccount: '' });
+  });
+  return Array.from(categoriesByName.values());
+}
+
 export interface PreppedRecipe {
   id: string;
   menuItemName: string;
@@ -255,6 +276,7 @@ interface InventoryContextType {
   orders: DailyOrder[];
   invoices: InvoiceRecord[];
   suppliers: Supplier[];
+  categories: CategoryDefinition[];
   inventoryCounts: InventoryCount[];
   isLocationLoaded: boolean;
   refreshLocationData: () => Promise<void>;
@@ -284,6 +306,9 @@ interface InventoryContextType {
   addSupplier: (supplier: Omit<Supplier, 'id' | 'dateAdded'>) => void;
   updateSupplier: (id: string, supplier: Partial<Supplier>) => void;
   deleteSupplier: (id: string) => void;
+  addCategory: (category: Omit<CategoryDefinition, 'id'>) => void;
+  updateCategory: (id: string, updates: Partial<Omit<CategoryDefinition, 'id'>>) => void;
+  deleteCategory: (id: string) => { success: boolean; error?: string };
   saveInventoryCount: (count: InventoryCount) => void;
   finalizeInventoryCount: (count: InventoryCount) => void;
   deleteInventoryCount: (countId: string) => void;
@@ -296,6 +321,7 @@ interface LocationPayload {
   orders?: DailyOrder[];
   invoices?: InvoiceRecord[];
   suppliers?: Supplier[];
+  categories?: CategoryDefinition[];
   preppedRecipes?: PreppedRecipe[];
   inventoryCounts?: InventoryCount[];
   integrations?: { demoDataVersion?: string; [key: string]: unknown };
@@ -328,6 +354,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<DailyOrder[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<CategoryDefinition[]>([]);
   const [preppedRecipes, setPreppedRecipes] = useState<PreppedRecipe[]>([]);
   const [inventoryCounts, setInventoryCounts] = useState<InventoryCount[]>([]);
   const [isLocationLoaded, setIsLocationLoaded] = useState(false);
@@ -350,6 +377,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
     nextInventoryCounts: InventoryCount[] = inventoryCounts,
+    nextCategories: CategoryDefinition[] = categories,
   ) => {
     const inventoryKey = localKey('inventory');
     const recipesKey = localKey('recipes');
@@ -359,6 +387,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const suppliersKey = localKey('suppliers');
     const preppedRecipesKey = localKey('preppedRecipes');
     const inventoryCountsKey = localKey('inventoryCounts');
+    const categoriesKey = localKey('categories');
     if (inventoryKey) localStorage.setItem(inventoryKey, JSON.stringify(nextInventory));
     if (recipesKey) localStorage.setItem(recipesKey, JSON.stringify(nextRecipes));
     if (storageAreasKey) localStorage.setItem(storageAreasKey, JSON.stringify(nextStorageAreas));
@@ -367,6 +396,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     if (suppliersKey) localStorage.setItem(suppliersKey, JSON.stringify(nextSuppliers));
     if (preppedRecipesKey) localStorage.setItem(preppedRecipesKey, JSON.stringify(nextPreppedRecipes));
     if (inventoryCountsKey) localStorage.setItem(inventoryCountsKey, JSON.stringify(nextInventoryCounts));
+    if (categoriesKey) localStorage.setItem(categoriesKey, JSON.stringify(nextCategories));
   };
 
   const saveLocationData = (
@@ -378,7 +408,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
     nextInventoryCounts: InventoryCount[] = inventoryCounts,
-    options: { allowEmptyInventoryCounts?: boolean } = {},
+    options: { allowEmptyInventoryCounts?: boolean; categories?: CategoryDefinition[] } = {},
   ) => {
     if (!accountId || !activeLocationId) return;
     const currentLocalInventory = readScopedJson<InventoryItem[]>(localKey('inventory'), []);
@@ -389,6 +419,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const currentLocalSuppliers = readScopedJson<Supplier[]>(localKey('suppliers'), []);
     const currentLocalPreppedRecipes = readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []);
     const currentLocalInventoryCounts = readScopedJson<InventoryCount[]>(localKey('inventoryCounts'), []);
+    const currentLocalCategories = readScopedJson<CategoryDefinition[]>(localKey('categories'), []);
 
     const effectiveInventory = nextInventory.length === 0 && currentLocalInventory.length > 0
       ? currentLocalInventory
@@ -414,6 +445,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const effectiveInventoryCounts = !options.allowEmptyInventoryCounts && nextInventoryCounts.length === 0 && currentLocalInventoryCounts.length > 0
       ? currentLocalInventoryCounts
       : nextInventoryCounts;
+    const effectiveCategories = options.categories ?? (categories.length > 0 ? categories : currentLocalCategories);
 
     persistLocalLocationData(
       effectiveInventory,
@@ -424,6 +456,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       effectiveSuppliers,
       effectivePreppedRecipes,
       effectiveInventoryCounts,
+      effectiveCategories,
     );
     if (!token || isDemoAccount) return;
     const locationId = activeLocationId;
@@ -437,6 +470,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       suppliers: effectiveSuppliers,
       preppedRecipes: effectivePreppedRecipes,
       inventoryCounts: effectiveInventoryCounts,
+      categories: effectiveCategories,
     };
     savesPendingRef.current += 1;
     saveQueueRef.current = saveQueueRef.current
@@ -501,6 +535,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setInventory([]);
       setStorageAreas([]);
       setRecipes([]);
+      setCategories([]);
       setIsLocationLoaded(true);
       return;
     }
@@ -512,6 +547,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const localRecipes = readScopedJson<Recipe[]>(localKey('recipes'), []);
     const localStorageAreas = readScopedJson<string[]>(localKey('storageAreas'), []);
     const localInventoryCounts = readScopedJson<InventoryCount[]>(localKey('inventoryCounts'), []);
+    const localCategories = readScopedJson<CategoryDefinition[]>(localKey('categories'), []);
 
     const demoData = buildDemoLocationData();
     const fallbackInventory = isDemoAccount ? (demoData.inventory as unknown as InventoryItem[]).map(normalizeInventoryStorage) : [];
@@ -536,9 +572,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const nextSuppliers = shouldReset || localSuppliers.length === 0 ? fallbackSuppliers : localSuppliers;
       const nextPreppedRecipes = shouldReset || localPreppedRecipes.length === 0 ? fallbackPreppedRecipes : localPreppedRecipes;
       const nextCounts = shouldReset ? [] : localInventoryCounts;
+      const nextCategories = buildCategories(nextInventory, nextSuppliers, shouldReset ? [] : localCategories);
       const mergedStorageAreas = sortUniqueStorageAreas([...DEFAULT_STORAGE_AREAS, ...nextStorageAreas, ...nextInventory.map(item => normalizeStorageArea(item.storageArea))]);
-      setInventory(nextInventory); setRecipes(nextRecipes); setStorageAreas(mergedStorageAreas); setOrders(nextOrders); setInvoices(nextInvoices); setSuppliers(nextSuppliers); setPreppedRecipes(nextPreppedRecipes); setInventoryCounts(nextCounts);
-      persistLocalLocationData(nextInventory, nextRecipes, mergedStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextCounts);
+      setInventory(nextInventory); setRecipes(nextRecipes); setStorageAreas(mergedStorageAreas); setOrders(nextOrders); setInvoices(nextInvoices); setSuppliers(nextSuppliers); setCategories(nextCategories); setPreppedRecipes(nextPreppedRecipes); setInventoryCounts(nextCounts);
+      persistLocalLocationData(nextInventory, nextRecipes, mergedStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextCounts, nextCategories);
       markDemoSessionReset(DEMO_DATA_VERSION);
       setIsLocationLoaded(true);
       return;
@@ -559,6 +596,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setOrders(localOrders.length > 0 ? localOrders : fallbackOrders);
       setInvoices(localInvoices.length > 0 ? localInvoices : fallbackInvoices);
       setSuppliers(localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers);
+      setCategories(buildCategories(localInventory.length > 0 ? localInventory : fallbackInventory, localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers, localCategories));
       const localPreppedRecipes = readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe));
       setPreppedRecipes(localPreppedRecipes.length > 0 ? localPreppedRecipes : fallbackPreppedRecipes);
       setInventoryCounts(localInventoryCounts);
@@ -601,6 +639,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           orders: readScopedJson<DailyOrder[]>(localKey('orders'), []),
           invoices: readScopedJson<InvoiceRecord[]>(localKey('invoices'), []),
           suppliers: readScopedJson<Supplier[]>(localKey('suppliers'), []),
+          categories: localCategories,
           preppedRecipes: readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe)),
           inventoryCounts: localInventoryCounts,
         },
@@ -616,6 +655,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const apiOrders = merged.orders || [];
       const apiInvoices = merged.invoices || [];
       const apiSuppliers = merged.suppliers || [];
+      const apiCategories = merged.categories || [];
       const apiPreppedRecipes = (merged.preppedRecipes || []).map(recipe => normalizePreppedRecipe(recipe));
       const apiInventoryCounts = merged.inventoryCounts || [];
 
@@ -637,6 +677,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const nextSuppliers = isDemoAccount && apiSuppliers.length === 0 ? fallbackSuppliers : (serverHasData ? apiSuppliers : (localSuppliers.length > 0 ? localSuppliers : fallbackSuppliers));
       const nextPreppedRecipes = isDemoAccount && apiPreppedRecipes.length === 0 ? fallbackPreppedRecipes : (serverHasData ? apiPreppedRecipes : readScopedJson<PreppedRecipe[]>(localKey('preppedRecipes'), []).map(recipe => normalizePreppedRecipe(recipe)));
       const nextInventoryCounts = apiInventoryCounts.length > 0 ? apiInventoryCounts : localInventoryCounts;
+      const nextCategories = buildCategories(nextInventory, nextSuppliers, apiCategories.length > 0 ? apiCategories : localCategories);
 
       const inferredAreas = nextInventory.map(item => normalizeStorageArea(item.storageArea));
       const mergedStorageAreas = sortUniqueStorageAreas([
@@ -651,14 +692,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setOrders(nextOrders);
       setInvoices(nextInvoices);
       setSuppliers(nextSuppliers);
+      setCategories(nextCategories);
       setPreppedRecipes(nextPreppedRecipes);
       setInventoryCounts(nextInventoryCounts);
       setIsLocationLoaded(true);
 
       if (serverHasData && (nextInventory.length > 0 || nextRecipes.length > 0 || nextOrders.length > 0 || nextInvoices.length > 0 || nextSuppliers.length > 0 || nextPreppedRecipes.length > 0)) {
-        persistLocalLocationData(nextInventory, nextRecipes, nextStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextInventoryCounts);
+        persistLocalLocationData(nextInventory, nextRecipes, nextStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextInventoryCounts, nextCategories);
       } else if (isDemoAccount && !hasLocalData) {
-        persistLocalLocationData(nextInventory, nextRecipes, mergedStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextInventoryCounts);
+        persistLocalLocationData(nextInventory, nextRecipes, mergedStorageAreas, nextOrders, nextInvoices, nextSuppliers, nextPreppedRecipes, nextInventoryCounts, nextCategories);
       }
     } catch (error) {
       const localStorageAreas = sortUniqueStorageAreas([
@@ -672,6 +714,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setOrders(readScopedJson<DailyOrder[]>(localKey('orders'), fallbackOrders));
       setInvoices(readScopedJson<InvoiceRecord[]>(localKey('invoices'), fallbackInvoices));
       setSuppliers(readScopedJson<Supplier[]>(localKey('suppliers'), fallbackSuppliers));
+      setCategories(buildCategories(localInventory, readScopedJson<Supplier[]>(localKey('suppliers'), fallbackSuppliers), localCategories));
       setInventoryCounts(localInventoryCounts);
       setIsLocationLoaded(true);
       if (!silent) {
@@ -688,6 +731,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setForecasts([]);
       setOrders([]);
       setSuppliers([]);
+      setCategories([]);
       setPreppedRecipes([]);
       setInventoryCounts([]);
       setIsLocationLoaded(true);
@@ -1524,20 +1568,58 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       dateAdded: new Date().toISOString(),
     };
     const nextSuppliers = [...suppliers, newSupplier];
+    const nextCategories = buildCategories(inventory, nextSuppliers, categories);
     setSuppliers(nextSuppliers);
-    saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes);
+    setCategories(nextCategories);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes, inventoryCounts, { categories: nextCategories });
   };
 
   const updateSupplier = (id: string, updates: Partial<Supplier>) => {
     const nextSuppliers = suppliers.map(supplier => (supplier.id === id ? { ...supplier, ...updates } : supplier));
+    const nextCategories = buildCategories(inventory, nextSuppliers, categories);
     setSuppliers(nextSuppliers);
-    saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes);
+    setCategories(nextCategories);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes, inventoryCounts, { categories: nextCategories });
   };
 
   const deleteSupplier = (id: string) => {
     const nextSuppliers = suppliers.filter(supplier => supplier.id !== id);
     setSuppliers(nextSuppliers);
     saveLocationData(inventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes);
+  };
+
+  const addCategory = (category: Omit<CategoryDefinition, 'id'>) => {
+    const name = category.name.trim();
+    if (!name || categories.some(existing => existing.name.trim().toLowerCase() === name.toLowerCase())) return;
+    const nextCategories = [...categories, { id: `category-${Date.now()}`, name, expenseAccount: category.expenseAccount.trim() }];
+    setCategories(nextCategories);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts, { categories: nextCategories });
+  };
+
+  const updateCategory = (id: string, updates: Partial<Omit<CategoryDefinition, 'id'>>) => {
+    const current = categories.find(category => category.id === id);
+    if (!current) return;
+    const nextName = updates.name?.trim() || current.name;
+    const duplicate = categories.some(category => category.id !== id && category.name.trim().toLowerCase() === nextName.toLowerCase());
+    if (duplicate) return;
+    const nextCategories = categories.map(category => category.id === id ? { ...category, ...updates, name: nextName, expenseAccount: updates.expenseAccount?.trim() ?? category.expenseAccount } : category);
+    const nextInventory = current.name === nextName ? inventory : inventory.map(item => item.category === current.name ? { ...item, category: nextName } : item);
+    const nextSuppliers = current.name === nextName ? suppliers : suppliers.map(supplier => supplier.category === current.name ? { ...supplier, category: nextName } : supplier);
+    setCategories(nextCategories);
+    setInventory(nextInventory);
+    setSuppliers(nextSuppliers);
+    saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, nextSuppliers, preppedRecipes, inventoryCounts, { categories: nextCategories });
+  };
+
+  const deleteCategory = (id: string) => {
+    const category = categories.find(item => item.id === id);
+    if (!category) return { success: false, error: 'Category not found' };
+    const inUse = inventory.some(item => item.category === category.name) || suppliers.some(supplier => supplier.category === category.name);
+    if (inUse) return { success: false, error: 'This category is in use. Reassign its items and suppliers before deleting it.' };
+    const nextCategories = categories.filter(item => item.id !== id);
+    setCategories(nextCategories);
+    saveLocationData(inventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts, { categories: nextCategories });
+    return { success: true };
   };
 
   const saveInventoryCount = (count: InventoryCount) => {
@@ -1625,6 +1707,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         orders,
         invoices,
         suppliers,
+        categories,
         inventoryCounts,
         isLocationLoaded,
         refreshLocationData: () => loadLocationData(true),
@@ -1655,6 +1738,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         addSupplier,
         updateSupplier,
         deleteSupplier,
+        addCategory,
+        updateCategory,
+        deleteCategory,
         saveInventoryCount,
         finalizeInventoryCount,
         deleteInventoryCount,

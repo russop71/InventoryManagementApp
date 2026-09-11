@@ -153,6 +153,7 @@ function buildDefaultLocationData() {
     orders: [],
     invoices: [],
     suppliers: [],
+    categories: [],
     preppedRecipes: [],
     forecasts: [],
     inventoryCounts: [],
@@ -411,7 +412,7 @@ app.get('/api/v1/accounts/:accountId/locations/:locationId/data', (req, res) => 
 
 app.put('/api/v1/accounts/:accountId/locations/:locationId/data', (req, res) => {
   const { accountId, locationId } = req.params;
-  const { inventory: nextInventory, recipes: nextRecipes, storageAreas: nextStorageAreas } = req.body || {};
+  const { inventory: nextInventory, recipes: nextRecipes, storageAreas: nextStorageAreas, categories: nextCategories } = req.body || {};
 
   const result = withLiveData(data => {
     const account = data.accounts[accountId];
@@ -424,6 +425,7 @@ app.put('/api/v1/accounts/:accountId/locations/:locationId/data', (req, res) => 
     if (Array.isArray(nextInventory)) locationData.inventory = nextInventory;
     if (Array.isArray(nextRecipes)) locationData.recipes = nextRecipes;
     if (Array.isArray(nextStorageAreas)) locationData.storageAreas = nextStorageAreas;
+    if (Array.isArray(nextCategories)) locationData.categories = nextCategories;
 
     return data;
   });

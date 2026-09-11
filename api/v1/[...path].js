@@ -59,7 +59,22 @@ function defaultToast() {
 }
 
 function defaultLocationData() {
-  return { inventory: [], recipes: [], storageAreas: [], orders: [], invoices: [], suppliers: [], preppedRecipes: [], forecasts: [], inventoryCounts: [], integrations: { toast: defaultToast() } };
+  return { inventory: [], recipes: [], storageAreas: [], orders: [], invoices: [], suppliers: [], categories: [], preppedRecipes: [], forecasts: [], inventoryCounts: [], integrations: { toast: defaultToast() } };
+}
+
+function normalizeCategories(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value.slice(0, 250).map(category => ({
+    id: String(category?.id || '').trim().slice(0, 120),
+    name: String(category?.name || '').trim().slice(0, 120),
+    expenseAccount: String(category?.expenseAccount || '').trim().slice(0, 120),
+  })).filter(category => {
+    const key = category.name.toLowerCase();
+    if (!category.id || !key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function defaultLabor() {
@@ -515,6 +530,7 @@ function mapLocationData(row) {
     orders: row?.orders || [],
     invoices: row?.invoices || [],
     suppliers: row?.suppliers || [],
+    categories: normalizeCategories(row?.integrations?.categories),
     preppedRecipes: row?.prepped_recipes || [],
     forecasts: row?.forecasts || [],
     inventoryCounts: row?.inventory_counts || [],
@@ -531,6 +547,7 @@ function mapOrderingData(row) {
     orders: data.orders,
     invoices: data.invoices,
     suppliers: data.suppliers,
+    categories: data.categories,
     forecasts: data.forecasts,
     integrations: { toast: data.integrations?.toast || defaultToast() },
     version: data.version,
@@ -2106,6 +2123,7 @@ export default async function handler(req, res) {
             inventory_counts: orderingOnly ? (current.inventory_counts || []) : nextCounts,
             integrations: {
               ...(current.integrations || { toast: defaultToast() }),
+              ...(!orderingOnly && Array.isArray(body.categories) ? { categories: normalizeCategories(body.categories) } : {}),
               ...(isDemoAccount(account) && typeof body.demoDataVersion === 'string'
                 ? { demoDataVersion: body.demoDataVersion.slice(0, 80) }
                 : {}),

@@ -9,8 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Truck, Plus, Pencil, Trash2, Mail, Phone, MapPin, ChevronDown, ChevronRight, FileText, DollarSign, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { getInvalidEmailListEntries, parseEmailList } from '../utils/supplierEmailDraft.js';
-
-const DEFAULT_SUPPLIER_CATEGORIES = ['Proteins', 'Produce', 'Dairy', 'Dry Goods', 'Beverages', 'Pantry', 'Seafood'];
+import { useNavigate } from 'react-router';
 
 function SupplierCategoryField({ initialValue = '', options }: { initialValue?: string; options: string[] }) {
   const [category, setCategory] = useState(initialValue);
@@ -56,7 +55,8 @@ function SupplierCategoryField({ initialValue = '', options }: { initialValue?: 
 }
 
 export function Suppliers() {
-  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useInventory();
+  const navigate = useNavigate();
+  const { suppliers, categories, addSupplier, updateSupplier, deleteSupplier } = useInventory();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<string | null>(null);
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
@@ -120,10 +120,7 @@ export function Suppliers() {
   const editingSupplierData = editingSupplier 
     ? suppliers.find(s => s.id === editingSupplier)
     : null;
-  const supplierCategoryOptions = Array.from(new Set([
-    ...DEFAULT_SUPPLIER_CATEGORIES,
-    ...suppliers.map(supplier => supplier.category?.trim()).filter((category): category is string => Boolean(category)),
-  ]));
+  const supplierCategoryOptions = categories.map(category => category.name);
   return (
     <div className="space-y-3 pb-20">
       <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#303A43] px-4 py-3 shadow-sm">
@@ -136,6 +133,8 @@ export function Suppliers() {
           </h2>
           <p className="mt-0.5 truncate pl-10 text-xs text-gray-300">Contacts, terms and ordering details</p>
         </div>
+        <div className="flex shrink-0 gap-2">
+          <Button size="sm" variant="outline" onClick={() => navigate('/app/costs?categories=open')} className="h-10 rounded-xl border-white/30 bg-white/10 px-3 font-bold text-white hover:bg-white/20 hover:text-white">Categories</Button>
         <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
           setIsAddDialogOpen(open);
           if (!open) setEditingSupplier(null);
@@ -218,6 +217,7 @@ export function Suppliers() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 rounded-xl border border-[#F5D62E]/50 bg-[#FFFBE7] px-4 py-2.5 text-xs text-[#303A43] shadow-sm">

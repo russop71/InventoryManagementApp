@@ -16,6 +16,7 @@ test('mergeLocationData falls back to local arrays when the server payload omits
       orders: [{ id: 'o1' }],
       invoices: [{ id: 'i1' }],
       suppliers: [{ id: 's1' }],
+      categories: [{ id: 'cat-1', name: 'Food', expenseAccount: '5000' }],
       preppedRecipes: [{ id: 'p1' }],
       inventoryCounts: [{ id: 'c1' }],
     }
@@ -24,6 +25,7 @@ test('mergeLocationData falls back to local arrays when the server payload omits
   assert.deepEqual(result.orders, [{ id: 'o1' }]);
   assert.deepEqual(result.invoices, [{ id: 'i1' }]);
   assert.deepEqual(result.suppliers, [{ id: 's1' }]);
+  assert.deepEqual(result.categories, [{ id: 'cat-1', name: 'Food', expenseAccount: '5000' }]);
   assert.deepEqual(result.preppedRecipes, [{ id: 'p1' }]);
   assert.deepEqual(result.inventoryCounts, [{ id: 'c1' }]);
 });
