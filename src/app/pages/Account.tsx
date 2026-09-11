@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { apiRequest } from '../utils/api';
 
 export function Account() {
-  const { user, accountId, accountName, locations, addLocation, updateLocation, logout, changePassword, updateLocalAccountProfile } = useAuth();
+  const { user, accountId, accountName, locations, addLocation, updateLocation, logout, changePassword, updateAccountProfile, updateLocalAccountProfile } = useAuth();
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const isShowcaseAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.ca'
     || accountName?.trim().toLowerCase() === 'zestiq showcase';
   const canResetAccountData = user?.role === 'Owner';
   const [isEditing, setIsEditing] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
   const [locationNames, setLocationNames] = useState<Record<string, string>>({});
   const [savingLocationId, setSavingLocationId] = useState<string | null>(null);
@@ -60,30 +61,56 @@ export function Account() {
   useEffect(() => {
     if (!profileStorageKey || isDemoAccount) return;
     const raw = localStorage.getItem(profileStorageKey);
-    if (!raw) return;
+    if (!raw) {
+      setFormData(prev => ({ ...prev, email: user?.email || prev.email, restaurant: accountName || prev.restaurant }));
+      return;
+    }
     try {
       const saved = JSON.parse(raw) as Partial<typeof formData>;
-      setFormData(prev => ({ ...prev, ...saved }));
+      setFormData(prev => ({
+        ...prev,
+        name: saved.name || prev.name,
+        phone: saved.phone || '',
+        address: saved.address || '',
+        email: user?.email || prev.email,
+        restaurant: accountName || prev.restaurant,
+      }));
     } catch {
       // Ignore malformed profile payloads.
     }
-  }, [isDemoAccount, profileStorageKey]);
+  }, [accountName, isDemoAccount, profileStorageKey, user?.email]);
 
   useEffect(() => {
     setLocationNames(Object.fromEntries(locations.map(location => [location.id, location.name])));
   }, [locations]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (profileStorageKey) {
-      localStorage.setItem(profileStorageKey, JSON.stringify(formData));
+    const restaurantName = formData.restaurant.trim();
+    if (canResetAccountData && restaurantName.length < 2) {
+      toast.error('Restaurant name must be at least 2 characters');
+      return;
     }
-    updateLocalAccountProfile({
-      name: formData.name,
-      accountName: formData.restaurant,
-    });
-    setIsEditing(false);
-    toast.success('Account updated successfully');
+    setIsSavingProfile(true);
+    try {
+      if (canResetAccountData && restaurantName !== accountName) {
+        await updateAccountProfile(restaurantName);
+      }
+      if (profileStorageKey) {
+        localStorage.setItem(profileStorageKey, JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+        }));
+      }
+      updateLocalAccountProfile({ name: formData.name });
+      setIsEditing(false);
+      toast.success('Account updated successfully');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update the account');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,9 +273,10 @@ export function Account() {
                   name="restaurant"
                   value={formData.restaurant}
                   onChange={handleChange}
-                  disabled={!isEditing}
+                  disabled={!isEditing || !canResetAccountData}
                   className="pl-10"
                 />
+                {!canResetAccountData && <p className="mt-1 text-xs text-slate-500">Only the account owner can change the restaurant name.</p>}
               </div>
             </div>
 
@@ -279,9 +307,10 @@ export function Account() {
                 </Button>
                 <Button
                   type="submit"
+                  disabled={isSavingProfile}
                   className="flex-1 bg-[#303A43] hover:bg-[#1E293B] text-white"
                 >
-                  Save Changes
+                  {isSavingProfile ? 'Saving…' : 'Save Changes'}
                 </Button>
               </div>
             )}

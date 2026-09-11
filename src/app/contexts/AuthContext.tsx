@@ -56,7 +56,7 @@ interface AuthContextType {
   updateOnboarding: (updates: Partial<OnboardingProgress>) => Promise<OnboardingProgress>;
   refreshSession: () => Promise<void>;
   completeMfa: (factorId: string, code: string) => Promise<void>;
-  updateLocalAccountProfile: (updates: { name?: string; accountName?: string }) => void;
+  updateLocalAccountProfile: (updates: { name?: string }) => void;
 }
 
 interface StoredSession {
@@ -269,13 +269,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const updateLocalAccountProfile = (updates: { name?: string; accountName?: string }) => {
+  const updateLocalAccountProfile = (updates: { name?: string }) => {
     const nextName = updates.name?.trim();
-    const nextAccountName = updates.accountName?.trim();
     setAuthState(current => ({
       ...current,
       user: current.user && nextName ? { ...current.user, name: nextName } : current.user,
-      accountName: nextAccountName || current.accountName,
     }));
   };
 
