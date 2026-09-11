@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { clearLocationScopedData } from '../utils/storageScope';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { apiRequest } from '../utils/api';
 
 export function Account() {
   const { user, accountId, accountName, locations, addLocation, updateLocation, logout, changePassword, updateLocalAccountProfile } = useAuth();
@@ -20,6 +21,7 @@ export function Account() {
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
+  const [isResettingData, setIsResettingData] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || 'Team Member',
     email: user?.email || '',
@@ -29,6 +31,25 @@ export function Account() {
   });
 
   const profileStorageKey = accountId ? `zestiq:account:${accountId}:profile` : null;
+
+  const handleResetAppData = async () => {
+    if (!accountId || isResettingData) return;
+    if (!confirm('Reset all restaurant operating data for this account? Inventory, recipes, suppliers, orders, invoices, forecasts, counts, imported POS data, waste and schedules will be removed. Users, roles, location access, billing and connected access points will remain.')) return;
+
+    setIsResettingData(true);
+    try {
+      await apiRequest(`/api/v1/accounts/${encodeURIComponent(accountId)}/reset-data`, {
+        method: 'POST',
+        body: JSON.stringify({ confirmation: 'RESET' }),
+      });
+      locations.forEach(location => clearLocationScopedData(accountId, location.id));
+      toast.success('Restaurant data reset. Your users and access settings were preserved.');
+      setTimeout(() => logout(), 800);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The account data could not be reset');
+      setIsResettingData(false);
+    }
+  };
 
   useEffect(() => {
     if (!profileStorageKey || isDemoAccount) return;
@@ -377,18 +398,10 @@ export function Account() {
           <Button
             variant="outline"
             className="w-full text-red-600 border-red-300 mb-3 hover:bg-red-50"
-            onClick={() => {
-              if (!accountId) return;
-              if (confirm('Are you sure you want to reset all location data for this account? This clears inventory, recipes, orders, integrations, and alarms for every location in this account.')) {
-                locations.forEach(location => clearLocationScopedData(accountId, location.id));
-                toast.success('App data reset. Redirecting to login...');
-                setTimeout(() => {
-                  logout();
-                }, 800);
-              }
-            }}
+            disabled={isResettingData}
+            onClick={() => void handleResetAppData()}
           >
-            Reset App Data
+            {isResettingData ? 'Resetting account data…' : 'Reset App Data'}
           </Button>
         </CardContent>
       </Card>

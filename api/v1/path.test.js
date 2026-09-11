@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { accountSlugFromEmail, findDuplicateInvoiceNumber, identifierFilter, isPlatformAdmin, orderingOnlyRouteAllowed, summarizeUsage } from './[...path].js';
+import { accountSlugFromEmail, buildResetLocationRecord, findDuplicateInvoiceNumber, identifierFilter, isPlatformAdmin, orderingOnlyRouteAllowed, summarizeUsage } from './[...path].js';
 
 test('identifierFilter uses UUID columns for canonical database IDs', () => {
   const accountId = 'b74c80db-0c0b-4fc0-8a89-b5d2cbd808f5';
@@ -65,4 +65,29 @@ test('ordering-only users can reach order workflows but not account administrati
   assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'billing'], 'GET'), false);
   assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations', 'main', 'labor'], 'GET'), false);
   assert.equal(orderingOnlyRouteAllowed(['accounts', 'company-a', 'locations', 'main', 'integrations', 'toast'], 'PUT'), false);
+});
+
+test('account reset clears operations while preserving connected access points', () => {
+  const reset = buildResetLocationRecord({
+    inventory: [{ id: 'item-1' }],
+    recipes: [{ id: 'recipe-1' }],
+    orders: [{ id: 'order-1' }],
+    integrations: {
+      toast: { connected: true, provider: 'toast', connectionMode: 'direct', restaurantId: 'restaurant-1', salesData: [{ revenue: 100 }], menuItems: [{ id: 'menu-1' }], cogsCategories: ['Food'], lastSync: '2026-09-10' },
+      labor: { employees: [{ id: 'employee-1', name: 'Manager', role: 'Manager', email: 'manager@example.com', active: true }], shifts: [{ id: 'shift-1', employeeId: 'employee-1', date: '2026-09-10' }] },
+      employeePushDevices: [{ token: 'device-1' }],
+      waste: { entries: [{ id: 'waste-1' }] },
+    },
+  }, '2026-09-11T12:00:00.000Z');
+
+  assert.deepEqual(reset.inventory, []);
+  assert.deepEqual(reset.recipes, []);
+  assert.deepEqual(reset.orders, []);
+  assert.equal(reset.integrations.toast.connected, true);
+  assert.equal(reset.integrations.toast.restaurantId, 'restaurant-1');
+  assert.deepEqual(reset.integrations.toast.salesData, []);
+  assert.deepEqual(reset.integrations.labor.employees.map(employee => employee.email), ['manager@example.com']);
+  assert.deepEqual(reset.integrations.labor.shifts, []);
+  assert.deepEqual(reset.integrations.employeePushDevices, [{ token: 'device-1' }]);
+  assert.deepEqual(reset.integrations.waste.entries, []);
 });

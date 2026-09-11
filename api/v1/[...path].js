@@ -62,6 +62,46 @@ function defaultLocationData() {
   return { inventory: [], recipes: [], storageAreas: [], orders: [], invoices: [], suppliers: [], categories: [], preppedRecipes: [], forecasts: [], inventoryCounts: [], integrations: { toast: defaultToast() } };
 }
 
+export function buildResetLocationRecord(current = {}, updatedAt = new Date().toISOString()) {
+  const existingIntegrations = current?.integrations && typeof current.integrations === 'object' && !Array.isArray(current.integrations)
+    ? current.integrations
+    : {};
+  const existingToast = existingIntegrations.toast && typeof existingIntegrations.toast === 'object'
+    ? existingIntegrations.toast
+    : defaultToast();
+  const existingLabor = normalizeLabor(existingIntegrations.labor);
+
+  return {
+    inventory: [],
+    recipes: [],
+    storage_areas: [],
+    orders: [],
+    invoices: [],
+    suppliers: [],
+    prepped_recipes: [],
+    forecasts: [],
+    inventory_counts: [],
+    integrations: {
+      ...existingIntegrations,
+      toast: {
+        ...defaultToast(),
+        ...existingToast,
+        salesData: [],
+        menuItems: [],
+        cogsCategories: [],
+        lastSync: null,
+      },
+      labor: {
+        ...defaultLabor(),
+        employees: existingLabor.employees,
+      },
+      waste: { entries: [] },
+      categories: [],
+    },
+    updated_at: updatedAt,
+  };
+}
+
 function normalizeCategories(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -1498,6 +1538,7 @@ export default async function handler(req, res) {
     const requestedAccountId = segments[1];
     const ownerOnly = segments[2] === 'users'
       || segments[2] === 'billing'
+      || segments[2] === 'reset-data'
       || ((segments[2] === 'profile' || segments[2] === 'onboarding') && method !== 'GET')
       || (segments.length === 2 && method === 'DELETE');
     const access = await requireAccountAccess(req, requestedAccountId, { ownerOnly });
@@ -1509,6 +1550,27 @@ export default async function handler(req, res) {
     }
     if (isDemoAccount(account) && segments[2] === 'users' && method === 'GET') {
       return json(res, 200, { users: [{ ...mapUser(access.appUser), name: 'Demo Owner', email: 'demo@zestiq.com', usage: { eventCount: 0, lastActive: null, topArea: null } }] });
+    }
+
+    if (segments[2] === 'reset-data' && method === 'POST') {
+      if (req.body?.confirmation !== 'RESET') return json(res, 400, { error: 'Type RESET to confirm this operation' });
+      const accountLocations = await listLocations(accountId);
+      const updatedAt = new Date().toISOString();
+      for (const location of accountLocations) {
+        const rows = await supabase(`location_data?location_id=eq.${encodeURIComponent(location.id)}&select=*`);
+        const current = rows?.[0] || { location_id: location.id };
+        await supabase(`location_data?location_id=eq.${encodeURIComponent(location.id)}`, {
+          method: 'PATCH',
+          prefer: 'return=minimal',
+          body: buildResetLocationRecord(current, updatedAt),
+        });
+      }
+      await supabase('app_usage_events', {
+        method: 'POST',
+        prefer: 'return=minimal',
+        body: { account_id: accountId, user_id: access.appUser.id, event_name: 'account_operational_data_reset', path: '/app/account', metadata: { location_count: accountLocations.length } },
+      }).catch(() => {});
+      return json(res, 200, { reset: true, locationsReset: accountLocations.length, accessPreserved: true });
     }
 
     const accessExempt = segments[2] === 'billing'
