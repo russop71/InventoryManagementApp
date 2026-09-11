@@ -16,7 +16,7 @@ import { convertIngredientQuantity, formatUnitLabel, getIngredientCompatibleUnit
 
 type IngredientSelection = { inventoryItemId: string; quantity: number; unit: string };
 
-const MENU_ITEM_CATEGORIES = ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Beverages', 'Kids Menu'];
+const MENU_ITEM_CATEGORIES = ['Food', 'Liquor', 'Beer', 'Non-Alcoholic Beverage', 'Wine'];
 const PREP_RECIPE_CATEGORIES = ['Sauces & Dressings', 'Stocks & Broths', 'Marinades', 'Prep Components', 'Baked Goods', 'Garnishes'];
 
 function CategoryPicker({
