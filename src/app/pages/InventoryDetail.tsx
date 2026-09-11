@@ -9,7 +9,8 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { ArrowLeft, Plus, Minus, AlertTriangle, TrendingDown, Package, TrendingUp, DollarSign, Calendar, Archive, Undo2, BookOpen } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
+import { ArrowLeft, Plus, Minus, AlertTriangle, TrendingDown, Package, TrendingUp, DollarSign, Calendar, Archive, Undo2, BookOpen, Trash2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toast as showToast } from 'sonner';
 import { convertQuantity } from '../utils/unitConversion';
@@ -67,6 +68,7 @@ export function InventoryDetail() {
   const [quickCustomStorageArea, setQuickCustomStorageArea] = useState('');
   const [quickCurrentStock, setQuickCurrentStock] = useState(0);
   const [quickParLevel, setQuickParLevel] = useState(0);
+  const [storageAreaPendingRemoval, setStorageAreaPendingRemoval] = useState<string | null>(null);
   const [purchaseOptions, setPurchaseOptions] = useState<PurchaseOptionDraft[]>([]);
   const [isPurchaseOptionsExpanded, setIsPurchaseOptionsExpanded] = useState(true);
   const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState('');
@@ -416,6 +418,33 @@ export function InventoryDetail() {
     const location = getInventoryStorageLocations(item).find(entry => entry.storageArea === storageArea);
     setQuickCurrentStock(location?.currentStock || 0);
     setQuickParLevel(location?.parLevel || 0);
+  };
+
+  const removeStorageAreaAssignment = () => {
+    if (!storageAreaPendingRemoval) return;
+    const existingLocations = getInventoryStorageLocations(item);
+    if (existingLocations.length <= 1) {
+      showToast.error('Keep at least one storage area for this item');
+      setStorageAreaPendingRemoval(null);
+      return;
+    }
+
+    const nextLocations = existingLocations.filter(location => location.storageArea !== storageAreaPendingRemoval);
+    updateInventoryItem(item.id, {
+      storageArea: nextLocations[0].storageArea,
+      storageLocations: nextLocations,
+      currentStock: nextLocations.reduce((sum, location) => sum + location.currentStock, 0),
+      parLevel: nextLocations.reduce((sum, location) => sum + location.parLevel, 0),
+      lastUpdated: new Date().toISOString().split('T')[0],
+    });
+
+    if (quickStorageArea === storageAreaPendingRemoval) {
+      setQuickStorageArea(nextLocations[0].storageArea);
+      setQuickCurrentStock(nextLocations[0].currentStock);
+      setQuickParLevel(nextLocations[0].parLevel);
+    }
+    showToast.success(`${storageAreaPendingRemoval} removed from ${item.name}`);
+    setStorageAreaPendingRemoval(null);
   };
 
   const updatePurchaseOption = (optionId: string, patch: Partial<PurchaseOptionDraft>) => {
@@ -1067,15 +1096,26 @@ export function InventoryDetail() {
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Storage areas</p>
                 <div className="mt-2 space-y-2">
                   {getInventoryStorageLocations(item).map(location => (
-                    <button
-                      key={location.storageArea}
-                      type="button"
-                      onClick={() => selectQuickStorageArea(location.storageArea)}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-left text-sm text-slate-800 hover:bg-amber-50"
-                    >
-                      <span className="font-semibold">{location.storageArea}</span>
-                      <span className="text-xs text-slate-500">{location.currentStock} {item.unit} on hand · par {location.parLevel}</span>
-                    </button>
+                    <div key={location.storageArea} className="flex items-center gap-1 rounded-lg bg-slate-50 pr-1 hover:bg-amber-50">
+                      <button
+                        type="button"
+                        onClick={() => selectQuickStorageArea(location.storageArea)}
+                        className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm text-slate-800"
+                      >
+                        <span className="font-semibold">{location.storageArea}</span>
+                        <span className="text-xs text-slate-500">{location.currentStock} {item.unit} on hand · par {location.parLevel}</span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${location.storageArea} from ${item.name}`}
+                        title={getInventoryStorageLocations(item).length <= 1 ? 'An item needs at least one storage area' : `Remove ${location.storageArea}`}
+                        disabled={getInventoryStorageLocations(item).length <= 1}
+                        onClick={() => setStorageAreaPendingRemoval(location.storageArea)}
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   ))}
                 </div>
                 <p className="mt-2 text-xs font-semibold text-slate-600">Total: {item.currentStock} {item.unit} on hand · par {item.parLevel}</p>
@@ -1086,6 +1126,21 @@ export function InventoryDetail() {
               </div>
             </div>
           </div>
+
+          <AlertDialog open={Boolean(storageAreaPendingRemoval)} onOpenChange={open => { if (!open) setStorageAreaPendingRemoval(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove {storageAreaPendingRemoval}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes the storage assignment and its on-hand and par amounts from {item.name}. The storage area itself remains available for other items.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep area</AlertDialogCancel>
+                <AlertDialogAction onClick={removeStorageAreaAssignment} className="bg-rose-700 text-white hover:bg-rose-800">Remove area</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <div className="rounded-xl border border-slate-200 overflow-hidden">
             <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">

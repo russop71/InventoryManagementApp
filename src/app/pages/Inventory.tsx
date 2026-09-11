@@ -75,7 +75,13 @@ export function Inventory() {
   const [sortBy, setSortBy] = useState<InventorySort>('name-asc');
   const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock' | 'deactivated'>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', category: '', supplier: '', unit: 'ea', parLevel: '10', currentStock: '0', unitCost: '0' });
+  const emptyNewItem = {
+    name: '', category: '', supplier: '', sku: '', vendorItemCode: '', invoiceAliases: '',
+    storageArea: '', unit: '', parLevel: '', currentStock: '', unitCost: '', taxRate: '',
+    reorderPoint: '', minimumOrderQty: '', leadTimeDays: '', targetStockDays: '', packSize: '',
+    packUnit: '', unitsPerPack: '', yieldPercent: '', wastePercent: '', lastCountedAt: '', notes: '',
+  };
+  const [newItem, setNewItem] = useState(emptyNewItem);
   const [newItemError, setNewItemError] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<'last-month' | 'this-month' | 'last-7-days' | 'today' | 'custom'>('last-month');
@@ -105,24 +111,48 @@ export function Inventory() {
       setNewItemError('Enter an item name before saving.');
       return;
     }
-    const numericValues = [newItem.currentStock, newItem.parLevel, newItem.unitCost].map(Number);
+    const numericValues = [
+      newItem.currentStock, newItem.parLevel, newItem.unitCost, newItem.taxRate,
+      newItem.reorderPoint, newItem.minimumOrderQty, newItem.leadTimeDays,
+      newItem.targetStockDays, newItem.packSize, newItem.unitsPerPack,
+      newItem.yieldPercent, newItem.wastePercent,
+    ].filter(value => value !== '').map(Number);
     if (numericValues.some(value => !Number.isFinite(value) || value < 0)) {
       setNewItemError('On hand, par level, and unit cost must be zero or greater.');
+      return;
+    }
+    if (!newItem.category.trim() || !newItem.supplier.trim() || !newItem.unit.trim()) {
+      setNewItemError('Enter a category, supplier, and counting unit before saving.');
       return;
     }
 
     addInventoryItem({
       name: trimmedName,
-      category: newItem.category.trim() || 'General',
-      supplier: newItem.supplier.trim() || 'Supplier',
+      category: newItem.category.trim(),
+      supplier: newItem.supplier.trim(),
+      sku: newItem.sku.trim(),
+      vendorItemCode: newItem.vendorItemCode.trim(),
+      invoiceAliases: Array.from(new Set(newItem.invoiceAliases.split(/[,;\n]/).map(alias => alias.trim()).filter(Boolean))),
       currentStock: Number(newItem.currentStock) || 0,
       parLevel: Number(newItem.parLevel) || 0,
-      unit: newItem.unit.trim() || 'ea',
+      unit: newItem.unit.trim(),
       unitCost: Number(newItem.unitCost) || 0,
-      storageArea: 'Unassigned',
+      taxRate: Number(newItem.taxRate) || 0,
+      reorderPoint: Number(newItem.reorderPoint) || 0,
+      minimumOrderQty: Number(newItem.minimumOrderQty) || 0,
+      leadTimeDays: Number(newItem.leadTimeDays) || 0,
+      targetStockDays: Number(newItem.targetStockDays) || 0,
+      packSize: Number(newItem.packSize) || 1,
+      packUnit: newItem.packUnit.trim() || newItem.unit.trim(),
+      unitsPerPack: Number(newItem.unitsPerPack) || 1,
+      yieldPercent: newItem.yieldPercent === '' ? 100 : Number(newItem.yieldPercent),
+      wastePercent: Number(newItem.wastePercent) || 0,
+      lastCountedAt: newItem.lastCountedAt ? new Date(newItem.lastCountedAt).toISOString() : undefined,
+      notes: newItem.notes.trim(),
+      storageArea: newItem.storageArea.trim() || 'Unassigned',
     });
 
-    setNewItem({ name: '', category: '', supplier: '', unit: 'ea', parLevel: '10', currentStock: '0', unitCost: '0' });
+    setNewItem(emptyNewItem);
     setNewItemError('');
     setShowAddDialog(false);
   };
@@ -727,30 +757,78 @@ export function Inventory() {
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Add inventory item</DialogTitle>
-            <DialogDescription>Add the item’s basic counting and costing information. You can add more details after saving.</DialogDescription>
+            <DialogDescription>Complete the item profile. Fields are blank so you can enter exactly what applies to this item.</DialogDescription>
           </DialogHeader>
           <form noValidate onSubmit={event => { event.preventDefault(); handleAddItem(); }} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-bold text-slate-700 sm:col-span-2">Item name
-                <input autoFocus value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Example: Fresh basil" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              <label className="text-sm font-bold text-slate-700 sm:col-span-2">Item name<span aria-hidden="true"> *</span>
+                <input autoFocus aria-label="Item name" aria-required="true" value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Example: Fresh basil" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
-              <label className="text-sm font-bold text-slate-700">Category
-                <input value={newItem.category} onChange={event => setNewItem(prev => ({ ...prev, category: event.target.value }))} placeholder="Example: Produce" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              <label className="text-sm font-bold text-slate-700">Category<span aria-hidden="true"> *</span>
+                <input aria-label="Category" aria-required="true" value={newItem.category} onChange={event => setNewItem(prev => ({ ...prev, category: event.target.value }))} placeholder="Example: Produce" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
-              <label className="text-sm font-bold text-slate-700">Supplier
-                <input value={newItem.supplier} onChange={event => setNewItem(prev => ({ ...prev, supplier: event.target.value }))} placeholder="Supplier name" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              <label className="text-sm font-bold text-slate-700">Supplier<span aria-hidden="true"> *</span>
+                <input aria-label="Supplier" aria-required="true" value={newItem.supplier} onChange={event => setNewItem(prev => ({ ...prev, supplier: event.target.value }))} placeholder="Supplier name" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
-              <label className="text-sm font-bold text-slate-700">Unit
-                <input value={newItem.unit} onChange={event => setNewItem(prev => ({ ...prev, unit: event.target.value }))} placeholder="Example: lb" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              <label className="text-sm font-bold text-slate-700">SKU
+                <input value={newItem.sku} onChange={event => setNewItem(prev => ({ ...prev, sku: event.target.value }))} placeholder="Optional" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Vendor item code
+                <input value={newItem.vendorItemCode} onChange={event => setNewItem(prev => ({ ...prev, vendorItemCode: event.target.value }))} placeholder="Optional" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700 sm:col-span-2">Invoice aliases
+                <input value={newItem.invoiceAliases} onChange={event => setNewItem(prev => ({ ...prev, invoiceAliases: event.target.value }))} placeholder="Names this item may use on supplier invoices" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Storage area
+                <input value={newItem.storageArea} onChange={event => setNewItem(prev => ({ ...prev, storageArea: event.target.value }))} placeholder="Example: Walk-In Cooler" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Unit<span aria-hidden="true"> *</span>
+                <input aria-label="Unit" aria-required="true" value={newItem.unit} onChange={event => setNewItem(prev => ({ ...prev, unit: event.target.value }))} placeholder="Example: lb, kg, bottle" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
               <label className="text-sm font-bold text-slate-700">On hand
-                <input type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
               <label className="text-sm font-bold text-slate-700">Par level
-                <input type="number" min="0" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
               <label className="text-sm font-bold text-slate-700">Unit cost
-                <input type="number" min="0" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} placeholder="0.00" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Tax rate (%)
+                <input type="number" min="0" step="0.01" value={newItem.taxRate} onChange={event => setNewItem(prev => ({ ...prev, taxRate: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Reorder point
+                <input type="number" min="0" step="0.01" value={newItem.reorderPoint} onChange={event => setNewItem(prev => ({ ...prev, reorderPoint: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Minimum order quantity
+                <input type="number" min="0" step="0.01" value={newItem.minimumOrderQty} onChange={event => setNewItem(prev => ({ ...prev, minimumOrderQty: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Lead time (days)
+                <input type="number" min="0" step="1" value={newItem.leadTimeDays} onChange={event => setNewItem(prev => ({ ...prev, leadTimeDays: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Target stock days
+                <input type="number" min="0" step="1" value={newItem.targetStockDays} onChange={event => setNewItem(prev => ({ ...prev, targetStockDays: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Pack size
+                <input type="number" min="0" step="0.01" value={newItem.packSize} onChange={event => setNewItem(prev => ({ ...prev, packSize: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Pack unit
+                <input value={newItem.packUnit} onChange={event => setNewItem(prev => ({ ...prev, packUnit: event.target.value }))} placeholder="Example: oz, kg, can" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Units per pack
+                <input type="number" min="0" step="0.01" value={newItem.unitsPerPack} onChange={event => setNewItem(prev => ({ ...prev, unitsPerPack: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Yield (%)
+                <input type="number" min="0" step="0.01" value={newItem.yieldPercent} onChange={event => setNewItem(prev => ({ ...prev, yieldPercent: event.target.value }))} placeholder="100" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Waste (%)
+                <input type="number" min="0" step="0.01" value={newItem.wastePercent} onChange={event => setNewItem(prev => ({ ...prev, wastePercent: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700">Last counted
+                <input type="date" value={newItem.lastCountedAt} onChange={event => setNewItem(prev => ({ ...prev, lastCountedAt: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+              </label>
+              <label className="text-sm font-bold text-slate-700 sm:col-span-2">Notes
+                <textarea value={newItem.notes} onChange={event => setNewItem(prev => ({ ...prev, notes: event.target.value }))} placeholder="Storage, handling, or substitution notes" className="mt-1 min-h-24 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-amber-400" />
               </label>
             </div>
             {newItemError && <p role="alert" className="text-sm font-semibold text-red-700">{newItemError}</p>}

@@ -389,6 +389,11 @@ test('inventory supports validated add, edit, aliases, multiple areas, merge, pe
   await page.getByRole('button', { name: 'Save area' }).click();
   await expect(page.getByText('Prep Cooler', { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Total: 8 kg on hand · par 12/)).toBeVisible();
+  await page.getByRole('button', { name: `Remove Prep Cooler from ${primaryName}` }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Remove Prep Cooler?');
+  await page.getByRole('button', { name: 'Remove area' }).click();
+  await expect(page.getByRole('button', { name: `Remove Prep Cooler from ${primaryName}` })).toHaveCount(0);
+  await expect(page.getByText(/Total: 5 kg on hand · par 8/)).toBeVisible();
   await page.getByRole('button', { name: 'Back' }).click();
 
   await page.getByPlaceholder('Search items...').fill('Golden Roma 5 KG');
