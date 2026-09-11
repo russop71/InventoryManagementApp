@@ -205,12 +205,9 @@ export interface CategoryDefinition {
   expenseAccount: string;
 }
 
-const DEFAULT_CATEGORY_NAMES = ['Proteins', 'Produce', 'Dairy', 'Dry Goods', 'Beverages', 'Pantry', 'Seafood'];
-
 function buildCategories(inventory: InventoryItem[], suppliers: Supplier[], saved: CategoryDefinition[] = []) {
   const savedByName = new Map(saved.map(category => [category.name.trim().toLowerCase(), category]));
-  const seedNames = saved.length === 0 && inventory.length === 0 && suppliers.length === 0 ? DEFAULT_CATEGORY_NAMES : [];
-  const names = [...seedNames, ...inventory.map(item => item.category), ...suppliers.map(supplier => supplier.category), ...saved.map(category => category.name)];
+  const names = [...inventory.map(item => item.category), ...suppliers.map(supplier => supplier.category), ...saved.map(category => category.name)];
   const categoriesByName = new Map<string, CategoryDefinition>();
   names.map(name => String(name || '').trim()).filter(Boolean).forEach(name => {
     const key = name.toLowerCase();
