@@ -66,7 +66,7 @@ export function Inventory() {
   const canManageCounts = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<InventorySort>('name-asc');
-  const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'low-stock' | 'out-of-stock' | 'deactivated'>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '', supplier: '', unit: 'ea', parLevel: '10', currentStock: '0', unitCost: '0' });
   const [newItemError, setNewItemError] = useState('');
@@ -83,6 +83,7 @@ export function Inventory() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [storageAreaFilter, setStorageAreaFilter] = useState('all');
+  const [isDeletingItems, setIsDeletingItems] = useState(false);
 
   const filterOptions = useMemo(() => ({
     categories: Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).sort(),
@@ -155,7 +156,9 @@ export function Inventory() {
     const matches = inventory.filter(item => {
       const matchesQuery = !query || `${item.name} ${item.category} ${item.supplier} ${(item.invoiceAliases || []).join(' ')}`.toLowerCase().includes(query);
       const status = getStatus(item.currentStock, item.parLevel);
-      const matchesTab = activeTab === 'all' ? true : activeTab === 'low-stock' ? status === 'low-stock' : status === 'out-of-stock';
+      const matchesTab = activeTab === 'deactivated'
+        ? item.inactive === true
+        : item.inactive !== true && (activeTab === 'all' ? true : activeTab === 'low-stock' ? status === 'low-stock' : status === 'out-of-stock');
       const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
       const matchesSupplier = supplierFilter === 'all' || item.supplier === supplierFilter;
       const matchesStorageArea = storageAreaFilter === 'all' || (item.storageArea || 'Unassigned') === storageAreaFilter;
@@ -195,11 +198,17 @@ export function Inventory() {
     if (checked && !mergeTargetId) setMergeTargetId(filteredItems[0]?.id || '');
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (!selectedItemIds.length || !window.confirm(`Delete ${selectedItemIds.length} selected inventory item${selectedItemIds.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
-    deleteInventoryItems(selectedItemIds);
-    setSelectedItemIds([]);
-    setMergeTargetId('');
+    setIsDeletingItems(true);
+    try {
+      await deleteInventoryItems(selectedItemIds);
+      setSelectedItemIds([]);
+      setMergeTargetId('');
+      toast.success('Inventory items deleted and saved');
+    } finally {
+      setIsDeletingItems(false);
+    }
   };
 
   const handleMergeSelected = () => {
@@ -213,10 +222,12 @@ export function Inventory() {
     setMergeTargetId('');
   };
 
-  const totalValue = inventory.reduce((sum, item) => sum + item.currentStock * item.unitCost, 0);
-  const lowStockItems = inventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'low-stock').length;
-  const outItems = inventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'out-of-stock').length;
-  const wasteValue = inventory.reduce((sum, item) => sum + Math.max(0, item.currentStock - item.parLevel) * item.unitCost, 0);
+  const activeInventory = inventory.filter(item => !item.inactive);
+  const totalValue = activeInventory.reduce((sum, item) => sum + item.currentStock * item.unitCost, 0);
+  const lowStockItems = activeInventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'low-stock').length;
+  const outItems = activeInventory.filter(item => getStatus(item.currentStock, item.parLevel) === 'out-of-stock').length;
+  const wasteValue = activeInventory.reduce((sum, item) => sum + Math.max(0, item.currentStock - item.parLevel) * item.unitCost, 0);
+  const deactivatedItems = inventory.filter(item => item.inactive).length;
   const countRows: InventoryCount[] = [...inventoryCounts].sort((left, right) => {
     const statusDifference = Number(isInventoryCountFinalized(left)) - Number(isInventoryCountFinalized(right));
     if (statusDifference !== 0) return statusDifference;
@@ -254,6 +265,7 @@ export function Inventory() {
     { key: 'all', label: 'All Items', count: null as number | null },
     { key: 'low-stock', label: 'Low Stock', count: lowStockItems },
     { key: 'out-of-stock', label: 'Out of Stock', count: outItems },
+    { key: 'deactivated', label: 'Deactivated', count: deactivatedItems },
   ] as const;
 
   const fmtVal = (value: number) => (value >= 1000 ? `$${(value / 1000).toFixed(1)}k` : `$${value.toFixed(0)}`);
@@ -573,7 +585,7 @@ export function Inventory() {
             return (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => { setActiveTab(tab.key); setSelectedItemIds([]); setMergeTargetId(''); }}
                 className="relative flex items-center gap-1.5 py-3 px-3 text-[12px] font-bold whitespace-nowrap shrink-0 transition-colors"
                 style={{ color: active ? D : '#9CA3AF' }}
               >
@@ -625,7 +637,7 @@ export function Inventory() {
             </>
           )}
           <button type="button" onClick={handleMergeSelected} disabled={selectedItemIds.length < 2} title={selectedItemIds.length < 2 ? 'Select at least two items to merge' : 'Merge selected items'} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"><GitMerge className="h-3.5 w-3.5" />Merge items</button>
-          <button type="button" onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white"><Trash2 className="h-3.5 w-3.5" />Delete selected</button>
+          <button type="button" onClick={handleBulkDelete} disabled={isDeletingItems} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" />{isDeletingItems ? 'Saving…' : 'Delete selected'}</button>
           <button type="button" onClick={() => { setSelectedItemIds([]); setMergeTargetId(''); }} className="px-2 py-2 text-xs font-bold text-slate-600 underline">Clear</button>
         </div>
       )}
@@ -650,7 +662,9 @@ export function Inventory() {
         ) : (
           filteredItems.map(item => {
             const status = getStatus(item.currentStock, item.parLevel);
-            const { label, bg, color } = STATUS[status];
+            const { label, bg, color } = item.inactive
+              ? { label: 'Deactivated', bg: '#E5E7EB', color: '#4B5563' }
+              : STATUS[status];
             return (
               <div
                 key={item.id}

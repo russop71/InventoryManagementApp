@@ -70,6 +70,7 @@ export function InventoryDetail() {
   const [isPurchaseOptionsExpanded, setIsPurchaseOptionsExpanded] = useState(true);
   const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState('');
   const [showPurchaseOptionSettings, setShowPurchaseOptionSettings] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     category: '',
@@ -567,13 +568,18 @@ export function InventoryDetail() {
             <Button variant="outline" size="sm" className={`h-9 rounded-xl ${item.inactive ? 'border-green-200 text-green-700' : 'border-slate-200 text-slate-700'}`} onClick={toggleInactive}>
               {item.inactive ? <Undo2 className="mr-1 h-4 w-4" /> : <Archive className="mr-1 h-4 w-4" />}{item.inactive ? 'Reactivate' : 'Deactivate'}
             </Button>
-            {item.deletable !== false && <Button variant="outline" size="sm" className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => {
+            {item.deletable !== false && <Button variant="outline" size="sm" disabled={isDeleting} className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60" onClick={async () => {
               if (confirm(`Delete "${item.name}" from inventory? This cannot be undone.`)) {
-                deleteInventoryItem(item.id);
-                showToast.success('Item deleted');
-                navigate('/app/inventory');
+                setIsDeleting(true);
+                try {
+                  await deleteInventoryItem(item.id);
+                  showToast.success('Item deleted and saved');
+                  navigate('/app/inventory');
+                } finally {
+                  setIsDeleting(false);
+                }
               }
-            }}>Delete</Button>}
+            }}>{isDeleting ? 'Saving…' : 'Delete'}</Button>}
           </div>
         </div>
       </section>

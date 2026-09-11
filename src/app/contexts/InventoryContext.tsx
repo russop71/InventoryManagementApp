@@ -280,8 +280,8 @@ interface InventoryContextType {
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => InventoryItem;
   addStorageArea: (storageArea: string) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
-  deleteInventoryItem: (id: string) => void;
-  deleteInventoryItems: (ids: string[]) => void;
+  deleteInventoryItem: (id: string) => Promise<void>;
+  deleteInventoryItems: (ids: string[]) => Promise<void>;
   mergeInventoryItems: (ids: string[], primaryId: string) => { success: boolean; error?: string };
   adjustInventory: (id: string, change: number, reason: string) => void;
   addRecipe: (recipe: Omit<Recipe, 'id'>) => void;
@@ -405,9 +405,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
     nextInventoryCounts: InventoryCount[] = inventoryCounts,
-    options: { allowEmptyInventoryCounts?: boolean; categories?: CategoryDefinition[] } = {},
+    options: { allowEmptyInventory?: boolean; allowEmptyInventoryCounts?: boolean; categories?: CategoryDefinition[] } = {},
   ) => {
-    if (!accountId || !activeLocationId) return;
+    if (!accountId || !activeLocationId) return Promise.resolve();
     const currentLocalInventory = readScopedJson<InventoryItem[]>(localKey('inventory'), []);
     const currentLocalRecipes = readScopedJson<Recipe[]>(localKey('recipes'), []);
     const currentLocalStorageAreas = readScopedJson<string[]>(localKey('storageAreas'), []);
@@ -418,7 +418,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const currentLocalInventoryCounts = readScopedJson<InventoryCount[]>(localKey('inventoryCounts'), []);
     const currentLocalCategories = readScopedJson<CategoryDefinition[]>(localKey('categories'), []);
 
-    const effectiveInventory = nextInventory.length === 0 && currentLocalInventory.length > 0
+    const effectiveInventory = !options.allowEmptyInventory && nextInventory.length === 0 && currentLocalInventory.length > 0
       ? currentLocalInventory
       : nextInventory;
     const effectiveRecipes = nextRecipes.length === 0 && currentLocalRecipes.length > 0
@@ -455,7 +455,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       effectiveInventoryCounts,
       effectiveCategories,
     );
-    if (!token || isDemoAccount) return;
+    if (!token || isDemoAccount) return Promise.resolve();
     const locationId = activeLocationId;
     const requestPath = `/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(locationId)}/data`;
     const snapshot = {
@@ -525,6 +525,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         savesPendingRef.current = Math.max(0, savesPendingRef.current - 1);
       });
+    return saveQueueRef.current;
   };
 
   const loadLocationData = async (silent = false) => {
@@ -899,18 +900,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     saveLocationData(nextInventory, recipes, nextStorageAreas);
   };
 
-  const deleteInventoryItem = (id: string) => {
+  const deleteInventoryItem = async (id: string) => {
     const nextInventory = inventory.filter(item => item.id !== id);
     setInventory(nextInventory);
-    saveLocationData(nextInventory, recipes, storageAreas);
+    await saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts, { allowEmptyInventory: true });
   };
 
-  const deleteInventoryItems = (ids: string[]) => {
+  const deleteInventoryItems = async (ids: string[]) => {
     const idSet = new Set(ids);
     if (idSet.size === 0) return;
     const nextInventory = inventory.filter(item => !idSet.has(item.id));
     setInventory(nextInventory);
-    saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts);
+    await saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts, { allowEmptyInventory: true });
   };
 
   const mergeInventoryItems = (ids: string[], primaryId: string) => {
