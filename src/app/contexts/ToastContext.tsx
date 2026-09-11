@@ -77,14 +77,38 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 const DEMO_COGS_CATEGORIES: CogsCategory[] = [
-  { id: 'demo-food', name: 'Food', color: '#F59E0B', inventoryCategoryIds: [], posCategoryNames: ['Food'] },
-  { id: 'demo-beverage', name: 'Beverage', color: '#8B5CF6', inventoryCategoryIds: [], posCategoryNames: ['Cocktail', 'Wine', 'Beer', 'Beverage'] },
+  {
+    id: 'demo-food',
+    name: 'Food',
+    color: '#F59E0B',
+    inventoryCategoryIds: [
+      'category-proteins',
+      'category-produce',
+      'category-dairy',
+      'category-dry-goods',
+      'category-pantry',
+      'category-seafood',
+      'category-bakery',
+      'category-condiments',
+      'category-other',
+      'category-broadline',
+      'category-specialty',
+    ],
+    posCategoryNames: ['Food', 'Brunch', 'Pizza', 'Sandwich', 'Main', 'Starter', 'Side'],
+  },
+  { id: 'demo-liquor', name: 'Liquor', color: '#7C3AED', inventoryCategoryIds: ['category-liquor'], posCategoryNames: ['Liquor', 'Cocktail'] },
+  { id: 'demo-beer', name: 'Beer', color: '#D97706', inventoryCategoryIds: ['category-beer'], posCategoryNames: ['Beer'] },
+  { id: 'demo-non-alcoholic', name: 'Non-Alcoholic Beverage', color: '#0284C7', inventoryCategoryIds: ['category-beverage', 'category-beverages'], posCategoryNames: ['Beverage', 'Non-Alcoholic Beverage'] },
+  { id: 'demo-wine', name: 'Wine', color: '#BE123C', inventoryCategoryIds: ['category-wine'], posCategoryNames: ['Wine'] },
 ];
 
 function demoCogsCategory(category: string) {
-  return ['wine', 'cocktail', 'beer', 'beverage'].includes(String(category || '').trim().toLowerCase())
-    ? 'demo-beverage'
-    : 'demo-food';
+  const normalizedCategory = String(category || '').trim().toLowerCase();
+  if (normalizedCategory === 'wine') return 'demo-wine';
+  if (normalizedCategory === 'beer') return 'demo-beer';
+  if (['beverage', 'non-alcoholic beverage', 'non alcoholic beverage'].includes(normalizedCategory)) return 'demo-non-alcoholic';
+  if (['liquor', 'cocktail'].includes(normalizedCategory)) return 'demo-liquor';
+  return 'demo-food';
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
