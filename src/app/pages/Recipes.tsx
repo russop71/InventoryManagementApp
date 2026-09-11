@@ -835,61 +835,45 @@ export function Recipes() {
             </Card>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <Card className="border-slate-200 bg-white shadow-sm">
-              <CardContent>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Recipe Intake</p>
-                    <p className="text-xs text-slate-500 mt-1">Create manually, scan a recipe card, or connect an item to POS before costing it.</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => setIsScanOpen(true)}>
-                    <Camera className="w-4 h-4 mr-2" /> Scan
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:grid-cols-2">
+            <section className="flex items-center justify-between gap-3 border-b border-slate-200 p-3 sm:border-b-0 sm:border-r sm:p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900">Recipe Intake</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Create, scan, or connect a menu item.</p>
+              </div>
+              <Button className="shrink-0" size="sm" variant="outline" onClick={() => setIsScanOpen(true)}>
+                <Camera className="mr-2 h-4 w-4" />Scan
+              </Button>
+            </section>
 
-            <Card className="border-slate-200 bg-white shadow-sm">
-              <CardContent>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">POS Sync</p>
-                    <p className="text-xs text-slate-500 mt-1">Keep menu items aligned with connected POS records and prices.</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={handleSyncToastItems}>
-                    <RefreshCw className="w-4 h-4 mr-2" /> Sync
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <section className="flex items-center justify-between gap-3 p-3 sm:p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900">POS Sync</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Update menu items and prices from POS.</p>
+              </div>
+              <Button className="shrink-0" size="sm" variant="outline" onClick={handleSyncToastItems}>
+                <RefreshCw className="mr-2 h-4 w-4" />Sync
+              </Button>
+            </section>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-4">
-            <Card className="border-slate-200 bg-white shadow-sm">
-              <CardContent className="p-4">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Menu Items</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{recipes.length}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-200 bg-white shadow-sm">
-              <CardContent className="p-4">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Not Linked To POS</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{unlinkedMenuItemCount}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-200 bg-white shadow-sm">
-              <CardContent className="p-4">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Missing Costing</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{uncostedMenuItemCount}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-200 bg-white shadow-sm">
-              <CardContent className="p-4">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Average Margin</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{averageMarginPercent.toFixed(0)}%</p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:grid-cols-4">
+            <div className="flex items-center justify-between gap-3 border-b border-r border-slate-200 px-4 py-3 md:block md:border-b-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Menu Items</p>
+              <p className="text-xl font-black text-slate-900 md:mt-1">{recipes.length}</p>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 md:block md:border-b-0 md:border-r">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Not Linked</p>
+              <p className="text-xl font-black text-slate-900 md:mt-1">{unlinkedMenuItemCount}</p>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-r border-slate-200 px-4 py-3 md:block">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Missing Cost</p>
+              <p className="text-xl font-black text-slate-900 md:mt-1">{uncostedMenuItemCount}</p>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-4 py-3 md:block">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Average Margin</p>
+              <p className="text-xl font-black text-slate-900 md:mt-1">{averageMarginPercent.toFixed(0)}%</p>
+            </div>
           </div>
 
           {recipes.length === 0 ? (
