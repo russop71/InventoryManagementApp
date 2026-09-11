@@ -16,6 +16,59 @@ import { convertIngredientQuantity, formatUnitLabel, getIngredientCompatibleUnit
 
 type IngredientSelection = { inventoryItemId: string; quantity: number; unit: string };
 
+const MENU_ITEM_CATEGORIES = ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Beverages', 'Kids Menu'];
+const PREP_RECIPE_CATEGORIES = ['Sauces & Dressings', 'Stocks & Broths', 'Marinades', 'Prep Components', 'Baked Goods', 'Garnishes'];
+
+function CategoryPicker({
+  id,
+  value,
+  onChange,
+  options,
+  description,
+  className = '',
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  description: string;
+  className?: string;
+}) {
+  return (
+    <fieldset className={`rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-4 ${className}`}>
+      <legend className="px-2 text-sm font-black text-slate-900">Category <span className="text-red-600">*</span></legend>
+      <p className="mb-3 text-xs leading-5 text-slate-600">{description}</p>
+      <div className="flex flex-wrap gap-2" aria-label="Recipe categories">
+        {options.map(option => {
+          const selected = value === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(option)}
+              className={`rounded-full border px-3 py-2 text-xs font-bold transition ${selected ? 'border-[#303A43] bg-[#303A43] text-white shadow-sm' : 'border-amber-300 bg-white text-slate-700 hover:border-[#303A43]'}`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+      <Label htmlFor={id} className="mt-4 block text-xs font-bold text-slate-600">Or enter a custom category</Label>
+      <Input
+        id={id}
+        name={id}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder="Type a category name"
+        className="mt-1 border-amber-300 bg-white"
+        required
+      />
+      {value && <p className="mt-2 text-xs font-semibold text-slate-700">Selected category: <span className="font-black">{value}</span></p>}
+    </fieldset>
+  );
+}
+
 function IngredientAutocomplete({
   inventory,
   onAddIngredient,
@@ -674,17 +727,6 @@ export function Recipes() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      name="category"
-                      value={recipeCategory}
-                      onChange={(e) => setRecipeCategory(e.target.value)}
-                      placeholder="Entrees"
-                      required
-                    />
-                  </div>
-                  <div>
                     <Label htmlFor="price">Price</Label>
                     <Input
                       id="price"
@@ -698,6 +740,14 @@ export function Recipes() {
                       required
                     />
                   </div>
+                  <CategoryPicker
+                    id="category"
+                    value={recipeCategory}
+                    onChange={setRecipeCategory}
+                    options={MENU_ITEM_CATEGORIES}
+                    description="Choose where this item appears on the menu. Consistent categories make costing and sales reports easier to compare."
+                    className="md:col-span-2"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1026,16 +1076,14 @@ export function Recipes() {
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="prepCategory">Category</Label>
-                <Input
-                  id="prepCategory"
-                  value={prepCategory}
-                  onChange={(e) => setPrepCategory(e.target.value)}
-                  placeholder="Prepped Items"
-                  required
-                />
-              </div>
+              <CategoryPicker
+                id="prepCategory"
+                value={prepCategory}
+                onChange={setPrepCategory}
+                options={PREP_RECIPE_CATEGORIES}
+                description="Choose the type of batch recipe so managers can quickly find and reuse it in menu items."
+                className="sm:col-span-2"
+              />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
