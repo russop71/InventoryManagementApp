@@ -1167,8 +1167,11 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   const placeOrder = (orderInput: { date: string; items: OrderItem[]; supplier: string; totalCost: number; status?: DailyOrder['status']; supplierDates?: Record<string, string>; }) => {
     const totalCost = orderInput.totalCost;
+    const recordId = typeof globalThis.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const newOrder: DailyOrder = {
-      id: Date.now().toString(),
+      id: recordId,
       date: orderInput.date,
       items: orderInput.items,
       totalCost,
@@ -1177,7 +1180,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     };
 
     const newInvoice: InvoiceRecord = {
-      id: `${Date.now()}-invoice`,
+      id: `${recordId}-invoice`,
       date: orderInput.date,
       invoiceNumber: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
       supplier: orderInput.supplier || 'Supplier',

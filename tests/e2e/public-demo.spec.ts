@@ -238,8 +238,9 @@ test('invoice camera capture supports correction and approval before posting', a
   await page.getByLabel('Invoice #').fill('QA-CAMERA-1001-CORRECTED');
   await page.getByLabel('Date').fill('2026-09-08');
   await page.getByLabel('Item Name').fill('Fresh Basil Leaves');
-  await page.getByLabel('Pack size').fill('50');
-  await page.getByLabel('Packages on invoice').fill('2');
+  await page.getByLabel('Cases / packages').fill('2');
+  await page.getByLabel('Units per case').fill('1');
+  await page.getByLabel('Size per unit').fill('50');
   await expect(page.getByLabel('Quantity')).toHaveValue('100');
   await expect(page.getByText('$1.85').first()).toBeVisible();
   await page.getByLabel('I reviewed the unclear, new, or unmatched information').check();
@@ -595,30 +596,27 @@ test('forecast buffers create editable supplier-grouped orders and recover from 
   test.setTimeout(60_000);
   await freshDemoLogin(page);
   await page.goto('/app/inventory');
-  await addInventoryItem(page, { name: 'QA Buffer Tomatoes', supplier: 'QA Forecast One', onHand: '0', par: '10', cost: '2' });
-  await addInventoryItem(page, { name: 'QA Buffer Peppers', supplier: 'QA Forecast Two', onHand: '0', par: '10', cost: '3' });
+  await addInventoryItem(page, { name: 'QA Buffer Tomatoes', supplier: 'QA Forecast One', onHand: '0', par: '20', cost: '2' });
+  await addInventoryItem(page, { name: 'QA Buffer Peppers', supplier: 'QA Forecast Two', onHand: '0', par: '20', cost: '3' });
 
   await page.goto('/app/ai-orders');
   const bufferControl = page.getByLabel('Forecast safety buffer percentage');
   await bufferControl.getByRole('button', { name: '0%', exact: true }).click();
-  await expect(page.getByLabel('Order quantity for QA Buffer Tomatoes')).toHaveValue('12');
+  const tomatoesSuggestion = page.getByRole('button', { name: /QA Buffer Tomatoes/ });
+  await expect(tomatoesSuggestion).toContainText('25 kg');
   await bufferControl.getByRole('button', { name: '10%', exact: true }).click();
-  await expect(page.getByLabel('Order quantity for QA Buffer Tomatoes')).toHaveValue('13');
+  await expect(tomatoesSuggestion).toContainText('26 kg');
 
-  const tomatoesCard = page.getByText('QA Buffer Tomatoes', { exact: true }).locator('xpath=ancestor::*[@data-slot="card"][1]');
-  const peppersCard = page.getByText('QA Buffer Peppers', { exact: true }).locator('xpath=ancestor::*[@data-slot="card"][1]');
-  await tomatoesCard.click();
-  await peppersCard.click();
-  await page.getByLabel('Order quantity for QA Buffer Tomatoes').fill('9');
-  await expect(page.getByText('QA Forecast One', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('1 item • $18.00', { exact: true })).toBeVisible();
-  await expect(page.getByText('QA Forecast Two', { exact: true }).last()).toBeVisible();
+  const peppersSuggestion = page.getByRole('button', { name: /QA Buffer Peppers/ });
+  await tomatoesSuggestion.click();
+  await peppersSuggestion.click();
+  await expect(page.getByText('2 selected · Est. $130.00', { exact: true })).toBeVisible();
 
   const approve = page.getByRole('button', { name: 'Approve 2 orders' });
   await approve.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
   const emailDialog = page.getByRole('dialog');
   await expect(emailDialog.getByText('Supplier email drafts (2)')).toBeVisible();
-  await expect(emailDialog.getByLabel('Draft quantity for QA Buffer Tomatoes')).toHaveValue('9');
+  await expect(emailDialog.getByLabel('Draft quantity for QA Buffer Tomatoes')).toHaveValue('26');
   await emailDialog.getByLabel('Draft quantity for QA Buffer Tomatoes').fill('10');
   await expect(emailDialog.getByLabel('Body for QA Forecast One')).toContainText('QA Buffer Tomatoes - 10');
   await emailDialog.getByLabel('Subject for QA Forecast One').fill('QA reviewed supplier order');
@@ -629,9 +627,9 @@ test('forecast buffers create editable supplier-grouped orders and recover from 
   const downloadedBytes = await readFile(await download.path());
   expect(downloadedBytes.subarray(0, 8).toString()).toBe('%PDF-1.4');
   expect(downloadedBytes.toString('latin1')).toContain('QA Buffer Tomatoes');
-  await emailDialog.getByRole('button', { name: 'Open Email' }).first().click();
+  await emailDialog.getByRole('button', { name: 'Send' }).first().click();
   await expect(page.getByText('No supplier email address is configured')).toBeVisible();
-  await emailDialog.getByRole('button', { name: 'Close' }).click();
+  await emailDialog.getByRole('button', { name: 'Close' }).first().click();
 
   await page.goto('/app/orders');
   const firstSupplierOrder = page.locator('button:has-text("QA Forecast One"):visible');

@@ -11,12 +11,13 @@ import { Badge } from '../components/ui/badge';
 import { CalendarDays } from 'lucide-react';
 import {
   Plus, ChevronRight, ShoppingCart, Truck, CheckCircle2,
-  Clock, Package, SlidersHorizontal, Mail,
+  Clock, Download, Package, SlidersHorizontal, Mail,
   Check, AlertCircle, TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils';
 import { buildSupplierEmailDrafts, parseEmailList } from '../utils/supplierEmailDraft.js';
+import { downloadSupplierOrdersPdf } from '../utils/supplierOrderPdf.js';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { apiRequest } from '../utils/api';
 import { OrderBufferControl } from '../components/OrderBufferControl';
@@ -139,6 +140,7 @@ export function Orders() {
   const [orderSupplierFilter, setOrderSupplierFilter] = useState('');
   const [orderSort, setOrderSort] = useState<OrderSort>('newest');
   const [safetyBufferPercent, setSafetyBufferPercent] = useState(10);
+  const approvalInProgressRef = useRef(false);
 
   const open      = orders.filter(o => o.status === 'pending' || o.status === 'ordered');
   const received  = orders.filter(o => o.status === 'received');
@@ -314,7 +316,14 @@ export function Orders() {
   }, [aiSuggestions, orderSuggestions]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:4001');
+    const websocketUrl = import.meta.env.VITE_ZESTIQ_WS_URL?.trim();
+    if (!websocketUrl) {
+      setWsConnected(false);
+      setAiSuggestions(null);
+      return;
+    }
+
+    const ws = new WebSocket(websocketUrl);
     ws.addEventListener('open', () => {
       setWsConnected(true);
       ws.send(JSON.stringify({ type: 'requestAiOrder', payload: { inventory, salesData } }));
@@ -521,12 +530,15 @@ export function Orders() {
   };
 
   const handleApproveOrders = () => {
+    if (approvalInProgressRef.current) return;
+
     const sourceList = effectiveSuggestions;
     const ordersToPlace = sourceList.filter(s => selectedSuggestions.has(s.itemId));
     if (ordersToPlace.length === 0) {
       toast.error('Select at least one item to place an order');
       return;
     }
+    approvalInProgressRef.current = true;
 
     const supplierMap: Record<string, OrderSuggestion[]> = {};
     ordersToPlace.forEach(suggestion => {
@@ -785,7 +797,7 @@ export function Orders() {
                 <p className="text-xs text-gray-500">Smart recommendations based on inventory risk and recent sales.</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className="bg-[#303A43] text-white">{wsConnected ? 'Live' : 'Offline'}</Badge>
+                <Badge className="bg-[#303A43] text-white">{wsConnected ? 'Live AI' : 'Forecast engine'}</Badge>
                 <Button size="sm" variant="outline" onClick={() => setShowAllSuggestions(!showAllSuggestions)}>
                   {showAllSuggestions ? 'Priority only' : 'Show all'}
                 </Button>
@@ -1047,10 +1059,15 @@ export function Orders() {
       </Dialog>
 
       {/* Email draft dialog */}
-      <Dialog open={showEmailDialog} onOpenChange={open => !open && setShowEmailDialog(false)}>
+      <Dialog open={showEmailDialog} onOpenChange={open => {
+        if (!open) {
+          approvalInProgressRef.current = false;
+          setShowEmailDialog(false);
+        }
+      }}>
         <DialogContent className="max-w-[760px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Supplier email drafts</DialogTitle>
+            <DialogTitle>Supplier email drafts ({draftEmails.length})</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {draftEmails.length === 0 ? (
@@ -1074,6 +1091,7 @@ export function Orders() {
                 <div className="mt-3 space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">CC recipients</label>
                   <input
+                    aria-label={`CC recipients for ${email.supplier}`}
                     type="text"
                     value={email.ccText}
                     onChange={(event) => updateDraftEmailField(email.supplier, 'ccText', event.target.value)}
@@ -1085,6 +1103,7 @@ export function Orders() {
                 <div className="mt-3 space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Subject</label>
                   <input
+                    aria-label={`Subject for ${email.supplier}`}
                     value={email.emailSubject}
                     onChange={(event) => updateDraftEmailField(email.supplier, 'emailSubject', event.target.value)}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
@@ -1093,6 +1112,7 @@ export function Orders() {
                 <div className="mt-3 space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Body</label>
                   <textarea
+                    aria-label={`Body for ${email.supplier}`}
                     value={email.emailBody}
                     onChange={(event) => updateDraftEmailField(email.supplier, 'emailBody', event.target.value)}
                     rows={8}
@@ -1109,6 +1129,7 @@ export function Orders() {
                           <p className="text-xs text-gray-500">{item.unit}</p>
                         </div>
                         <input
+                          aria-label={`Draft quantity for ${item.itemName}`}
                           type="number"
                           min="0"
                           step="1"
@@ -1122,6 +1143,20 @@ export function Orders() {
                 </div>
               </div>
             ))}
+            {draftEmails.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 pt-3">
+                <Button
+                  variant="outline"
+                  onClick={() => downloadSupplierOrdersPdf({ restaurantName, drafts: draftEmails })}
+                >
+                  <Download className="mr-1.5 h-4 w-4" /> Download PDF
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  approvalInProgressRef.current = false;
+                  setShowEmailDialog(false);
+                }}>Close</Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

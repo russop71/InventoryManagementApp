@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ArrowLeft, Plus, Minus, AlertTriangle, TrendingDown, Package, TrendingUp, DollarSign, Calendar, Archive, Undo2, BookOpen } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toast as showToast } from 'sonner';
+import { convertQuantity } from '../utils/unitConversion';
 
 const MARKETMAN_UOM_OPTIONS = [
   'oz', 'EA', 'gr', 'L', 'Kg', 'lb',
@@ -224,43 +225,53 @@ export function InventoryDetail() {
     );
   }
 
-  // Calculate usage from recipes (mock data for today)
+  const orderedSalesDays = [...salesData]
+    .filter(day => day.date)
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+  const latestSalesDay = orderedSalesDays.at(-1);
+  const recentSalesDays = orderedSalesDays.slice(-7);
+
+  const usageForSalesDay = (salesDay: typeof latestSalesDay) => recipes.reduce((total, recipe) => {
+    if (!salesDay) return total;
+    const ingredient = recipe.ingredients.find(entry => entry.inventoryItemId === id);
+    if (!ingredient) return total;
+    const soldCount = salesDay.topItems.find(entry => entry.itemName.trim().toLowerCase() === recipe.menuItemName.trim().toLowerCase())?.quantity || 0;
+    const quantityPerDish = convertQuantity(ingredient.quantity, ingredient.unit, item.unit) ?? ingredient.quantity;
+    return total + quantityPerDish * soldCount;
+  }, 0);
+
+  // Calculate usage from the latest available POS sales day.
   const usageByDish = recipes
     .map(recipe => {
       const ingredient = recipe.ingredients.find(ing => ing.inventoryItemId === id);
       if (!ingredient) return null;
-
-      // Mock: assume 28 chicken sandwiches sold today
-      const mockSalesCount = recipe.menuItemName.includes('Chicken') ? 28 : 
-                            recipe.menuItemName.includes('Beef') ? 15 : 0;
-      
-      const totalUsed = ingredient.quantity * mockSalesCount;
+      const soldCount = latestSalesDay?.topItems.find(entry => entry.itemName.trim().toLowerCase() === recipe.menuItemName.trim().toLowerCase())?.quantity || 0;
+      const quantityPerDish = convertQuantity(ingredient.quantity, ingredient.unit, item.unit) ?? ingredient.quantity;
 
       return {
         dishName: recipe.menuItemName,
-        soldCount: mockSalesCount,
-        usedAmount: totalUsed,
+        soldCount,
+        usedAmount: quantityPerDish * soldCount,
         unit: item.unit,
       };
     })
     .filter(usage => usage && usage.soldCount > 0);
 
-  // Calculate 7-day trend (mock data)
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - i));
-    const baseUsage = 15;
-    const variance = Math.random() * 10 - 5;
-    return {
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      usage: Math.max(0, baseUsage + variance),
-    };
-  });
+  const last7Days = recentSalesDays.map(day => ({
+    date: new Date(`${day.date}T12:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }),
+    usage: usageForSalesDay(day),
+  }));
 
-  // Calculate variance
-  const expectedUsage = 20;
-  const actualUsage = usageByDish.reduce((sum, usage) => sum + (usage?.usedAmount || 0), 0);
+  const actualUsage = usageForSalesDay(latestSalesDay);
+  const comparisonDays = recentSalesDays.slice(0, -1);
+  const expectedUsage = comparisonDays.length > 0
+    ? comparisonDays.reduce((sum, day) => sum + usageForSalesDay(day), 0) / comparisonDays.length
+    : actualUsage;
   const variance = actualUsage - expectedUsage;
+  const hasPosUsageData = last7Days.some(day => day.usage > 0);
+  const latestSalesDate = latestSalesDay
+    ? new Date(`${latestSalesDay.date}T12:00:00`).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })
+    : '';
 
   const stockPercentage = (item.currentStock / item.parLevel) * 100;
   const isLowStock = stockPercentage < 30;
@@ -1173,13 +1184,13 @@ export function InventoryDetail() {
         </CardContent>
       </Card>
 
-      {/* Usage Breakdown Today */}
+      {/* Usage from the latest available POS sales day */}
       {usageByDish.length > 0 && (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="px-4 py-3">
             <CardTitle className="text-base flex items-center">
               <TrendingDown className="w-4 h-4 mr-2 text-[#2563EB]" />
-              Usage Today
+              Usage · {latestSalesDate}
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
@@ -1210,12 +1221,12 @@ export function InventoryDetail() {
         </Card>
       )}
 
-      {/* 7-Day Trend */}
-      <Card className="border-slate-200 shadow-sm">
+      {/* POS usage history */}
+      {hasPosUsageData ? <><Card className="border-slate-200 shadow-sm">
         <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center">
             <TrendingUp className="w-4 h-4 mr-2 text-[#2563EB]" />
-            Usage Trend (7 Days)
+            POS Usage Trend
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4">
@@ -1251,7 +1262,7 @@ export function InventoryDetail() {
               <div className="bg-[#FEFCE8] rounded p-2">
                 <p className="text-xs text-gray-600">Expected</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {expectedUsage} {item.unit}
+                  {expectedUsage.toFixed(1)} {item.unit}
                 </p>
               </div>
               <div className="bg-gray-50 rounded p-2">
@@ -1268,16 +1279,25 @@ export function InventoryDetail() {
               </div>
             </div>
             <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-              <p className="text-xs font-medium text-yellow-900 mb-1">Why are we off?</p>
+              <p className="text-xs font-medium text-yellow-900 mb-1">Compared with recent POS usage</p>
               <p className="text-xs text-yellow-800">
                 {variance > 0 
-                  ? 'Higher than expected usage - check for waste or portion control'
-                  : 'Lower than expected - sales may be down or portions are smaller'}
+                  ? 'The latest sales day used more of this item than the average of the preceding available sales days.'
+                  : variance < 0
+                    ? 'The latest sales day used less of this item than the average of the preceding available sales days.'
+                    : 'The latest sales day matched the average of the preceding available sales days.'}
               </p>
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card></> : (
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-sm font-bold text-slate-800">No POS usage data yet</p>
+            <p className="mt-1 text-sm text-slate-500">Import or connect sales data to see ingredient usage and trends for this item.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Adjust Inventory Button */}
       <Dialog open={isAdjustDialogOpen} onOpenChange={setIsAdjustDialogOpen}>

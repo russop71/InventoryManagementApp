@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canAdministerAccount, canManageOperations, hasProductAccess, hasSchedulingAccess, isDemoAdministrativeMutation, isShowcaseAccount, validateFinalizedCounts } from './_launch-controls.js';
+import { canAdministerAccount, canManageOperations, hasProductAccess, hasSchedulingAccess, isDemoAccount, isDemoAdministrativeMutation, isShowcaseAccount, validateFinalizedCounts } from './_launch-controls.js';
 
 test('new clients are gated until the CAD Premium subscription is active', () => {
   const account = { id: 'company-a', slug: 'company-a', billing_status: 'not_configured' };
@@ -49,4 +49,12 @@ test('public demo blocks administrative mutations but keeps operational data ava
   assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'users'], 'GET'), false);
   assert.equal(isDemoAdministrativeMutation(demo, ['accounts', 'id', 'locations', 'loc', 'data'], 'PUT'), true);
   assert.equal(isDemoAdministrativeMutation({ slug: 'customer' }, ['accounts', 'id', 'users'], 'POST'), false);
+});
+
+test('a normal ZestIQ customer workspace is never treated as the public demo', () => {
+  const yesAccount = { id: 'yes-account', slug: 'yes', name: 'Yes', billing_status: 'active' };
+  assert.equal(isDemoAccount(yesAccount), false);
+  assert.equal(isShowcaseAccount(yesAccount), false);
+  assert.equal(isDemoAdministrativeMutation(yesAccount, ['accounts', yesAccount.id, 'locations', 'main', 'data'], 'PUT'), false);
+  assert.equal(hasProductAccess({ account: yesAccount, authUser: { email: 'pat@zestiq.ca' }, platformAdminEmails: '', billingBypassAccountIds: '' }), true);
 });
