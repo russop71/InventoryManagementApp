@@ -56,7 +56,10 @@ export function BeverageCosting() {
     setEditingRecipeName(recipe.menuItemName);
     setEditingRecipeCategory(recipe.category);
     setEditingRecipePrice(String(recipe.price));
-    setEditingRecipeIngredients(recipe.ingredients.map(ingredient => ({ ...ingredient })));
+    setEditingRecipeIngredients(recipe.ingredients.map(ingredient => ({
+      ...ingredient,
+      unit: ingredient.unit || inventory.find(item => item.id === ingredient.inventoryItemId)?.unit || '',
+    })));
     setNewIngredientId('');
   };
   const editingIngredientCost = editingRecipeIngredients.reduce((sum, ingredient) => sum + calculateIngredientLineCost(ingredient), 0);
@@ -78,7 +81,7 @@ export function BeverageCosting() {
     const item = inventory.find(candidate => candidate.id === itemId);
     setEditingRecipeIngredients(current => current.map(ingredient => {
       if (ingredient.inventoryItemId !== itemId) return ingredient;
-      const convertedQuantity = item ? convertIngredientQuantity(item, ingredient.quantity, ingredient.unit, unit) : null;
+      const convertedQuantity = item ? convertIngredientQuantity(item, ingredient.quantity, ingredient.unit || item.unit, unit) : null;
       return { ...ingredient, unit, quantity: convertedQuantity ?? ingredient.quantity };
     }));
   };

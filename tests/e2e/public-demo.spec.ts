@@ -87,6 +87,34 @@ test('every demo inventory item detail opens without an application error', asyn
   }
 });
 
+test('beverage units change safely for legacy ingredients without a unit', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.includes('recipes')) continue;
+      const records = JSON.parse(localStorage.getItem(key) || 'null');
+      if (!Array.isArray(records)) continue;
+      for (const recipe of records) {
+        if (recipe.menuItemName !== 'Local Lager') continue;
+        for (const ingredient of recipe.ingredients) delete ingredient.unit;
+      }
+      localStorage.setItem(key, JSON.stringify(records));
+    }
+  });
+  await page.goto('/app/beverages');
+  await page.getByRole('button', { name: /^Local Lager/ }).click();
+  const dialog = page.getByRole('dialog');
+  const unit = dialog.getByRole('combobox', { name: 'Unit', exact: true });
+  await expect(unit).toHaveValue('case');
+  await unit.selectOption('can');
+  await expect(dialog.getByLabel('Quantity', { exact: true })).toHaveValue('24');
+  await unit.selectOption('ea');
+  await expect(dialog.getByLabel('Quantity', { exact: true })).toHaveValue('24');
+  await unit.selectOption('case');
+  await expect(dialog.getByLabel('Quantity', { exact: true })).toHaveValue('1');
+  await expect(dialog).toContainText('$54.00');
+});
+
 const scannedRecipeResponse = {
   menuItemName: 'Classic Tomato Basil Sauce',
   category: 'Sauces',
