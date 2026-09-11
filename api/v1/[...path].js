@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizePosImportPayload } from '../../server/pos-import.js';
 import { extractResponseText } from '../scan.js';
 import { enforceAiQuota, recordAiUsage } from '../_ai-quota.js';
-import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAccount, isDemoAdministrativeMutation, isPlatformAdminEmail, validateFinalizedCounts } from '../_launch-controls.js';
+import { canAdministerAccount, canManageOperations, hasProductAccess, hasSchedulingAccess, isDemoAccount, isDemoAdministrativeMutation, isPlatformAdminEmail, validateFinalizedCounts } from '../_launch-controls.js';
 import { enforceRateLimit } from '../_request-guard.js';
 import { launchReadiness } from '../_launch-readiness.js';
 import { reportServerError } from '../_observability.js';
@@ -260,7 +260,7 @@ function normalizeOnboardingState(value) {
 }
 
 function schedulingEnabled(account) {
-  return account?.onboarding_state?.clientProfile?.schedulingEnabled === true;
+  return hasSchedulingAccess(account);
 }
 
 function mapAccount(row, authUser) {

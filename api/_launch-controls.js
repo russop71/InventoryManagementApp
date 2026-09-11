@@ -20,6 +20,10 @@ export function isShowcaseAccount(account) {
   return slug === 'demo-zestiq-ca' || slug === 'zestiq-showcase' || name === 'zestiq showcase';
 }
 
+export function hasSchedulingAccess(account) {
+  return isShowcaseAccount(account) || account?.onboarding_state?.clientProfile?.schedulingEnabled === true;
+}
+
 export function isDemoAdministrativeMutation(account, segments = [], method = 'GET') {
   if (!isDemoAccount(account) || String(method).toUpperCase() === 'GET') return false;
   const area = segments[2];

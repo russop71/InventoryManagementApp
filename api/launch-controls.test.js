@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canAdministerAccount, canManageOperations, hasProductAccess, isDemoAdministrativeMutation, isShowcaseAccount, validateFinalizedCounts } from './_launch-controls.js';
+import { canAdministerAccount, canManageOperations, hasProductAccess, hasSchedulingAccess, isDemoAdministrativeMutation, isShowcaseAccount, validateFinalizedCounts } from './_launch-controls.js';
 
 test('new clients are gated until the CAD Premium subscription is active', () => {
   const account = { id: 'company-a', slug: 'company-a', billing_status: 'not_configured' };
@@ -13,7 +13,13 @@ test('ZestIQ Showcase has product access without a paid subscription', () => {
   const showcase = { slug: 'demo-zestiq-ca', name: 'ZestIQ Showcase', billing_status: 'not_configured' };
   assert.equal(isShowcaseAccount(showcase), true);
   assert.equal(hasProductAccess({ account: showcase, authUser: { email: 'demo@zestiq.ca' }, platformAdminEmails: '', billingBypassAccountIds: '' }), true);
+  assert.equal(hasSchedulingAccess(showcase), true);
   assert.equal(isDemoAdministrativeMutation(showcase, ['accounts', 'id', 'locations'], 'POST'), false);
+});
+
+test('Scheduling remains opt-in for non-showcase accounts', () => {
+  assert.equal(hasSchedulingAccess({ name: 'Restaurant', onboarding_state: { clientProfile: { schedulingEnabled: false } } }), false);
+  assert.equal(hasSchedulingAccess({ name: 'Restaurant', onboarding_state: { clientProfile: { schedulingEnabled: true } } }), true);
 });
 
 test('manager permissions do not give staff access to company operations', () => {
