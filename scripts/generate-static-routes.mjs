@@ -11,7 +11,7 @@ const pages = [
   ['/best-restaurant-inventory-management-software-canada', 'Best Restaurant Inventory Software in Canada: 2026 Buyer’s Guide', 'A practical 2026 guide to choosing restaurant inventory management software in Canada. Compare counting, food cost, invoices, ordering, POS, labour and multi-location requirements.'],
   ['/restaurant-inventory-management-guide', 'Restaurant Inventory Management Guide: Counts, Food Cost & Ordering', 'A practical restaurant inventory management guide covering count sheets, units, recipe costing, invoice prices, waste, variance, pars and ordering.'],
   ['/restaurant-food-cost-calculator', 'Free Restaurant Food Cost Calculator | Food Cost Percentage', 'Calculate restaurant food cost percentage, gross profit and target menu price. Includes the formula and practical guidance for recipe and menu costing.'],
-  ['/restaurant-inventory-management-software', 'Restaurant Inventory Management Software | ZestIQ', 'Restaurant inventory software for counts, pars, purchasing, recipe costs, supplier pricing and multi-location visibility.'],
+  ['/restaurant-inventory-management-software', 'Restaurant Inventory Management Software Canada | ZestIQ', 'Restaurant inventory management software for Canadian operators. Connect mobile counts, invoices, live food cost, waste, pars, purchasing and multi-location insights.'],
   ['/restaurant-food-cost-software', 'Restaurant Food Cost & Recipe Costing Software | ZestIQ', 'Restaurant food cost software linking recipes to current ingredient prices, menu margins, beverages and supplier changes.'],
   ['/restaurant-invoice-scanner', 'AI Restaurant Invoice Scanner for PDF & Photos | ZestIQ', 'Scan restaurant invoices from PDF, image or camera and review extracted supplier, items, units and prices.'],
   ['/restaurant-labour-scheduling-software', 'Restaurant Labour Scheduling Software Canada | ZestIQ', 'Restaurant labour scheduling for shifts, labour cost, sales comparison, employee availability, swaps and time off.'],
@@ -30,9 +30,9 @@ const pages = [
 const resourceContent = {
   '/restaurant-inventory-management-software': {
     label: 'Restaurant inventory management software for Canadian operators',
-    heading: 'Know what is on hand, what it costs and what to order next.',
-    intro: 'ZestIQ connects restaurant inventory counts, supplier invoices, recipe cost, waste, pars, purchasing and sales signals in one location-aware operating system.',
-    modified: '2026-09-11',
+    heading: 'Know what is on hand, what it costs, and what to order next.',
+    intro: 'ZestIQ is restaurant inventory management and food inventory control software built for Canadian operators. It connects counts, supplier prices, invoices, recipes and sales signals so teams can spend less time reconciling spreadsheets and more time acting on margin.',
+    modified: '2026-09-12',
     schemaType: 'SoftwareApplication',
     sections: [
       ['Count restaurant inventory by storage area', 'Organize mobile-friendly counts in the physical order the team walks the freezer, walk-in, dry storage and bar. Track cases, kilograms, bottles, pours, portions and other restaurant units.'],
@@ -42,9 +42,10 @@ const resourceContent = {
       ['Use inventory data to investigate variance', 'Compare actual stock movement with recipe-linked sales and purchases, then focus on high-dollar exceptions caused by unit errors, waste, over-portioning, receiving mistakes or other operational issues.'],
     ],
     faqs: [
-      ['What should restaurant inventory management software include?', 'It should support restaurant units and pack sizes, mobile counts, supplier prices, invoice review, recipe costing, waste, variance, pars, purchasing and location-level permissions.'],
-      ['How often should a restaurant count inventory?', 'Many restaurants complete a full count weekly and use daily spot counts for expensive, fast-moving or high-variance products. Consistent timing and process matter more than false precision.'],
-      ['Can restaurant inventory software use POS sales?', 'Yes. POS menu-item and sales data can support theoretical usage, food cost, labour comparison, forecasting and suggested ordering when a supported connection or structured import is available.'],
+      ['What should restaurant inventory software actually solve?', 'A useful system should make weekly counts faster, preserve units and pack sizes, connect purchases to on-hand value, show variance and turn stock data into ordering decisions. ZestIQ is designed around that complete operating loop.'],
+      ['How often should restaurants count inventory?', 'Many restaurants complete a full inventory count weekly and use daily spot counts for expensive, fast-moving or high-variance products. The best schedule is one the team can complete consistently at the same operational cut-off.'],
+      ['How is restaurant inventory software different from a generic inventory app?', 'Restaurant systems must understand changing supplier prices, cases and recipe units, preparation yields, theoretical usage, food and beverage cost, waste, pars and purchasing—not only quantities on a shelf.'],
+      ['Can restaurant inventory software connect with POS sales?', 'Yes. Sales and menu-item data can support theoretical usage, menu margin, labour comparison, forecasting and suggested ordering when the POS connection or import is available.'],
     ],
   },
   '/best-restaurant-inventory-management-software-canada': {
