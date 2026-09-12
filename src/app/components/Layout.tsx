@@ -54,6 +54,7 @@ export function Layout() {
       items: [
         { label: 'Forecasting', path: '/app/forecasting', icon: TrendingUp },
         { label: 'Cost & COGS', path: '/app/costs', icon: FileText },
+        { label: 'Actual vs Theoretical', path: '/app/usage-variance', icon: FileText },
         { label: 'Waste Tracking', path: '/app/waste', icon: Trash2 },
       ],
     },

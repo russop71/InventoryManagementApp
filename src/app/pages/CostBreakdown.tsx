@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -11,6 +11,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import { ItemActivityDialog } from '../components/ItemActivityDialog';
+import { SupplierInvoicesDialog } from '../components/SupplierInvoicesDialog';
 
 function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { categories, inventory, suppliers, addCategory, updateCategory, deleteCategory } = useInventory();
@@ -212,6 +214,14 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
 
 export function CostBreakdown() {
   const { inventory, orders, forecasts } = useInventory();
+  const [historyItemId, setHistoryItemId] = useState<string | null>(null);
+  const historyTrigger = useRef<HTMLButtonElement | null>(null);
+  const [invoiceSupplier, setInvoiceSupplier] = useState<string | null>(null);
+  const supplierTrigger = useRef<HTMLButtonElement | null>(null);
+  const [reportRange, setReportRange] = useState({ start: '', end: '' });
+  const invalidRange = !!(reportRange.start && reportRange.end && reportRange.start > reportRange.end);
+  const inRange = (date: string) => !invalidRange && (!reportRange.start || date.slice(0, 10) >= reportRange.start) && (!reportRange.end || date.slice(0, 10) <= reportRange.end);
+  const reportOrders = orders.filter(order => order.status !== 'cancelled' && inRange(order.date));
   const [searchParams, setSearchParams] = useSearchParams();
   const [categoryConfigOpen, setCategoryConfigOpen] = useState(searchParams.get('categories') === 'open');
   const activeView = searchParams.get('view') === 'cogs' ? 'cogs' : 'inventory';
@@ -245,7 +255,7 @@ export function CostBreakdown() {
   }, [] as { name: string; value: number }[]);
 
   // Calculate order costs by month
-  const ordersByMonth = orders.reduce((acc, order) => {
+  const ordersByMonth = reportOrders.reduce((acc, order) => {
     const month = new Date(order.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     const existing = acc.find(m => m.month === month);
     if (existing) {
@@ -262,8 +272,8 @@ export function CostBreakdown() {
   }, [] as { month: string; value: number; count: number }[]);
 
   // Calculate total orders cost
-  const totalOrdersCost = orders.reduce((sum, order) => sum + order.totalCost, 0);
-  const averageOrderCost = orders.length > 0 ? totalOrdersCost / orders.length : 0;
+  const totalOrdersCost = reportOrders.reduce((sum, order) => sum + order.totalCost, 0);
+  const averageOrderCost = reportOrders.length > 0 ? totalOrdersCost / reportOrders.length : 0;
 
   // Most expensive items
   const expensiveItems = [...inventory]
@@ -293,6 +303,15 @@ export function CostBreakdown() {
 
   return (
     <div className="space-y-5">
+      <section aria-label="Report date range" className="rounded-xl border bg-white p-4">
+        <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
+          <label className="text-sm font-medium">Report from<Input type="date" value={reportRange.start} onChange={event => setReportRange(previous => ({ ...previous, start: event.target.value }))} /></label>
+          <label className="text-sm font-medium">Report to<Input type="date" value={reportRange.end} onChange={event => setReportRange(previous => ({ ...previous, end: event.target.value }))} /></label>
+          <Button variant="outline" onClick={() => setReportRange({ start: '', end: '' })}>All dates</Button>
+        </div>
+        <p className="mt-2 text-sm text-slate-500">Filters orders, menu sales, and purchase/invoice histories. Stock value and stock breakdowns below are current snapshots, not historical valuations.</p>
+        {invalidRange && <p role="alert" className="mt-2 text-sm text-red-700">Report from must be on or before Report to.</p>}
+      </section>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Cost &amp; COGS Reports</h2>
@@ -323,7 +342,7 @@ export function CostBreakdown() {
       </div>
 
       {activeView === 'cogs' ? (
-        <COGSBreakdown embedded />
+        <COGSBreakdown embedded reportRange={reportRange} />
       ) : (
       <div className="space-y-4">
 
@@ -331,7 +350,7 @@ export function CostBreakdown() {
       <div className="grid grid-cols-1 gap-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Inventory Value</CardTitle>
+            <CardTitle className="text-sm font-medium">Current Inventory Value</CardTitle>
             <DollarSign className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
@@ -351,7 +370,7 @@ export function CostBreakdown() {
             <CardContent>
               <div className="text-xl font-bold">${totalOrdersCost.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">
-                {orders.length} orders
+                {reportOrders.length} orders in range · Cancelled excluded
               </p>
             </CardContent>
           </Card>
@@ -463,7 +482,7 @@ export function CostBreakdown() {
                 const percentage = (totalValue / totalInventoryValue) * 100;
                 
                 return (
-                  <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                  <button type="button" key={item.id} onClick={event => { historyTrigger.current = event.currentTarget; setHistoryItemId(item.id); }} aria-label={`View purchase and sales history for ${item.name}`} className="w-full text-left bg-gray-50 rounded-lg p-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-500">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-start flex-1">
                         <div className="w-6 h-6 rounded-full bg-[#F5D62E] text-[#303A43] flex items-center justify-center text-xs font-black mr-2 flex-shrink-0 mt-0.5">
@@ -481,7 +500,7 @@ export function CostBreakdown() {
                         <p className="text-xs text-gray-500">{percentage.toFixed(1)}%</p>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -498,7 +517,7 @@ export function CostBreakdown() {
                 const percentage = (supplier.value / totalInventoryValue) * 100;
                 
                 return (
-                  <div key={supplier.supplier} className="bg-gray-50 rounded-lg p-3">
+                  <button type="button" key={supplier.supplier} onClick={event => { supplierTrigger.current = event.currentTarget; setInvoiceSupplier(supplier.supplier); }} aria-label={`View invoices for ${supplier.supplier}`} className="w-full text-left bg-gray-50 rounded-lg p-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-500">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-start flex-1">
                         <div 
@@ -519,7 +538,7 @@ export function CostBreakdown() {
                         <p className="text-xs text-gray-500">{percentage.toFixed(1)}%</p>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -528,6 +547,8 @@ export function CostBreakdown() {
       </div>
       </div>
       )}
+      <ItemActivityDialog reportRange={reportRange} item={inventory.find(item => item.id === historyItemId) || null} onClose={() => setHistoryItemId(null)} restoreFocus={() => historyTrigger.current?.focus()} />
+      <SupplierInvoicesDialog key={`${invoiceSupplier}-${reportRange.start}-${reportRange.end}`} initialRange={reportRange} supplier={invoiceSupplier} onClose={() => setInvoiceSupplier(null)} restoreFocus={() => supplierTrigger.current?.focus()} />
     </div>
   );
 }

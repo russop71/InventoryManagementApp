@@ -342,9 +342,8 @@ export function Orders() {
     return () => ws.close();
   }, [inventory, salesData]);
 
-  const displayedSuggestions = showAllSuggestions
-    ? effectiveSuggestions
-    : effectiveSuggestions.filter(s => s.priority === 'critical' || s.priority === 'high');
+  const suggestionsExpanded = showAllSuggestions || !!selectedSupplier;
+  const displayedSuggestions = !suggestionsExpanded ? [] : effectiveSuggestions.filter(s => !selectedSupplier || s.supplier === selectedSupplier);
 
   const totalOrderCost = displayedSuggestions.filter(s => selectedSuggestions.has(s.itemId)).reduce((sum, s) => sum + s.totalCost, 0);
   const selectedCount = selectedSuggestions.size;
@@ -455,6 +454,10 @@ export function Orders() {
   };
 
   const openEmailClient = async (email: SupplierEmailDraft) => {
+    if (user?.email?.trim().toLowerCase() === 'demo@zestiq.com') {
+      toast.info('Demo only — no email sent. Copy or download this draft to preview the order.');
+      return;
+    }
     if (!email.supplierEmail) {
       toast.error('No supplier email address is configured');
       return;
@@ -714,15 +717,8 @@ export function Orders() {
           ))}
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-black text-slate-900">Order workspace</p>
-              <p className="text-xs text-slate-500">Find a supplier, product or purchase order in seconds.</p>
-            </div>
-            <span className="rounded-full bg-[#F5D62E] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[#303A43]">Fast order</span>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
+        <div className="mt-3">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
             <Input
               aria-label="Search orders, suppliers, or items"
               value={orderSearchQuery}
@@ -798,17 +794,17 @@ export function Orders() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge className="bg-[#303A43] text-white">{wsConnected ? 'Live AI' : 'Forecast engine'}</Badge>
-                <Button size="sm" variant="outline" onClick={() => setShowAllSuggestions(!showAllSuggestions)}>
-                  {showAllSuggestions ? 'Priority only' : 'Show all'}
+                <Button size="sm" variant="outline" aria-expanded={suggestionsExpanded} aria-controls="order-suggestions-list" onClick={() => { setShowAllSuggestions(!suggestionsExpanded); setSelectedSupplier(''); setSelectedSuggestions(new Set()); }}>
+                  {suggestionsExpanded ? 'Collapse' : 'Show all'}
                 </Button>
               </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3" hidden={!suggestionsExpanded}>
               <OrderBufferControl value={safetyBufferPercent} onChange={setSafetyBufferPercent} />
             </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+            <div className={suggestionsExpanded ? 'mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2' : 'hidden'}>
               <p className="text-xs text-gray-600">{selectedCount} selected · Est. ${totalOrderCost.toFixed(2)}</p>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={selectAll}>Select all</Button>
@@ -819,18 +815,19 @@ export function Orders() {
             <div className="mt-3">
               <label className="text-xs font-semibold text-gray-600">Supplier</label>
               <select
+                aria-label="Suggestion supplier"
                 value={selectedSupplier}
-                onChange={(event) => setSelectedSupplier(event.target.value)}
+                onChange={(event) => { setSelectedSupplier(event.target.value); setShowAllSuggestions(false); setSelectedSuggestions(new Set()); }}
                 className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
               >
                 <option value="">Choose a supplier</option>
-                {Array.from(new Set(displayedSuggestions.map(item => item.supplier))).sort((a, b) => a.localeCompare(b)).map(supplier => (
+                {Array.from(new Set(effectiveSuggestions.map(item => item.supplier))).sort((a, b) => a.localeCompare(b)).map(supplier => (
                   <option key={supplier} value={supplier}>{supplier}</option>
                 ))}
               </select>
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div id="order-suggestions-list" hidden={!suggestionsExpanded} className="mt-3 space-y-2">
               {displayedSuggestions.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-200 p-4 text-sm text-gray-500">
                   No urgent reorder suggestions right now.
@@ -867,7 +864,7 @@ export function Orders() {
               )}
             </div>
 
-            {selectedCount > 0 && (
+            {suggestionsExpanded && selectedCount > 0 && (
               <div className="mt-3 flex gap-2">
                 <Button className="flex-1 bg-[#303A43] hover:bg-[#1E293B] text-white" onClick={handleApproveOrders}>
                   <Check className="mr-2 h-4 w-4" /> Approve {selectedCount} orders
@@ -1069,6 +1066,7 @@ export function Orders() {
           <DialogHeader>
             <DialogTitle>Supplier email drafts ({draftEmails.length})</DialogTitle>
           </DialogHeader>
+          {user?.email?.trim().toLowerCase() === 'demo@zestiq.com' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Demo only — no emails will be sent. You can edit, copy, or download these drafts.</p>}
           <div className="space-y-3">
             {draftEmails.length === 0 ? (
               <p className="text-sm text-gray-500">No supplier drafts available yet.</p>

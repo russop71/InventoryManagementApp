@@ -25,7 +25,7 @@ function fmtRangeLabel(startDate: string, endDate: string) {
   return `${formatter.format(new Date(startDate))} - ${formatter.format(new Date(endDate))}`;
 }
 
-export function COGSBreakdown({ embedded = false }: { embedded?: boolean }) {
+export function COGSBreakdown({ embedded = false, reportRange }: { embedded?: boolean; reportRange?: { start: string; end: string } }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { inventory } = useInventory();
@@ -40,12 +40,12 @@ export function COGSBreakdown({ embedded = false }: { embedded?: boolean }) {
     };
   }, [salesData]);
   const [draftDateRange, setDraftDateRange] = useState(() => ({ start: dateBounds.start, end: dateBounds.end }));
-  const [appliedDateRange, setAppliedDateRange] = useState(() => ({ start: dateBounds.start, end: dateBounds.end }));
+  const [localDateRange, setAppliedDateRange] = useState(() => ({ start: dateBounds.start, end: dateBounds.end }));
+  const appliedDateRange = reportRange || localDateRange;
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
   const visibleSalesData = salesData.filter(day => {
-    if (!appliedDateRange.start || !appliedDateRange.end) return true;
-    return day.date >= appliedDateRange.start && day.date <= appliedDateRange.end;
+    return (!appliedDateRange.start || day.date.slice(0, 10) >= appliedDateRange.start) && (!appliedDateRange.end || day.date.slice(0, 10) <= appliedDateRange.end);
   });
 
   // ── Aggregate units sold per menu item across all days ─────────────────────
@@ -164,7 +164,7 @@ export function COGSBreakdown({ embedded = false }: { embedded?: boolean }) {
           ))}
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr_auto] lg:items-end">
+        <div hidden={!!reportRange} className={reportRange ? 'hidden' : 'mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr_auto] lg:items-end'}>
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
               <span className="mb-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">

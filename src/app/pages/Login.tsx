@@ -83,7 +83,9 @@ export function Login() {
       toast.success('Logged in as Demo User');
       navigate(returnTo);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Demo login failed');
+      toast.error(error instanceof Error && error.name === 'TimeoutError'
+        ? 'Demo sign-in took too long. Please try again.'
+        : error instanceof Error ? error.message : 'Demo login failed');
     }
     setIsLoading(false);
   };

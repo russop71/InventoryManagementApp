@@ -226,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearDemoSessionReset();
     const payload = await apiRequest<AuthApiResponse>('/api/v1/auth/demo', {
       method: 'POST',
+      signal: AbortSignal.timeout(20_000),
     });
     applySession(payload);
   };

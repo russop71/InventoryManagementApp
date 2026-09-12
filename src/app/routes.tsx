@@ -1,4 +1,5 @@
 import { lazy } from "react";
+const UsageVariance = lazy(() => import("./pages/UsageVariance").then(module => ({ default: module.UsageVariance })));
 import { createBrowserRouter, Navigate, useLocation } from "react-router";
 import { RouteError } from "./components/RouteError";
 
@@ -219,6 +220,7 @@ export const router = createBrowserRouter([
           { path: "invoices", Component: Invoices },
           { path: "ai-orders", Component: LegacyAIOrdersRedirect },
           { path: "costs", Component: CostBreakdown },
+          { path: "usage-variance", Component: UsageVariance },
           { path: "cogs", Component: LegacyCogsRedirect },
           { path: "integrations", Component: Integrations },
           { path: "invoice-scanner", Component: InvoiceScanner },

@@ -33,6 +33,137 @@ const demoRoutes = [
 
 const demoInventoryItems = buildDemoLocationData().inventory;
 
+test('order suggestions start collapsed and expand for all or one supplier', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/orders');
+  const list = page.locator('#order-suggestions-list');
+  await expect(list).not.toBeVisible();
+  await page.getByRole('button', { name: 'Show all', exact: true }).click();
+  await expect(list).toBeVisible();
+  const allCount = await list.getByRole('button').count();
+  expect(allCount).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Collapse', exact: true }).click();
+  await expect(list).not.toBeVisible();
+  const supplier = page.getByRole('combobox', { name: 'Suggestion supplier' });
+  await supplier.selectOption({ index: 1 });
+  await expect(list).toBeVisible();
+  expect(await list.getByRole('button').count()).toBeLessThan(allCount);
+  await page.getByRole('button', { name: 'Select all', exact: true }).click();
+  await supplier.selectOption('');
+  await expect(list).not.toBeVisible();
+  await expect(page.getByRole('button', { name: /^Approve \d+ orders$/ })).toHaveCount(0);
+  await page.reload();
+  await expect(list).not.toBeVisible();
+});
+
+test('actual versus theoretical includes every item and calculates quantity and percentage variance', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.evaluate(() => {
+    const key = Object.keys(localStorage).find(key => key.endsWith(':inventory'))!;
+    const prefix = key.slice(0, -'inventory'.length);
+    const inventory = JSON.parse(localStorage.getItem(key)!);
+    const item = inventory.find((item: { id: string }) => item.id === 'demo-tequila');
+    const entry = { itemId: item.id, name: item.name, unit: item.unit, unitCost: item.unitCost, isCounted: true };
+    localStorage.setItem(prefix + 'inventoryCounts', JSON.stringify([
+      { id: 'opening-qa', countDate: '2026-09-01', description: 'QA opening', status: 'finalized', countType: 'day-end', entries: [{ ...entry, counted: 10 }] },
+      { id: 'closing-qa', countDate: '2026-09-03', description: 'QA closing', status: 'finalized', countType: 'day-end', entries: [{ ...entry, counted: 6 }] },
+    ]));
+    localStorage.setItem(prefix + 'invoices', JSON.stringify([{ id: 'qa-invoice', date: '2026-09-02', status: 'received', orderId: 'qa-order', items: [{ itemId: item.id, quantity: 2, cost: 77 }] }]));
+    localStorage.setItem(prefix + 'orders', JSON.stringify([{ id: 'qa-order', date: '2026-09-02', status: 'received', items: [{ itemId: item.id, quantity: 2, cost: 77 }] }]));
+    localStorage.setItem(prefix + 'recipes', JSON.stringify([{ id: 'qa-recipe', menuItemName: 'QA tequila drink', ingredients: [{ inventoryItemId: item.id, quantity: 1, unit: item.unit }] }]));
+    localStorage.setItem(prefix + 'toastSalesData', JSON.stringify([{ date: '2026-09-02', topItems: [{ itemName: 'QA tequila drink', quantity: 4, revenue: 40 }] }]));
+  });
+  await page.goto('/app/usage-variance');
+  await expect(page.getByRole('heading', { name: 'Actual vs Theoretical' })).toBeVisible();
+  await expect(page.locator('tbody tr')).toHaveCount(demoInventoryItems.length);
+  await page.getByRole('combobox', { name: /^Opening count/ }).selectOption('opening-qa');
+  await page.getByRole('combobox', { name: /^Closing count/ }).selectOption('closing-qa');
+  const row = page.getByRole('row').filter({ hasText: 'Blanco Tequila 750ml' });
+  const sold = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find(key => key.endsWith(':toastSalesData'))!;
+    return JSON.parse(localStorage.getItem(key)!).filter((day: { date: string }) => day.date > '2026-09-01' && day.date <= '2026-09-03')
+      .flatMap((day: { topItems: { itemName: string; quantity: number }[] }) => day.topItems)
+      .filter((sale: { itemName: string }) => sale.itemName === 'QA tequila drink')
+      .reduce((sum: number, sale: { quantity: number }) => sum + sale.quantity, 0);
+  });
+  expect(sold).toBeGreaterThan(0);
+  await expect(row.getByRole('cell').nth(3)).toHaveText('6');
+  await expect(row.getByRole('cell').nth(4)).toHaveText(String(sold));
+  await expect(row.getByRole('cell').nth(5)).toHaveText(String(6 - sold));
+  await expect(row.getByRole('cell').nth(6)).toHaveText(`${((6 - sold) / sold * 100).toLocaleString('en-CA', { maximumFractionDigits: 3 })}%`);
+  await expect(page.getByRole('row').filter({ hasText: 'Ground Beef' })).toContainText('Unavailable');
+});
+
+test('shared report dates filter orders, sales, and supplier invoice history', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/costs');
+  await page.getByLabel('Report from').fill('2099-01-01');
+  await page.getByLabel('Report to').fill('2099-01-31');
+  await expect(page.getByText('0 orders in range · Cancelled excluded')).toBeVisible();
+  await expect(page.getByText('Current Inventory Value')).toBeVisible();
+  await page.getByRole('button', { name: 'View invoices for Ontario Beverage Retail', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('From date')).toHaveValue('2099-01-01');
+  await expect(dialog.getByLabel('To date')).toHaveValue('2099-01-31');
+  await expect(dialog).toContainText('No invoices for this supplier');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Menu COGS', exact: true }).click();
+  await expect(page.getByText(/Cost of Goods Sold · 0 days/)).toBeVisible();
+  await page.getByLabel('Report from').fill('2099-02-01');
+  await expect(page.getByRole('alert')).toContainText('Report from');
+  await page.getByRole('button', { name: 'All dates', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('supplier invoices filter inclusive dates and show invoice totals', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.evaluate(() => {
+    const keys = Object.keys(localStorage).filter(key => key.includes('invoices'));
+    if (!keys.length) throw new Error('Demo invoice storage missing');
+    const records = [
+      { id: 'range-first', invoiceNumber: 'RANGE-001', supplier: 'Ontario Beverage Retail', date: '2026-09-01', totalAmount: 100, status: 'received', items: [] },
+      { id: 'range-last', invoiceNumber: 'RANGE-002', supplier: 'Ontario Beverage Retail', date: '2026-09-30', totalAmount: 250, status: 'open', items: [] },
+      { id: 'range-cancel', invoiceNumber: 'RANGE-CANCEL', supplier: 'Ontario Beverage Retail', date: '2026-09-15', totalAmount: 70, status: 'cancelled', items: [] },
+      { id: 'outside', invoiceNumber: 'OUTSIDE', supplier: 'Ontario Beverage Retail', date: '2026-08-31', totalAmount: 800, status: 'received', items: [] },
+      { id: 'other', invoiceNumber: 'OTHER-SUPPLIER', supplier: 'Another Supplier', date: '2026-09-10', totalAmount: 900, status: 'received', items: [] },
+    ];
+    keys.forEach(key => localStorage.setItem(key, JSON.stringify(records)));
+  });
+  await page.goto('/app/costs');
+  const trigger = page.getByRole('button', { name: 'View invoices for Ontario Beverage Retail', exact: true });
+  await trigger.click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('From date').fill('2026-09-01');
+  await dialog.getByLabel('To date').fill('2026-09-30');
+  await expect(dialog).toContainText('RANGE-001');
+  await expect(dialog).toContainText('RANGE-002');
+  await expect(dialog).toContainText('3 invoices · Total: $350.00');
+  await expect(dialog).not.toContainText('OUTSIDE');
+  await expect(dialog).not.toContainText('OTHER-SUPPLIER');
+  await dialog.getByLabel('From date').fill('2026-10-01');
+  await expect(dialog.getByRole('alert')).toBeVisible();
+  await dialog.getByLabel('To date').fill('2026-10-31');
+  await expect(dialog).toContainText('No invoices for this supplier');
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+});
+
+test('cost items open purchase and sales history with keyboard access', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/costs');
+  const item = page.getByRole('button', { name: 'View purchase and sales history for Blanco Tequila 750ml', exact: true });
+  await item.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'Blanco Tequila 750ml — history' })).toBeVisible();
+  await expect(dialog.getByRole('region', { name: 'Purchase history', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('region', { name: 'Sales history', exact: true })).toBeVisible();
+  await expect(dialog).toContainText('menu revenue');
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  await expect(item).toBeFocused();
+});
+
 function captureRuntimeFailures(page: Page) {
   const failures: string[] = [];
   page.on('pageerror', error => failures.push(`page error: ${error.message}`));
@@ -58,7 +189,7 @@ async function freshDemoLogin(page: Page) {
   await expect(demoButton).toBeVisible();
   await demoButton.focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/app(?:\/dashboard)?$/);
+  await expect(page).toHaveURL(/\/app(?:\/dashboard)?$/, { timeout: 25_000 });
   await expect(page.locator('main')).toBeVisible();
 }
 
@@ -647,6 +778,7 @@ test('forecast buffers create editable supplier-grouped orders and recover from 
   await addInventoryItem(page, { name: 'QA Buffer Peppers', supplier: 'QA Forecast Two', onHand: '0', par: '20', cost: '3' });
 
   await page.goto('/app/ai-orders');
+  await page.getByRole('button', { name: 'Show all', exact: true }).click();
   const bufferControl = page.getByLabel('Forecast safety buffer percentage');
   await bufferControl.getByRole('button', { name: '0%', exact: true }).click();
   const tomatoesSuggestion = page.getByRole('button', { name: /QA Buffer Tomatoes/ });
@@ -675,7 +807,7 @@ test('forecast buffers create editable supplier-grouped orders and recover from 
   expect(downloadedBytes.subarray(0, 8).toString()).toBe('%PDF-1.4');
   expect(downloadedBytes.toString('latin1')).toContain('QA Buffer Tomatoes');
   await emailDialog.getByRole('button', { name: 'Send' }).first().click();
-  await expect(page.getByText('No supplier email address is configured')).toBeVisible();
+  await expect(page.getByText('Demo only — no email sent. Copy or download this draft to preview the order.')).toBeVisible();
   await emailDialog.getByRole('button', { name: 'Close' }).first().click();
 
   await page.goto('/app/orders');
