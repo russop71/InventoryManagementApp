@@ -380,6 +380,13 @@ test('demo-login API failure is explained and the sign-in screen remains usable'
 test('usage numeric columns toggle descending and ascending', async ({ page }) => {
   await freshDemoLogin(page);
   await page.goto('/app/usage-variance');
+  const firstRow = page.locator('tbody tr').first();
+  await expect(firstRow.locator('td').first()).toHaveCSS('border-left-width', '1px');
+  const shaded = await firstRow.locator('td').first().evaluate(cell => getComputedStyle(cell).backgroundColor);
+  expect(shaded).not.toBe('rgba(0, 0, 0, 0)');
+  await expect(firstRow.locator('td').nth(1)).not.toHaveCSS('background-color', shaded);
+  await page.getByRole('table').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('usage-column-separation.png') });
   const titles = ['Opening', 'Received', 'Closing', 'Actual usage', 'Theoretical usage', 'Variance amount', 'Variance %', 'Est. cost variance'];
   for (const [index, title] of titles.entries()) {
     for (const direction of ['highest to lowest', 'lowest to highest']) {
