@@ -377,6 +377,22 @@ test('demo-login API failure is explained and the sign-in screen remains usable'
   await expect(page.getByRole('button', { name: 'Try Demo Account' }).last()).toBeEnabled();
 });
 
+test('beverage stock categories save and survive reload', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/beverages');
+  const category = page.getByRole('combobox', { name: 'Category for House Pinot Grigio', exact: true });
+  await expect(category).toBeVisible();
+  for (const name of ['White Wine', 'Red Wine', 'Liquor', 'Beer']) {
+    await expect(category.locator('option', { hasText: name }).first()).toHaveCount(1);
+  }
+  await category.selectOption('White Wine');
+  await expect(category).toHaveValue('White Wine');
+  await page.reload();
+  await expect(category).toHaveValue('White Wine');
+  await page.getByRole('link', { name: 'House Pinot Grigio', exact: true }).click();
+  await expect(page.getByText('White Wine', { exact: false }).first()).toBeVisible();
+});
+
 test('usage numeric columns toggle descending and ascending', async ({ page }) => {
   await freshDemoLogin(page);
   await page.goto('/app/usage-variance');
