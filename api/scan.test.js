@@ -1,7 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { mapRecipeScanError, normalizeRecipeIngredientName, normalizeScannedRecipe } from './scan.js';
+import { mapRecipeScanError, normalizeRecipeIngredientName, normalizeScannedRecipe, recipeInputContent } from './scan.js';
+
+test('recipe documents use native file input and photos retain image input', () => {
+  for (const [mime, extension] of [['application/pdf', 'pdf'], ['application/msword', 'doc'], ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx']]) {
+    const data = `data:${mime};base64,cmVjaXBl`;
+    assert.deepEqual(recipeInputContent(data), { type: 'input_file', filename: `recipe.${extension}`, file_data: data });
+  }
+  const image = 'data:image/png;base64,cmVjaXBl';
+  assert.deepEqual(recipeInputContent(image), { type: 'input_image', image_url: image, detail: 'high' });
+});
+
+test('recipe input rejects unsupported, empty, malformed and oversized documents', () => {
+  for (const data of [undefined, 'data:text/html;base64,YQ==', 'data:application/pdf;base64,', 'data:application/pdf;base64,!!']) {
+    assert.throws(() => recipeInputContent(data), { status: 400 });
+  }
+  assert.throws(() => recipeInputContent(`data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024 + 1).toString('base64')}`), { status: 413 });
+});
 
 test('normalizes AI recipe matches against authoritative inventory IDs', () => {
   const recipe = normalizeScannedRecipe({

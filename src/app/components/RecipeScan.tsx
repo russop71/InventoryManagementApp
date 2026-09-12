@@ -49,6 +49,7 @@ const MIN_AUTO_MATCH_CONFIDENCE = 0.7;
 
 export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: RecipeScanProps) {
   const [image, setImage] = useState<string | null>(null);
+  const [documentName, setDocumentName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<ScannedRecipeData | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -70,6 +71,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
   const reset = () => {
     stopCamera();
     setImage(null);
+    setDocumentName('');
     setIsProcessing(false);
     setExtractedData(null);
     setErrorMessage('');
@@ -151,23 +153,33 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setErrorMessage('Upload a JPEG, PNG, or WebP recipe photo.');
+    const types: Record<string, string> = {
+      pdf: 'application/pdf', doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    };
+    const mime = (!file.type || file.type === 'application/octet-stream')
+      ? types[file.name.split('.').pop()?.toLowerCase() || ''] : file.type;
+    if (!Object.values(types).includes(mime)) {
+      setErrorMessage('Upload a JPEG, PNG, WebP, PDF, DOC, or DOCX recipe.');
       event.target.value = '';
       return;
     }
-    if (file.size > 4 * 1024 * 1024) {
-      setErrorMessage('Use a recipe photo smaller than 4 MB.');
+    const isDocument = mime.startsWith('application/');
+    if (!file.size || file.size > (isDocument ? 3 : 4) * 1024 * 1024) {
+      setErrorMessage(!file.size ? 'This file is empty. Choose another file.' : isDocument ? 'Use a document no larger than 3 MB.' : 'Use a recipe photo smaller than 4 MB.');
       event.target.value = '';
       return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onerror = () => setErrorMessage('Could not read this file. Choose it again or try another file.');
+    reader.onload = () => {
       const imageData = String(reader.result || '');
+      setDocumentName(isDocument ? file.name : '');
       setImage(imageData);
       void processImage(imageData);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(new Blob([file], { type: mime }));
   };
 
   const ingredientCost = (ingredient: ScannedRecipeIngredient) => {
@@ -218,11 +230,12 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
         <DialogHeader>
           <DialogTitle>AI Recipe Scanner</DialogTitle>
           <DialogDescription>
-            Photograph a handwritten or printed recipe. AI transcribes it and matches ingredients to current inventory for costing.
+            Photograph a recipe or upload a PDF or Word document. AI transcribes it and matches ingredients to current inventory for costing.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          <p className="text-sm text-slate-600">Files are sent to OpenAI for recipe extraction. Review before saving. Upload one recipe at a time. PDF and Word files: up to 3 MB. Word reads text only; export recipes embedded as pictures to PDF first.</p>
           {!image && !isCameraActive && (
             <div className="grid gap-3 sm:grid-cols-2">
               <Button type="button" className="bg-[#303A43] text-white hover:bg-[#1E293B]" onClick={startCamera} disabled={inventory.length === 0}>
@@ -231,13 +244,12 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="environment"
+                accept="image/jpeg,image/png,image/webp,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={handleFileUpload}
                 className="hidden"
               />
               <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={inventory.length === 0}>
-                <Upload className="mr-2 h-4 w-4" /> Upload Photo
+                <Upload className="mr-2 h-4 w-4" /> Upload File
               </Button>
               {inventory.length === 0 && (
                 <p className="sm:col-span-2 text-sm text-amber-700">Add inventory items before scanning so every ingredient can be matched and costed.</p>
@@ -261,7 +273,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
 
           {image && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-              <img src={image} alt="Recipe to scan" className="max-h-72 w-full object-contain" />
+              {documentName ? <p className="break-words p-4 text-sm">Recipe document: {documentName}</p> : <img src={image} alt="Recipe to scan" className="max-h-72 w-full object-contain" />}
             </div>
           )}
 

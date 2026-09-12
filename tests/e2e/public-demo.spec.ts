@@ -402,6 +402,28 @@ test('handwritten recipe photo can be reviewed, corrected, and approved before s
   await expect(page.getByText('Classic Tomato Basil Sauce').last()).toBeVisible();
 });
 
+for (const [extension, mime] of [['pdf', 'application/pdf'], ['doc', 'application/msword'], ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']]) {
+  test(`recipe ${extension} upload opens review without saving automatically`, async ({ page }) => {
+    const uploads: string[] = [];
+    await mockRecipeScan(page, uploads);
+    await freshDemoLogin(page);
+    await page.goto('/app/recipes');
+    await page.getByRole('button', { name: 'Scan Recipe' }).click();
+    await expect(page.getByText(/Files are sent to OpenAI/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Upload File' })).toBeVisible();
+    const input = page.locator('input[type="file"][accept*="image/jpeg"]');
+    await input.setInputFiles({ name: `large.${extension}`, mimeType: mime, buffer: Buffer.alloc(3 * 1024 * 1024 + 1) });
+    await expect(page.getByText('Use a document no larger than 3 MB.')).toBeVisible();
+    expect(uploads).toHaveLength(0);
+    await input.setInputFiles({ name: `recipe.${extension}`, mimeType: mime, buffer: Buffer.from('Mock recipe document') });
+    await expect(page.getByText('AI scan complete')).toBeVisible();
+    await expect(page.getByText(`Recipe document: recipe.${extension}`)).toBeVisible();
+    expect(uploads).toHaveLength(1);
+    expect(uploads[0]).toContain(`data:${mime};base64,`);
+    await expect(page.getByRole('button', { name: 'Review Recipe' })).toBeVisible();
+  });
+}
+
 test('camera capture produces a recipe image and opens human review', async ({ page }) => {
   const capturedImages: string[] = [];
   await mockRecipeScan(page, capturedImages);
