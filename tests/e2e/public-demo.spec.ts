@@ -291,12 +291,22 @@ async function mockInvoiceScan(page: Page, capturedImages: string[] = []) {
   });
 }
 
+async function chooseInventoryOption(page: Page, label: string, value: string) {
+  const select = page.getByRole('dialog').getByRole('combobox', { name: label, exact: true });
+  if (await select.locator('option').evaluateAll((options, value) => options.some(option => (option as HTMLOptionElement).value === value), value)) {
+    await select.selectOption(value);
+  } else {
+    await select.selectOption('__new__');
+    await page.getByLabel(`New ${label.toLowerCase()}`, { exact: true }).fill(value);
+  }
+}
+
 async function addInventoryItem(page: Page, values: { name: string; category?: string; supplier?: string; unit?: string; onHand?: string; par?: string; cost?: string }) {
   await page.getByRole('button', { name: 'Add Item' }).click();
   await page.getByLabel('Item name', { exact: true }).fill(values.name);
-  await page.getByLabel('Category', { exact: true }).fill(values.category || 'Produce');
-  await page.getByLabel('Supplier', { exact: true }).fill(values.supplier || 'QA Produce Supplier');
-  await page.getByLabel('Unit', { exact: true }).fill(values.unit || 'kg');
+  await chooseInventoryOption(page, 'Category', values.category || 'Produce');
+  await chooseInventoryOption(page, 'Supplier', values.supplier || 'QA Produce Supplier');
+  await chooseInventoryOption(page, 'Unit', values.unit || 'kg');
   await page.getByLabel('On hand', { exact: true }).fill(values.onHand || '5');
   await page.getByLabel('Par level', { exact: true }).fill(values.par || '8');
   await page.getByLabel('Unit cost', { exact: true }).fill(values.cost || '4.25');
@@ -312,6 +322,27 @@ async function addRecipeIngredient(page: Page, name: string) {
   await search.press('Enter');
   await expect(dialog.getByLabel(`Quantity for ${name}`)).toBeVisible();
 }
+
+test('mobile location selector and notification controls stay visible across widths', async ({ page }) => {
+  await freshDemoLogin(page);
+  for (const width of [320, 390, 640, 768, 877]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/app/notifications');
+    const location = page.locator('select[aria-label="Active location"]:visible');
+    await expect(location).toBeVisible();
+    const box = (await location.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.height).toBeGreaterThanOrEqual(40);
+    await location.selectOption(await location.inputValue());
+    for (const toggle of await page.getByRole('switch').all()) {
+      await toggle.scrollIntoViewIfNeeded();
+      const bounds = (await toggle.boundingBox())!;
+      expect(bounds.width).toBeGreaterThanOrEqual(44);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    }
+  }
+});
 
 test('fresh public-demo visitor can enter with the keyboard and traverse every demo route', async ({ page }) => {
   test.setTimeout(120_000);
@@ -531,6 +562,29 @@ test('invoice review handles tax, credits, low confidence, new records, duplicat
   await expect(page.getByText('Invoice Extracted')).toHaveCount(0);
 });
 
+test('inventory dropdowns start blank, accept existing and custom options, and persist', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/inventory');
+  await page.getByRole('button', { name: 'Add Item' }).click();
+  for (const label of ['Category', 'Supplier', 'Storage area', 'Unit', 'Pack unit']) {
+    await expect(page.getByRole('dialog').getByRole('combobox', { name: label, exact: true })).toHaveValue('');
+  }
+  await page.getByLabel('Item name', { exact: true }).fill('QA Dropdown Item');
+  await chooseInventoryOption(page, 'Category', 'QA Custom Category');
+  await chooseInventoryOption(page, 'Supplier', 'QA Dropdown Supplier');
+  await chooseInventoryOption(page, 'Storage area', 'QA Dropdown Cooler');
+  await chooseInventoryOption(page, 'Unit', 'kg');
+  await chooseInventoryOption(page, 'Pack unit', 'QA Custom Pack');
+  await page.getByRole('button', { name: 'Save item' }).click();
+  await page.reload();
+  await expect(page.getByText('QA Dropdown Item', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Add Item' }).click();
+  for (const [label, value] of [['Category', 'QA Custom Category'], ['Supplier', 'QA Dropdown Supplier'], ['Storage area', 'QA Dropdown Cooler'], ['Pack unit', 'QA Custom Pack']]) {
+    await page.getByRole('dialog').getByRole('combobox', { name: label, exact: true }).selectOption(value);
+  }
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+});
+
 test('inventory supports validated add, edit, aliases, multiple areas, merge, persistence, and delete', async ({ page }) => {
   test.setTimeout(90_000);
   const primaryName = 'QA Golden Tomatoes';
@@ -592,6 +646,32 @@ test('inventory supports validated add, edit, aliases, multiple areas, merge, pe
   await expect(page).toHaveURL(/\/app\/inventory$/);
   await page.getByPlaceholder('Search items...').fill(primaryName);
   await expect(page.getByText(primaryName, { exact: true })).toHaveCount(0);
+});
+
+test('inventory count layout fits narrow and wide workspaces without overlapping columns', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/inventory/counts/new');
+  await expect(page.getByText('Count in progress')).toBeVisible();
+  for (const width of [877, 1230, 1600]) {
+    await page.setViewportSize({ width, height: 758 });
+    const area = page.locator('.inventory-count-area').first();
+    const areaWidth = (await area.boundingBox())!.width;
+    if (areaWidth < 960) {
+      await expect(area.locator('.inventory-count-cards')).toBeVisible();
+      await expect(area.locator('.inventory-count-table')).toBeHidden();
+    } else {
+      await expect(area.locator('.inventory-count-table')).toBeVisible();
+      const cells = await area.locator('.inventory-count-columns').first().locator(':scope > div').evaluateAll(nodes => nodes.map(node => {
+        const rect = node.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, fits: node.scrollWidth <= node.clientWidth };
+      }));
+      for (let index = 0; index < cells.length; index++) {
+        expect(cells[index].fits).toBeTruthy();
+        if (index) expect(cells[index].left).toBeGreaterThan(cells[index - 1].right);
+      }
+    }
+    expect(await area.evaluate(node => node.scrollWidth <= node.clientWidth)).toBeTruthy();
+  }
 });
 
 test('inventory count supports drafts, repeated storage-area lines, finalization, and locking', async ({ page }) => {

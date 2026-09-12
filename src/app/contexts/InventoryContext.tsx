@@ -569,7 +569,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       const nextInvoices = shouldReset || localInvoices.length === 0 ? fallbackInvoices : localInvoices;
       const nextSuppliers = shouldReset || localSuppliers.length === 0 ? fallbackSuppliers : localSuppliers;
       const nextPreppedRecipes = shouldReset || localPreppedRecipes.length === 0 ? fallbackPreppedRecipes : localPreppedRecipes;
-      const nextCounts = shouldReset ? [] : localInventoryCounts;
+      const nextCounts = shouldReset ? demoData.inventoryCounts || [] : localInventoryCounts;
       const nextCategories = buildCategories(nextInventory, nextSuppliers, shouldReset ? [] : localCategories);
       const mergedStorageAreas = sortUniqueStorageAreas([...DEFAULT_STORAGE_AREAS, ...nextStorageAreas, ...nextInventory.map(item => normalizeStorageArea(item.storageArea))]);
       setInventory(nextInventory); setRecipes(nextRecipes); setStorageAreas(mergedStorageAreas); setOrders(nextOrders); setInvoices(nextInvoices); setSuppliers(nextSuppliers); setCategories(nextCategories); setPreppedRecipes(nextPreppedRecipes); setInventoryCounts(nextCounts);
@@ -1243,11 +1243,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const updateOrder = (orderId: string, updates: Partial<Omit<DailyOrder, 'id'>>) => {
-    setOrders(previous => {
-      const nextOrders = previous.map(order => order.id === orderId ? { ...order, ...updates } : order);
-      saveLocationData(inventory, recipes, storageAreas, nextOrders, invoices, suppliers, preppedRecipes);
-      return nextOrders;
-    });
+    const order = orders.find(entry => entry.id === orderId);
+    if (!order) return;
+    const updated = { ...order, ...updates };
+    const nextOrders = orders.map(entry => entry.id === orderId ? updated : entry);
+    // Persist both sides together; separate writes can overwrite one another
+    // with stale order/invoice snapshots.
+    const nextInvoices = updates.items ? invoices.map(invoice => invoice.orderId === orderId
+      ? { ...invoice, items: updated.items.map(item => ({ ...item })), totalAmount: updated.items.reduce((sum, item) => sum + item.cost, 0) }
+      : invoice) : invoices;
+    setOrders(nextOrders);
+    setInvoices(nextInvoices);
+    saveLocationData(inventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
   };
 
   const addInvoice = (invoiceInput: Omit<InvoiceRecord, 'id'>) => {
@@ -1280,8 +1287,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    setInvoices(prev => {
-      const nextInvoices = prev.map(invoice => {
+    const currentInvoice = invoices.find(invoice => invoice.id === invoiceId);
+    if (!currentInvoice) return { success: false, error: 'Invoice not found.' };
+    const nextInvoices = invoices.map(invoice => {
         if (invoice.id !== invoiceId) return invoice;
 
         const nextInvoice = {
@@ -1295,9 +1303,21 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
         return nextInvoice;
       });
-      saveLocationData(inventory, recipes, storageAreas, orders, nextInvoices, suppliers, preppedRecipes);
-      return nextInvoices;
-    });
+    // Update the linked order status in this same snapshot. Calling
+    // updateOrderStatus separately restores the original order's invoice lines.
+    const linkedOrder = orders.find(order => order.id === currentInvoice.orderId);
+    const nextOrders = updates.status === 'received' && linkedOrder
+      ? orders.map(order => order.id === linkedOrder.id ? { ...order, status: 'received' as const } : order)
+      : orders;
+    const firstReceipt = updates.status === 'received' && linkedOrder && linkedOrder.status !== 'received';
+    const nextInventory = firstReceipt ? inventory.map(item => {
+      const quantity = (updates.items || currentInvoice.items).filter(line => line.itemId === item.id).reduce((sum, line) => sum + line.quantity, 0);
+      return quantity ? { ...item, currentStock: item.currentStock + quantity, lastUpdated: new Date().toISOString() } : item;
+    }) : inventory;
+    setInvoices(nextInvoices);
+    setOrders(nextOrders);
+    setInventory(nextInventory);
+    saveLocationData(nextInventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
     return { success: true };
   };
 

@@ -15,6 +15,7 @@ import {
   Check, AlertCircle, TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { defaultOrderReceiptDate } from '../utils/orderReceiptDate';
 import { calculateForecastOrderQuantity, estimateDemandForTomorrow } from '../utils/forecastOrderUtils';
 import { buildSupplierEmailDrafts, parseEmailList } from '../utils/supplierEmailDraft.js';
 import { downloadSupplierOrdersPdf } from '../utils/supplierOrderPdf.js';
@@ -113,7 +114,7 @@ interface SupplierEmailDraft {
 }
 
 export function Orders() {
-  const { orders, inventory, forecasts, updateOrder, updateOrderStatus, placeOrder, suppliers, invoices, updateInvoice } = useInventory();
+  const { orders, inventory, forecasts, updateOrder, updateOrderStatus, placeOrder, suppliers, invoices } = useInventory();
   const { salesData } = useToast();
   const { accountId, accountName, user } = useAuth();
   const navigate = useNavigate();
@@ -606,11 +607,6 @@ export function Orders() {
     updateOrder(orderId, { items: updatedOrder.items, totalCost: updatedOrder.totalCost, supplierDates });
     setDetailOrder({ ...updatedOrder, supplierDates });
 
-    const existingInvoice = invoices.find(invoice => invoice.orderId === orderId);
-    if (existingInvoice) {
-      updateInvoice(existingInvoice.id, { items: nextItems, totalAmount: updatedTotal, supplier: primarySupplierFor(order) });
-    }
-
     toast.success('Order lines updated');
   };
 
@@ -654,6 +650,10 @@ export function Orders() {
     const nextDates = Object.fromEntries(
       Object.entries(order.supplierDates || {}).filter(([, value]) => Boolean(value))
     );
+    order.items.forEach(line => {
+      const supplier = inventory.find(item => item.id === line.itemId)?.supplier || 'Supplier';
+      if (!nextDates[supplier]) nextDates[supplier] = defaultOrderReceiptDate(order.date);
+    });
     setSupplierDateOverrides(nextDates);
   };
 
@@ -897,8 +897,7 @@ export function Orders() {
             const cfg = STATUS_CFG[order.status as OrderStatus] ?? STATUS_CFG.pending;
             const av  = avatarColor(primarySup);
 
-            const delivery = new Date(order.date);
-            delivery.setDate(delivery.getDate() + 3);
+            const delivery = new Date(`${order.supplierDates?.[primarySup] || defaultOrderReceiptDate(order.date)}T12:00:00`);
 
             return (
               <button
@@ -1195,10 +1194,10 @@ export function Orders() {
                 {Object.entries(groups).map(([sup, items]) => {
                   const av = avatarColor(sup);
                   const tot = items.reduce((sum, oi) => sum + (editableItems[oi.itemId]?.cost ?? oi.cost), 0);
-                  const receiptDate = supplierDateOverrides[sup] || detailOrder.supplierDates?.[sup] || '';
+                  const receiptDate = supplierDateOverrides[sup] ?? detailOrder.supplierDates?.[sup] ?? defaultOrderReceiptDate(detailOrder.date);
                   return (
                     <div key={sup}>
-                      <div className="mb-2 flex items-center gap-2 px-1">
+                      <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-black" style={{ background: av.bg, color: av.text }}>
                           {initials(sup)}
                         </div>
@@ -1223,7 +1222,7 @@ export function Orders() {
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold text-gray-600">Item</th>
                               <th className="px-3 py-2 text-left font-semibold text-gray-600">Qty</th>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Cost</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Line cost</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
@@ -1268,12 +1267,12 @@ export function Orders() {
                   );
                 })}
 
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1 font-bold" onClick={() => handleSaveLineEdits(detailOrder.id)}>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button variant="outline" className="min-h-11 h-auto flex-1 basis-40 whitespace-normal py-3 font-bold" onClick={() => handleSaveLineEdits(detailOrder.id)}>
                     Save Changes
                   </Button>
                   {(detailOrder.status === 'pending' || detailOrder.status === 'ordered') && (
-                    <Button className="flex-1 font-bold" style={{ background: '#166534', color: '#fff' }}
+                    <Button className="min-h-11 h-auto flex-1 basis-56 whitespace-normal py-3 font-bold" style={{ background: '#166534', color: '#fff' }}
                       onClick={() => handleReceiveOrder(detailOrder.id)}>
                       <CheckCircle2 className="w-4 h-4 mr-1.5" /> Receive &amp; save invoice
                     </Button>
@@ -1283,7 +1282,7 @@ export function Orders() {
                       <CheckCircle2 className="w-4 h-4" /> Order Complete
                     </div>
                   )}
-                  <Button variant="outline" className="flex-1" onClick={() => setDetailOrder(null)}>Close</Button>
+                  <Button variant="outline" className="min-h-11 h-auto flex-1 basis-24 whitespace-normal py-3" onClick={() => setDetailOrder(null)}>Close</Button>
                 </div>
               </div>
             );

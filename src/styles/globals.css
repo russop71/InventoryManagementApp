@@ -47,3 +47,17 @@ canvas {
     color: #303a43;
   }
 }
+/* Count columns depend on available space, including an open sidebar. */
+.inventory-count-area {
+  container-type: inline-size;
+}
+.inventory-count-table {
+  display: none;
+}
+.inventory-count-columns {
+  grid-template-columns: minmax(220px, 1.7fr) minmax(88px, .8fr) minmax(88px, .8fr) minmax(180px, 1fr) minmax(130px, 1fr) 76px;
+}
+@container (min-width: 960px) {
+  .inventory-count-cards { display: none; }
+  .inventory-count-table { display: block; }
+}

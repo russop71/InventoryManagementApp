@@ -23,6 +23,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useInventory } from '../contexts/InventoryContext';
+import { InventoryOptionSelect } from '../components/InventoryOptionSelect';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -69,7 +70,8 @@ const STATUS: Record<Status, { label: string; bg: string; color: string }> = {
 export function Inventory() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { inventory, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount, deleteInventoryItems, mergeInventoryItems } = useInventory();
+  const { inventory, categories, suppliers, storageAreas, inventoryCounts, addInventoryItem, updateInventoryItem, deleteInventoryCount, deleteInventoryItems, mergeInventoryItems } = useInventory();
+  const unitOptions = ['mg', 'g', 'kg', 'oz', 'lb', 'mL', 'L', 'fl oz', 'cup', 'tbsp', 'tsp', 'gallon', 'each', 'batch', 'bottle', 'can', 'case', 'bag', 'box', 'pack', ...inventory.flatMap(item => [item.unit, item.packUnit || ''])];
   const canManageCounts = ['Owner', 'Admin', 'Manager', 'BOH Manager', 'FOH Manager'].includes(user?.role || '');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<InventorySort>('name-asc');
@@ -764,12 +766,8 @@ export function Inventory() {
               <label className="text-sm font-bold text-slate-700 sm:col-span-2">Item name<span aria-hidden="true"> *</span>
                 <input autoFocus aria-label="Item name" aria-required="true" value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Example: Fresh basil" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
-              <label className="text-sm font-bold text-slate-700">Category<span aria-hidden="true"> *</span>
-                <input aria-label="Category" aria-required="true" value={newItem.category} onChange={event => setNewItem(prev => ({ ...prev, category: event.target.value }))} placeholder="Example: Produce" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
-              </label>
-              <label className="text-sm font-bold text-slate-700">Supplier<span aria-hidden="true"> *</span>
-                <input aria-label="Supplier" aria-required="true" value={newItem.supplier} onChange={event => setNewItem(prev => ({ ...prev, supplier: event.target.value }))} placeholder="Supplier name" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
-              </label>
+              <InventoryOptionSelect label="Category" required value={newItem.category} options={[...categories.map(category => category.name), ...filterOptions.categories]} onChange={category => setNewItem(prev => ({ ...prev, category }))} />
+              <InventoryOptionSelect label="Supplier" required value={newItem.supplier} options={[...suppliers.map(supplier => supplier.name), ...filterOptions.suppliers]} onChange={supplier => setNewItem(prev => ({ ...prev, supplier }))} />
               <label className="text-sm font-bold text-slate-700">SKU
                 <input value={newItem.sku} onChange={event => setNewItem(prev => ({ ...prev, sku: event.target.value }))} placeholder="Optional" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
@@ -779,12 +777,8 @@ export function Inventory() {
               <label className="text-sm font-bold text-slate-700 sm:col-span-2">Invoice aliases
                 <input value={newItem.invoiceAliases} onChange={event => setNewItem(prev => ({ ...prev, invoiceAliases: event.target.value }))} placeholder="Names this item may use on supplier invoices" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
-              <label className="text-sm font-bold text-slate-700">Storage area
-                <input value={newItem.storageArea} onChange={event => setNewItem(prev => ({ ...prev, storageArea: event.target.value }))} placeholder="Example: Walk-In Cooler" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
-              </label>
-              <label className="text-sm font-bold text-slate-700">Unit<span aria-hidden="true"> *</span>
-                <input aria-label="Unit" aria-required="true" value={newItem.unit} onChange={event => setNewItem(prev => ({ ...prev, unit: event.target.value }))} placeholder="Example: lb, kg, bottle" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
-              </label>
+              <InventoryOptionSelect label="Storage area" value={newItem.storageArea} options={storageAreas} onChange={storageArea => setNewItem(prev => ({ ...prev, storageArea }))} />
+              <InventoryOptionSelect label="Unit" required value={newItem.unit} options={unitOptions} onChange={unit => setNewItem(prev => ({ ...prev, unit }))} />
               <label className="text-sm font-bold text-slate-700">On hand
                 <input type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
@@ -812,9 +806,7 @@ export function Inventory() {
               <label className="text-sm font-bold text-slate-700">Pack size
                 <input type="number" min="0" step="0.01" value={newItem.packSize} onChange={event => setNewItem(prev => ({ ...prev, packSize: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>
-              <label className="text-sm font-bold text-slate-700">Pack unit
-                <input value={newItem.packUnit} onChange={event => setNewItem(prev => ({ ...prev, packUnit: event.target.value }))} placeholder="Example: oz, kg, can" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
-              </label>
+              <InventoryOptionSelect label="Pack unit" value={newItem.packUnit} options={unitOptions} onChange={packUnit => setNewItem(prev => ({ ...prev, packUnit }))} />
               <label className="text-sm font-bold text-slate-700">Units per pack
                 <input type="number" min="0" step="0.01" value={newItem.unitsPerPack} onChange={event => setNewItem(prev => ({ ...prev, unitsPerPack: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
               </label>

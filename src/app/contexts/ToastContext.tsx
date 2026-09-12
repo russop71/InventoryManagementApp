@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { useInventory, type Recipe } from './InventoryContext';
 import { locationScopedStorageKey, readScopedJson } from '../utils/storageScope';
 import { apiRequest } from '../utils/api';
+import { buildDemoSales } from '../utils/demoSales';
 
 export interface ToastSalesData {
   date: string;
@@ -113,7 +114,7 @@ function demoCogsCategory(category: string) {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const { accountId, activeLocationId, token, user } = useAuth();
-  const { recipes, syncToastMenuItems } = useInventory();
+  const { recipes, inventoryCounts, syncToastMenuItems } = useInventory();
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   const [isHydrated, setIsHydrated] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -134,21 +135,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     ingredients: recipe.ingredients.map(ingredient => ({ inventoryItemId: ingredient.inventoryItemId, quantity: ingredient.quantity })),
   }));
 
-  const buildDemoSales = (items: ToastMenuItem[]): ToastSalesData[] => Array.from({ length: 30 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (29 - index));
-    const dayOfWeek = date.getDay();
-    const demandFactor = dayOfWeek === 5 || dayOfWeek === 6 ? 1.35 : dayOfWeek === 0 ? 1.18 : 0.94;
-    const topItems = items.map((item, itemIndex) => {
-      const menuMix = Math.max(0.58, 1.32 - itemIndex * 0.045);
-      const baseQuantity = 16 + ((index * 11 + itemIndex * 7) % 34);
-      const quantity = Math.max(1, Math.round(baseQuantity * demandFactor * menuMix));
-      return { itemName: item.name, quantity, revenue: quantity * Math.max(item.price, 1) };
-    }).sort((left, right) => right.revenue - left.revenue);
-    const revenue = topItems.reduce((sum, item) => sum + item.revenue, 0);
-    return { date: date.toISOString().split('T')[0], covers: Math.max(1, Math.round(revenue / 42)), revenue, topItems };
-  });
-
   const demoState = () => {
     const recipeItems = buildMenuItemsFromRecipes(recipes);
     const items = recipeItems.length > 0 ? recipeItems : [
@@ -156,7 +142,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       { id: 'demo-salmon', name: 'Cedar Salmon', category: 'Food', price: 34, ingredients: [] },
       { id: 'demo-negroni', name: 'House Negroni', category: 'Cocktail', price: 16, ingredients: [] },
     ];
-    return { items, sales: buildDemoSales(items), cogsCategories: DEMO_COGS_CATEGORIES };
+    const closing = inventoryCounts.find(count => count.id === 'demo-usage-count-0');
+    return { items, sales: buildDemoSales(items, closing ? new Date(`${closing.countDate.slice(0, 10)}T12:00:00Z`) : new Date()), cogsCategories: DEMO_COGS_CATEGORIES };
   };
 
   useEffect(() => {

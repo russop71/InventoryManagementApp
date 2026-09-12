@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router';
 import {
-  LayoutDashboard, Package, ChefHat,
+  LayoutDashboard, Package, ChefHat, Percent,
   Users, LogOut, CreditCard, HelpCircle, MessageSquare, Bell,
   FileText, Shield, User, Truck, AlarmClock, Settings, Receipt, ChevronDown, Building2, CalendarClock, Trash2, TrendingUp, Wine,
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { TeamPageTabs } from './TeamPageTabs';
 import { apiRequest } from '../utils/api';
 import { AIChat } from './AIChat';
 import { ZestIQBrand } from './ZestIQBrand';
@@ -54,7 +55,7 @@ export function Layout() {
       items: [
         { label: 'Forecasting', path: '/app/forecasting', icon: TrendingUp },
         { label: 'Cost & COGS', path: '/app/costs', icon: FileText },
-        { label: 'Actual vs Theoretical', path: '/app/usage-variance', icon: FileText },
+        { label: 'Actual vs Theoretical', path: '/app/usage-variance', icon: Percent },
         { label: 'Waste Tracking', path: '/app/waste', icon: Trash2 },
       ],
     },
@@ -173,7 +174,7 @@ export function Layout() {
 
       {/* ── Desktop top bar ──────────────────────────────── */}
       <header className="fixed left-[264px] right-0 top-0 z-40 hidden h-[72px] items-center justify-between border-b border-[#DDD6C6] bg-[#FCFBF7]/95 px-7 backdrop-blur md:flex">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3 pr-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDD6C6] bg-white shadow-sm transition hover:border-[#F5D62E] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E]" aria-label="Menu">
@@ -208,14 +209,14 @@ export function Layout() {
               <div className="py-1"><DropdownMenuItem onClick={handleLogout} className="mx-1 rounded-lg text-red-600 focus:bg-red-50 focus:text-red-600"><LogOut className="mr-2.5 h-4 w-4" />Logout</DropdownMenuItem></div>
             </DropdownMenuContent>
           </DropdownMenu>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#9A8B65]">Restaurant operations</p>
-            <p className="mt-0.5 text-sm font-bold text-[#303A43]">{accountName || 'ZestIQ'} <span className="font-medium text-[#8A9298]">· {locations.find(site => site.id === activeLocationId)?.name || 'All locations'}</span></p>
+            <p className="mt-0.5 truncate text-sm font-bold text-[#303A43]" title={accountName || 'ZestIQ'}>{accountName || 'ZestIQ'} <span className="font-medium text-[#8A9298]">· {locations.find(site => site.id === activeLocationId)?.name || 'All locations'}</span></p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <select
-            className="h-10 rounded-xl border border-[#DDD6C6] bg-white px-3 text-sm font-semibold text-[#303A43] shadow-sm outline-none focus:border-[#F5D62E] focus:ring-2 focus:ring-[#F5D62E]/20"
+            className="h-10 w-36 min-w-0 rounded-xl border border-[#DDD6C6] bg-white px-3 text-sm font-semibold text-[#303A43] shadow-sm outline-none focus:border-[#F5D62E] focus:ring-2 focus:ring-[#F5D62E]/20 lg:w-48"
             value={activeLocationId ?? ''}
             onChange={(event) => switchLocation(event.target.value)}
             aria-label="Active location"
@@ -315,8 +316,8 @@ export function Layout() {
           </button>
         </div>
 
-        <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1.5">
+        <div className="flex min-w-0 flex-col gap-2 px-4 pb-3">
+          <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-2 py-1.5">
             {topMenuGroups.map(group => (
               <DropdownMenu
                 key={group.label}
@@ -367,10 +368,11 @@ export function Layout() {
               </DropdownMenu>
             ))}
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="flex w-full min-w-0 items-center gap-3">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Location</span>
             <select
-              className="h-8 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700"
+              aria-label="Active location"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2.5 text-sm font-medium text-gray-700"
               value={activeLocationId ?? ''}
               onChange={(event) => switchLocation(event.target.value)}
             >
@@ -387,6 +389,7 @@ export function Layout() {
       {/* ── Content ──────────────────────────────────────── */}
       <main className="min-w-0 overflow-x-clip px-3 pb-40 pt-4 sm:px-4 md:ml-[264px] md:px-7 md:pb-8 md:pt-[96px]">
         <div className="mx-auto w-full max-w-[1500px]">
+          <TeamPageTabs />
           <Outlet />
         </div>
       </main>

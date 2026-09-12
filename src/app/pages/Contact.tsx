@@ -4,11 +4,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Mail, MapPin, Send } from 'lucide-react';
 
-const SUPPORT_EMAIL = 'Pat@zestiq.ca';
-const SUPPORT_PHONE_DISPLAY = '416-455-7401';
-const SUPPORT_PHONE_LINK = '+14164557401';
+const SUPPORT_EMAIL = 'support@zestiq.ca';
 
 export function Contact() {
   const [formData, setFormData] = useState({
@@ -56,20 +54,6 @@ export function Contact() {
               <div>
                 <p className="font-medium">Email Support</p>
                 <p className="text-sm text-gray-600">{SUPPORT_EMAIL}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `tel:${SUPPORT_PHONE_LINK}`}>
-          <CardContent className="py-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Phone className="w-6 h-6 text-green-900" />
-              </div>
-              <div>
-                <p className="font-medium">Phone Support</p>
-                <p className="text-sm text-gray-600">{SUPPORT_PHONE_DISPLAY}</p>
               </div>
             </div>
           </CardContent>

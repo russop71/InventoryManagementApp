@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useInventory, type InventoryItem } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import type { InventoryCount } from '../utils/inventoryCounts';
 import { convertIngredientQuantity } from '../utils/unitConversion';
 
@@ -18,11 +19,15 @@ function countQuantity(count: InventoryCount | undefined, item: InventoryItem) {
 export function UsageVariance() {
   const { inventory, inventoryCounts, invoices, orders, recipes } = useInventory();
   const { salesData } = useToast();
+  const { user } = useAuth();
+  const isDemo = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
   // Daily sales cannot be split around a mid-day count: compare end-of-day snapshots only.
   const counts = inventoryCounts.filter(count => count.status === 'finalized' && count.countType !== 'day-start')
     .sort((a, b) => a.countDate.localeCompare(b.countDate));
-  const [openingId, setOpeningId] = useState('');
-  const [closingId, setClosingId] = useState('');
+  const [selectedOpening, setOpeningId] = useState<string | null>(null);
+  const [selectedClosing, setClosingId] = useState<string | null>(null);
+  const openingId = selectedOpening ?? (isDemo && counts.some(count => count.id === 'demo-usage-count-7') ? 'demo-usage-count-7' : '');
+  const closingId = selectedClosing ?? (isDemo && counts.some(count => count.id === 'demo-usage-count-0') ? 'demo-usage-count-0' : '');
   const [search, setSearch] = useState('');
   const opening = counts.find(count => count.id === openingId);
   const closing = counts.find(count => count.id === closingId);
@@ -63,6 +68,7 @@ export function UsageVariance() {
 
   return <div className="space-y-4">
     <header><h2 className="text-2xl font-semibold">Actual vs Theoretical</h2><p className="mt-1 text-sm text-slate-600">Ingredient usage and variance for the current location.</p></header>
+    {isDemo && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">Sample demo data: opening counts, received invoices, recipe-based sales, and closing counts reconcile. Positive and negative variances are simulated. Choose the count from 14 days ago for a longer comparison. Editing demo records can change the results.</p>}
     <section className="rounded-xl border bg-white p-4 space-y-3" aria-label="Comparison period">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-medium">Opening count<select className="mt-1 h-10 w-full rounded-lg border bg-white px-2" value={openingId} onChange={event => setOpeningId(event.target.value)}><option value="">Choose a finalized count</option>{counts.map(count => <option key={count.id} value={count.id}>{count.countDate.slice(0, 10)} · {count.description}</option>)}</select></label>

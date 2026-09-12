@@ -1,3 +1,6 @@
+import { buildDemoUsageData } from './demoUsageData';
+import type { InventoryCount } from './inventoryCounts';
+
 export interface DemoLocationData {
   inventory: Array<{
     id: string;
@@ -27,9 +30,10 @@ export interface DemoLocationData {
   preppedRecipes: Array<Record<string, unknown>>;
   orders: Array<Record<string, unknown>>;
   invoices: Array<Record<string, unknown>>;
+  inventoryCounts?: InventoryCount[];
 }
 
-export const DEMO_DATA_VERSION = '2026-09-10-lager-pack-conversion-v8';
+export const DEMO_DATA_VERSION = '2026-09-11-reconciled-usage-v9';
 
 export function buildDemoLocationData(): DemoLocationData {
   const inventory = [
@@ -157,9 +161,11 @@ export function buildDemoLocationData(): DemoLocationData {
       { id: 'demo-margarita', menuItemName: 'Golden Hour Margarita', category: 'Cocktail', price: 17, ingredients: [{ inventoryItemId: 'demo-tequila', quantity: 0.08, unit: 'bottle' }, { inventoryItemId: 'demo-triple-sec', quantity: 0.03, unit: 'bottle' }, { inventoryItemId: 'demo-lime', quantity: 1, unit: 'each' }] },
       { id: 'demo-mimosa', menuItemName: 'Citrus Mimosa', category: 'Cocktail', price: 13, ingredients: [{ inventoryItemId: 'demo-prosecco', quantity: 0.17, unit: 'bottle' }, { inventoryItemId: 'demo-orange-juice', quantity: 0.12, unit: 'L' }] },
       { id: 'demo-cabernet-glass', menuItemName: 'Cabernet · 5oz', category: 'Wine', price: 15, ingredients: [{ inventoryItemId: 'demo-cabernet', quantity: 0.2, unit: 'bottle' }] },
+      { id: 'demo-latte', menuItemName: 'Cafe Latte', category: 'Beverage', price: 6, ingredients: [{ inventoryItemId: 'demo-espresso', quantity: 0.018, unit: 'kg' }, { inventoryItemId: 'demo-milk', quantity: 0.25, unit: 'L' }] },
+      { id: 'demo-lemonade', menuItemName: 'Fresh Lemonade', category: 'Beverage', price: 7, ingredients: [{ inventoryItemId: 'demo-lemon', quantity: 1, unit: 'each' }] },
     ];
   const now = new Date().toISOString();
-  return {
+  const data: DemoLocationData = {
     inventory,
     recipes: recipes.map(recipe => ({ ...recipe, externalId: `toast-${recipe.id}` })),
     storageAreas: ['Walk-In Cooler', 'Dry Storage', 'Freezer', 'Bar', 'Wine Cellar'],
@@ -197,4 +203,5 @@ export function buildDemoLocationData(): DemoLocationData {
       },
     ],
   };
+  return { ...data, ...buildDemoUsageData(data) };
 }

@@ -144,13 +144,13 @@ export function Notifications() {
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FEF9C3]">
                     <Icon className="w-5 h-5 text-[#303A43]" />
                   </div>
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1 break-words">
                     <h3 className="font-semibold text-gray-900">{setting.label}</h3>
                     <p className="text-xs text-gray-600 sm:text-sm">{setting.description}</p>
                   </div>
                 </div>
 
-                <div className="grid gap-2 border-t border-gray-100 pt-3 sm:grid-cols-3 sm:gap-4">
+                <div className="grid gap-3 border-t border-gray-100 pt-3 xl:grid-cols-3 xl:gap-4">
                   {/* Email Toggle */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center space-x-2">
@@ -163,7 +163,7 @@ export function Notifications() {
                       aria-checked={setting.email}
                       aria-label={`${setting.label} email notifications`}
                       onClick={() => handleToggle(setting.id, 'email')}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                         setting.email ? 'bg-[#303A43]' : 'bg-gray-200'
                       }`}
                     >
@@ -187,7 +187,7 @@ export function Notifications() {
                       aria-checked={setting.push}
                       aria-label={`${setting.label} push notifications`}
                       onClick={() => handleToggle(setting.id, 'push')}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                         setting.push ? 'bg-[#303A43]' : 'bg-gray-200'
                       }`}
                     >
@@ -211,7 +211,7 @@ export function Notifications() {
                       aria-checked={setting.sms}
                       aria-label={`${setting.label} SMS notifications`}
                       onClick={() => handleToggle(setting.id, 'sms')}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                         setting.sms ? 'bg-[#303A43]' : 'bg-gray-200'
                       }`}
                     >

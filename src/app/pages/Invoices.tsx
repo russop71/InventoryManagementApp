@@ -26,7 +26,7 @@ function fmtMoney(value: number) {
 export function Invoices() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { invoices, inventory, addInvoice, updateInvoice, deleteInvoice, updateOrderStatus } = useInventory();
+  const { invoices, inventory, addInvoice, updateInvoice, deleteInvoice } = useInventory();
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [draftInvoices, setDraftInvoices] = useState<Record<string, { invoiceNumber: string; supplier: string; status: InvoiceRecord['status']; items: OrderItem[] }>>({});
@@ -87,7 +87,8 @@ export function Invoices() {
         invoiceNumber: invoice.invoiceNumber,
         supplier: invoice.supplier,
         status: invoice.status,
-        items: invoice.items.map(item => ({ ...item })),
+        // Stored cost is the line total; the editor's Price field is per unit.
+        items: invoice.items.map(item => ({ ...item, cost: item.quantity > 0 ? item.cost / item.quantity : item.cost })),
       },
     }));
   };
@@ -128,7 +129,7 @@ export function Invoices() {
     const nextItems = draft.items.map(item => ({
       ...item,
       quantity: Number(item.quantity) || 0,
-      cost: Number(item.cost) || 0,
+      cost: Math.round((Number(item.cost) || 0) * (Number(item.quantity) || 0) * 100) / 100,
     }));
 
     const result = updateInvoice(invoice.id, {
@@ -141,10 +142,6 @@ export function Invoices() {
     if (!result.success) {
       window.alert(result.error || 'The invoice could not be saved.');
       return;
-    }
-
-    if (draft.status === 'received' && invoice.orderId) {
-      updateOrderStatus(invoice.orderId, 'received');
     }
 
     setEditingInvoiceId(null);
@@ -495,7 +492,7 @@ export function Invoices() {
                                         <tr>
                                           <th className="px-3 py-2 text-left font-semibold text-gray-600">Item</th>
                                           <th className="px-3 py-2 text-left font-semibold text-gray-600">Qty</th>
-                                          <th className="px-3 py-2 text-left font-semibold text-gray-600">Price</th>
+                                          <th className="px-3 py-2 text-left font-semibold text-gray-600">Unit price</th>
                                           <th className="px-3 py-2 text-left font-semibold text-gray-600">Total</th>
                                         </tr>
                                       </thead>
@@ -508,6 +505,7 @@ export function Invoices() {
                                               <td className="px-3 py-2">
                                                 <Input
                                                   type="number"
+                                                  aria-label={`Quantity for ${getItemName(item.itemId)}`}
                                                   min="0"
                                                   value={item.quantity}
                                                   onChange={event => updateDraftItem(invoice.id, index, { quantity: Number(event.target.value) || 0 })}
@@ -517,6 +515,7 @@ export function Invoices() {
                                               <td className="px-3 py-2">
                                                 <Input
                                                   type="number"
+                                                  aria-label={`Unit price for ${getItemName(item.itemId)}`}
                                                   min="0"
                                                   step="0.01"
                                                   value={item.cost}

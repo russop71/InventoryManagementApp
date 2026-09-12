@@ -415,7 +415,7 @@ export function InventoryCountEditor() {
         {areaGroups.map(({ area, entries }, areaIndex) => {
           const completedInArea = entries.filter(entry => isInventoryCountEntryComplete(entry, draft)).length;
           return (
-            <section key={area} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <section key={area} className="inventory-count-area overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2"><MapPin className="h-4 w-4 shrink-0 text-[#B58B00]" /><h2 className="break-words font-black text-slate-900">{area}</h2></div>
@@ -429,7 +429,7 @@ export function InventoryCountEditor() {
                 )}
               </div>
 
-              <div className="divide-y divide-slate-100 md:hidden">
+              <div className="inventory-count-cards divide-y divide-slate-100">
                 {entries.map((entry, index) => (
                   <MobileCountRow
                     key={entryKey(entry)}
@@ -449,8 +449,8 @@ export function InventoryCountEditor() {
                 ))}
               </div>
 
-              <div className="hidden md:block">
-                <div className="grid grid-cols-[minmax(220px,1.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(150px,0.9fr)_minmax(0,0.9fr)_72px] gap-3 bg-white px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+              <div className="inventory-count-table">
+                <div className="inventory-count-columns grid gap-3 bg-white px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
                   <div>Inventory item</div><div className="text-right">Previous</div><div className="text-right">Expected</div><div className="text-right">Actual count</div><div className="text-right">Variance</div><div className="text-right">Order</div>
                 </div>
                 <div className="divide-y divide-slate-100">
@@ -459,7 +459,7 @@ export function InventoryCountEditor() {
                     const quantityVariance = complete ? entry.counted - entry.hypothetical : 0;
                     const dollarVariance = quantityVariance * entry.unitCost;
                     return (
-                      <div key={entryKey(entry)} className={`grid grid-cols-[minmax(220px,1.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(150px,0.9fr)_minmax(0,0.9fr)_72px] items-center gap-3 px-4 py-3 ${complete ? '' : 'bg-amber-50/20'}`}>
+                      <div key={entryKey(entry)} className={`inventory-count-columns grid items-center gap-3 px-4 py-3 ${complete ? '' : 'bg-amber-50/20'}`}>
                         <div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{entry.name}</p><p className="mt-1 break-words text-[11px] text-slate-500">{entry.category || 'Other'} · {entry.supplier || 'Unknown'} · {entry.unit}</p></div>
                         <div className="text-right text-sm font-semibold text-slate-500">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)}</div>
                         <div className="text-right text-sm font-semibold text-slate-700">{entry.hypothetical.toFixed(2)}</div>
