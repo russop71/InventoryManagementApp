@@ -7,6 +7,7 @@ import { convertIngredientQuantity } from '../utils/unitConversion';
 
 const quantity = (value: number | null) => value === null ? 'Unavailable' : value.toLocaleString('en-CA', { maximumFractionDigits: 3 });
 const money = (value: number) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(value);
+const numericColumns = ['Opening', 'Received', 'Closing', 'Actual usage', 'Theoretical usage', 'Variance amount', 'Variance %', 'Est. cost variance'];
 
 function countQuantity(count: InventoryCount | undefined, item: InventoryItem) {
   const entries = count?.entries.filter(entry => entry.itemId === item.id) || [];
@@ -29,6 +30,7 @@ export function UsageVariance() {
   const openingId = selectedOpening ?? (isDemo && counts.some(count => count.id === 'demo-usage-count-7') ? 'demo-usage-count-7' : '');
   const closingId = selectedClosing ?? (isDemo && counts.some(count => count.id === 'demo-usage-count-0') ? 'demo-usage-count-0' : '');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<{ column: number; descending: boolean } | null>(null);
   const opening = counts.find(count => count.id === openingId);
   const closing = counts.find(count => count.id === closingId);
   const valid = !!opening && !!closing && opening.countDate.slice(0, 10) < closing.countDate.slice(0, 10);
@@ -63,7 +65,18 @@ export function UsageVariance() {
       }
     }
     const variance = actual === null || theoretical === null ? null : actual - theoretical;
-    return { item, start, end, receipts, actual, theoretical, variance, issues: [...new Set(issues)] };
+    const percent = variance === null || theoretical === null || theoretical <= 0 ? null : variance / theoretical * 100;
+    const cost = variance === null ? null : variance * item.unitCost;
+    return { item, start, end, receipts, actual, theoretical, variance, percent, cost,
+      values: [start, valid ? receipts : null, end, actual, theoretical, variance, percent, cost], issues: [...new Set(issues)] };
+  });
+  if (sort) rows.sort((a, b) => {
+    const left = a.values[sort.column];
+    const right = b.values[sort.column];
+    const leftMissing = left === null || !Number.isFinite(left);
+    const rightMissing = right === null || !Number.isFinite(right);
+    if (leftMissing || rightMissing) return leftMissing === rightMissing ? a.item.name.localeCompare(b.item.name) : leftMissing ? 1 : -1;
+    return (sort.descending ? right! - left! : left! - right!) || a.item.name.localeCompare(b.item.name);
   });
 
   return <div className="space-y-4">
@@ -88,11 +101,15 @@ export function UsageVariance() {
       <label className="block text-sm font-medium">Search ingredients<input value={search} onChange={event => setSearch(event.target.value)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3" /></label>
       <div className="overflow-x-auto rounded-xl border bg-white">
         <table className="w-full text-left text-sm"><caption className="sr-only">Actual and theoretical ingredient usage comparison</caption>
-          <thead className="bg-slate-50"><tr>{['Ingredient / unit', 'Opening', 'Received', 'Closing', 'Actual usage', 'Theoretical usage', 'Variance amount', 'Variance %', 'Est. cost variance'].map(title => <th key={title} className="whitespace-nowrap p-3">{title}</th>)}</tr></thead>
+          <thead className="bg-slate-50"><tr><th scope="col" className="whitespace-nowrap p-3">Ingredient / unit</th>{numericColumns.map((title, column) => <th key={title} scope="col" aria-sort={sort?.column === column ? sort.descending ? 'descending' : 'ascending' : 'none'} className="whitespace-nowrap p-3">
+            <button type="button" className="inline-flex min-h-10 items-center gap-2 rounded px-1 text-left hover:bg-slate-200 focus-visible:outline focus-visible:outline-2" onClick={() => setSort(current => ({ column, descending: current?.column === column ? !current.descending : true }))} aria-label={`${title}: sort ${sort?.column === column && sort.descending ? 'lowest to highest' : 'highest to lowest'}`}>
+              {title}<span aria-hidden="true">{sort?.column === column ? sort.descending ? '↓' : '↑' : '↕'}</span>
+            </button>
+          </th>)}</tr></thead>
           <tbody>{rows.map(row => <tr key={row.item.id} className="border-t align-top"><th scope="row" className="min-w-48 p-3 font-medium">{row.item.name}<span className="block text-slate-500">{row.item.unit}</span>{row.issues.map(issue => <span key={issue} className="block text-xs font-normal text-amber-800">{issue}</span>)}</th>
             {[row.start, valid ? row.receipts : null, row.end, row.actual, row.theoretical, row.variance].map((value, index) => <td key={index} className="p-3">{quantity(value)}</td>)}
-            <td className="p-3">{row.variance === null || row.theoretical === null || row.theoretical <= 0 ? 'N/A' : `${quantity(row.variance / row.theoretical * 100)}%`}</td>
-            <td className="p-3">{row.variance === null ? 'Unavailable' : money(row.variance * row.item.unitCost)}</td>
+            <td className="p-3">{row.percent === null ? 'N/A' : `${quantity(row.percent)}%`}</td>
+            <td className="p-3">{row.cost === null ? 'Unavailable' : money(row.cost)}</td>
           </tr>)}</tbody>
         </table>
         {!rows.length && <p className="p-4 text-sm">No matching inventory items.</p>}

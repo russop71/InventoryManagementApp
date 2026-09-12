@@ -377,6 +377,24 @@ test('demo-login API failure is explained and the sign-in screen remains usable'
   await expect(page.getByRole('button', { name: 'Try Demo Account' }).last()).toBeEnabled();
 });
 
+test('usage numeric columns toggle descending and ascending', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/usage-variance');
+  const titles = ['Opening', 'Received', 'Closing', 'Actual usage', 'Theoretical usage', 'Variance amount', 'Variance %', 'Est. cost variance'];
+  for (const [index, title] of titles.entries()) {
+    for (const direction of ['highest to lowest', 'lowest to highest']) {
+      await page.getByRole('button', { name: `${title}: sort ${direction}`, exact: true }).click();
+      await expect(page.getByRole('columnheader').nth(index + 1)).toHaveAttribute('aria-sort', direction === 'highest to lowest' ? 'descending' : 'ascending');
+      const cells = await page.locator(`tbody tr td:nth-of-type(${index + 1})`).allTextContents();
+      const values = cells.map(text => /Unavailable|N\/A/.test(text) ? null : Number(text.replace(/[^0-9.-]/g, '')));
+      const available = values.filter((value): value is number => value !== null);
+      expect(available.length).toBeGreaterThan(1);
+      expect(available).toEqual([...available].sort((a, b) => direction === 'highest to lowest' ? b - a : a - b));
+      expect(values.slice(0, available.length)).toEqual(available);
+    }
+  }
+});
+
 test('handwritten recipe photo can be reviewed, corrected, and approved before saving', async ({ page }) => {
   await mockRecipeScan(page);
   await freshDemoLogin(page);
