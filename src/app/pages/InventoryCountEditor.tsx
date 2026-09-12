@@ -38,6 +38,30 @@ import { convertQuantity, formatUnitLabel, getCompatibleUnits } from '../utils/u
 const Y = '#F5D62E';
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+function itemCountTotals(entry: InventoryCountEntry, count: InventoryCount) {
+  const lines = count.entries.filter(line => line.itemId === entry.itemId);
+  const sum = (value: (line: InventoryCountEntry) => number) => {
+    const values = lines.map(line => convertQuantity(value(line), line.unit, entry.unit));
+    return values.some(value => value === null || !Number.isFinite(value)) ? null : values.reduce<number>((total, value) => total + (value || 0), 0);
+  };
+  const previous = sum(line => Number(line.previousCounted ?? line.hypothetical));
+  const expected = sum(line => line.hypothetical);
+  const actual = sum(line => isInventoryCountEntryComplete(line, count) ? line.counted : 0);
+  const complete = lines.every(line => isInventoryCountEntryComplete(line, count));
+  return { previous, expected, actual, complete, variance: complete && actual !== null && expected !== null ? actual - expected : null };
+}
+
+const totalQuantity = (value: number | null) => value === null ? 'Unavailable' : value.toFixed(2);
+
+function ItemCountVariance({ entry, count }: { entry: InventoryCountEntry; count: InventoryCount }) {
+  const totals = itemCountTotals(entry, count);
+  const dollars = totals.variance === null ? null : totals.variance * entry.unitCost;
+  return <div className={`mt-3 rounded-xl px-3 py-2 text-xs font-bold ${dollars === null ? 'bg-slate-50 text-slate-500' : dollars < 0 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+    <p>Item total across all areas: {totalQuantity(totals.actual)} {entry.unit}{!totals.complete && ' so far'}</p>
+    <p className="mt-1">{totals.variance === null ? 'Item variance pending — count every area' : `Item variance: ${totals.variance > 0 ? '+' : ''}${totals.variance.toFixed(2)} ${entry.unit} · ${formatCurrency(dollars!)}`}</p>
+  </div>;
+}
+
 function formatCurrency(value: number) {
   return value.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
 }
@@ -451,22 +475,21 @@ export function InventoryCountEditor() {
 
               <div className="inventory-count-table">
                 <div className="inventory-count-columns grid gap-3 bg-white px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
-                  <div>Inventory item</div><div className="text-right">Previous</div><div className="text-right">Expected</div><div className="text-right">Actual count</div><div className="text-right">Variance</div><div className="text-right">Order</div>
+                  <div>Inventory item</div><div className="text-right">Previous (all areas)</div><div className="text-right">Expected (all areas)</div><div className="text-right">Area count</div><div className="text-right">Item total / variance</div><div className="text-right">Order</div>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {entries.map((entry, index) => {
                     const complete = isInventoryCountEntryComplete(entry, draft);
-                    const quantityVariance = complete ? entry.counted - entry.hypothetical : 0;
-                    const dollarVariance = quantityVariance * entry.unitCost;
+                    const totals = itemCountTotals(entry, draft);
                     return (
                       <div key={entryKey(entry)} className={`inventory-count-columns grid items-center gap-3 px-4 py-3 ${complete ? '' : 'bg-amber-50/20'}`}>
                         <div className="min-w-0"><p className="break-words text-sm font-black text-slate-900">{entry.name}</p><p className="mt-1 break-words text-[11px] text-slate-500">{entry.category || 'Other'} · {entry.supplier || 'Unknown'} · {entry.unit}</p></div>
-                        <div className="text-right text-sm font-semibold text-slate-500">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)}</div>
-                        <div className="text-right text-sm font-semibold text-slate-700">{entry.hypothetical.toFixed(2)}</div>
+                        <div className="text-right text-sm font-semibold text-slate-500">{totalQuantity(totals.previous)}</div>
+                        <div className="text-right text-sm font-semibold text-slate-700">{totalQuantity(totals.expected)}</div>
                         <div className="text-right">
                           {isFinalized ? <span className="text-sm font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</span> : <div className="flex min-w-[150px] gap-1"><input aria-label={`Count ${entry.name}`} type="number" min="0" step="0.01" value={countInputFor(entry, complete)} onChange={event => updateEntry(entryKey(entry), event.target.value, countUnitFor(entry))} className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={countUnitFor(entry)} onChange={event => changeCountUnit(entry, event.target.value)} className="h-10 max-w-[72px] rounded-xl border border-slate-200 bg-white px-1 text-xs font-bold">{getCompatibleUnits(entry.unit).map(unit => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></div>}
                         </div>
-                        <div className={`text-right text-sm font-black ${!complete ? 'text-slate-400' : dollarVariance < 0 ? 'text-rose-600' : dollarVariance > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>{complete ? <><span className="block">{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit}</span><span className="text-[10px]">{dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span></> : <span className="text-[10px]">Blank → 0 on finalize</span>}</div>
+                        <ItemCountVariance entry={entry} count={draft} />
                         <div className="flex justify-end gap-1">{!isFinalized && <><OrderButton label={`Move ${entry.name} up`} disabled={index === 0} onClick={() => moveEntry(area, entryKey(entry), -1)} icon="up" /><OrderButton label={`Move ${entry.name} down`} disabled={index === entries.length - 1} onClick={() => moveEntry(area, entryKey(entry), 1)} icon="down" /></>}</div>
                       </div>
                     );
@@ -524,15 +547,14 @@ function OrderButton({ label, disabled, onClick, icon }: { label: string; disabl
 
 function MobileCountRow({ entry, count, readOnly, onChange, unit, units, value, onUnitChange, onMoveUp, onMoveDown, disableMoveUp, disableMoveDown }: { entry: InventoryCountEntry; count: InventoryCount; readOnly: boolean; onChange: (value: string) => void; unit: string; units: Array<{ value: string; label: string }>; value: string; onUnitChange: (unit: string) => void; onMoveUp: () => void; onMoveDown: () => void; disableMoveUp: boolean; disableMoveDown: boolean }) {
   const complete = isInventoryCountEntryComplete(entry, count);
-  const quantityVariance = complete ? entry.counted - entry.hypothetical : 0;
-  const dollarVariance = quantityVariance * entry.unitCost;
+  const totals = itemCountTotals(entry, count);
   return <div className={`p-4 ${complete ? 'bg-white' : 'bg-amber-50/20'}`}>
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0 flex-1"><p className="break-words text-base font-black leading-snug text-slate-900">{entry.name}</p><p className="mt-1 break-words text-[11px] leading-5 text-slate-500">{entry.category || 'Other'} · {entry.supplier || 'Unknown'}</p></div>
       {!readOnly && <div className="flex shrink-0 gap-1"><OrderButton label={`Move ${entry.name} up`} disabled={disableMoveUp} onClick={onMoveUp} icon="up" /><OrderButton label={`Move ${entry.name} down`} disabled={disableMoveDown} onClick={onMoveDown} icon="down" /></div>}
     </div>
-    <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Previous count</p><p className="mt-1 font-black text-slate-700">{Number(entry.previousCounted ?? entry.hypothetical).toFixed(2)} {entry.unit}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Expected now</p><p className="mt-1 font-black text-slate-700">{entry.hypothetical.toFixed(2)} {entry.unit}</p></div></div>
-    <label className="mt-3 block"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Actual count</span>{readOnly ? <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xl font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</div> : <div className="mt-1 flex gap-2"><input aria-label={`Count ${entry.name}`} type="number" inputMode="decimal" min="0" step="0.01" value={value} onChange={event => onChange(event.target.value)} placeholder="Enter count" className="h-14 min-w-0 flex-1 rounded-xl border-2 border-slate-200 bg-white px-4 text-xl font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={unit} onChange={event => onUnitChange(event.target.value)} className="h-14 rounded-xl border-2 border-slate-200 bg-white px-2 text-sm font-black text-slate-700">{units.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>}</label>
-    <div className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold ${!complete ? 'bg-slate-50 text-slate-500' : dollarVariance < 0 ? 'bg-rose-50 text-rose-700' : dollarVariance > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'}`}><span>{complete ? 'Variance' : 'Blank · records as 0 when finalized'}</span>{complete && <span>{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} {entry.unit} · {dollarVariance > 0 ? '+' : ''}{formatCurrency(dollarVariance)}</span>}</div>
+    <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Previous count · all areas</p><p className="mt-1 font-black text-slate-700">{totalQuantity(totals.previous)} {entry.unit}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Expected now · all areas</p><p className="mt-1 font-black text-slate-700">{totalQuantity(totals.expected)} {entry.unit}</p></div></div>
+    <label className="mt-3 block"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Actual count · this area</span>{readOnly ? <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xl font-black text-slate-900">{entry.counted.toFixed(2)} {entry.unit}</div> : <div className="mt-1 flex gap-2"><input aria-label={`Count ${entry.name}`} type="number" inputMode="decimal" min="0" step="0.01" value={value} onChange={event => onChange(event.target.value)} placeholder="Enter count" className="h-14 min-w-0 flex-1 rounded-xl border-2 border-slate-200 bg-white px-4 text-xl font-black text-slate-900 focus:border-[#D9A900] focus:outline-none focus:ring-2 focus:ring-amber-100" /><select aria-label={`Count unit for ${entry.name}`} value={unit} onChange={event => onUnitChange(event.target.value)} className="h-14 rounded-xl border-2 border-slate-200 bg-white px-2 text-sm font-black text-slate-700">{units.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>}</label>
+    <ItemCountVariance entry={entry} count={count} />
   </div>;
 }

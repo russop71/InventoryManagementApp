@@ -377,6 +377,29 @@ test('demo-login API failure is explained and the sign-in screen remains usable'
   await expect(page.getByRole('button', { name: 'Try Demo Account' }).last()).toBeEnabled();
 });
 
+test('same item shares count totals across storage areas without duplicating stock', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/inventory/counts/new');
+  await page.getByPlaceholder('Search inventory…').fill('00 Pizza Flour');
+  await page.getByLabel('Additional count item').selectOption('demo-flour');
+  await page.getByLabel('Additional count storage area').selectOption('Walk-In Cooler');
+  await page.getByRole('button', { name: 'Add count line', exact: true }).click();
+  const inputs = page.locator('input[aria-label="Count 00 Pizza Flour"]:visible');
+  await expect(inputs).toHaveCount(2);
+  await inputs.nth(0).fill('12');
+  await inputs.nth(1).fill('22');
+  const cards = page.locator('.inventory-count-cards:visible');
+  if (await cards.count()) {
+    await expect(cards.getByText('Item total across all areas: 34.00 kg', { exact: true })).toHaveCount(2);
+    await expect(cards.getByText('Item variance: -8.00 kg · -$17.20', { exact: true })).toHaveCount(2);
+    await expect(cards.getByText('42.00 kg', { exact: true })).toHaveCount(4);
+  } else {
+    const table = page.locator('.inventory-count-table:visible');
+    await expect(table.getByText('Item total across all areas: 34.00 kg', { exact: true })).toHaveCount(2);
+    await expect(table.getByText('Item variance: -8.00 kg · -$17.20', { exact: true })).toHaveCount(2);
+  }
+});
+
 test('beverage stock categories save and survive reload', async ({ page }) => {
   await freshDemoLogin(page);
   await page.goto('/app/beverages');
