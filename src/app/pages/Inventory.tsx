@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { PrintCountSheet } from '../components/PrintCountSheet';
+import { buildCountEntries } from '../utils/inventoryCounts';
 import { parseInventoryCountCsv, buildInventoryUpdates } from '../utils/inventoryImport';
 import type { InventoryCount } from '../utils/inventoryCounts';
 import { useNavigate } from 'react-router';
@@ -353,6 +355,8 @@ export function Inventory() {
             <div>
               <h1 className="text-[24px] font-black tracking-tight" style={{ color: D }}>INVENTORY COUNTS</h1>
             </div>
+            <div className="flex flex-wrap gap-2">
+            <PrintCountSheet entries={activeDraftCount?.entries ?? buildCountEntries(inventory)} areaOrder={activeDraftCount?.storageAreaOrder} />
             <button
               type="button"
               onClick={handleAddCount}
@@ -362,6 +366,7 @@ export function Inventory() {
               {activeDraftCount ? <Clock3 className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
               {activeDraftCount ? 'Resume count' : 'Start count'}
             </button>
+            </div>
           </div>
 
           {activeDraftCount && (

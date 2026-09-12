@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PrintCountSheet } from '../components/PrintCountSheet';
 import { useNavigate, useParams } from 'react-router';
 import {
   ArrowDown,
@@ -372,6 +373,7 @@ export function InventoryCountEditor() {
   return (
     <div className="-mx-4 min-h-screen bg-[#F7F8FA] px-3 py-2 sm:px-5 sm:py-4">
       <div className="mx-auto max-w-6xl space-y-3">
+        <PrintCountSheet entries={draft.entries} areaOrder={draft.storageAreaOrder} />
         <section className="overflow-hidden rounded-2xl bg-[#303A43] text-white shadow-sm">
           <div className="h-1" style={{ background: Y }} />
           <div className="p-4">
