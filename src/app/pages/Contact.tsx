@@ -153,8 +153,7 @@ export function Contact() {
         <CardContent>
           <p className="text-sm text-gray-600">
             Zest IQ Inc.<br />
-            5137 Oakley Drive<br />
-            Burlington, Ontario L7L 6P1, Canada
+            Burlington, Ontario, Canada
           </p>
         </CardContent>
       </Card>
