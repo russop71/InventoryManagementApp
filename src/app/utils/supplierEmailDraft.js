@@ -26,7 +26,7 @@ export function getSupplierCcEmails(supplierName, suppliers = [], defaultCc = []
     .filter(email => email !== primaryEmail);
 }
 
-export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [], defaultCc = [] }) {
+export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [], defaultCc = [], orderIdsBySupplier = {} }) {
   const supplierGroups = suggestions.reduce((groups, suggestion) => {
     const supplier = suggestion.supplier || 'Supplier';
     if (!groups[supplier]) groups[supplier] = [];
@@ -47,6 +47,7 @@ export function buildSupplierEmailDrafts({ restaurantName, suggestions, supplier
     const supplierEmail = getSupplierEmailAddress(supplier, suppliers);
     return {
       supplier,
+      orderId: orderIdsBySupplier[supplier] || '',
       supplierEmail,
       ccEmails: getSupplierCcEmails(supplier, suppliers, defaultCc),
       canSend: Boolean(supplierEmail),

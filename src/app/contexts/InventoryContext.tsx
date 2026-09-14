@@ -290,9 +290,9 @@ interface InventoryContextType {
   syncToastMenuItems: (toastMenuItems: any[]) => void;
   addForecast: (forecast: Omit<ForecastData, 'id'>) => void;
   generateDailyOrder: (forecastId: string) => void;
-  placeOrder: (order: { date: string; items: OrderItem[]; supplier: string; totalCost: number; status?: DailyOrder['status']; supplierDates?: Record<string, string>; }) => void;
+  placeOrder: (order: { date: string; items: OrderItem[]; supplier: string; totalCost: number; status?: DailyOrder['status']; supplierDates?: Record<string, string>; }) => DailyOrder;
   updateOrder: (orderId: string, updates: Partial<Omit<DailyOrder, 'id'>>) => void;
-  updateOrderStatus: (orderId: string, status: DailyOrder['status'], updates?: Partial<Omit<DailyOrder, 'id' | 'status'>>) => void;
+  updateOrderStatus: (orderId: string, status: DailyOrder['status'], updates?: Partial<Omit<DailyOrder, 'id' | 'status'>>, invoiceNumber?: string) => InvoiceMutationResult;
   addInvoice: (invoice: Omit<InvoiceRecord, 'id'>) => InvoiceRecord;
   updateInvoice: (invoiceId: string, updates: Partial<InvoiceRecord>) => InvoiceMutationResult;
   deleteInvoice: (invoiceId: string) => void;
@@ -1197,14 +1197,26 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setOrders(nextOrders);
     setInvoices(nextInvoices);
     saveLocationData(inventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
+    return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, status: DailyOrder['status'], updates: Partial<Omit<DailyOrder, 'id' | 'status'>> = {}) => {
-    const order = orders.find(entry => entry.id === orderId);
-    if (!order) return;
+  const updateOrderStatus = (orderId: string, status: DailyOrder['status'], updates: Partial<Omit<DailyOrder, 'id' | 'status'>> = {}, invoiceNumber?: string): InvoiceMutationResult => {
+    const currentOrders = ordersRef.current;
+    const currentInvoices = invoicesRef.current;
+    const order = currentOrders.find(entry => entry.id === orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    const linkedInvoice = currentInvoices.find(invoice => invoice.orderId === orderId);
+    const nextInvoiceNumber = invoiceNumber?.trim() || linkedInvoice?.invoiceNumber || `PO-${order.id.slice(-8).toUpperCase()}`;
+    if (
+      status === 'received' &&
+      hasDuplicateInvoiceNumber(currentInvoices.filter(invoice => invoice.id !== linkedInvoice?.id), nextInvoiceNumber)
+    ) {
+      return { success: false, error: `Invoice ${nextInvoiceNumber} already exists.` };
+    }
 
     const updatedOrder = { ...order, ...updates, status };
-    const nextOrders = orders.map(entry => (entry.id === orderId ? updatedOrder : entry));
+    const nextOrders = currentOrders.map(entry => (entry.id === orderId ? updatedOrder : entry));
     const isFirstReceipt = status === 'received' && order.status !== 'received';
     const nextInventory = isFirstReceipt
       ? inventory.map(item => {
@@ -1217,29 +1229,35 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           };
         })
       : inventory;
-    const linkedInvoice = invoices.find(invoice => invoice.orderId === orderId);
     const primarySupplier = order.items
       .map(line => inventory.find(item => item.id === line.itemId)?.supplier)
       .find(Boolean) || 'Supplier';
     const nextInvoices = status === 'received'
       ? linkedInvoice
-        ? invoices.map(invoice => invoice.orderId === orderId ? { ...invoice, items: updatedOrder.items, totalAmount: updatedOrder.totalCost, supplier: primarySupplier, status: 'received' } : invoice)
-        : [...invoices, {
+        ? currentInvoices.map(invoice => invoice.orderId === orderId ? { ...invoice, invoiceNumber: nextInvoiceNumber, items: updatedOrder.items, totalAmount: updatedOrder.totalCost, supplier: primarySupplier, status: 'received' } : invoice)
+        : [...currentInvoices, {
             id: `${Date.now()}-invoice`,
             date: new Date().toISOString(),
-            invoiceNumber: `PO-${order.id.slice(-8).toUpperCase()}`,
+            invoiceNumber: nextInvoiceNumber,
             supplier: primarySupplier,
             items: updatedOrder.items,
             totalAmount: updatedOrder.totalCost,
             status: 'received' as const,
             orderId,
           }]
-      : invoices;
+      : updates.items && linkedInvoice
+        ? currentInvoices.map(invoice => invoice.orderId === orderId
+            ? { ...invoice, items: updatedOrder.items, totalAmount: updatedOrder.totalCost }
+            : invoice)
+        : currentInvoices;
 
+    ordersRef.current = nextOrders;
+    invoicesRef.current = nextInvoices;
     setOrders(nextOrders);
     setInventory(nextInventory);
     setInvoices(nextInvoices);
     saveLocationData(nextInventory, recipes, storageAreas, nextOrders, nextInvoices, suppliers, preppedRecipes);
+    return { success: true, invoice: nextInvoices.find(invoice => invoice.orderId === orderId) };
   };
 
   const updateOrder = (orderId: string, updates: Partial<Omit<DailyOrder, 'id'>>) => {

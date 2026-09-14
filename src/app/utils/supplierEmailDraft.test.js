@@ -59,3 +59,28 @@ test('getSupplierEmailAddress preserves the address stored on the supplier', () 
   const email = getSupplierEmailAddress('Example Meats', [{ name: 'Example Meats', email: 'orderdesk@meats.example' }]);
   assert.equal(email, 'orderdesk@meats.example');
 });
+
+test('buildSupplierEmailDrafts links every supplier draft to only its own order', () => {
+  const drafts = buildSupplierEmailDrafts({
+    restaurantName: 'Zestiq',
+    suggestions: [
+      { itemId: 'salmon', itemName: 'Salmon', suggestedQuantity: 4, unit: 'lb', totalCost: 40, supplier: 'Seafood Co', priority: 'high' },
+      { itemId: 'lemons', itemName: 'Lemons', suggestedQuantity: 2, unit: 'case', totalCost: 30, supplier: 'Produce Co', priority: 'low' },
+    ],
+    suppliers: [
+      { name: 'Seafood Co', email: 'orders@seafood.example' },
+      { name: 'Produce Co', email: 'orders@produce.example' },
+    ],
+    orderIdsBySupplier: {
+      'Seafood Co': 'order-seafood',
+      'Produce Co': 'order-produce',
+    },
+  });
+
+  const seafoodDraft = drafts.find(draft => draft.supplier === 'Seafood Co');
+  const produceDraft = drafts.find(draft => draft.supplier === 'Produce Co');
+  assert.equal(seafoodDraft.orderId, 'order-seafood');
+  assert.deepEqual(seafoodDraft.items.map(item => item.itemId), ['salmon']);
+  assert.equal(produceDraft.orderId, 'order-produce');
+  assert.deepEqual(produceDraft.items.map(item => item.itemId), ['lemons']);
+});

@@ -31,7 +31,7 @@ type OrderSort = 'newest' | 'oldest' | 'total-desc' | 'total-asc' | 'supplier';
 
 const STATUS_CFG: Record<OrderStatus, { label: string; bg: string; color: string }> = {
   pending:   { label: 'Open',       bg: `${Y}25`,  color: '#7A5E00' },
-  ordered:   { label: 'Open',       bg: `${Y}25`,  color: '#7A5E00' },
+  ordered:   { label: 'Sent',       bg: '#DBEAFE', color: '#1D4ED8' },
   received:  { label: 'Received',   bg: '#DCFCE7', color: '#166534' },
   cancelled: { label: 'Cancelled',  bg: '#F3F4F6', color: '#6B7280' },
 };
@@ -105,6 +105,7 @@ interface OrderSuggestion {
 
 interface SupplierEmailDraft {
   supplier: string;
+  orderId: string;
   supplierEmail: string;
   ccText: string;
   items: OrderSuggestion[];
@@ -128,6 +129,7 @@ export function Orders() {
   const [wsConnected, setWsConnected] = useState(false);
   const [editableItems, setEditableItems] = useState<Record<string, { quantity: number; cost: number }>>({});
   const [supplierDateOverrides, setSupplierDateOverrides] = useState<Record<string, string>>({});
+  const [invoiceNumberDraft, setInvoiceNumberDraft] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
   const [draftEmails, setDraftEmails] = useState<SupplierEmailDraft[]>([]);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -141,6 +143,7 @@ export function Orders() {
   const [orderSupplierFilter, setOrderSupplierFilter] = useState('');
   const [orderSort, setOrderSort] = useState<OrderSort>('newest');
   const [safetyBufferPercent, setSafetyBufferPercent] = useState(10);
+  const [sendingOrderId, setSendingOrderId] = useState<string | null>(null);
   const approvalInProgressRef = useRef(false);
 
   const open      = orders.filter(o => o.status === 'pending' || o.status === 'ordered');
@@ -433,7 +436,7 @@ export function Orders() {
       cost: item.totalCost,
     }));
 
-    placeOrder({
+    const newOrder = placeOrder({
       date: getDefaultOrderDate(),
       items: orderItems,
       supplier: manualSupplier,
@@ -446,6 +449,7 @@ export function Orders() {
       suggestions: itemsForOrder,
       suppliers,
       defaultCc: supplierEmailCc,
+      orderIdsBySupplier: { [manualSupplier]: newOrder.id },
     }).map(draft => ({ ...draft, ccText: draft.ccEmails.join(', ') }));
 
     setDraftEmails(drafts);
@@ -470,6 +474,7 @@ export function Orders() {
       return;
     }
 
+    setSendingOrderId(email.orderId);
     try {
       await sendSupplierEmail({
         to: email.supplierEmail,
@@ -479,7 +484,17 @@ export function Orders() {
         senderEmail: user?.email,
         senderName: user?.name,
       });
-      toast.success(`Sent supplier email to ${email.supplier}`);
+      const orderItems = email.items.map(item => ({
+        itemId: item.itemId,
+        quantity: item.suggestedQuantity,
+        cost: item.totalCost,
+      }));
+      const result = updateOrderStatus(email.orderId, 'ordered', {
+        items: orderItems,
+        totalCost: orderItems.reduce((sum, item) => sum + item.cost, 0),
+      });
+      if (!result.success) throw new Error(result.error || 'The email was sent, but the order status could not be updated.');
+      toast.success(`Sent order to ${email.supplier}`);
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
         openMailtoDraft(email.supplierEmail, email.emailSubject, email.emailBody, parseEmailList(email.ccText));
@@ -487,6 +502,8 @@ export function Orders() {
         return;
       }
       toast.error(error instanceof Error ? error.message : 'Failed to send email');
+    } finally {
+      setSendingOrderId(null);
     }
   };
 
@@ -550,23 +567,25 @@ export function Orders() {
       supplierMap[suggestion.supplier].push(suggestion);
     });
 
-    const drafts = buildSupplierEmailDrafts({ restaurantName, suggestions: ordersToPlace, suppliers, defaultCc: supplierEmailCc })
-      .map(draft => ({ ...draft, ccText: draft.ccEmails.join(', ') }));
-
+    const orderIdsBySupplier: Record<string, string> = {};
     Object.entries(supplierMap).forEach(([supplier, suggestions]) => {
       const items = suggestions.map(suggestion => ({
         itemId: suggestion.itemId,
         quantity: suggestion.suggestedQuantity,
         cost: suggestion.totalCost,
       }));
-      placeOrder({
+      const order = placeOrder({
         date: getDefaultOrderDate(),
         items,
         supplier,
         totalCost: items.reduce((sum, item) => sum + item.cost, 0),
         status: 'pending',
       });
+      orderIdsBySupplier[supplier] = order.id;
     });
+
+    const drafts = buildSupplierEmailDrafts({ restaurantName, suggestions: ordersToPlace, suppliers, defaultCc: supplierEmailCc, orderIdsBySupplier })
+      .map(draft => ({ ...draft, ccText: draft.ccEmails.join(', ') }));
 
     setDraftEmails(drafts);
     setShowEmailDialog(true);
@@ -620,7 +639,11 @@ export function Orders() {
     }));
     const totalCost = nextItems.reduce((sum, item) => sum + item.cost, 0);
     const supplierDates = { ...(order.supplierDates || {}), ...supplierDateOverrides };
-    updateOrderStatus(orderId, 'received', { items: nextItems, totalCost, supplierDates });
+    const result = updateOrderStatus(orderId, 'received', { items: nextItems, totalCost, supplierDates }, invoiceNumberDraft);
+    if (!result.success) {
+      toast.error(result.error || 'Could not receive this order');
+      return;
+    }
     toast.success('Order received and invoice saved');
     setDetailOrder(null);
   };
@@ -655,6 +678,7 @@ export function Orders() {
       if (!nextDates[supplier]) nextDates[supplier] = defaultOrderReceiptDate(order.date);
     });
     setSupplierDateOverrides(nextDates);
+    setInvoiceNumberDraft(invoices.find(invoice => invoice.orderId === orderId)?.invoiceNumber || '');
   };
 
   const TABS = [
@@ -1069,8 +1093,12 @@ export function Orders() {
           <div className="space-y-3">
             {draftEmails.length === 0 ? (
               <p className="text-sm text-gray-500">No supplier drafts available yet.</p>
-            ) : draftEmails.map(email => (
-              <div key={`${email.supplier}-${email.supplierEmail}`} className="rounded-2xl border border-gray-200 p-3">
+            ) : draftEmails.map(email => {
+              const linkedOrder = orders.find(order => order.id === email.orderId);
+              const isSent = linkedOrder?.status === 'ordered' || linkedOrder?.status === 'received';
+              const isSending = sendingOrderId === email.orderId;
+              return (
+              <div key={email.orderId || `${email.supplier}-${email.supplierEmail}`} className="rounded-2xl border border-gray-200 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold text-gray-900">{email.supplier}</p>
@@ -1080,8 +1108,15 @@ export function Orders() {
                     <Button size="sm" variant="outline" onClick={() => copyDraftToClipboard(email)}>
                       <Mail className="mr-1.5 h-3.5 w-3.5" /> Copy
                     </Button>
-                    <Button size="sm" onClick={() => void openEmailClient(email)}>
-                      <Mail className="mr-1.5 h-3.5 w-3.5" /> Send
+                    <Button
+                      size="sm"
+                      disabled={isSent || isSending}
+                      onClick={() => void openEmailClient(email)}
+                      className={isSent ? 'bg-green-700 text-white hover:bg-green-700' : ''}
+                    >
+                      {isSent
+                        ? <><Check className="mr-1.5 h-3.5 w-3.5" /> Sent</>
+                        : <><Mail className="mr-1.5 h-3.5 w-3.5" /> {isSending ? 'Sending…' : 'Send this order'}</>}
                     </Button>
                   </div>
                 </div>
@@ -1139,7 +1174,8 @@ export function Orders() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
             {draftEmails.length > 0 && (
               <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 pt-3">
                 <Button
@@ -1266,6 +1302,24 @@ export function Orders() {
                     </div>
                   );
                 })}
+
+                {(detailOrder.status === 'pending' || detailOrder.status === 'ordered') && (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <label htmlFor="received-invoice-number" className="text-xs font-black uppercase tracking-wide text-gray-600">
+                      Supplier invoice number
+                    </label>
+                    <Input
+                      id="received-invoice-number"
+                      value={invoiceNumberDraft}
+                      onChange={(event) => setInvoiceNumberDraft(event.target.value)}
+                      placeholder="Enter the number printed on the invoice"
+                      className="mt-2 bg-white"
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Replace the provisional number with the supplier's real invoice number before receiving.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button variant="outline" className="min-h-11 h-auto flex-1 basis-40 whitespace-normal py-3 font-bold" onClick={() => handleSaveLineEdits(detailOrder.id)}>
