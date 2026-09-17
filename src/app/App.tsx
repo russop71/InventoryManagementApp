@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router';
 import { router } from './routes';
 import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from './components/ui/sonner';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
         <RouterProvider router={router} />
       </Suspense>
       <Toaster />
+      <Analytics />
     </AuthProvider>
   );
 }
