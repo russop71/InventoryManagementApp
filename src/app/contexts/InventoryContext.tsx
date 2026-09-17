@@ -11,6 +11,7 @@ import { hasDuplicateInvoiceNumber, inventoryItemMatchesInvoiceName, normalizeIn
 import { findBestSupplierMatch, mergeDuplicateSuppliers, normalizeSupplierName } from '../utils/supplierMatching.js';
 import { convertIngredientQuantity, convertQuantity, normalizeUnit } from '../utils/unitConversion';
 import type { InventoryCount } from '../utils/inventoryCounts';
+import { addReceivedStock } from '../utils/receiptStock.js';
 
 const DEFAULT_STORAGE_AREAS = ['Walk-In Cooler', 'Dry Storage', 'Freezer', 'Bar', 'Wine Cellar', 'Unassigned'] as const;
 
@@ -1220,13 +1221,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const isFirstReceipt = status === 'received' && order.status !== 'received';
     const nextInventory = isFirstReceipt
       ? inventory.map(item => {
-          const matchingItem = updatedOrder.items.find(entry => entry.itemId === item.id);
-          if (!matchingItem) return item;
-          return {
-            ...item,
-            currentStock: item.currentStock + matchingItem.quantity,
-            lastUpdated: new Date().toISOString(),
-          };
+          const quantity = updatedOrder.items.filter(entry => entry.itemId === item.id).reduce((sum, entry) => sum + Number(entry.quantity), 0);
+          return quantity ? addReceivedStock(item, quantity) : item;
         })
       : inventory;
     const primarySupplier = order.items
@@ -1327,10 +1323,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const nextOrders = updates.status === 'received' && linkedOrder
       ? orders.map(order => order.id === linkedOrder.id ? { ...order, status: 'received' as const } : order)
       : orders;
-    const firstReceipt = updates.status === 'received' && linkedOrder && linkedOrder.status !== 'received';
+    const firstReceipt = updates.status === 'received' && currentInvoice.status !== 'received' && (!linkedOrder || linkedOrder.status !== 'received');
     const nextInventory = firstReceipt ? inventory.map(item => {
       const quantity = (updates.items || currentInvoice.items).filter(line => line.itemId === item.id).reduce((sum, line) => sum + line.quantity, 0);
-      return quantity ? { ...item, currentStock: item.currentStock + quantity, lastUpdated: new Date().toISOString() } : item;
+      return quantity ? addReceivedStock(item, quantity) : item;
     }) : inventory;
     setInvoices(nextInvoices);
     setOrders(nextOrders);
@@ -1444,7 +1440,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           : existingItem.priceHistory;
 
         nextInventory[itemIndex] = {
-          ...existingItem,
+          ...addReceivedStock(existingItem, quantity),
           invoiceAliases: Array.from(new Set([...(existingItem.invoiceAliases || []), scannedItem.name.trim()].filter(name => name && normalizeInventoryItemName(name) !== normalizeInventoryItemName(existingItem.name)))),
           currentStock: newStock,
           supplier: isPrimarySupplier ? supplierName : existingItem.supplier,

@@ -2,6 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSupplierEmailDrafts, getSupplierCcEmails, getSupplierEmailAddress, parseEmailList } from './supplierEmailDraft.js';
 
+test('order subjects default to tomorrow using the local calendar', () => {
+  for (const [now, expected] of [
+    [new Date(2026, 8, 17, 23, 30), 'Friday, September 18, 2026'],
+    [new Date(2026, 11, 31, 23, 30), 'Friday, January 1, 2027'],
+    [new Date(2028, 1, 28, 12), 'Tuesday, February 29, 2028'],
+    [new Date(2026, 2, 7, 23, 30), 'Sunday, March 8, 2026'],
+    [new Date(2026, 9, 31, 23, 30), 'Sunday, November 1, 2026'],
+  ]) {
+    const originalTime = now.getTime();
+    const [draft] = buildSupplierEmailDrafts({
+      restaurantName: 'Test', now,
+      suggestions: [{ supplier: 'Produce', itemName: 'Basil', suggestedQuantity: 2, unit: 'lb' }],
+    });
+    assert.equal(draft.emailSubject, `Order Request - Test (${expected})`);
+    assert.equal(now.getTime(), originalTime);
+  }
+});
+
 test('buildSupplierEmailDrafts uses supplier emails and creates a mail draft', () => {
   const drafts = buildSupplierEmailDrafts({
     restaurantName: 'Zestiq',

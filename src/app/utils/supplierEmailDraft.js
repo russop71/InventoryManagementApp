@@ -26,7 +26,16 @@ export function getSupplierCcEmails(supplierName, suppliers = [], defaultCc = []
     .filter(email => email !== primaryEmail);
 }
 
-export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [], defaultCc = [], orderIdsBySupplier = {} }) {
+export function buildSupplierEmailDrafts({ restaurantName, suggestions, suppliers = [], defaultCc = [], orderIdsBySupplier = {}, now = new Date() }) {
+  // Advance the local calendar date, including across daylight-saving changes.
+  const deliveryDate = new Date(now);
+  deliveryDate.setDate(deliveryDate.getDate() + 1);
+  const tomorrow = deliveryDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
   const supplierGroups = suggestions.reduce((groups, suggestion) => {
     const supplier = suggestion.supplier || 'Supplier';
     if (!groups[supplier]) groups[supplier] = [];
@@ -37,12 +46,6 @@ export function buildSupplierEmailDrafts({ restaurantName, suggestions, supplier
   return Object.entries(supplierGroups).map(([supplier, items]) => {
     const totalCost = items.reduce((sum, item) => sum + Number(item.totalCost || 0), 0);
     const urgentItems = items.filter(item => item.priority === 'critical' || item.priority === 'high').length;
-    const today = new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
 
     const supplierEmail = getSupplierEmailAddress(supplier, suppliers);
     return {
@@ -54,7 +57,7 @@ export function buildSupplierEmailDrafts({ restaurantName, suggestions, supplier
       items,
       totalCost,
       emailBody: `Hi ${supplier},\n\nPlease send the following items for ${restaurantName}:\n\n${items.map(item => `${item.itemName} - ${item.suggestedQuantity} ${item.unit || 'ea'}`).join('\n')}\n\n${urgentItems > 0 ? `Priority items included: ${urgentItems}\n\n` : ''}Thank you`,
-      emailSubject: `Order Request - ${restaurantName} (${today})`,
+      emailSubject: `Order Request - ${restaurantName} (${tomorrow})`,
     };
   });
 }
