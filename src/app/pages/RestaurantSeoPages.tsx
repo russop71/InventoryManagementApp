@@ -60,8 +60,8 @@ const pages = {
   },
   beverage: {
     path: '/restaurant-beverage-costing-software',
-    title: 'Restaurant Beverage Costing Software | ZestIQ',
-    description: 'Liquor, wine and beer inventory and beverage costing software for bottles, cases, pours, cocktails, pars and drink margins.',
+    title: 'Restaurant Beverage Costing & Inventory Software | ZestIQ',
+    description: 'Restaurant beverage costing and inventory software for liquor, wine, beer, bottles, cases, pours, cocktails, bar pars and drink margins.',
     eyebrow: 'Restaurant beverage costing software',
     heading: 'Run bar and kitchen cost from the same inventory system.',
     intro: 'Track liquor, wine and beer by bottle, case and pour. ZestIQ connects purchase cost, bottle yield, cocktail recipes, bar pars and menu price so beverage margin is visible beside food cost.',
@@ -86,11 +86,11 @@ const pages = {
   },
   multiLocation: {
     path: '/multi-location-restaurant-software',
-    title: 'Multi-Location Restaurant Management Software | ZestIQ',
-    description: 'Manage restaurant inventory, costs, purchasing, labour and users by location while company owners retain protected cross-location visibility.',
+    title: 'Multi-Location Restaurant Software & Reporting | ZestIQ',
+    description: 'Multi-location restaurant management software for inventory, COGS, purchasing, labour, users and protected cross-location reporting.',
     eyebrow: 'Multi-location restaurant operations',
-    heading: 'Standardize the operation without mixing restaurant data.',
-    intro: 'Each restaurant location keeps its own inventory, suppliers, counts, orders, recipes and labour records. Authorized company owners can compare locations without exposing one company to another.',
+    heading: 'Multi-location restaurant software without mixed-up data.',
+    intro: 'Standardize restaurant operations while each location keeps its own inventory, COGS, suppliers, counts, orders, recipes and labour records. Authorized owners get protected multi-location reporting across the company.',
     icon: ShieldCheck,
     points: ['Location-specific inventory, counts and purchasing', 'Company-level owner visibility and user access', 'Separate restaurant companies and protected records', 'Additional locations billed clearly per active location'],
     workflow: [['Set up', 'Create the company, locations and authorized users with defined roles.'], ['Operate', 'Let each location count, buy, cost and schedule against its own records.'], ['Compare', 'Give owners a controlled view of cost, labour and operational performance across locations.']],
@@ -99,10 +99,10 @@ const pages = {
   },
   posIntegrations: {
     path: '/restaurant-pos-integrations',
-    title: 'Restaurant POS Integrations Canada | ZestIQ',
-    description: 'Connect or import restaurant POS sales into ZestIQ for menu performance, food cost, labour comparison, forecasts and ordering recommendations.',
+    title: 'Restaurant POS Integration Software Canada | ZestIQ',
+    description: 'Restaurant POS integration software that connects or imports sales for menu performance, food cost, labour comparison, forecasts and ordering.',
     eyebrow: 'Restaurant POS integrations',
-    heading: 'Bring sales into the same place as cost, stock and labour.',
+    heading: 'Connect restaurant POS sales with cost, stock and labour.',
     intro: 'ZestIQ is designed to normalize restaurant sales and menu-item data so operators can compare what sold with what it cost, what labour was scheduled and what inventory should be ordered next.',
     icon: BarChart3,
     points: ['Sales and menu-item import workflows', 'Menu-to-recipe linking for theoretical cost', 'Labour percentage and sales comparison', 'Forecast and ordering signals from historical demand'],
@@ -134,6 +134,21 @@ function SeoPage({ pageKey }: { pageKey: PageKey }) {
     ['What is restaurant food costing software?', 'Restaurant food costing software connects ingredient quantities, yields and portions with current purchase prices to calculate recipe cost, food-cost percentage, contribution margin and menu profitability.'],
     ['How is recipe costing software different from a spreadsheet?', 'A spreadsheet records a point-in-time calculation. Connected recipe costing software can update affected dishes when reviewed supplier or invoice prices change, making margin movement easier to find.'],
     ['Can food cost software connect with restaurant inventory and invoices?', 'Yes. Connecting approved invoice prices, inventory units and recipes gives operators a more current view of ingredient cost, stock value and menu margin.'],
+  ] : pageKey === 'multiLocation' ? [
+    [page.question, page.answer],
+    ['Can managers be limited to one restaurant location?', 'Yes. Location assignments and role-based permissions can limit managers to the restaurant records they are authorized to use, while designated company owners can review multiple locations.'],
+    ['What can owners compare across restaurant locations?', 'Authorized owners can review location-level inventory, COGS, purchasing, waste, forecasting and labour information without combining the underlying operating records.'],
+    ['Does each location keep separate inventory and COGS?', 'Yes. Counts, purchases, invoices, inventory value and cost reporting stay associated with the correct restaurant location.'],
+  ] : pageKey === 'posIntegrations' ? [
+    [page.question, page.answer],
+    ['What does restaurant POS data add to inventory management?', 'Menu-item sales can support theoretical ingredient usage, menu margin review, labour-to-sales comparisons, forecasting and suggested ordering when items are mapped correctly.'],
+    ['Can ZestIQ use a POS sales export?', 'Yes. Structured sales exports can be normalized and mapped into ZestIQ workflows when a direct provider connection is not available.'],
+    ['Does connecting a POS automatically change inventory?', 'POS data should first be mapped to recipes and reviewed. ZestIQ uses sales as an operating signal while keeping users in control of counts, invoices and purchasing decisions.'],
+  ] : pageKey === 'beverage' ? [
+    [page.question, page.answer],
+    ['Can beverage software calculate liquor cost per pour?', 'Yes. Bottle size, purchase cost and pour size can be connected to calculate expected cost per drink and compare it with menu price.'],
+    ['Can liquor, wine and beer be counted in different units?', 'Yes. Beverage inventory needs to support cases, bottles, kegs, litres, ounces, pours and partial-container counts without losing the relationship to purchase cost.'],
+    ['Does beverage inventory connect with cocktail recipes?', 'Yes. Cocktail ingredients, pour quantities and current bottle costs can be linked so drink cost and margin change when reviewed supplier prices change.'],
   ] : [[page.question, page.answer]];
   usePageSeo({ title: page.title, description: page.description, path: page.path });
   return <div className="min-h-screen bg-[#FBFAF6] text-[#303A43]">

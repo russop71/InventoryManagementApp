@@ -12,12 +12,12 @@ const guideLinks = [
 
 export function RestaurantInventoryBuyerGuide() {
   usePageSeo({
-    title: 'Best Restaurant Inventory Software in Canada: 2026 Buyer’s Guide',
+    title: 'Best Restaurant Inventory Management Software Canada | 2026 Guide',
     description: 'A practical 2026 guide to choosing restaurant inventory management software in Canada. Compare counting, food cost, invoices, ordering, POS, labour and multi-location requirements.',
     path: '/best-restaurant-inventory-management-software-canada',
   });
 
-  return <GuideLayout eyebrow="2026 Canadian buyer’s guide" title="How to choose the best restaurant inventory software for your operation." intro="The best system is not the one with the longest feature list. It is the one your team will actually use every week—and the one that turns counts, purchases and recipes into decisions before margin disappears.">
+  return <GuideLayout eyebrow="2026 Canadian buyer’s guide" title="How to choose the best restaurant inventory management software in Canada." intro="The best system is not the one with the longest feature list. It is the one your team will actually use every week—and the one that turns counts, purchases and recipes into decisions before margin disappears.">
     <GuideSection title="Start with the operating problem, not the software demo">
       <p>Restaurant inventory systems generally promise tighter food cost, faster counts and better purchasing. Those outcomes only happen when the system fits how products are received, stored, prepared and sold in your restaurant. Before comparing vendors, document who counts inventory, how often it happens, which units are used, how invoices arrive and who approves an order.</p>
       <p>Independent restaurants often need a simpler workflow than a national chain. Multi-location groups need consistent item definitions and owner visibility without mixing each location’s operational records. Canadian operators should also confirm CAD pricing, tax handling, privacy documentation, support availability and compatibility with the POS and suppliers they actually use.</p>
