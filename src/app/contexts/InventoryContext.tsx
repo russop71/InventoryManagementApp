@@ -287,7 +287,7 @@ interface InventoryContextType {
   adjustInventory: (id: string, change: number, reason: string) => void;
   addRecipe: (recipe: Omit<Recipe, 'id'>) => void;
   updateRecipe: (id: string, recipe: Partial<Recipe>) => void;
-  deleteRecipe: (id: string) => void;
+  deleteRecipe: (id: string) => Promise<void>;
   syncToastMenuItems: (toastMenuItems: any[]) => void;
   addForecast: (forecast: Omit<ForecastData, 'id'>) => void;
   generateDailyOrder: (forecastId: string) => void;
@@ -406,7 +406,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     nextSuppliers: Supplier[] = suppliers,
     nextPreppedRecipes: PreppedRecipe[] = preppedRecipes,
     nextInventoryCounts: InventoryCount[] = inventoryCounts,
-    options: { allowEmptyInventory?: boolean; allowEmptyInventoryCounts?: boolean; allowEmptySuppliers?: boolean; categories?: CategoryDefinition[] } = {},
+    options: { allowEmptyInventory?: boolean; allowEmptyRecipes?: boolean; allowEmptyInventoryCounts?: boolean; allowEmptySuppliers?: boolean; categories?: CategoryDefinition[] } = {},
   ) => {
     if (!accountId || !activeLocationId) return Promise.resolve();
     const currentLocalInventory = readScopedJson<InventoryItem[]>(localKey('inventory'), []);
@@ -422,7 +422,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const effectiveInventory = !options.allowEmptyInventory && nextInventory.length === 0 && currentLocalInventory.length > 0
       ? currentLocalInventory
       : nextInventory;
-    const effectiveRecipes = nextRecipes.length === 0 && currentLocalRecipes.length > 0
+    const effectiveRecipes = !options.allowEmptyRecipes && nextRecipes.length === 0 && currentLocalRecipes.length > 0
       ? currentLocalRecipes
       : nextRecipes;
     const effectiveStorageAreas = nextStorageAreas.length === 0 && currentLocalStorageAreas.length > 0
@@ -1066,10 +1066,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     saveLocationData(inventory, nextRecipes, storageAreas);
   };
 
-  const deleteRecipe = (id: string) => {
+  const deleteRecipe = async (id: string) => {
     const nextRecipes = recipes.filter(recipe => recipe.id !== id);
     setRecipes(nextRecipes);
-    saveLocationData(inventory, nextRecipes, storageAreas);
+    await saveLocationData(inventory, nextRecipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts, { allowEmptyRecipes: true });
   };
 
   const syncToastMenuItems = (toastMenuItems: any[]) => {

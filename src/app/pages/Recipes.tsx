@@ -3,6 +3,7 @@ import { useInventory, type InventoryItem } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
 import { useLocation, useNavigate } from 'react-router';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -211,6 +212,8 @@ export function Recipes() {
   const [prepYieldUnit, setPrepYieldUnit] = useState('batch');
   const [selectedPrepIngredients, setSelectedPrepIngredients] = useState<IngredientSelection[]>([]);
   const [scannedRecipeData, setScannedRecipeData] = useState<ScannedRecipeData | null>(null);
+  const [recipePendingDelete, setRecipePendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingRecipe, setIsDeletingRecipe] = useState(false);
 
   const resetRecipeForm = () => {
     setEditingRecipe(null);
@@ -523,10 +526,19 @@ export function Recipes() {
     setActiveTab('menuItems');
   };
 
-  const handleDeleteRecipe = (recipeId: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    deleteRecipe(recipeId);
-    showToast.success('Recipe deleted');
+  const handleDeleteRecipe = async () => {
+    if (!recipePendingDelete || isDeletingRecipe) return;
+
+    setIsDeletingRecipe(true);
+    try {
+      await deleteRecipe(recipePendingDelete.id);
+      setRecipePendingDelete(null);
+      showToast.success('Menu item deleted and saved');
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'This menu item could not be deleted.');
+    } finally {
+      setIsDeletingRecipe(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -906,7 +918,7 @@ export function Recipes() {
                       <div className="p-4 md:hidden">
                         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><button type="button" onClick={() => handleEditRecipe(recipe.id)} className="break-words text-left text-base font-black leading-snug text-slate-900">{recipe.menuItemName}</button><p className="mt-1 break-words text-xs text-slate-500">{recipe.category} · {recipe.ingredients.length} ingredients{recipe.externalId ? ` · POS ${recipe.externalId}` : ''}</p></div>{isTopSellerMatch && <Badge className="shrink-0 bg-amber-100 text-[10px] text-amber-800">Top Seller</Badge>}</div>
                         <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Food cost</p><p className="mt-1 font-black text-slate-900">${recipeCost.toFixed(2)}</p><p className="text-[10px] text-slate-500">{foodCostPercent.toFixed(0)}%</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Price</p><p className="mt-1 font-black text-slate-900">${recipe.price.toFixed(2)}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Margin</p><p className="mt-1 font-black" style={{ color: getMarginColor(marginPercent) }}>${margin.toFixed(2)}</p><p className="text-[10px]" style={{ color: getMarginColor(marginPercent) }}>{marginPercent.toFixed(0)}%</p></div></div>
-                        <div className="mt-3 flex gap-2"><Button className="flex-1" size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}><Edit className="mr-1.5 h-4 w-4" />Edit</Button><Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
+                        <div className="mt-3 flex gap-2"><Button className="flex-1" size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}><Edit className="mr-1.5 h-4 w-4" />Edit</Button><Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => setRecipePendingDelete({ id: recipe.id, name: recipe.menuItemName })}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
                       </div>
                       <div className="hidden grid-cols-[minmax(180px,1.3fr)_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_0.9fr] items-center gap-3 px-4 py-4 text-sm text-slate-700 md:grid">
                       <div className="min-w-0">
@@ -939,7 +951,7 @@ export function Recipes() {
                         <Button aria-label={`Edit ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}>
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => handleDeleteRecipe(recipe.id, recipe.menuItemName)}>
+                        <Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => setRecipePendingDelete({ id: recipe.id, name: recipe.menuItemName })}>
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
                       </div>
@@ -1147,6 +1159,32 @@ export function Recipes() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(recipePendingDelete)} onOpenChange={open => {
+        if (!open && !isDeletingRecipe) setRecipePendingDelete(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{recipePendingDelete?.name || 'this menu item'}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the menu item and its ingredient recipe. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingRecipe}>Keep menu item</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingRecipe}
+              onClick={event => {
+                event.preventDefault();
+                void handleDeleteRecipe();
+              }}
+              className="bg-rose-700 text-white hover:bg-rose-800"
+            >
+              {isDeletingRecipe ? 'Deleting…' : 'Delete menu item'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <RecipeScan inventory={inventory} isOpen={isScanOpen} onClose={() => setIsScanOpen(false)} onRecipeExtracted={handleRecipeScanned} />
     </div>
