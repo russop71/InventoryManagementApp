@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
 import { Truck, Plus, Pencil, Trash2, Mail, Phone, MapPin, ChevronDown, ChevronRight, FileText, DollarSign, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { getInvalidEmailListEntries, parseEmailList } from '../utils/supplierEmailDraft.js';
@@ -61,6 +62,7 @@ export function Suppliers() {
   const [editingSupplier, setEditingSupplier] = useState<string | null>(null);
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
   const [deletingSupplierId, setDeletingSupplierId] = useState<string | null>(null);
+  const [supplierPendingDelete, setSupplierPendingDelete] = useState<string | null>(null);
 
   const handleAddSupplier = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -107,17 +109,20 @@ export function Suppliers() {
     setIsAddDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    const supplier = suppliers.find(item => item.id === id);
-    if (confirm(`Delete ${supplier?.name || 'this supplier'}? Existing inventory and invoice history will be kept.`)) {
-      setDeletingSupplierId(id);
-      try {
-        await deleteSupplier(id);
-        setExpandedSupplier(current => current === id ? null : current);
-        toast.success('Supplier deleted and saved');
-      } finally {
-        setDeletingSupplierId(null);
-      }
+  const handleDelete = async () => {
+    if (!supplierPendingDelete || deletingSupplierId) return;
+
+    const id = supplierPendingDelete;
+    setDeletingSupplierId(id);
+    try {
+      await deleteSupplier(id);
+      setExpandedSupplier(current => current === id ? null : current);
+      setSupplierPendingDelete(null);
+      toast.success('Supplier deleted and saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'This supplier could not be deleted.');
+    } finally {
+      setDeletingSupplierId(null);
     }
   };
 
@@ -294,7 +299,7 @@ export function Suppliers() {
                         aria-label={`Delete ${supplier.name}`}
                         disabled={deletingSupplierId === supplier.id}
                         className="h-9 w-9 rounded-lg p-0"
-                        onClick={() => handleDelete(supplier.id)}
+                        onClick={() => setSupplierPendingDelete(supplier.id)}
                       >
                         {deletingSupplierId === supplier.id ? <span className="text-[10px] font-bold text-gray-500">…</span> : <Trash2 className="h-3.5 w-3.5 text-red-600" />}
                       </Button>
@@ -367,6 +372,34 @@ export function Suppliers() {
           })
         )}
       </div>
+
+      <AlertDialog open={Boolean(supplierPendingDelete)} onOpenChange={open => {
+        if (!open && !deletingSupplierId) setSupplierPendingDelete(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {suppliers.find(supplier => supplier.id === supplierPendingDelete)?.name || 'this supplier'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The supplier contact will be removed. Existing inventory, invoices and order history will be kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingSupplierId)}>Keep supplier</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={Boolean(deletingSupplierId)}
+              onClick={event => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              className="bg-rose-700 text-white hover:bg-rose-800"
+            >
+              {deletingSupplierId ? 'Deleting…' : 'Delete supplier'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
