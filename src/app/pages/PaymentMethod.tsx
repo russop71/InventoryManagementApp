@@ -14,6 +14,8 @@ type BillingPlan = 'monthly';
 
 interface BillingDetails {
   configured: boolean;
+  checkoutUnavailableReason?: string | null;
+  trialEndsAt?: string | null;
   additionalLocationPriceConfigured: boolean;
   schedulingPriceConfigured: boolean;
   additionalLocationSchedulingPriceConfigured: boolean;
@@ -54,7 +56,7 @@ interface BillingDetails {
 }
 
 const PLANS: Array<{ id: BillingPlan; name: string; price: string; detail: string }> = [
-  { id: 'monthly', name: 'ZestIQ Basic', price: 'CAD $249.99', detail: 'Per month · one location included · no free trial' },
+  { id: 'monthly', name: 'ZestIQ Basic', price: 'CAD $249.99', detail: 'Per month plus applicable tax · one location included · 30-day free trial' },
 ];
 
 const BASE_MONTHLY_PRICE = 249.99;
@@ -184,20 +186,6 @@ export function PaymentMethod() {
     }
   };
 
-  const requestNonRenewal = async () => {
-    if (!accountId || !billing || !window.confirm(`This does not cancel service today. Billing and access continue through ${formatDate(billing.commitmentEndsAt || null)}. Submit a non-renewal request for that date?`)) return;
-    setIsLoading(true);
-    try {
-      const result = await apiRequest<{ nonRenewalRequestedAt: string; nonRenewalEffectiveAt: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/billing/non-renewal`, { method: 'POST' });
-      setBilling(current => current ? { ...current, nonRenewalRequestedAt: result.nonRenewalRequestedAt, nonRenewalEffectiveAt: result.nonRenewalEffectiveAt } : current);
-      toast.success(`Non-renewal scheduled for ${formatDate(result.nonRenewalEffectiveAt)}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to request non-renewal');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   if (!isOwner) {
     return (
       <Card className="border-amber-200 bg-amber-50">
@@ -286,23 +274,24 @@ export function PaymentMethod() {
         </Card>
         <Card>
           <CardContent className="py-4">
-            <p className="text-xs text-slate-400">Next renewal</p>
-            <p className="mt-2 font-semibold text-slate-900">{formatDate(billing?.currentPeriodEnd || null)}</p>
+            <p className="text-xs text-slate-400">{billing?.status === 'trialing' ? 'Trial ends / first payment' : 'Next billing date'}</p>
+            <p className="mt-2 font-semibold text-slate-900">{formatDate((billing?.status === 'trialing' ? billing.trialEndsAt : billing?.currentPeriodEnd) || null)}</p>
           </CardContent>
         </Card>
       </div>
 
       {billing?.customerCreated && (
         <Card>
-          <CardHeader><CardTitle>Committed term & non-renewal</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Trial, committed term & cancellation</CardTitle></CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-sm text-slate-600">
               <p className="font-semibold text-slate-950">Current commitment ends {formatDate(billing.commitmentEndsAt || null)}</p>
+              {billing.status === 'trialing' && <p className="mt-1">Email hello@zestiq.ca before {billing.trialEndsAt ? new Date(billing.trialEndsAt).toLocaleString() : 'the trial expires'} to cancel without charge or a paid commitment.</p>}
               {billing.nonRenewalEffectiveAt
                 ? <p className="mt-1 text-amber-800">Non-renewal is scheduled. Service and monthly billing continue through {formatDate(billing.nonRenewalEffectiveAt)}.</p>
-                : <p className="mt-1">Non-renewal must be submitted at least 90 days before term end. It does not cancel service early.</p>}
+                : <p className="mt-1">New subscriptions continue month-to-month after the paid year, with 30 days’ cancellation notice by email. You may give notice before the term ends; the paid commitment still applies. Any separate signed agreement governs your existing subscription.</p>}
             </div>
-            {!billing.nonRenewalEffectiveAt && <Button type="button" variant="outline" disabled={isLoading || !billing.commitmentEndsAt} onClick={() => void requestNonRenewal()}>Request non-renewal</Button>}
+            {!billing.nonRenewalEffectiveAt && <Button asChild variant="outline"><a href="mailto:hello@zestiq.ca?subject=ZestIQ%20subscription%20cancellation">Email cancellation request</a></Button>}
           </CardContent>
         </Card>
       )}
@@ -358,15 +347,17 @@ export function PaymentMethod() {
                 <div className="mt-3 rounded-xl bg-slate-50 p-3">
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Monthly total</p>
                   <p className="mt-2 text-lg font-extrabold text-slate-950">
-                    CAD ${monthlyTotal.toFixed(2)}/month
+                    CAD ${monthlyTotal.toFixed(2)}/month + applicable tax
                   </p>
                 </div>
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
-                  <p className="font-bold text-slate-950">12-month commitment</p>
-                  <p className="mt-1 leading-5">Your subscription is billed monthly, with an initial 12-month term. It automatically renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.</p>
+                  <p className="font-bold text-slate-950">30-day free trial, then a 12-month paid commitment</p>
+                  <p className="mt-1 leading-5">Provide payment details upfront. No subscription fee is charged during the trial. Email hello@zestiq.ca before the trial expires to cancel without charge or commitment.</p>
+                  <p className="mt-2 leading-5">Otherwise, your first monthly payment plus applicable tax is charged when the trial ends, starting a separate full 12-month paid term. The trial does not count toward that year.</p>
+                  <p className="mt-2 leading-5">After the paid year, billing continues month-to-month with 30 days’ cancellation notice by email. Another annual term is optional and requires your express agreement. Your exact trial end and first-payment date appear in secure checkout.</p>
                   <label className="mt-3 flex cursor-pointer items-start gap-2 leading-5">
                     <Checkbox checked={commitmentAccepted} onCheckedChange={checked => setCommitmentAccepted(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#303A43]" />
-                    <span>I understand and agree to the 12-month commitment and 90-day non-renewal notice.</span>
+                    <span>I agree to the trial terms, automatic conversion to a 12-month paid commitment, monthly charges plus applicable tax, and subsequent month-to-month billing.</span>
                   </label>
                   <a href="/terms" target="_blank" rel="noreferrer" className="mt-2 inline-block font-semibold text-slate-900 underline underline-offset-2">Read Terms of Service</a>
                 </div>
@@ -376,8 +367,9 @@ export function PaymentMethod() {
                   disabled={isLoading || current || !commitmentAccepted || !billing?.configured || (locationCount > 1 && !billing?.additionalLocationPriceConfigured) || (zestEmployeeEnabled && !billing?.schedulingPriceConfigured) || (locationCount > 1 && zestEmployeeEnabled && !billing?.additionalLocationSchedulingPriceConfigured)}
                   onClick={() => void openCheckout(plan.id)}
                 >
-                  {current ? 'Manage subscription in Stripe' : `Subscribe for CAD $${monthlyTotal.toFixed(2)}/month`}
+                  {current ? 'Current subscription' : 'Start 30-day free trial'}
                 </Button>
+                {!billing?.configured && billing?.checkoutUnavailableReason && <p className="mt-2 text-sm text-amber-800">{billing.checkoutUnavailableReason}</p>}
                 {zestEmployeeEnabled && (!billing?.schedulingPriceConfigured || (locationCount > 1 && !billing?.additionalLocationSchedulingPriceConfigured)) && (
                   <p className="mt-2 text-xs font-medium text-amber-700">Scheduling checkout will be available once its Stripe price{locationCount > 1 ? 's are' : ' is'} connected.</p>
                 )}

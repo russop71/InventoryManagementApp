@@ -718,10 +718,10 @@ export function PlatformAdmin() {
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="font-semibold text-slate-950">Secure billing setup</p>
-                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for the first location. Each additional location is CAD $199.99/month. Scheduling is optional at CAD $49.99/month for the first location and CAD $24.99/month for each additional location. There is no free trial.</p>
+                <p className="mt-1 text-sm text-slate-500">ZestIQ Basic is CAD $249.99/month for the first location. Each additional location is CAD $199.99/month. Scheduling is optional at CAD $49.99/month for the first location and CAD $24.99/month for each additional location. Prices exclude applicable tax. New subscriptions start with a 30-day free trial and require payment details upfront.</p>
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
                   <p className="font-semibold text-slate-950">Contract term disclosure</p>
-                  <p className="mt-1">Billed monthly with a 12-month initial commitment. The subscription renews for another 12-month term unless written non-renewal notice is received at least 90 days before term end.</p>
+                  <p className="mt-1">Cancel by emailing hello@zestiq.ca before the trial ends to avoid charges and commitment. Otherwise, the trial converts to a separate full 12-month paid term billed monthly. After that year, billing continues month-to-month with 30 days’ cancellation notice by email. A further annual term requires express agreement.</p>
                   <label className="mt-3 flex cursor-pointer items-start gap-2">
                     <Checkbox checked={commitmentConfirmed} onCheckedChange={checked => setCommitmentConfirmed(checked === true)} className="mt-0.5 border-slate-400 data-[state=checked]:bg-[#303A43]" />
                     <span>I have confirmed these terms with this client before creating their checkout link.</span>

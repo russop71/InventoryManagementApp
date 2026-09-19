@@ -7,6 +7,7 @@ import { enforceRateLimit } from '../_request-guard.js';
 import { launchReadiness } from '../_launch-readiness.js';
 import { reportServerError } from '../_observability.js';
 import { addCheckoutLineItems, checkoutLineItems, SUBSCRIPTION_PRICES_CAD_CENTS } from '../_subscription-pricing.js';
+import { applyCheckoutPolicy, checkoutReady, COMMITMENT_TERMS, CHECKOUT_DISCLOSURE, SUBSCRIPTION_AGREEMENT_VERSION } from '../_subscription-policy.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,7 +29,6 @@ const PREMIUM_MONTHLY_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.firstLocation;
 const ADDITIONAL_LOCATION_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.additionalLocation;
 const SCHEDULING_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.schedulingFirstLocation;
 const ADDITIONAL_LOCATION_SCHEDULING_CAD_CENTS = SUBSCRIPTION_PRICES_CAD_CENTS.schedulingAdditionalLocation;
-const SUBSCRIPTION_AGREEMENT_VERSION = '2026-08-25';
 const PLATFORM_REAUTH_TTL_MS = 60 * 60 * 1000;
 
 function json(res, status, body) {
@@ -419,6 +419,8 @@ async function validateStripePrice(priceId, expectedAmount, label) {
     || price?.unit_amount !== expectedAmount
     || price?.recurring?.interval !== 'month'
     || Number(price?.recurring?.interval_count || 1) !== 1
+    || price?.tax_behavior !== 'exclusive'
+    || price?.active !== true
   ) {
     throw Object.assign(new Error(`${label} must be a CAD monthly Stripe price for $${(expectedAmount / 100).toFixed(2)}`), { status: 503 });
   }
@@ -625,7 +627,8 @@ export function canRequestNonRenewal(commitmentEndsAt, now = new Date()) {
 
 function mapBilling(account, details = {}) {
   return {
-    configured: Boolean(STRIPE_SECRET_KEY && BILLING_PRICE_IDS.monthly),
+    configured: checkoutReady(),
+    checkoutUnavailableReason: checkoutReady() ? null : 'Checkout is being configured. Please contact hello@zestiq.ca.',
     additionalLocationPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION),
     schedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_SCHEDULING),
     additionalLocationSchedulingPriceConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ADDITIONAL_LOCATION_SCHEDULING),
@@ -638,6 +641,7 @@ function mapBilling(account, details = {}) {
     nonRenewalRequestedAt: account.non_renewal_requested_at || null,
     nonRenewalEffectiveAt: account.non_renewal_effective_at || null,
     currentPeriodEnd: account.current_period_end || null,
+    trialEndsAt: account.trial_ends_at || null,
     subscriptionStartedAt: null,
     billingFrequency: null,
     paymentMethods: [],
@@ -672,6 +676,7 @@ async function getStripeBillingDetails(account) {
     additionalLocationQuantity: Number(additionalLocationItem?.quantity || account.additional_location_quantity || 0),
     schedulingEnabled: Boolean(schedulingItem || additionalLocationSchedulingItem) || schedulingEnabled(account),
     subscriptionStartedAt: stripeDate(subscription?.start_date || subscription?.created),
+    trialEndsAt: stripeDate(subscription?.trial_end) || account.trial_ends_at || null,
     currentPeriodEnd: stripeDate(currentPeriodEnd) || account.current_period_end || null,
     billingFrequency: recurring ? {
       interval: recurring.interval,
@@ -1482,11 +1487,12 @@ export default async function handler(req, res) {
         }
 
         if (segments[3] === 'billing' && segments[4] === 'checkout' && method === 'POST') {
+          if (!checkoutReady()) return json(res, 503, { error: 'Checkout is not ready. Configure payment confirmation and the billing portal first.' });
           if (clientAccount.stripe_subscription_id) {
             return json(res, 409, { error: 'This client already has a Stripe subscription. Manage it in Stripe instead of creating a duplicate.' });
           }
           const plan = String(req.body?.plan || '');
-          if (req.body?.commitmentAccepted !== true) return json(res, 400, { error: 'Confirm the 12-month commitment and 90-day non-renewal notice before creating checkout.' });
+          if (req.body?.commitmentAccepted !== true) return json(res, 400, { error: 'Confirm the 30-day trial and subsequent 12-month paid commitment before creating checkout.' });
           const priceId = BILLING_PRICE_IDS[plan];
           if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
           const locationCount = requestedLocationCount(req.body);
@@ -1502,20 +1508,20 @@ export default async function handler(req, res) {
             'metadata[location_count]': String(locationCount),
             'metadata[scheduling_enabled]': String(includeScheduling),
             'metadata[commitment_accepted]': 'true',
-            'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+            'metadata[commitment_terms]': COMMITMENT_TERMS,
             'metadata[agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
             'subscription_data[metadata][account_id]': clientAccount.id,
             'subscription_data[metadata][plan]': plan,
             'subscription_data[metadata][location_count]': String(locationCount),
             'subscription_data[metadata][scheduling_enabled]': String(includeScheduling),
             'subscription_data[metadata][commitment_accepted]': 'true',
-            'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+            'subscription_data[metadata][commitment_terms]': COMMITMENT_TERMS,
             'subscription_data[metadata][agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
             success_url: `${appOrigin(req)}/app/payment-method?checkout=success`,
             cancel_url: `${appOrigin(req)}/app/payment-method?checkout=cancelled`,
             allow_promotion_codes: 'true',
             'consent_collection[terms_of_service]': 'required',
-            'custom_text[submit][message]': 'By subscribing, you agree to a 12-month initial commitment billed monthly. The subscription renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.',
+            'custom_text[submit][message]': CHECKOUT_DISCLOSURE,
           }, checkoutLineItems({
             basePriceId: priceId,
             additionalLocationPriceId: STRIPE_PRICE_ADDITIONAL_LOCATION,
@@ -1526,7 +1532,7 @@ export default async function handler(req, res) {
           }));
           if (clientAccount.stripe_customer_id) form.customer = clientAccount.stripe_customer_id;
           else form.customer_email = owners[0].email;
-          const session = await stripe('checkout/sessions', form);
+          const session = await stripe('checkout/sessions', applyCheckoutPolicy(form));
           return json(res, 200, { url: session.url });
         }
       }
@@ -1803,11 +1809,12 @@ export default async function handler(req, res) {
         return json(res, 200, { billing: mapBilling(account, details) });
       }
       if (segments[3] === 'checkout' && method === 'POST') {
+        if (!checkoutReady()) return json(res, 503, { error: 'Checkout is not ready. Configure payment confirmation and the billing portal first.' });
         if (account.stripe_subscription_id) {
           return json(res, 409, { error: 'A subscription already exists. Use the Stripe billing portal to manage it.' });
         }
         const plan = String(req.body?.plan || '');
-        if (req.body?.commitmentAccepted !== true) return json(res, 400, { error: 'Confirm the 12-month commitment and 90-day non-renewal notice before starting checkout.' });
+        if (req.body?.commitmentAccepted !== true) return json(res, 400, { error: 'Confirm the 30-day trial and subsequent 12-month paid commitment before starting checkout.' });
         const priceId = BILLING_PRICE_IDS[plan];
         if (!priceId) return json(res, 503, { error: `The Stripe price for ${plan || 'this plan'} is not configured` });
         const locationCount = requestedLocationCount(req.body);
@@ -1822,20 +1829,20 @@ export default async function handler(req, res) {
           'metadata[location_count]': String(locationCount),
           'metadata[scheduling_enabled]': String(includeScheduling),
           'metadata[commitment_accepted]': 'true',
-          'metadata[commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+          'metadata[commitment_terms]': COMMITMENT_TERMS,
           'metadata[agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
           'subscription_data[metadata][account_id]': accountId,
           'subscription_data[metadata][plan]': plan,
           'subscription_data[metadata][location_count]': String(locationCount),
           'subscription_data[metadata][scheduling_enabled]': String(includeScheduling),
           'subscription_data[metadata][commitment_accepted]': 'true',
-          'subscription_data[metadata][commitment_terms]': '12-month initial term; 90-day non-renewal notice',
+          'subscription_data[metadata][commitment_terms]': COMMITMENT_TERMS,
           'subscription_data[metadata][agreement_version]': SUBSCRIPTION_AGREEMENT_VERSION,
           success_url: `${origin}/app/payment-method?checkout=success`,
           cancel_url: `${origin}/app/payment-method?checkout=cancelled`,
           allow_promotion_codes: 'true',
           'consent_collection[terms_of_service]': 'required',
-          'custom_text[submit][message]': 'By subscribing, you agree to a 12-month initial commitment billed monthly. The subscription renews for another 12-month term unless ZestIQ receives written notice of non-renewal at least 90 days before the term ends.',
+          'custom_text[submit][message]': CHECKOUT_DISCLOSURE,
         }, checkoutLineItems({
           basePriceId: priceId,
           additionalLocationPriceId: STRIPE_PRICE_ADDITIONAL_LOCATION,
@@ -1846,7 +1853,7 @@ export default async function handler(req, res) {
         }));
         if (account.stripe_customer_id) form.customer = account.stripe_customer_id;
         else form.customer_email = access.appUser.email;
-        const session = await stripe('checkout/sessions', form);
+        const session = await stripe('checkout/sessions', applyCheckoutPolicy(form));
         return json(res, 200, { url: session.url });
       }
       if (segments[3] === 'portal' && method === 'POST') {
@@ -1861,6 +1868,11 @@ export default async function handler(req, res) {
       }
       if (segments[3] === 'non-renewal' && method === 'POST') {
         if (!account.stripe_subscription_id) return json(res, 409, { error: 'An active Stripe subscription is required before requesting non-renewal.' });
+        const subscription = await stripeGet(`subscriptions/${encodeURIComponent(account.stripe_subscription_id)}`);
+        if (subscription.metadata?.agreement_version === SUBSCRIPTION_AGREEMENT_VERSION) {
+          return json(res, 409, { error: 'Please email hello@zestiq.ca to cancel. During the trial, email before it expires to cancel without charge or commitment. After the paid year, cancellation requires 30 days’ notice.' });
+        }
+        // Keep the prior contract handling for existing, explicitly older agreements.
         const commitment = commitmentDates(account.commitment_started_at || account.created_at);
         const commitmentEndsAt = account.commitment_ends_at || commitment?.endsAt;
         if (!commitmentEndsAt) return json(res, 409, { error: 'The commitment term could not be determined.' });

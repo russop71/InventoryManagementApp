@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { subscriptionBillingPatch } from './_subscription-policy.js';
 
 export const config = {
   api: {
@@ -9,6 +10,7 @@ export const config = {
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_PRICE_ADDITIONAL_LOCATION = process.env.STRIPE_PRICE_ADDITIONAL_LOCATION;
 const FALLBACK_AGREEMENT_VERSION = '2026-08-25';
 
@@ -28,7 +30,7 @@ export function verifyStripeSignature(payload, header, secret, now = Date.now())
   const fields = String(header).split(',').map(part => part.split('='));
   const timestamp = fields.find(([key]) => key === 't')?.[1];
   const signatures = fields.filter(([key]) => key === 'v1').map(([, value]) => value);
-  if (!timestamp || signatures.length === 0) return false;
+  if (!timestamp || !/^\d+$/.test(timestamp) || signatures.length === 0) return false;
   if (Math.abs(now / 1000 - Number(timestamp)) > 300) return false;
   const expected = createHmac('sha256', secret).update(`${timestamp}.${payload.toString('utf8')}`).digest('hex');
   const expectedBuffer = Buffer.from(expected);
@@ -114,24 +116,29 @@ function commitmentEnd(startDate) {
   return end.toISOString();
 }
 
-function checkoutPaymentSucceeded(session) {
-  return session?.payment_status === 'paid' || session?.payment_status === 'no_payment_required';
+async function readSubscription(value) {
+  const id = typeof value === 'string' ? value : value?.id;
+  if (!id || !STRIPE_SECRET_KEY) throw new Error('Stripe subscription or server credentials are missing');
+  const response = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${STRIPE_SECRET_KEY}` },
+  });
+  if (!response.ok) throw new Error(`Unable to read current subscription (${response.status})`);
+  return response.json();
 }
 
-async function activateAccountFromCheckout(accountId, session) {
+async function activateAccountFromCheckout(accountId, session, subscription) {
   const startedAt = unixDate(session.created) || new Date().toISOString();
   const patch = {
     stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
     stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
     billing_plan: session.metadata?.plan || null,
-    billing_status: checkoutPaymentSucceeded(session) ? 'active' : 'incomplete',
+    billing_status: subscription.status,
     additional_location_quantity: Math.max(0, Number(session.metadata?.location_count || 1) - 1),
     commitment_started_at: startedAt,
     commitment_ends_at: commitmentEnd(startedAt),
-    non_renewal_requested_at: null,
-    non_renewal_effective_at: null,
+    ...subscriptionBillingPatch(subscription, STRIPE_PRICE_ADDITIONAL_LOCATION),
   };
-  if (checkoutPaymentSucceeded(session) && session.metadata?.scheduling_enabled === 'true') {
+  if (['active', 'trialing'].includes(subscription.status) && session.metadata?.scheduling_enabled === 'true') {
     const onboardingState = await getAccountOnboardingState(accountId);
     patch.onboarding_state = {
       ...onboardingState,
@@ -162,47 +169,32 @@ export default async function handler(req, res) {
       const accountId = object.client_reference_id || object.metadata?.account_id;
       if (accountId) {
         const acceptedAt = unixDate(object.created) || new Date().toISOString();
-        await activateAccountFromCheckout(accountId, object);
+        const subscription = await readSubscription(object.subscription);
+        if (subscription.metadata?.account_id !== accountId) throw new Error('Checkout subscription account mismatch');
+        await activateAccountFromCheckout(accountId, object, subscription);
         if (event.type !== 'checkout.session.async_payment_failed') {
-          await recordSubscriptionAgreement(accountId, object, acceptedAt).catch(error => {
-            console.error('Unable to record subscription agreement', error);
-          });
+          await recordSubscriptionAgreement(accountId, object, acceptedAt);
         }
       }
     }
 
-    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-      const accountId = object.metadata?.account_id;
+    if (['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) {
+      // Stripe may deliver events out of order. Read current state rather than
+      // letting an older trial or invoice event reactivate a canceled account.
+      const subscription = await readSubscription(object.id);
+      const accountId = subscription.metadata?.account_id;
       if (accountId) {
-        const additionalLocationItem = object.items?.data?.find(item => item.price?.id === STRIPE_PRICE_ADDITIONAL_LOCATION);
-        await updateAccount(accountId, {
-          stripe_customer_id: typeof object.customer === 'string' ? object.customer : object.customer?.id,
-          stripe_subscription_id: object.id || null,
-          billing_plan: object.metadata?.plan || null,
-          billing_status: object.status || 'canceled',
-          trial_ends_at: unixDate(object.trial_end),
-          current_period_end: unixDate(object.current_period_end),
-          additional_location_quantity: event.type === 'customer.subscription.deleted'
-            ? 0
-            : Number(additionalLocationItem?.quantity || 0),
-        });
+        await updateAccount(accountId, subscriptionBillingPatch(subscription, STRIPE_PRICE_ADDITIONAL_LOCATION));
       }
     }
 
     if (event.type === 'invoice.payment_succeeded' || event.type === 'invoice.payment_failed') {
       const subscriptionDetails = object.parent?.subscription_details || {};
-      const metadataAccountId = subscriptionDetails.metadata?.account_id || object.subscription_details?.metadata?.account_id;
-      const accountId = metadataAccountId || await accountIdForStripeSubscription(object.subscription);
-      if (accountId) {
-        await updateAccount(accountId, {
-          stripe_customer_id: typeof object.customer === 'string' ? object.customer : object.customer?.id,
-          stripe_subscription_id: typeof object.subscription === 'string'
-            ? object.subscription
-            : subscriptionDetails.subscription || object.subscription?.id || null,
-          billing_plan: subscriptionDetails.metadata?.plan || null,
-          billing_status: event.type === 'invoice.payment_succeeded' ? 'active' : 'past_due',
-          current_period_end: unixDate(object.lines?.data?.[0]?.period?.end),
-        });
+      const subscriptionId = subscriptionDetails.subscription || object.subscription;
+      if (subscriptionId) {
+        const subscription = await readSubscription(subscriptionId);
+        const accountId = subscription.metadata?.account_id || await accountIdForStripeSubscription(subscription.id);
+        if (accountId) await updateAccount(accountId, subscriptionBillingPatch(subscription, STRIPE_PRICE_ADDITIONAL_LOCATION));
       }
     }
 

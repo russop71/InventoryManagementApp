@@ -33,6 +33,9 @@ export function isDemoAdministrativeMutation(account, segments = [], method = 'G
 }
 
 export function hasActiveSubscription(account) {
+  if (account?.billing_status === 'trialing') {
+    return Boolean(account.stripe_subscription_id && Date.parse(account.trial_ends_at) > Date.now());
+  }
   return ACTIVE_BILLING_STATUSES.has(String(account?.billing_status || '').trim().toLowerCase());
 }
 

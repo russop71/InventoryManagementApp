@@ -54,7 +54,7 @@ const pages = {
       [Check, 'ZestIQ Basic — CAD $249.99/month', 'Inventory, recipes, food and beverage costing, invoices, purchasing, forecasts, waste, users and AI tools for the first restaurant location.'],
       [CalendarClock, 'Scheduling — CAD $49.99/month', 'Optional for the first location, plus CAD $24.99/month for each additional location.'],
       [Building2, 'Additional locations — CAD $199.99/month', 'Add each additional restaurant location independently; Scheduling remains optional.'],
-      [ShieldCheck, 'Subscription terms', 'A 12-month commitment applies. Non-renewal notice is due at least 90 days before the renewal date.'],
+      [ShieldCheck, 'Subscription terms', 'Start with a 30-day free trial, then a separate 12-month paid commitment billed monthly plus applicable tax. After the paid year, continue month-to-month with 30 days’ cancellation notice by email.'],
       [ReceiptText, 'Acceptance record', 'Checkout records the agreement version, acceptance date and time, and the authorized customer acceptance.'],
     ],
   },
