@@ -12,6 +12,8 @@ export function checkoutReady(env = process.env) {
 export function applyCheckoutPolicy(form) {
   return {
     ...form,
+    // ZestIQ is the merchant; Managed Payments rejects our trial disclosure.
+    'managed_payments[enabled]': 'false',
     'automatic_tax[enabled]': 'true',
     billing_address_collection: 'required',
     payment_method_collection: 'always',
