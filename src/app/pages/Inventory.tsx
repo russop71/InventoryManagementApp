@@ -50,6 +50,7 @@ import {
   isInventoryCountFinalized,
   summarizeInventoryCount,
 } from '../utils/inventoryCountWorkflow.js';
+import { convertQuantity } from '../utils/unitConversion';
 
 const Y = '#F5D62E';
 const D = '#303A43';
@@ -101,6 +102,8 @@ export function Inventory() {
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [storageAreaFilter, setStorageAreaFilter] = useState('all');
   const [isDeletingItems, setIsDeletingItems] = useState(false);
+  const [isMergingItems, setIsMergingItems] = useState(false);
+  const [bulkActionPending, setBulkActionPending] = useState<'merge' | 'delete' | null>(null);
 
   const filterOptions = useMemo(() => ({
     categories: Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).sort(),
@@ -240,27 +243,53 @@ export function Inventory() {
   };
 
   const handleBulkDelete = async () => {
-    if (!selectedItemIds.length || !window.confirm(`Delete ${selectedItemIds.length} selected inventory item${selectedItemIds.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    if (!selectedItemIds.length) return;
     setIsDeletingItems(true);
     try {
       await deleteInventoryItems(selectedItemIds);
       setSelectedItemIds([]);
       setMergeTargetId('');
+      setBulkActionPending(null);
       toast.success('Inventory items deleted and saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The selected inventory items could not be deleted.');
     } finally {
       setIsDeletingItems(false);
     }
   };
 
-  const handleMergeSelected = () => {
+  const requestMergeSelected = () => {
     const primaryId = mergeTargetId || selectedItemIds[0];
     if (selectedItemIds.length < 2 || !primaryId) return;
     const primary = inventory.find(item => item.id === primaryId);
-    if (!window.confirm(`Merge ${selectedItemIds.length} selected items into “${primary?.name || 'the selected item'}”? On-hand stock, supplier options and history will be kept together.`)) return;
-    const result = mergeInventoryItems(selectedItemIds, primaryId);
-    if (!result.success) { window.alert(result.error || 'Those items could not be merged.'); return; }
-    setSelectedItemIds([]);
-    setMergeTargetId('');
+    const incompatible = selectedInventoryItems.find(item => item.id !== primaryId && primary && convertQuantity(1, item.unit, primary.unit) === null);
+    if (incompatible && primary) {
+      toast.error(`${incompatible.name} uses ${incompatible.unit}, which cannot be merged into ${primary.name} (${primary.unit}). Select duplicate items with compatible units.`);
+      return;
+    }
+    setBulkActionPending('merge');
+  };
+
+  const handleMergeSelected = async () => {
+    const primaryId = mergeTargetId || selectedItemIds[0];
+    if (selectedItemIds.length < 2 || !primaryId) return;
+    setIsMergingItems(true);
+    try {
+      const result = await mergeInventoryItems(selectedItemIds, primaryId);
+      if (!result.success) {
+        toast.error(result.error || 'Those items could not be merged.');
+        return;
+      }
+      const primary = inventory.find(item => item.id === primaryId);
+      setSelectedItemIds([]);
+      setMergeTargetId('');
+      setBulkActionPending(null);
+      toast.success(`Items merged into ${primary?.name || 'the selected item'} and saved`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The selected inventory items could not be merged.');
+    } finally {
+      setIsMergingItems(false);
+    }
   };
 
   const activeInventory = inventory.filter(item => !item.inactive);
@@ -680,8 +709,8 @@ export function Inventory() {
               </label>
             </>
           )}
-          <button type="button" onClick={handleMergeSelected} disabled={selectedItemIds.length < 2} title={selectedItemIds.length < 2 ? 'Select at least two items to merge' : 'Merge selected items'} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"><GitMerge className="h-3.5 w-3.5" />Merge items</button>
-          <button type="button" onClick={handleBulkDelete} disabled={isDeletingItems} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" />{isDeletingItems ? 'Saving…' : 'Delete selected'}</button>
+          <button type="button" onClick={requestMergeSelected} disabled={selectedItemIds.length < 2 || isMergingItems} title={selectedItemIds.length < 2 ? 'Select at least two items to merge' : 'Merge selected items'} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"><GitMerge className="h-3.5 w-3.5" />{isMergingItems ? 'Saving…' : 'Merge items'}</button>
+          <button type="button" onClick={() => setBulkActionPending('delete')} disabled={isDeletingItems} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" />{isDeletingItems ? 'Saving…' : 'Delete selected'}</button>
           <button type="button" onClick={() => { setSelectedItemIds([]); setMergeTargetId(''); }} className="px-2 py-2 text-xs font-bold text-slate-600 underline">Clear</button>
         </div>
       )}
@@ -847,6 +876,34 @@ export function Inventory() {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep count</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteCount} className="bg-rose-700 text-white hover:bg-rose-800">Delete count</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkActionPending === 'merge'} onOpenChange={open => { if (!open && !isMergingItems) setBulkActionPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Merge {selectedItemIds.length} inventory items?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The selected items will be combined into “{inventory.find(item => item.id === (mergeTargetId || selectedItemIds[0]))?.name || 'the selected item'}”. On-hand stock, supplier options, invoice aliases and history will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isMergingItems}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={isMergingItems} onClick={event => { event.preventDefault(); void handleMergeSelected(); }} className="bg-[#303A43] text-white hover:bg-[#202830]">{isMergingItems ? 'Saving…' : 'Merge items'}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkActionPending === 'delete'} onOpenChange={open => { if (!open && !isDeletingItems) setBulkActionPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedItemIds.length} selected inventory item{selectedItemIds.length === 1 ? '' : 's'}?</AlertDialogTitle>
+            <AlertDialogDescription>This permanently removes the selected items from this location. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingItems}>Keep items</AlertDialogCancel>
+            <AlertDialogAction disabled={isDeletingItems} onClick={event => { event.preventDefault(); void handleBulkDelete(); }} className="bg-rose-700 text-white hover:bg-rose-800">{isDeletingItems ? 'Deleting…' : 'Delete items'}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -716,8 +716,9 @@ test('inventory supports validated add, edit, aliases, multiple areas, merge, pe
 
   await page.getByLabel(`Select ${primaryName}`, { exact: true }).check();
   await page.getByLabel(`Select ${duplicateName}`, { exact: true }).check();
-  page.once('dialog', dialog => void dialog.accept());
   await page.getByRole('button', { name: 'Merge items' }).click();
+  await expect(page.getByRole('alertdialog')).toContainText(`Merge 2 inventory items?`);
+  await page.getByRole('button', { name: 'Merge items' }).last().click();
   await expect(page.getByLabel(`Select ${duplicateName}`, { exact: true })).toHaveCount(0);
   await page.getByPlaceholder('Search items...').fill(duplicateName);
   await expect(page.getByText(primaryName, { exact: true }).first()).toBeVisible();

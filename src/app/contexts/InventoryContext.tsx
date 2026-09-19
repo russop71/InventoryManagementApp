@@ -283,7 +283,7 @@ interface InventoryContextType {
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => Promise<void>;
   deleteInventoryItems: (ids: string[]) => Promise<void>;
-  mergeInventoryItems: (ids: string[], primaryId: string) => { success: boolean; error?: string };
+  mergeInventoryItems: (ids: string[], primaryId: string) => Promise<{ success: boolean; error?: string }>;
   adjustInventory: (id: string, change: number, reason: string) => void;
   addRecipe: (recipe: Omit<Recipe, 'id'>) => void;
   updateRecipe: (id: string, recipe: Partial<Recipe>) => void;
@@ -915,7 +915,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     await saveLocationData(nextInventory, recipes, storageAreas, orders, invoices, suppliers, preppedRecipes, inventoryCounts, { allowEmptyInventory: true });
   };
 
-  const mergeInventoryItems = (ids: string[], primaryId: string) => {
+  const mergeInventoryItems = async (ids: string[], primaryId: string) => {
     const idSet = new Set(ids);
     const primary = inventory.find(item => item.id === primaryId);
     const sources = inventory.filter(item => idSet.has(item.id) && item.id !== primaryId);
@@ -1012,7 +1012,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setPreppedRecipes(nextPreppedRecipes);
     setOrders(nextOrders);
     setInvoices(nextInvoices);
-    saveLocationData(nextInventory, nextRecipes, storageAreas, nextOrders, nextInvoices, suppliers, nextPreppedRecipes, inventoryCounts);
+    await saveLocationData(nextInventory, nextRecipes, storageAreas, nextOrders, nextInvoices, suppliers, nextPreppedRecipes, inventoryCounts);
     return { success: true };
   };
 
