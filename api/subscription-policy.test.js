@@ -18,6 +18,7 @@ test('checkout requires payment details, a 30-day trial, automatic tax and accep
   assert.equal(form.payment_method_collection, 'always');
   assert.equal(form['payment_method_types[0]'], 'card');
   assert.equal(form['automatic_tax[enabled]'], 'true');
+  assert.equal(form['managed_payments[enabled]'], 'false');
   assert.equal(form.billing_address_collection, 'required');
   assert.equal(form['consent_collection[terms_of_service]'], 'required');
   assert.equal(form['customer_update[address]'], undefined);
