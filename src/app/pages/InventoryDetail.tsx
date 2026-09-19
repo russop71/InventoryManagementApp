@@ -69,6 +69,7 @@ export function InventoryDetail() {
   const [quickCurrentStock, setQuickCurrentStock] = useState(0);
   const [quickParLevel, setQuickParLevel] = useState(0);
   const [storageAreaPendingRemoval, setStorageAreaPendingRemoval] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [purchaseOptions, setPurchaseOptions] = useState<PurchaseOptionDraft[]>([]);
   const [isPurchaseOptionsExpanded, setIsPurchaseOptionsExpanded] = useState(true);
   const [selectedPurchaseOptionId, setSelectedPurchaseOptionId] = useState('');
@@ -226,6 +227,22 @@ export function InventoryDetail() {
       </div>
     );
   }
+
+  const handleDeleteItem = async () => {
+    if (isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteInventoryItem(item.id);
+      setShowDeleteConfirm(false);
+      showToast.success('Item deleted and saved');
+      navigate('/app/inventory');
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'This item could not be deleted.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const orderedSalesDays = [...salesData]
     .filter(day => day.date)
@@ -608,18 +625,7 @@ export function InventoryDetail() {
             <Button variant="outline" size="sm" className={`h-9 rounded-xl ${item.inactive ? 'border-green-200 text-green-700' : 'border-slate-200 text-slate-700'}`} onClick={toggleInactive}>
               {item.inactive ? <Undo2 className="mr-1 h-4 w-4" /> : <Archive className="mr-1 h-4 w-4" />}{item.inactive ? 'Reactivate' : 'Deactivate'}
             </Button>
-            {item.deletable !== false && <Button variant="outline" size="sm" disabled={isDeleting} className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60" onClick={async () => {
-              if (confirm(`Delete "${item.name}" from inventory? This cannot be undone.`)) {
-                setIsDeleting(true);
-                try {
-                  await deleteInventoryItem(item.id);
-                  showToast.success('Item deleted and saved');
-                  navigate('/app/inventory');
-                } finally {
-                  setIsDeleting(false);
-                }
-              }
-            }}>{isDeleting ? 'Saving…' : 'Delete'}</Button>}
+            {item.deletable !== false && <Button variant="outline" size="sm" disabled={isDeleting} className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60" onClick={() => setShowDeleteConfirm(true)}>{isDeleting ? 'Deleting…' : 'Delete'}</Button>}
           </div>
         </div>
       </section>
@@ -1545,6 +1551,32 @@ export function InventoryDetail() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={open => {
+        if (!open && !isDeleting) setShowDeleteConfirm(false);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{item.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the item from this location. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Keep item</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={event => {
+                event.preventDefault();
+                void handleDeleteItem();
+              }}
+              className="bg-rose-700 text-white hover:bg-rose-800"
+            >
+              {isDeleting ? 'Deleting…' : 'Delete item'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
     </div>
   );
