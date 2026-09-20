@@ -20,7 +20,7 @@ export function calculateInvoiceTotal(items) {
   return items.reduce((sum, item) => sum + Number(item.cost || 0), 0);
 }
 
-export function sortInvoicesNewestFirst(invoices) {
+export function sortRecordsNewestFirst(invoices) {
   const timestamp = value => {
     if (!value) return 0;
     const parsed = Date.parse(value);
@@ -32,6 +32,8 @@ export function sortInvoicesNewestFirst(invoices) {
       || b.index - a.index)
     .map(entry => entry.invoice);
 }
+
+export const sortInvoicesNewestFirst = sortRecordsNewestFirst;
 
 export function filterInvoiceItems(inventory, query) {
   const normalized = (query || '').trim().toLowerCase();

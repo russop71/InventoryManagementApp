@@ -163,6 +163,7 @@ export interface OrderItem {
 
 export interface DailyOrder {
   id: string;
+  createdAt?: string;
   date: string;
   items: OrderItem[];
   totalCost: number;
@@ -1175,6 +1176,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const newOrder: DailyOrder = {
       id: recordId,
+      createdAt: new Date().toISOString(),
       date: orderInput.date,
       items: orderInput.items,
       totalCost,

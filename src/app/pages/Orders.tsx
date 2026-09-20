@@ -22,6 +22,7 @@ import { downloadSupplierOrdersPdf } from '../utils/supplierOrderPdf.js';
 import { sendSupplierEmail } from '../utils/sendSupplierEmail.js';
 import { apiRequest } from '../utils/api';
 import { OrderBufferControl } from '../components/OrderBufferControl';
+import { sortRecordsNewestFirst } from '../utils/invoiceWorkflow.js';
 
 const Y = '#F5D62E';
 const D = '#303A43';
@@ -158,12 +159,14 @@ export function Orders() {
     });
     return Object.entries(counts).sort((left, right) => right[1] - left[1])[0]?.[0] || 'Supplier';
   };
-  const sorted = [...orders].sort((a, b) => {
-    if (orderSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
+  const newestOrders = sortRecordsNewestFirst(orders);
+  const sorted = orderSort === 'newest' ? newestOrders
+    : orderSort === 'oldest' ? [...newestOrders].reverse()
+    : [...newestOrders].sort((a, b) => {
     if (orderSort === 'total-desc') return b.totalCost - a.totalCost;
     if (orderSort === 'total-asc') return a.totalCost - b.totalCost;
     if (orderSort === 'supplier') return primarySupplierFor(a).localeCompare(primarySupplierFor(b));
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
+    return 0;
   });
   const orderSuppliers = Array.from(new Set(orders.map(primarySupplierFor))).sort((left, right) => left.localeCompare(right));
   const filtered = (activeTab === 'all' ? sorted : sorted.filter(order => order.status === activeTab)).filter(order => {

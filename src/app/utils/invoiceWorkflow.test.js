@@ -9,7 +9,18 @@ import {
   inventoryItemMatchesInvoiceName,
   resolveInvoiceInventoryItem,
   sortInvoicesNewestFirst,
+  sortRecordsNewestFirst,
 } from './invoiceWorkflow.js';
+
+test('orders put latest additions first on equal dates without mutating stored order', () => {
+  const orders = [
+    { id: 'old', date: '2026-09-19' },
+    { id: 'first', date: '2026-09-20', createdAt: '2026-09-20T09:00:00Z' },
+    { id: 'latest', date: '2026-09-20', createdAt: '2026-09-20T10:00:00Z' },
+  ];
+  assert.deepEqual(sortRecordsNewestFirst(orders).map(order => order.id), ['latest', 'first', 'old']);
+  assert.equal(orders[0].id, 'old');
+});
 
 test('sorts invoices newest first with creation and legacy insertion tie breakers', () => {
   const invoices = [
