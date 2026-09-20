@@ -34,6 +34,7 @@ export function Dashboard() {
   const [breakdownType, setBreakdownType] = useState<'items' | 'cost' | 'lowStock' | 'orders'>('items');
   const [newCogsCategoryName, setNewCogsCategoryName] = useState('');
   const [salesRangePreset, setSalesRangePreset] = useState<SalesRangePreset>('this-week');
+  const [salesSummaryMode, setSalesSummaryMode] = useState<'average' | 'total'>('average');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
@@ -132,15 +133,14 @@ export function Dashboard() {
   const totalRevenue = filteredSalesData.reduce((sum, day) => sum + day.revenue, 0);
   const totalCovers = filteredSalesData.reduce((sum, day) => sum + day.covers, 0);
   const averageCheck = totalCovers > 0 ? totalRevenue / totalCovers : 0;
+  const recordedSalesDays = new Set(filteredSalesData.map(day => day.date)).size;
+  const summaryRevenue = salesSummaryMode === 'total' ? totalRevenue : totalRevenue / (recordedSalesDays || 1);
+  const summaryCovers = salesSummaryMode === 'total' ? totalCovers : totalCovers / (recordedSalesDays || 1);
   const chronologicalSales = [...filteredSalesData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const latestSalesDay = chronologicalSales[chronologicalSales.length - 1];
-  const previousSalesDay = chronologicalSales[chronologicalSales.length - 2];
   const todaysRevenue = latestSalesDay?.revenue ?? 0;
   const todaysCovers = latestSalesDay?.covers ?? 0;
   const todaysAvgCheck = todaysCovers > 0 ? todaysRevenue / todaysCovers : 0;
-  const revenueDeltaPercent = previousSalesDay && previousSalesDay.revenue > 0
-    ? ((todaysRevenue - previousSalesDay.revenue) / previousSalesDay.revenue) * 100
-    : 0;
 
   // Calculate food cost percentage (COGS / Revenue)
   const totalFoodCost = totalInventoryValue;
@@ -678,6 +678,20 @@ export function Dashboard() {
               ))}
             </div>
 
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Sales summary mode">
+              {(['average', 'total'] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={salesSummaryMode === mode}
+                  onClick={() => setSalesSummaryMode(mode)}
+                  className={`min-h-11 rounded-full px-4 py-2 text-xs font-semibold transition ${salesSummaryMode === mode ? 'bg-[#303A43] text-[#F5D62E]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {mode === 'average' ? 'Average' : 'Total Sales'}
+                </button>
+              ))}
+            </div>
+
             {salesRangePreset === 'custom' && (
               <div className="flex flex-wrap gap-2">
                 <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2 text-[11px] font-medium text-gray-600">
@@ -712,27 +726,27 @@ export function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4" role="group" aria-label="Sales summary">
                 <div className="rounded-xl border border-gray-100 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Revenue</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">{salesSummaryMode === 'average' ? 'Avg Revenue' : 'Total Revenue'}</p>
                   <p className="mt-1 text-lg font-black text-[#303A43] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                    ${todaysRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    ${summaryRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </p>
-                  <p className={`text-[10px] mt-1 font-semibold ${revenueDeltaPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {revenueDeltaPercent >= 0 ? '+' : ''}{revenueDeltaPercent.toFixed(1)}% vs prev day
+                  <p className="text-[10px] mt-1 text-gray-500 font-semibold">
+                    {salesSummaryMode === 'average' ? `Per recorded day · ${recordedSalesDays} days with data` : 'Selected date range'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-100 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Covers</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">{salesSummaryMode === 'average' ? 'Avg Covers' : 'Total Covers'}</p>
                   <p className="mt-1 text-lg font-black text-[#303A43] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {todaysCovers.toLocaleString('en-US')}
+                    {summaryCovers.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-[10px] mt-1 text-gray-500 font-semibold">guest count</p>
+                  <p className="text-[10px] mt-1 text-gray-500 font-semibold">{salesSummaryMode === 'average' ? 'Guests per recorded day' : 'Guests in selected range'}</p>
                 </div>
                 <div className="rounded-xl border border-gray-100 p-3">
                   <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Avg Check</p>
                   <p className="mt-1 text-lg font-black text-[#303A43] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                    ${todaysAvgCheck.toFixed(0)}
+                    ${averageCheck.toFixed(0)}
                   </p>
                   <p className="text-[10px] mt-1 text-gray-500 font-semibold">per cover</p>
                 </div>

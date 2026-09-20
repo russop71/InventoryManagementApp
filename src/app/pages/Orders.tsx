@@ -291,7 +291,7 @@ export function Orders() {
           forecastDemand: estimatedDailyUsage,
           baseSuggestedQuantity,
           bufferPercent: safetyBufferPercent,
-          bufferQuantity: Math.max(0, suggestedQuantity - baseSuggestedQuantity),
+          bufferQuantity,
         });
       }
     });
@@ -877,9 +877,12 @@ export function Orders() {
                           <p className="text-sm font-semibold text-gray-900">{suggestion.suggestedQuantity} {suggestion.unit}</p>
                           <p className="text-xs text-gray-500">${suggestion.totalCost.toFixed(2)}</p>
                           {suggestion.bufferPercent !== undefined && (
-                            <p className="mt-1 text-[10px] font-bold text-amber-700">
-                              Includes +{suggestion.bufferQuantity || 0} {suggestion.unit} buffer
-                            </p>
+                            <div className="mt-1 max-w-48 text-[10px] text-amber-700">
+                              <p className="font-bold">{suggestion.bufferPercent}% buffer: +{Number((suggestion.bufferQuantity || 0).toFixed(3))} {suggestion.unit} before rounding</p>
+                              {suggestion.bufferPercent > 0 && suggestion.suggestedQuantity === suggestion.baseSuggestedQuantity && (
+                                <p>Order quantity unchanged after rounding or minimum order.</p>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

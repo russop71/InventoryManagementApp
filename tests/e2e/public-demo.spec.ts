@@ -512,7 +512,9 @@ test('invoice camera capture supports correction and approval before posting', a
   await mockInvoiceScan(page, capturedImages);
   await freshDemoLogin(page);
   await page.goto('/app/invoice-scanner');
-  await page.getByRole('button', { name: 'Take Photo' }).click();
+  await expect(page.getByRole('button', { name: 'Take Photo' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Upload Invoice', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Take Photo' }).click();
 
   const video = page.locator('video');
   await expect(video).toBeVisible();
@@ -542,6 +544,10 @@ test('invoice camera capture supports correction and approval before posting', a
 test('invoice upload validates files and explains scan-service failures', async ({ page }) => {
   await freshDemoLogin(page);
   await page.goto('/app/invoice-scanner');
+  await page.getByRole('button', { name: 'Upload Invoice', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('menuitem', { name: 'Choose File' }).click();
+  await chooser;
   const upload = page.locator('#invoice-upload');
 
   await upload.setInputFiles({ name: 'invoice.txt', mimeType: 'text/plain', buffer: Buffer.from('not an invoice image') });
@@ -935,6 +941,60 @@ test('builds and saves a POS-informed supplier forecast', async ({ page }) => {
 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Generate Order' })).toHaveCount(1);
+});
+
+test('dashboard switches between range averages and total sales', async ({ page }) => {
+  await freshDemoLogin(page);
+  const mode = page.getByRole('group', { name: 'Sales summary mode', exact: true });
+  const summary = page.getByRole('group', { name: 'Sales summary', exact: true });
+  const readMetric = async (label: string) => Number((await summary.getByText(label, { exact: true }).locator('..').locator('p').nth(1).innerText()).replace(/[^\d.]/g, ''));
+  for (const range of ['This week', 'Last week', 'This month']) {
+    await page.getByRole('button', { name: range, exact: true }).click();
+    await mode.getByRole('button', { name: 'Average', exact: true }).click();
+    await expect(summary.getByText('Avg Revenue', { exact: true })).toBeVisible();
+    await expect(summary.getByText('Avg Covers', { exact: true })).toBeVisible();
+    const days = Number((await summary.innerText()).match(/(\d+) days with data/)?.[1]);
+    expect(days).toBeGreaterThan(0);
+    const revenue = await readMetric('Avg Revenue');
+    const covers = await readMetric('Avg Covers');
+    const check = await readMetric('Avg Check');
+    await mode.getByRole('button', { name: 'Total Sales', exact: true }).click();
+    await expect(mode.getByRole('button', { name: 'Total Sales', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(Math.abs(await readMetric('Total Revenue') / days - revenue)).toBeLessThanOrEqual(1);
+    expect(Math.abs(await readMetric('Total Covers') / days - covers)).toBeLessThanOrEqual(1);
+    expect(await readMetric('Avg Check')).toBe(check);
+    await expect(summary).not.toContainText('vs prev day');
+  }
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
+  await page.getByLabel('From', { exact: true }).fill('2000-01-01');
+  await page.getByLabel('To', { exact: true }).fill('2000-01-02');
+  await expect(page.getByText('No sales data for this range', { exact: true })).toBeVisible();
+});
+
+test('fractional forecast buffer labels update with every percentage selection', async ({ page }) => {
+  await freshDemoLogin(page);
+  await page.goto('/app/inventory');
+  await addInventoryItem(page, { name: 'QA Fractional Buffer', supplier: 'QA Buffer Supplier', onHand: '0', par: '10', cost: '2' });
+  for (const route of ['/app/orders']) {
+    await page.goto(route);
+    await page.getByRole('button', { name: 'Show all', exact: true }).click();
+    const control = page.getByLabel('Forecast safety buffer percentage');
+    const item = route === '/app/orders'
+      ? page.getByRole('button').filter({ has: page.getByText('QA Fractional Buffer', { exact: true }) })
+      : page.getByText('QA Fractional Buffer', { exact: true }).locator('xpath=ancestor::*[@data-slot="card"][1]');
+    let fivePercentBuffer = 0;
+    for (const percent of [0, 5, 10, 15, 0]) {
+      await control.getByRole('button', { name: `${percent}%`, exact: true }).click();
+      await expect(item).toContainText(`${percent}%`);
+      await expect(item).toContainText('before rounding');
+      const buffer = Number((await item.innerText()).match(/\+([\d.]+) /)?.[1]);
+      if (percent === 5) {
+        fivePercentBuffer = buffer;
+        expect(buffer).toBeGreaterThan(0);
+      }
+      expect(buffer).toBeCloseTo(fivePercentBuffer * percent / 5, 2);
+    }
+  }
 });
 
 test('forecast buffers create editable supplier-grouped orders and recover from missing email setup', async ({ page }) => {

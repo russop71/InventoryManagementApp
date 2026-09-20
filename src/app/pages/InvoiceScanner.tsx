@@ -6,7 +6,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Trash2, ChevronDown } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { findBestSupplierMatch } from '../utils/supplierMatching.js';
 import { inventoryItemMatchesInvoiceName } from '../utils/invoiceWorkflow.js';
@@ -310,14 +311,22 @@ export function InvoiceScanner() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!selectedFile && !isCameraActive && <div className="grid gap-3 sm:grid-cols-2">
-            <Button type="button" className="bg-[#303A43] text-white hover:bg-[#1E293B]" onClick={startCamera}>
-              <Camera className="mr-2 h-4 w-4" /> Take Photo
-            </Button>
-            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" /> Upload Invoice
-            </Button>
-          </div>}
+          {!selectedFile && !isCameraActive && <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" className="w-full bg-[#303A43] text-white hover:bg-[#1E293B]">
+                <Upload className="mr-2 h-4 w-4" /> Upload Invoice
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+              <DropdownMenuItem className="min-h-11" onSelect={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4" /> Choose File
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => { void startCamera(); }}>
+                <Camera className="h-4 w-4" /> Take Photo
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>}
 
           <div className="sr-only">
             <input

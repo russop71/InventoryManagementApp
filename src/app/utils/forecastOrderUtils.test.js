@@ -26,6 +26,13 @@ test('does not force a minimum order when there is no shortage', () => {
   }), 0);
 });
 
+test('fractional buffers can change while the rounded order stays the same', () => {
+  const input = { currentStock: 16, expectedUsage: 2.4, parLevel: 24 };
+  for (const percent of [0, 5, 10, 15]) {
+    assert.equal(calculateForecastOrderQuantity({ ...input, safetyBuffer: 2.4 * percent / 100 }), 11);
+  }
+});
+
 test('applies a minimum order only after a shortage exists', () => {
   assert.equal(calculateForecastOrderQuantity({
     currentStock: 10,
