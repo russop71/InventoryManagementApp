@@ -73,9 +73,9 @@ export function Notifications() {
       </div>
 
       {canReceiveManagerDigest && (
-        <Card className="overflow-hidden border-amber-200 bg-gradient-to-r from-[#303A43] to-[#202A33] text-white">
+        <Card className="overflow-hidden border-lime-200 bg-gradient-to-r from-[#303A43] to-[#202A33] text-white">
           <CardContent className="flex items-center gap-3 p-3 sm:px-4 sm:py-3.5">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#F5D62E] text-[#303A43]"><CalendarClock className="h-5 w-5" /></div>
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#F58220] text-[#303A43]"><CalendarClock className="h-5 w-5" /></div>
             <div className="flex-1">
               <p className="text-sm font-black sm:text-base">Weekly manager attention update</p>
               <p className="mt-0.5 text-xs leading-5 text-white/65 sm:text-sm">Every Monday: price changes, low stock, overdue counts, open invoices and pending orders.</p>
@@ -86,7 +86,7 @@ export function Notifications() {
 
       <Card>
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="flex items-center justify-between gap-3 text-lg"><span>Recent price changes</span><span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-800">{priceChanges.length}</span></CardTitle>
+          <CardTitle className="flex items-center justify-between gap-3 text-lg"><span>Recent price changes</span><span className="rounded-full bg-lime-100 px-2.5 py-0.5 text-xs font-black text-[#F58220]">{priceChanges.length}</span></CardTitle>
           <CardDescription className="text-sm leading-5">Last 30 days. Recipe and margin calculations use the current item cost.</CardDescription>
         </CardHeader>
         <CardContent className="px-4 pb-4 pt-0">
@@ -95,9 +95,9 @@ export function Notifications() {
             const increased = change.newPrice > change.oldPrice;
             return <Link key={`${item.id}:${change.date}:${change.newPrice}`} to={`/app/inventory/${item.id}`} className="flex flex-col gap-2 py-3 transition hover:bg-slate-50 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1"><p className="font-bold text-slate-900">{item.name}</p><p className="mt-0.5 text-xs text-slate-500">{item.supplier || 'Supplier not set'} · {new Date(change.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}{change.reason ? ` · ${change.reason}` : ''}</p></div>
-              <div className="flex items-center gap-3"><span className="text-sm text-slate-500">${change.oldPrice.toFixed(2)} → <strong className={increased ? 'text-red-600' : 'text-emerald-700'}>${change.newPrice.toFixed(2)}</strong></span>{percent !== null && <span className={`rounded-full px-2.5 py-1 text-xs font-black ${increased ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{percent >= 0 ? '+' : ''}{percent.toFixed(1)}%</span>}<ArrowRight className="h-4 w-4 text-slate-400" /></div>
+              <div className="flex items-center gap-3"><span className="text-sm text-slate-500">${change.oldPrice.toFixed(2)} → <strong className={increased ? 'text-red-600' : 'text-[#F58220]'}>${change.newPrice.toFixed(2)}</strong></span>{percent !== null && <span className={`rounded-full px-2.5 py-1 text-xs font-black ${increased ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-[#F58220]'}`}>{percent >= 0 ? '+' : ''}{percent.toFixed(1)}%</span>}<ArrowRight className="h-4 w-4 text-slate-400" /></div>
             </Link>;
-          })}</div> : <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-800">No ingredient price changes in the last 30 days.</div>}
+          })}</div> : <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-[#F58220]">No ingredient price changes in the last 30 days.</div>}
         </CardContent>
       </Card>
 

@@ -91,7 +91,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#303A43]">
+    <div className="login-colour-preview min-h-screen flex flex-col bg-[#F1EFEB]">
 
       <div className="flex items-center justify-end px-5 pt-5">
         <button
@@ -107,7 +107,7 @@ export function Login() {
 
       {/* ── Brand hero ────────────────────────────────── */}
       <div className="flex flex-col items-center justify-center px-6 pb-10 pt-12 sm:pt-16">
-        <Link to="/" aria-label="ZestIQ home" className="flex w-full max-w-[560px] items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 px-6 py-9 shadow-[0_20px_50px_rgba(0,0,0,0.18)] backdrop-blur transition hover:border-[#F5D62E]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E] sm:px-10 sm:py-12">
+        <Link to="/" aria-label="ZestIQ home" className="flex w-full max-w-[560px] items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 px-6 py-9 shadow-[0_20px_50px_rgba(0,0,0,0.18)] backdrop-blur transition hover:border-[#F58220]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F58220] sm:px-10 sm:py-12">
           <ZestIQBrand markClassName="h-24 w-24 rounded-none sm:h-28 sm:w-28" wordmarkClassName="text-5xl text-white sm:text-6xl" />
         </Link>
         <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.22em] text-white/45">
@@ -126,7 +126,7 @@ export function Login() {
                   setMenuOpen(false);
                   handleDemoLogin();
                 }}
-                className="h-11 rounded-2xl border border-[#F5D62E]/30 bg-[#F5D62E]/10 text-sm font-bold text-[#303A43] transition-colors active:scale-[0.99]"
+                className="h-11 rounded-2xl border border-[#F58220]/30 bg-[#F58220]/10 text-sm font-bold text-[#303A43] transition-colors active:scale-[0.99]"
               >
                 Try Demo Account
               </button>
@@ -218,7 +218,7 @@ export function Login() {
                 onClick={() => setShowPassword(current => !current)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 aria-pressed={showPassword}
-                className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-gray-500 transition hover:bg-gray-200 hover:text-[#303A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E]"
+                className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-gray-500 transition hover:bg-gray-200 hover:text-[#303A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F58220]"
               >
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
@@ -253,7 +253,7 @@ export function Login() {
           )}
 
           {isSignup && (
-            <div className="space-y-3 rounded-xl border border-[#F5D62E]/60 bg-[#FFFBE5] p-4 text-sm text-[#303A43]">
+            <div className="space-y-3 rounded-xl border border-[#F58220]/60 bg-[#FFFBE5] p-4 text-sm text-[#303A43]">
               <label className="flex cursor-pointer items-start gap-3">
                 <input type="checkbox" checked={privacyAccepted} onChange={event => setPrivacyAccepted(event.target.checked)} required className="mt-0.5 h-4 w-4 accent-[#303A43]" />
                 <span>I have read and accept the <Link to="/privacy" target="_blank" rel="noreferrer" className="font-bold underline underline-offset-4">Privacy Policy</Link>.</span>
@@ -269,7 +269,7 @@ export function Login() {
             type="submit"
             disabled={isLoading || (isSignup && (!privacyAccepted || !termsAccepted))}
             className="w-full h-12 rounded-xl text-sm font-black tracking-wide transition-all active:scale-[0.98] disabled:opacity-60"
-            style={{ background: '#303A43', color: '#F5D62E' }}
+            style={{ background: '#303A43', color: '#F58220' }}
           >
             {isLoading ? (isSignup ? 'Creating account…' : 'Signing in…') : (isSignup ? 'Create Account' : 'Sign In')}
           </button>
@@ -290,7 +290,7 @@ export function Login() {
           onClick={handleDemoLogin}
           disabled={isLoading}
           className="w-full h-12 rounded-xl text-sm font-bold border-2 transition-all active:scale-[0.98] disabled:opacity-60"
-          style={{ borderColor: '#F5D62E', color: '#303A43', background: 'transparent' }}
+          style={{ borderColor: '#F58220', color: '#303A43', background: 'transparent' }}
         >
           Try Demo Account
         </button>

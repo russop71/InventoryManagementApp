@@ -313,7 +313,7 @@ export function Invoices() {
                       <td className="px-3 py-3 text-gray-700">{fmtDate(invoice.date)}</td>
                       <td className="px-3 py-3 text-gray-700">{invoice.supplier}</td>
                       <td className="px-3 py-3">
-                        <Badge className="bg-[#FEF9C3] text-[#854D0E] border border-[#F5C10E]/40">
+                        <Badge className="bg-[#FEF9C3] text-[#854D0E] border border-[#F58220]/40">
                           {invoice.status === 'received' ? 'Received' : invoice.status === 'cancelled' ? 'Cancelled' : 'Open'}
                         </Badge>
                       </td>
@@ -344,7 +344,7 @@ export function Invoices() {
                                 <p className="text-sm text-gray-600 mt-1">{invoice.supplier}</p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Badge className="bg-[#FEF9C3] text-[#854D0E] border border-[#F5C10E]/40">
+                                <Badge className="bg-[#FEF9C3] text-[#854D0E] border border-[#F58220]/40">
                                   {invoice.status === 'received' ? 'Received' : invoice.status === 'cancelled' ? 'Cancelled' : 'Open'}
                                 </Badge>
                               </div>

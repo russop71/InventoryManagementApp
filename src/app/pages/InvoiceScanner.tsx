@@ -425,10 +425,10 @@ export function InvoiceScanner() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center">
-                  <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+                  <CheckCircle className="w-5 h-5 mr-2 text-[#F58220]" />
                   Invoice Extracted
                 </CardTitle>
-                <Badge className={requiresExplicitReview ? 'bg-amber-500 text-white' : 'bg-green-600 text-white'}>
+                <Badge className={requiresExplicitReview ? 'bg-[#F58220] text-white' : 'bg-[#F58220] text-white'}>
                   {requiresExplicitReview ? 'Review required' : 'High confidence'}
                 </Badge>
               </div>
@@ -436,35 +436,35 @@ export function InvoiceScanner() {
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="scanned-invoice-vendor" className="text-xs text-green-700">Vendor</Label>
-                  <Input id="scanned-invoice-vendor" value={extractedData.vendor} onChange={event => { setExtractedData({ ...extractedData, vendor: event.target.value }); setSupplierMatchMessage('Supplier name edited. Confirm it before saving.'); }} className="mt-1 bg-white text-sm font-semibold text-green-900" />
-                  <p className="mt-1 text-[11px] leading-4 text-green-700">{supplierMatchMessage}</p>
+                  <Label htmlFor="scanned-invoice-vendor" className="text-xs text-[#F58220]">Vendor</Label>
+                  <Input id="scanned-invoice-vendor" value={extractedData.vendor} onChange={event => { setExtractedData({ ...extractedData, vendor: event.target.value }); setSupplierMatchMessage('Supplier name edited. Confirm it before saving.'); }} className="mt-1 bg-white text-sm font-semibold text-[#F58220]" />
+                  <p className="mt-1 text-[11px] leading-4 text-[#F58220]">{supplierMatchMessage}</p>
                 </div>
                 <div>
-                  <Label htmlFor="scanned-invoice-number" className="text-xs text-green-700">Invoice #</Label>
-                  <Input id="scanned-invoice-number" value={extractedData.invoiceNumber} onChange={event => setExtractedData({ ...extractedData, invoiceNumber: event.target.value })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
+                  <Label htmlFor="scanned-invoice-number" className="text-xs text-[#F58220]">Invoice #</Label>
+                  <Input id="scanned-invoice-number" value={extractedData.invoiceNumber} onChange={event => setExtractedData({ ...extractedData, invoiceNumber: event.target.value })} className="mt-1 bg-white text-sm font-semibold text-[#F58220]" />
                 </div>
                 <div>
-                  <Label htmlFor="scanned-invoice-date" className="text-xs text-green-700">Date</Label>
-                  <Input id="scanned-invoice-date" type="date" value={extractedData.date} onChange={event => setExtractedData({ ...extractedData, date: event.target.value })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
+                  <Label htmlFor="scanned-invoice-date" className="text-xs text-[#F58220]">Date</Label>
+                  <Input id="scanned-invoice-date" type="date" value={extractedData.date} onChange={event => setExtractedData({ ...extractedData, date: event.target.value })} className="mt-1 bg-white text-sm font-semibold text-[#F58220]" />
                 </div>
                 <div>
-                  <p className="text-xs text-green-700">Line Subtotal</p>
-                  <p className="text-sm font-semibold text-green-900">
+                  <p className="text-xs text-[#F58220]">Line Subtotal</p>
+                  <p className="text-sm font-semibold text-[#F58220]">
                     ${totalValue.toFixed(2)}
                   </p>
                 </div>
                 <div>
-                  <Label htmlFor="scanned-invoice-tax" className="text-xs text-green-700">Tax</Label>
-                  <Input id="scanned-invoice-tax" type="number" min="0" step="0.01" value={extractedData.tax} onChange={event => setExtractedData({ ...extractedData, tax: Math.max(0, Number(event.target.value) || 0) })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
+                  <Label htmlFor="scanned-invoice-tax" className="text-xs text-[#F58220]">Tax</Label>
+                  <Input id="scanned-invoice-tax" type="number" min="0" step="0.01" value={extractedData.tax} onChange={event => setExtractedData({ ...extractedData, tax: Math.max(0, Number(event.target.value) || 0) })} className="mt-1 bg-white text-sm font-semibold text-[#F58220]" />
                 </div>
                 <div>
-                  <Label htmlFor="scanned-invoice-credits" className="text-xs text-green-700">Credits / allowances</Label>
-                  <Input id="scanned-invoice-credits" type="number" min="0" step="0.01" value={extractedData.credits} onChange={event => setExtractedData({ ...extractedData, credits: Math.max(0, Number(event.target.value) || 0) })} className="mt-1 bg-white text-sm font-semibold text-green-900" />
+                  <Label htmlFor="scanned-invoice-credits" className="text-xs text-[#F58220]">Credits / allowances</Label>
+                  <Input id="scanned-invoice-credits" type="number" min="0" step="0.01" value={extractedData.credits} onChange={event => setExtractedData({ ...extractedData, credits: Math.max(0, Number(event.target.value) || 0) })} className="mt-1 bg-white text-sm font-semibold text-[#F58220]" />
                 </div>
               </div>
               {requiresExplicitReview && (
-                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                <div className="mt-3 rounded-lg border border-[#F58220] bg-lime-50 p-3 text-xs leading-5 text-[#F58220]">
                   {hasLowConfidence && <p>Some text was unclear. Compare every highlighted value with the original invoice.</p>}
                   {hasUnknownSupplier && <p>This supplier is not in ZestIQ yet and will be created when you approve the invoice.</p>}
                   {hasNewInventoryItems && <p>Match each unmatched line to existing inventory, or explicitly choose Create new item. Check quantities and units before saving.</p>}
@@ -598,7 +598,7 @@ export function InvoiceScanner() {
                 </div>
 
                 {requiresExplicitReview && (
-                  <label className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                  <label className="mb-4 flex items-start gap-2 rounded-lg border border-lime-200 bg-lime-50 p-3 text-sm text-[#F58220]">
                     <input
                       type="checkbox"
                       checked={reviewAcknowledged}

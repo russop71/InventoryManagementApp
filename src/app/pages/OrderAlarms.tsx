@@ -214,7 +214,7 @@ export function OrderAlarms() {
       </div>
 
       {/* How it works banner */}
-      <div className="bg-[#FEFCE8] border border-[#F5C10E]/20 rounded-xl px-4 py-3 flex items-start gap-3">
+      <div className="bg-[#FEFCE8] border border-[#F58220]/20 rounded-xl px-4 py-3 flex items-start gap-3">
         <Bell className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" />
         <p className="text-xs text-[#1D4ED8] font-medium leading-relaxed">
           Alarms are saved only in this browser and fire as in-app notifications while ZestIQ is open. They are not background push, email or SMS alerts. Alarms check every 30 seconds.
@@ -256,7 +256,7 @@ export function OrderAlarms() {
                 }`}
               >
                 {/* Top accent stripe */}
-                <div className={`h-[3px] ${alarm.enabled ? (isSoon ? 'bg-amber-400' : 'bg-[#0F172A]') : 'bg-gray-200'}`} />
+                <div className={`h-[3px] ${alarm.enabled ? (isSoon ? 'bg-[#F58220]' : 'bg-[#0F172A]') : 'bg-gray-200'}`} />
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     {/* Time display */}
@@ -273,12 +273,12 @@ export function OrderAlarms() {
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-gray-900 text-sm truncate">{alarm.name}</p>
                           {isSoon && (
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
+                            <span className="text-[10px] font-bold text-[#F58220] bg-lime-50 px-1.5 py-0.5 rounded-full shrink-0">
                               {minutesUntil}m
                             </span>
                           )}
                           {firedToday && alarm.enabled && (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">
+                            <span className="text-[10px] font-bold text-[#F58220] bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">
                               Sent ✓
                             </span>
                           )}
@@ -348,7 +348,7 @@ export function OrderAlarms() {
                   setFormDays(WEEKDAYS);
                   setDialogOpen(true);
                 }}
-                className="text-left p-3 rounded-xl border border-gray-100 hover:border-[#F5C10E]/30 hover:bg-[#FEFCE8] transition-all group"
+                className="text-left p-3 rounded-xl border border-gray-100 hover:border-[#F58220]/30 hover:bg-[#FEFCE8] transition-all group"
               >
                 <p className="text-xs font-bold text-gray-700 group-hover:text-[#0F172A]">{preset.name}</p>
                 <p className="text-[10px] text-gray-400 font-mono mt-0.5">{formatTime12h(preset.time)}</p>

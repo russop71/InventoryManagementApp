@@ -20,7 +20,7 @@ export const POS_PROVIDERS: PosProvider[] = [
   { id: 'squirrel', name: 'Squirrel Systems', mark: 'SQ', colour: '#B45309', connection: 'Import ready', description: 'Hospitality POS sales and product reports.', website: 'https://www.squirrelsystems.com/' },
   { id: 'silverware', name: 'SilverWare POS', mark: 'SW', colour: '#475569', connection: 'Import ready', description: 'Canadian hospitality and venue sales exports.', website: 'https://www.silverwarepos.com/' },
   { id: 'revel', name: 'Revel Systems', mark: 'R', colour: '#0284C7', connection: 'Provider activation required', description: 'CSV/JSON import is ready; direct sync requires provider approval.', website: 'https://revelsystems.com/' },
-  { id: 'shopify', name: 'Shopify POS', mark: 'SP', colour: '#65A30D', connection: 'Provider activation required', description: 'CSV/JSON import is ready for cafe and restaurant-retail concepts.', website: 'https://www.shopify.com/ca/pos' },
+  { id: 'shopify', name: 'Shopify POS', mark: 'SP', colour: '#F58220', connection: 'Provider activation required', description: 'CSV/JSON import is ready for cafe and restaurant-retail concepts.', website: 'https://www.shopify.com/ca/pos' },
   { id: 'generic', name: 'Other POS / CSV', mark: '+', colour: '#303A43', connection: 'Import ready', description: 'Use ZestIQ’s universal CSV or JSON sales importer.', website: 'mailto:demo@zestiq.ca?subject=ZestIQ%20POS%20integration' },
 ];
 

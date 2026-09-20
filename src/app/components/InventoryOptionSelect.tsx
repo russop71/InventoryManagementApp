@@ -10,7 +10,7 @@ export function InventoryOptionSelect({ label, value, options, required = false,
 }) {
   const [custom, setCustom] = useState(false);
   const choices = Array.from(new Set(options.map(option => option.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-  const fieldClass = 'mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400';
+  const fieldClass = 'mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]';
   return (
     <div className="text-sm font-bold text-slate-700">
       <label>{label}{required && <span aria-hidden="true"> *</span>}

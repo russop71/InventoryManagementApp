@@ -23,7 +23,7 @@ import {
 type SalesRangePreset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'last-month' | 'custom';
 
 export function Dashboard() {
-  const systemChartColors = ['#F5D62E', '#303A43', '#D9BC24', '#68747D', '#FFE97A', '#46525B', '#E8C91F', '#8A949B'];
+  const systemChartColors = ['#F58220', '#303A43', '#D9BC24', '#68747D', '#FFE97A', '#46525B', '#E8C91F', '#8A949B'];
   const navigate = useNavigate();
   const { user } = useAuth();
   const { inventory, orders, recipes, inventoryCounts, suppliers } = useInventory();
@@ -481,7 +481,7 @@ export function Dashboard() {
       <section className="overflow-hidden rounded-3xl bg-[#303A43] p-5 text-white shadow-lg shadow-slate-900/10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F5D62E]">Today at a glance</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F58220]">Today at a glance</p>
             <h1 className="mt-2 text-2xl font-black tracking-tight">Good morning, {firstName}.</h1>
             <p className="mt-1 text-sm font-bold text-white">{briefTitle}</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{briefSummary}</p>
@@ -490,27 +490,27 @@ export function Dashboard() {
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {isBohManager ? <>
-            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
-            <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
-            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} waiting to be received</p></Link>
+            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Food COGS</p><p className="mt-2 text-2xl font-black text-[#F58220]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            <Link to="/app/inventory" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Low stock</p><p className="mt-2 text-2xl font-black text-[#F58220]">{lowStockItems.length}</p><p className="mt-1 text-xs text-slate-300">{lowStockItems.length ? lowStockItems.slice(0, 2).map(item => item.name).join(', ') : 'No critical items'}</p></Link>
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F58220]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} waiting to be received</p></Link>
           </> : isFohManager ? <>
-            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Sales</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">${todaysRevenue.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">{todaysCovers} covers · ${todaysAvgCheck.toFixed(0)} average check</p></Link>
-            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · view schedule</p></Link>
-            <Link to="/app/beverages" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Bar & beverage</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">${beverageCogs.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">Beverage COGS in the selected period</p></Link>
+            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Sales</p><p className="mt-2 text-2xl font-black text-[#F58220]">${todaysRevenue.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">{todaysCovers} covers · ${todaysAvgCheck.toFixed(0)} average check</p></Link>
+            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F58220]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · view schedule</p></Link>
+            <Link to="/app/beverages" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Bar & beverage</p><p className="mt-2 text-2xl font-black text-[#F58220]">${beverageCogs.toFixed(0)}</p><p className="mt-1 text-xs text-slate-300">Beverage COGS in the selected period</p></Link>
           </> : <>
-            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">COGS</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
-            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link>
-            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F5D62E]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
+            <Link to="/app/costs?view=cogs" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">COGS</p><p className="mt-2 text-2xl font-black text-[#F58220]">{totalRevenue > 0 ? `${cogsPercent.toFixed(1)}%` : '—'}</p><p className="mt-1 text-xs text-slate-300">{totalRevenue > 0 ? `$${totalCOGS.toFixed(0)} for the selected sales period` : 'Import POS sales to calculate'}</p></Link>
+            <Link to="/app/labor" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Labour</p><p className="mt-2 text-2xl font-black text-[#F58220]">{totalRevenue > 0 ? `${scheduledLaborPercent.toFixed(1)}%` : `$${scheduledLaborCost.toFixed(0)}`}</p><p className="mt-1 text-xs text-slate-300">Target {targetLaborPercent}% · {employees.filter(employee => employee.active).length} active team</p></Link>
+            <Link to="/app/orders" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Ordering</p><p className="mt-2 text-2xl font-black text-[#F58220]">{pendingOrdersCount}</p><p className="mt-1 text-xs text-slate-300">${pendingOrdersValue.toFixed(0)} pending · {lowStockItems.length} low-stock</p></Link>
           </>}
-          <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F5D62E]" /></div><p className="mt-2 text-2xl font-black text-[#F5D62E]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
+          <Link to="/app/waste" className="rounded-2xl bg-white/10 p-4 transition hover:bg-white/15"><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-300">Waste today</p><Trash2 className="h-4 w-4 text-[#F58220]" /></div><p className="mt-2 text-2xl font-black text-[#F58220]">${todayWaste.toFixed(2)}</p><p className="mt-1 text-xs text-slate-300">Log loss or review waste trends</p></Link>
         </div>
       </section>
 
       {canConfigureWorkspace && optionalSetupComplete < optionalSetup.length && (
-        <section className="rounded-3xl border border-amber-200 bg-[#FFFCED] p-5 shadow-sm">
+        <section className="rounded-3xl border border-lime-200 bg-[#FFFCED] p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9A7600]">Optional setup</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F58220]">Optional setup</p>
               <h2 className="mt-1 text-lg font-black text-[#303A43]">Finish setting up when you’re ready</h2>
               <p className="mt-1 text-sm text-slate-600">The dashboard is fully available. These steps help ZestIQ produce more useful insights.</p>
             </div>
@@ -520,10 +520,10 @@ export function Dashboard() {
             {optionalSetup.map(item => {
               const Icon = item.icon;
               return (
-                <Link key={item.title} to={item.path} className={`rounded-2xl border p-4 transition ${item.complete ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white hover:border-[#F5D62E] hover:shadow-sm'}`}>
+                <Link key={item.title} to={item.path} className={`rounded-2xl border p-4 transition ${item.complete ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white hover:border-[#F58220] hover:shadow-sm'}`}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-[#FFF4A3] text-[#303A43]'}`}><Icon className="h-4 w-4" /></span>
-                    {item.complete ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-5 w-5 text-slate-300" />}
+                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${item.complete ? 'bg-emerald-100 text-[#F58220]' : 'bg-[#FFF4A3] text-[#303A43]'}`}><Icon className="h-4 w-4" /></span>
+                    {item.complete ? <CheckCircle2 className="h-5 w-5 text-[#F58220]" /> : <Circle className="h-5 w-5 text-slate-300" />}
                   </div>
                   <p className="mt-3 text-sm font-black text-slate-900">{item.title}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
@@ -547,8 +547,8 @@ export function Dashboard() {
       )}
 
       {activeInventoryCountDraft && (
-        <Link to={`/app/inventory/counts/${activeInventoryCountDraft.id}`} className="block rounded-2xl border border-amber-200 bg-amber-50 p-4 transition hover:bg-amber-100/70">
-          <div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-200/60"><Clock3 className="h-5 w-5 text-amber-900" /></div><div className="min-w-0"><p className="break-words text-sm font-black text-amber-950">Resume inventory count</p><p className="mt-1 text-xs text-amber-800">{activeInventoryCountSummary.completedItems}/{activeInventoryCountSummary.totalItems} items counted · {activeInventoryCountSummary.remainingItems} remaining</p></div></div><ChevronRight className="h-5 w-5 shrink-0 text-amber-900" /></div>
+        <Link to={`/app/inventory/counts/${activeInventoryCountDraft.id}`} className="block rounded-2xl border border-lime-200 bg-lime-50 p-4 transition hover:bg-lime-100/70">
+          <div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-200/60"><Clock3 className="h-5 w-5 text-[#F58220]" /></div><div className="min-w-0"><p className="break-words text-sm font-black text-[#F58220]">Resume inventory count</p><p className="mt-1 text-xs text-[#F58220]">{activeInventoryCountSummary.completedItems}/{activeInventoryCountSummary.totalItems} items counted · {activeInventoryCountSummary.remainingItems} remaining</p></div></div><ChevronRight className="h-5 w-5 shrink-0 text-[#F58220]" /></div>
         </Link>
       )}
 
@@ -564,10 +564,10 @@ export function Dashboard() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Food Cost</span>
-              <TrendingDown className="h-3 w-3 text-emerald-400" />
+              <TrendingDown className="h-3 w-3 text-[#F58220]" />
             </div>
             <div className={`text-2xl font-black tabular-nums leading-none ${
-              totalRevenue > 0 ? (foodCostPercentage > 35 ? 'text-red-400' : 'text-emerald-400') : 'text-slate-600'
+              totalRevenue > 0 ? (foodCostPercentage > 35 ? 'text-red-400' : 'text-[#F58220]') : 'text-slate-600'
             }`} style={{ fontFamily: 'var(--font-mono)' }}>
               {totalRevenue > 0 ? `${foodCostPercentage.toFixed(1)}%` : '—'}
             </div>
@@ -600,11 +600,11 @@ export function Dashboard() {
           className={`border-0 shadow-sm overflow-hidden bg-white transition-all duration-200 ${pendingOrdersCount > 0 ? 'cursor-pointer hover:shadow-md' : ''}`}
           onClick={() => pendingOrdersCount > 0 && openBreakdown('orders')}
         >
-          <div className={`h-[3px] ${pendingOrdersCount > 0 ? 'bg-[#F5D62E]' : 'bg-gray-100'}`} />
+          <div className={`h-[3px] ${pendingOrdersCount > 0 ? 'bg-[#F58220]' : 'bg-gray-100'}`} />
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Orders</span>
-              <ShoppingCart className={`h-3 w-3 ${pendingOrdersCount > 0 ? 'text-[#F5D62E]' : 'text-gray-200'}`} />
+              <ShoppingCart className={`h-3 w-3 ${pendingOrdersCount > 0 ? 'text-[#F58220]' : 'text-gray-200'}`} />
             </div>
             <div className={`text-2xl font-black tabular-nums leading-none ${pendingOrdersCount > 0 ? 'text-[#303A43]' : 'text-gray-200'}`} style={{ fontFamily: 'var(--font-mono)' }}>
               {pendingOrdersCount}
@@ -626,13 +626,13 @@ export function Dashboard() {
       </div>}
 
       <Card className="border-0 shadow-sm overflow-hidden bg-white">
-        <div className="h-[3px] bg-[#F5D62E]" />
+        <div className="h-[3px] bg-[#F58220]" />
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 mb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-[#F5D62E]/20 flex items-center justify-center">
-                  <DollarSign className="w-4 h-4 text-[#9A7600]" />
+                <div className="w-7 h-7 rounded-lg bg-[#F58220]/20 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-[#F58220]" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-[#303A43]">Sales</p>
@@ -672,7 +672,7 @@ export function Dashboard() {
                       setCustomEndDate('');
                     }
                   }}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest transition ${salesRangePreset === value ? 'bg-[#303A43] text-[#F5D62E]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest transition ${salesRangePreset === value ? 'bg-[#303A43] text-[#F58220]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                 >
                   {label}
                 </button>
@@ -686,7 +686,7 @@ export function Dashboard() {
                   type="button"
                   aria-pressed={salesSummaryMode === mode}
                   onClick={() => setSalesSummaryMode(mode)}
-                  className={`min-h-11 rounded-full px-4 py-2 text-xs font-semibold transition ${salesSummaryMode === mode ? 'bg-[#303A43] text-[#F5D62E]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  className={`min-h-11 rounded-full px-4 py-2 text-xs font-semibold transition ${salesSummaryMode === mode ? 'bg-[#303A43] text-[#F58220]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                 >
                   {mode === 'average' ? 'Average' : 'Total Sales'}
                 </button>
@@ -709,7 +709,7 @@ export function Dashboard() {
 
           {filteredSalesData.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
-              <span className="mb-2 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-amber-800">
+              <span className="mb-2 inline-flex items-center rounded-full bg-lime-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-[#F58220]">
                 Sales
               </span>
               <p className="text-sm font-semibold text-gray-500">No sales data for this range</p>
@@ -717,10 +717,10 @@ export function Dashboard() {
             </div>
           ) : (
             <>
-              <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2">
+              <div className="mb-4 rounded-xl border border-lime-100 bg-lime-50/70 px-3 py-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-800">Sales</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[#F58220]">Sales</p>
                     <p className="text-[11px] font-semibold text-slate-700">{salesRangeLabel}</p>
                   </div>
                   <p className="text-[11px] font-semibold text-slate-600">{filteredSalesData.length} days</p>
@@ -763,7 +763,7 @@ export function Dashboard() {
                       formatter={(value: number) => [`$${value.toLocaleString('en-US')}`, 'Revenue']}
                       labelFormatter={(label) => `Date: ${label}`}
                     />
-                    <Line type="monotone" dataKey="revenue" stroke="#F5D62E" strokeWidth={2.5} dot={{ r: 2, fill: '#303A43' }} activeDot={{ r: 4, fill: '#F5D62E', stroke: '#303A43' }} />
+                    <Line type="monotone" dataKey="revenue" stroke="#F58220" strokeWidth={2.5} dot={{ r: 2, fill: '#303A43' }} activeDot={{ r: 4, fill: '#F58220', stroke: '#303A43' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -797,14 +797,14 @@ export function Dashboard() {
       </Dialog>
 
       {canManageLabor && <Card className="overflow-hidden border-0 bg-[#303A43] text-white shadow-sm">
-        <div className="h-[3px] bg-[#F5D62E]" />
+        <div className="h-[3px] bg-[#F58220]" />
         <CardContent className="p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-black">Labour versus sales</p>
               <p className="mt-1 text-xs text-white/45">{salesRangeLabel} · scheduled hourly labour plus prorated active salaries</p>
             </div>
-            <Link to="/app/labor" className="inline-flex w-fit items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#F5D62E]">Open scheduler <ChevronRight className="h-3.5 w-3.5" /></Link>
+            <Link to="/app/labor" className="inline-flex w-fit items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#F58220]">Open scheduler <ChevronRight className="h-3.5 w-3.5" /></Link>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
             <LaborSummary label="Sales" value={`$${totalRevenue.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`} detail={`${filteredSalesData.length} day${filteredSalesData.length === 1 ? '' : 's'} in range`} />
@@ -814,7 +814,7 @@ export function Dashboard() {
           </div>
           <div className="mt-4 rounded-2xl bg-white/5 p-3">
             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/40"><span>Labour mix</span><span>{hourlyShare.toFixed(0)}% hourly · {(100 - hourlyShare).toFixed(0)}% salaried</span></div>
-            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#F5D62E]" style={{ width: `${hourlyShare}%` }} /><div className="h-full flex-1 bg-white/35" /></div>
+            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#F58220]" style={{ width: `${hourlyShare}%` }} /><div className="h-full flex-1 bg-white/35" /></div>
           </div>
         </CardContent>
       </Card>}
@@ -890,12 +890,12 @@ export function Dashboard() {
 
       {/* ── Top Sellers from POS ─────────────────────── */}
       <Card className="border-0 shadow-sm bg-white overflow-hidden">
-        <div className="h-[3px] bg-[#F5D62E]" />
+        <div className="h-[3px] bg-[#F58220]" />
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-[#F5D62E]/15 rounded-lg flex items-center justify-center">
-                <Flame className="w-4 h-4 text-[#F5D62E]" />
+              <div className="w-7 h-7 bg-[#F58220]/15 rounded-lg flex items-center justify-center">
+                <Flame className="w-4 h-4 text-[#F58220]" />
               </div>
               <div>
                 <p className="text-sm font-bold text-[#303A43]">Top Sellers</p>
@@ -920,7 +920,7 @@ export function Dashboard() {
               {topSellingItems.map((item, idx) => {
                 const maxQty = topSellingItems[0].quantity;
                 const pct = Math.round((item.quantity / maxQty) * 100);
-                const rankColors = ['#F5D62E', '#F5D62E', '#9CA3AF', '#9CA3AF', '#9CA3AF'];
+                const rankColors = ['#F58220', '#F58220', '#9CA3AF', '#9CA3AF', '#9CA3AF'];
                 return (
                   <button
                     key={item.itemName}
@@ -942,7 +942,7 @@ export function Dashboard() {
                         <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all"
-                            style={{ width: `${pct}%`, background: idx < 2 ? '#F5D62E' : '#E5E7EB' }}
+                            style={{ width: `${pct}%`, background: idx < 2 ? '#F58220' : '#E5E7EB' }}
                           />
                         </div>
                         <span className="text-[10px] text-gray-400 font-semibold shrink-0 tabular-nums">
@@ -985,7 +985,7 @@ export function Dashboard() {
               <>
                 {itemsByCategory.map(cat => (
                   <div key={cat.category} className="border rounded-lg overflow-hidden">
-                    <div className="bg-[#FEFCE8] border-b border-[#F5D62E]/30 p-3">
+                    <div className="bg-[#FEFCE8] border-b border-[#F58220]/30 p-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="font-semibold text-[#303A43]">{cat.category}</h3>
@@ -1023,21 +1023,21 @@ export function Dashboard() {
               <>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-green-900">Total Inventory Value</span>
-                    <span className="text-lg font-bold text-green-900">
+                    <span className="text-sm font-medium text-[#F58220]">Total Inventory Value</span>
+                    <span className="text-lg font-bold text-[#F58220]">
                       ${totalInventoryValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-green-900">Total Revenue (Toast POS)</span>
-                    <span className="text-lg font-bold text-green-900">
+                    <span className="text-sm font-medium text-[#F58220]">Total Revenue (Toast POS)</span>
+                    <span className="text-lg font-bold text-[#F58220]">
                       ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="pt-2 border-t border-green-300">
+                  <div className="pt-2 border-t border-[#F58220]">
                     <div className="flex items-center justify-between">
-                      <span className="text-base font-semibold text-green-900">Food Cost %</span>
-                      <span className="text-2xl font-bold text-green-900">{foodCostPercentage.toFixed(1)}%</span>
+                      <span className="text-base font-semibold text-[#F58220]">Food Cost %</span>
+                      <span className="text-2xl font-bold text-[#F58220]">{foodCostPercentage.toFixed(1)}%</span>
                     </div>
                   </div>
                 </div>
@@ -1059,7 +1059,7 @@ export function Dashboard() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="h-2 rounded-full bg-green-500"
+                          className="h-2 rounded-full bg-[#F58220]"
                           style={{ width: `${(cat.totalValue / totalInventoryValue) * 100}%` }}
                         />
                       </div>
@@ -1116,7 +1116,7 @@ export function Dashboard() {
 
             {breakdownType === 'orders' && (
               <>
-                <div className="bg-[#FEFCE8] border border-[#F5D62E]/30 rounded-lg p-3 mb-3">
+                <div className="bg-[#FEFCE8] border border-[#F58220]/30 rounded-lg p-3 mb-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-[#303A43]">
                       {pendingOrders.length} pending orders
@@ -1139,7 +1139,7 @@ export function Dashboard() {
                         <p className="text-lg font-bold text-gray-900">
                           ${order.totalCost.toFixed(2)}
                         </p>
-                        <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-300 mt-1">
+                        <Badge className="bg-lime-100 text-[#F58220] border border-[#F58220] mt-1">
                           {order.status}
                         </Badge>
                       </div>
@@ -1201,10 +1201,10 @@ export function Dashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-[#F58220] rounded-full animate-pulse" />
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Toast POS</span>
               </div>
-              <Badge className="bg-emerald-500/20 text-emerald-400 border-0 text-[10px] font-bold px-2">LIVE</Badge>
+              <Badge className="bg-[#F58220]/20 text-[#F58220] border-0 text-[10px] font-bold px-2">LIVE</Badge>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
@@ -1228,11 +1228,11 @@ export function Dashboard() {
 
       {/* Feature shortcuts are available from the main navigation, not repeated on the dashboard. */}
       {false && <><Card className="border-0 shadow-sm overflow-hidden">
-        <div className="h-[3px] bg-[#F5D62E]" />
+        <div className="h-[3px] bg-[#F58220]" />
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <div className="bg-[#FEFCE8] rounded-xl p-2.5 shrink-0 mt-0.5">
-              <Sparkles className="w-5 h-5 text-[#B58B00]" />
+              <Sparkles className="w-5 h-5 text-[#F58220]" />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-gray-900 text-sm">AI Order Assistant</h3>
@@ -1298,10 +1298,10 @@ export function Dashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center">
-                <Activity className="w-5 h-5 mr-2 text-[#B58B00]" />
+                <Activity className="w-5 h-5 mr-2 text-[#F58220]" />
                 Usage Summary - This Week
               </CardTitle>
-              <Badge className={variancePercent > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
+              <Badge className={variancePercent > 0 ? 'bg-lime-100 text-[#F58220]' : 'bg-green-100 text-[#F58220]'}>
                 {variancePercent > 0 ? '+' : ''}{variancePercent.toFixed(1)}% variance
               </Badge>
             </div>
@@ -1362,14 +1362,14 @@ export function Dashboard() {
                             {/* Actual bar (overlay) */}
                             <div 
                               className={`absolute h-2 rounded-full ${
-                                isOver ? 'bg-yellow-500' : 'bg-green-500'
+                                isOver ? 'bg-[#F58220]' : 'bg-[#F58220]'
                               }`}
                               style={{ width: `${(item.actual / safeHypothetical * 100)}%` }}
                             />
                           </div>
                         </div>
                         <div className={`ml-3 min-w-[60px] text-right text-xs font-medium ${
-                          isOver ? 'text-yellow-600' : 'text-green-600'
+                          isOver ? 'text-[#F58220]' : 'text-[#F58220]'
                         }`}>
                           {isOver ? '+' : ''}{variance} {item.unit}
                           <div className="text-xs opacity-75">
@@ -1406,14 +1406,14 @@ export function Dashboard() {
                                       {/* Actual bar (overlay) */}
                                       <div 
                                         className={`absolute h-1.5 rounded-full ${
-                                          isSubOver ? 'bg-yellow-500' : 'bg-green-500'
+                                          isSubOver ? 'bg-[#F58220]' : 'bg-[#F58220]'
                                         }`}
                                         style={{ width: `${(subItem.actual / safeSubHypothetical * 100)}%` }}
                                       />
                                     </div>
                                   </div>
                                   <div className={`ml-3 min-w-[50px] text-right text-xs ${
-                                    isSubOver ? 'text-yellow-600' : 'text-green-600'
+                                    isSubOver ? 'text-[#F58220]' : 'text-[#F58220]'
                                   }`}>
                                     {isSubOver ? '+' : ''}{subVariance}
                                     <div className="text-xs opacity-75">
@@ -1439,11 +1439,11 @@ export function Dashboard() {
                     <span className="text-gray-600">Forecasted</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-4 h-2 bg-green-500 rounded"></div>
+                    <div className="w-4 h-2 bg-[#F58220] rounded"></div>
                     <span className="text-gray-600">Under Forecast</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-4 h-2 bg-yellow-500 rounded"></div>
+                    <div className="w-4 h-2 bg-[#F58220] rounded"></div>
                     <span className="text-gray-600">Over Forecast</span>
                   </div>
                 </div>
@@ -1529,7 +1529,7 @@ export function Dashboard() {
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} key="xaxis-line" />
                   <YAxis tick={{ fontSize: 12 }} key="yaxis-line" />
                   <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} key="tooltip-line" />
-                  <Line dataKey="revenue" fill="#F5D62E" name="Revenue ($)" stroke="#F5D62E" strokeWidth={2.5} key="line-revenue" />
+                  <Line dataKey="revenue" fill="#F58220" name="Revenue ($)" stroke="#F58220" strokeWidth={2.5} key="line-revenue" />
                 </LineChart>
               </ResponsiveContainer>
             ) : (

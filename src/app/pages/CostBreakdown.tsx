@@ -108,13 +108,13 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
           <Button type="button" onClick={() => { resetEditor(); setIsEditorOpen(true); }} className="bg-[#303A43] text-white hover:bg-[#1E293B]"><Plus className="mr-2 h-4 w-4" />Add category</Button>
         </div>
 
-        <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-slate-700">
-          <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#B58B00]" />
+        <div className="flex gap-3 rounded-2xl border border-lime-200 bg-lime-50 p-4 text-sm leading-6 text-slate-700">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#F58220]" />
           <p>Expense accounts are optional. When configured, the category provides the accounting default for matching inventory and supplier records.</p>
         </div>
 
         {isEditorOpen && (
-          <form onSubmit={saveCategory} className="grid gap-3 rounded-2xl border-2 border-[#F5D62E] bg-[#FFFBE7] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <form onSubmit={saveCategory} className="grid gap-3 rounded-2xl border-2 border-[#F58220] bg-[#FFFBE7] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <div><Label htmlFor="category-name">Category name</Label><Input id="category-name" value={name} onChange={event => setName(event.target.value)} placeholder="Food" required /></div>
             <div><Label htmlFor="expense-account">Expense account (optional)</Label><Input id="expense-account" value={expenseAccount} onChange={event => setExpenseAccount(event.target.value)} placeholder="5000 · Food purchases" /></div>
             <div className="flex gap-2"><Button type="submit" className="bg-[#303A43] text-white">{editingId ? 'Save' : 'Add'}</Button><Button type="button" variant="outline" onClick={resetEditor}>Cancel</Button></div>
@@ -133,7 +133,7 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
               return (
                 <div key={category.id} className="grid gap-2 px-4 py-4 sm:grid-cols-[1.2fr_.7fr_1fr_auto] sm:items-center sm:gap-3">
                   <div><p className="font-black text-slate-900">{category.name}</p><p className="text-xs text-slate-500">{itemCount} items · {supplierCount} suppliers</p></div>
-                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${inUse ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{inUse ? 'In use' : 'Not used'}</span>
+                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${inUse ? 'bg-emerald-50 text-[#F58220]' : 'bg-slate-100 text-slate-500'}`}>{inUse ? 'In use' : 'Not used'}</span>
                   <p className="text-sm text-slate-600">{category.expenseAccount || 'Not assigned'}</p>
                   <div className="flex gap-1.5">
                     <Button type="button" size="sm" variant="outline" aria-label={`Edit ${category.name}`} onClick={() => { setEditingId(category.id); setName(category.name); setExpenseAccount(category.expenseAccount); setIsEditorOpen(true); }}><Pencil className="h-4 w-4" /></Button>
@@ -147,8 +147,8 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
         </> : (
           <div className="space-y-4">
-            <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-slate-700">
-              <Link2 className="mt-0.5 h-5 w-5 shrink-0 text-[#B58B00]" />
+            <div className="flex gap-3 rounded-2xl border border-lime-200 bg-lime-50 p-4 text-sm leading-6 text-slate-700">
+              <Link2 className="mt-0.5 h-5 w-5 shrink-0 text-[#F58220]" />
               <p>Place inventory categories and matching POS categories under one ZestIQ reporting group. Each category can belong to only one group, preventing duplicated COGS.</p>
             </div>
 
@@ -182,7 +182,7 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
                       <div className="flex flex-wrap gap-2">
                         {categories.map(category => {
                           const selected = draft.inventoryCategoryIds.includes(category.id);
-                          return <button key={category.id} type="button" onClick={() => toggleMapping(group.id, 'inventoryCategoryIds', category.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${selected ? 'border-[#F5D62E] bg-[#FFF6BF] text-slate-900' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>{selected && <Check className="h-3.5 w-3.5" />}{category.name}</button>;
+                          return <button key={category.id} type="button" onClick={() => toggleMapping(group.id, 'inventoryCategoryIds', category.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${selected ? 'border-[#F58220] bg-[#FFF6BF] text-slate-900' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>{selected && <Check className="h-3.5 w-3.5" />}{category.name}</button>;
                         })}
                         {categories.length === 0 && <p className="text-sm text-slate-400">No inventory categories yet.</p>}
                       </div>
@@ -203,7 +203,7 @@ function CategoryConfiguration({ open, onOpenChange }: { open: boolean; onOpenCh
             })}
 
             <div className="sticky bottom-0 flex justify-end border-t border-slate-200 bg-white/95 pt-4 backdrop-blur">
-              <Button type="button" onClick={saveMappings} disabled={cogsCategories.length === 0} className="w-full bg-[#F5D62E] font-black text-[#303A43] hover:bg-[#E8C514] sm:w-auto"><Check className="mr-2 h-4 w-4" />Save category mappings</Button>
+              <Button type="button" onClick={saveMappings} disabled={cogsCategories.length === 0} className="w-full bg-[#F58220] font-black text-[#303A43] hover:bg-[#E8C514] sm:w-auto"><Check className="mr-2 h-4 w-4" />Save category mappings</Button>
             </div>
           </div>
         )}
@@ -299,7 +299,7 @@ export function CostBreakdown() {
 
   const categoryTotal = categoryData.reduce((sum, category) => sum + category.value, 0);
   const sortedCategoryData = [...categoryData].sort((left, right) => right.value - left.value);
-  const COLORS = ['#F5D62E', '#303A43', '#D9BC24', '#68747D', '#FFE97A', '#46525B', '#E8C91F', '#8A949B'];
+  const COLORS = ['#F58220', '#303A43', '#D9BC24', '#68747D', '#FFE97A', '#46525B', '#E8C91F', '#8A949B'];
 
   return (
     <div className="space-y-5">
@@ -335,7 +335,7 @@ export function CostBreakdown() {
           type="button"
           onClick={() => setActiveView('cogs')}
           className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition sm:flex-none"
-          style={activeView === 'cogs' ? { background: '#F5D62E', color: '#303A43' } : { color: '#68747D' }}
+          style={activeView === 'cogs' ? { background: '#F58220', color: '#303A43' } : { color: '#68747D' }}
         >
           Menu COGS
         </button>
@@ -409,7 +409,7 @@ export function CostBreakdown() {
                         innerRadius={54}
                         outerRadius={88}
                         paddingAngle={2}
-                        stroke="#FFFEFA"
+                        stroke="#FFFDFA"
                         strokeWidth={3}
                         dataKey="value"
                       >
@@ -457,7 +457,7 @@ export function CostBreakdown() {
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#68747D' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#68747D' }} axisLine={false} tickLine={false} />
                   <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
-                  <Bar dataKey="value" fill="#F5D62E" radius={[6, 6, 0, 0]} name="Cost ($)" />
+                  <Bar dataKey="value" fill="#F58220" radius={[6, 6, 0, 0]} name="Cost ($)" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -482,10 +482,10 @@ export function CostBreakdown() {
                 const percentage = (totalValue / totalInventoryValue) * 100;
                 
                 return (
-                  <button type="button" key={item.id} onClick={event => { historyTrigger.current = event.currentTarget; setHistoryItemId(item.id); }} aria-label={`View purchase and sales history for ${item.name}`} className="w-full text-left bg-gray-50 rounded-lg p-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-500">
+                  <button type="button" key={item.id} onClick={event => { historyTrigger.current = event.currentTarget; setHistoryItemId(item.id); }} aria-label={`View purchase and sales history for ${item.name}`} className="w-full text-left bg-gray-50 rounded-lg p-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-500">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-start flex-1">
-                        <div className="w-6 h-6 rounded-full bg-[#F5D62E] text-[#303A43] flex items-center justify-center text-xs font-black mr-2 flex-shrink-0 mt-0.5">
+                        <div className="w-6 h-6 rounded-full bg-[#F58220] text-[#303A43] flex items-center justify-center text-xs font-black mr-2 flex-shrink-0 mt-0.5">
                           {index + 1}
                         </div>
                         <div className="flex-1">
@@ -517,7 +517,7 @@ export function CostBreakdown() {
                 const percentage = (supplier.value / totalInventoryValue) * 100;
                 
                 return (
-                  <button type="button" key={supplier.supplier} onClick={event => { supplierTrigger.current = event.currentTarget; setInvoiceSupplier(supplier.supplier); }} aria-label={`View invoices for ${supplier.supplier}`} className="w-full text-left bg-gray-50 rounded-lg p-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-500">
+                  <button type="button" key={supplier.supplier} onClick={event => { supplierTrigger.current = event.currentTarget; setInvoiceSupplier(supplier.supplier); }} aria-label={`View invoices for ${supplier.supplier}`} className="w-full text-left bg-gray-50 rounded-lg p-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-500">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-start flex-1">
                         <div 

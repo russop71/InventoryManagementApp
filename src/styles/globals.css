@@ -24,17 +24,17 @@ canvas {
 .zestiq-app-shell input,
 .zestiq-app-shell select,
 .zestiq-app-shell textarea {
-  accent-color: #f5d62e;
+  accent-color: #F58220;
 }
 
 :where(a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 3px solid #b58b00 !important;
+  outline: 3px solid #F58220 !important;
   outline-offset: 2px !important;
 }
 
 @media screen and (min-width: 1024px) {
   .zestiq-app-shell [data-slot="card"] {
-    background-color: #fffefa;
+    background-color: #FFFDFA;
   }
 
   .zestiq-dashboard > section:first-of-type {

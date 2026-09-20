@@ -623,7 +623,7 @@ export function InventoryDetail() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" className="h-9 rounded-xl" onClick={() => setIsEditing(current => !current)}>{isEditing ? 'Close editor' : 'Edit'}</Button>
-            <Button variant="outline" size="sm" className={`h-9 rounded-xl ${item.inactive ? 'border-green-200 text-green-700' : 'border-slate-200 text-slate-700'}`} onClick={toggleInactive}>
+            <Button variant="outline" size="sm" className={`h-9 rounded-xl ${item.inactive ? 'border-green-200 text-[#F58220]' : 'border-slate-200 text-slate-700'}`} onClick={toggleInactive}>
               {item.inactive ? <Undo2 className="mr-1 h-4 w-4" /> : <Archive className="mr-1 h-4 w-4" />}{item.inactive ? 'Reactivate' : 'Deactivate'}
             </Button>
             {item.deletable !== false && <Button variant="outline" size="sm" disabled={isDeleting} className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60" onClick={() => setShowDeleteConfirm(true)}>{isDeleting ? 'Deleting…' : 'Delete'}</Button>}
@@ -637,7 +637,7 @@ export function InventoryDetail() {
             <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">On hand</p><p className="mt-1 text-2xl font-black text-slate-950">{item.currentStock} <span className="text-sm text-slate-500">{item.unit}</span></p></div>
             <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Par level</p><p className="mt-1 text-2xl font-black text-slate-950">{item.parLevel}</p></div>
             <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Inventory value</p><p className="mt-1 text-xl font-black text-slate-950">${(item.currentStock * item.unitCost).toFixed(2)}</p></div>
-            <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Unit cost</p><p className="mt-1 text-xl font-black text-slate-950">${item.unitCost.toFixed(2)}</p>{priceChange !== 0 && <p className={`text-[10px] font-bold ${priceChange > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{priceChange > 0 ? '+' : ''}{priceChange.toFixed(1)}%</p>}</div>
+            <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Unit cost</p><p className="mt-1 text-xl font-black text-slate-950">${item.unitCost.toFixed(2)}</p>{priceChange !== 0 && <p className={`text-[10px] font-bold ${priceChange > 0 ? 'text-rose-600' : 'text-[#F58220]'}`}>{priceChange > 0 ? '+' : ''}{priceChange.toFixed(1)}%</p>}</div>
           </div>
           <div className="mt-3 h-2 w-full rounded-full bg-slate-200">
             <div
@@ -888,7 +888,7 @@ export function InventoryDetail() {
             </div>
             {isPurchaseOptionsExpanded && activePurchaseOption && (
               <div className="space-y-3 p-3">
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-[#FEFCE8] px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-lime-100 bg-[#FEFCE8] px-3 py-2">
                   <p className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
                     {activePurchaseOption.productName}
                   </p>
@@ -904,7 +904,7 @@ export function InventoryDetail() {
                         key={option.id}
                         type="button"
                         onClick={() => { setSelectedPurchaseOptionId(option.id); setShowPurchaseOptionSettings(false); }}
-                        className={`shrink-0 rounded-lg border px-3 py-1.5 text-left text-xs transition ${activePurchaseOption.id === option.id ? 'border-[#F5D62E] bg-amber-50 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                        className={`shrink-0 rounded-lg border px-3 py-1.5 text-left text-xs transition ${activePurchaseOption.id === option.id ? 'border-[#F58220] bg-lime-50 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
                       >
                         <span className="block font-black">Option {index + 1}{option.isMain ? ' · Main' : ''}</span>
                         <span className="block max-w-40 truncate text-[10px]">{option.supplier || 'Choose supplier'}</span>
@@ -1005,7 +1005,7 @@ export function InventoryDetail() {
                   </div>
 
                   {showPurchaseOptionSettings && (
-                    <div className="grid gap-2 rounded-xl border border-amber-100 bg-amber-50/60 p-3 sm:grid-cols-3">
+                    <div className="grid gap-2 rounded-xl border border-lime-100 bg-lime-50/60 p-3 sm:grid-cols-3">
                       <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">
                         <input type="radio" name="main-purchase-option" checked={activePurchaseOption.isMain} onChange={() => setMainPurchaseOption(activePurchaseOption.id)} className="accent-[#D6B900]" />
                         Main purchase option
@@ -1103,7 +1103,7 @@ export function InventoryDetail() {
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Storage areas</p>
                 <div className="mt-2 space-y-2">
                   {getInventoryStorageLocations(item).map(location => (
-                    <div key={location.storageArea} className="flex items-center gap-1 rounded-lg bg-slate-50 pr-1 hover:bg-amber-50">
+                    <div key={location.storageArea} className="flex items-center gap-1 rounded-lg bg-slate-50 pr-1 hover:bg-lime-50">
                       <button
                         type="button"
                         onClick={() => selectQuickStorageArea(location.storageArea)}
@@ -1335,14 +1335,14 @@ export function InventoryDetail() {
               </div>
               <div className={`rounded p-2 ${variance < 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                 <p className="text-xs text-gray-600">Variance</p>
-                <p className={`text-lg font-semibold ${variance < 0 ? 'text-green-700' : 'text-red-700'}`}>
+                <p className={`text-lg font-semibold ${variance < 0 ? 'text-[#F58220]' : 'text-red-700'}`}>
                   {variance > 0 ? '+' : ''}{variance.toFixed(1)} {item.unit}
                 </p>
               </div>
             </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-              <p className="text-xs font-medium text-yellow-900 mb-1">Compared with recent POS usage</p>
-              <p className="text-xs text-yellow-800">
+            <div className="bg-lime-50 border border-lime-200 rounded p-3">
+              <p className="text-xs font-medium text-[#F58220] mb-1">Compared with recent POS usage</p>
+              <p className="text-xs text-[#F58220]">
                 {variance > 0 
                   ? 'The latest sales day used more of this item than the average of the preceding available sales days.'
                   : variance < 0
@@ -1377,10 +1377,10 @@ export function InventoryDetail() {
             <div>
               <Label>Action Type</Label>
               <div className="grid grid-cols-2 gap-3 mt-2">
-                <label className="relative flex items-center justify-center p-3 border-2 border-gray-300 rounded-lg cursor-pointer has-[:checked]:border-green-500 has-[:checked]:bg-green-50">
+                <label className="relative flex items-center justify-center p-3 border-2 border-gray-300 rounded-lg cursor-pointer has-[:checked]:border-[#F58220] has-[:checked]:bg-green-50">
                   <input type="radio" name="type" value="add" className="sr-only" required />
                   <div className="text-center">
-                    <Plus className="w-6 h-6 mx-auto mb-1 text-green-600" />
+                    <Plus className="w-6 h-6 mx-auto mb-1 text-[#F58220]" />
                     <p className="text-sm font-medium">Add Stock</p>
                   </div>
                 </label>
@@ -1461,7 +1461,7 @@ export function InventoryDetail() {
                 onClick={() => setActiveTab('price')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   activeTab === 'price'
-                    ? 'bg-green-100 text-green-900'
+                    ? 'bg-green-100 text-[#F58220]'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -1493,7 +1493,7 @@ export function InventoryDetail() {
                           </p>
                         </div>
                         <div className="text-right ml-4">
-                          <p className={`text-sm font-semibold ${record.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <p className={`text-sm font-semibold ${record.change > 0 ? 'text-[#F58220]' : 'text-red-600'}`}>
                             {record.change > 0 ? '+' : ''}{record.change} {item.unit}
                           </p>
                           <p className="text-xs text-gray-500 mt-0.5">
@@ -1505,7 +1505,7 @@ export function InventoryDetail() {
                       <>
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">
-                            <DollarSign className="w-4 h-4 text-green-600" />
+                            <DollarSign className="w-4 h-4 text-[#F58220]" />
                             <p className="text-sm font-medium text-gray-900">
                               {record.reason || 'Price updated'}
                             </p>
@@ -1531,7 +1531,7 @@ export function InventoryDetail() {
                             </p>
                           </div>
                           <p className={`text-xs mt-0.5 ${
-                            record.newPrice > record.oldPrice ? 'text-red-600' : 'text-green-600'
+                            record.newPrice > record.oldPrice ? 'text-red-600' : 'text-[#F58220]'
                           }`}>
                             {record.newPrice > record.oldPrice ? '+' : ''}
                             {((record.newPrice - record.oldPrice) / record.oldPrice * 100).toFixed(1)}%

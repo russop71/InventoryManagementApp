@@ -202,11 +202,11 @@ export function Users() {
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Team access preview</h2>
           <p className="mt-1 text-sm text-slate-600">This page uses fictional roles and contains no real team records.</p>
         </div>
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-lime-200 bg-lime-50">
           <CardContent className="py-5">
-            <Shield className="mb-3 h-8 w-8 text-amber-700" />
-            <p className="font-semibold text-amber-950">Administrative controls are disabled in the public demo.</p>
-            <p className="mt-1 text-sm text-amber-800">Billing, invitations, password resets, role changes and user removal are available only in a private customer workspace.</p>
+            <Shield className="mb-3 h-8 w-8 text-[#F58220]" />
+            <p className="font-semibold text-[#F58220]">Administrative controls are disabled in the public demo.</p>
+            <p className="mt-1 text-sm text-[#F58220]">Billing, invitations, password resets, role changes and user removal are available only in a private customer workspace.</p>
           </CardContent>
         </Card>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -225,9 +225,9 @@ export function Users() {
 
   if (!isOwner) {
     return (
-      <Card className="border-amber-200 bg-amber-50">
+      <Card className="border-lime-200 bg-lime-50">
         <CardContent className="py-8">
-          <Shield className="mb-3 h-8 w-8 text-amber-700" />
+          <Shield className="mb-3 h-8 w-8 text-[#F58220]" />
           <h2 className="text-xl font-bold text-slate-950">Company owner access required</h2>
           <p className="mt-2 text-sm text-slate-600">Only a company Owner can view team members, usage, password resets, roles, and billing.</p>
         </CardContent>
@@ -305,7 +305,7 @@ export function Users() {
                           name="locationIds"
                           value={location.id}
                           defaultChecked={selectedUser ? (selectedUser.locationIds || []).includes(location.id) : location.id === activeLocationId}
-                          className="h-4 w-4 accent-[#F5D62E]"
+                          className="h-4 w-4 accent-[#F58220]"
                         />
                         <MapPin className="h-4 w-4 text-slate-400" />
                         {location.name}
@@ -364,23 +364,23 @@ export function Users() {
         </CardContent>
       </Card>
 
-      <Card className="gap-0 overflow-hidden border-[#F5D62E]/60">
-        <CardHeader className="border-b border-[#F5D62E]/30 bg-[#303A43] px-5 py-4 text-white">
-          <CardTitle className="flex items-center gap-2 text-lg"><Mail className="h-5 w-5 text-[#F5D62E]" />Supplier order email CC</CardTitle>
+      <Card className="gap-0 overflow-hidden border-[#F58220]/60">
+        <CardHeader className="border-b border-[#F58220]/30 bg-[#303A43] px-5 py-4 text-white">
+          <CardTitle className="flex items-center gap-2 text-lg"><Mail className="h-5 w-5 text-[#F58220]" />Supplier order email CC</CardTitle>
           <p className="mt-1 text-sm text-slate-300">Choose the active managers who should automatically receive a copy of every supplier order email.</p>
         </CardHeader>
         <CardContent className="space-y-3 px-5 py-4">
           {users.filter(user => user.status === 'Active' && user.role !== 'Staff').length ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {users.filter(user => user.status === 'Active' && user.role !== 'Staff').map(user => (
-                <label key={user.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-[#F5D62E]">
+                <label key={user.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-[#F58220]">
                   <input
                     type="checkbox"
                     checked={supplierEmailCc.includes(user.email)}
                     onChange={event => setSupplierEmailCc(current => event.target.checked
                       ? [...new Set([...current, user.email])]
                       : current.filter(email => email !== user.email))}
-                    className="h-4 w-4 accent-[#F5D62E]"
+                    className="h-4 w-4 accent-[#F58220]"
                   />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold text-slate-900">{user.name}</span>
@@ -394,7 +394,7 @@ export function Users() {
           )}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
             <p className="text-xs text-slate-500">{supplierEmailCc.length ? `${supplierEmailCc.length} recipient${supplierEmailCc.length === 1 ? '' : 's'} selected` : 'No automatic CC recipients'}</p>
-            <Button type="button" disabled={isLoading || !onboardingState} onClick={() => void saveSupplierEmailCc()} className="bg-[#F5D62E] font-bold text-[#303A43] hover:bg-[#E9C900]">Save email settings</Button>
+            <Button type="button" disabled={isLoading || !onboardingState} onClick={() => void saveSupplierEmailCc()} className="bg-[#F58220] font-bold text-[#303A43] hover:bg-[#E9C900]">Save email settings</Button>
           </div>
         </CardContent>
       </Card>
@@ -426,7 +426,7 @@ export function Users() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge className={roleBadgeClass(user.role)}><Shield className="mr-1 h-3 w-3" />{user.role}</Badge>
-                  <Badge className={user.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}>{user.status}</Badge>
+                  <Badge className={user.status === 'Active' ? 'bg-green-100 text-[#F58220]' : 'bg-slate-100 text-slate-600'}>{user.status}</Badge>
                 </div>
               </div>
 

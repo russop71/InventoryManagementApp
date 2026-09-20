@@ -47,7 +47,7 @@ function SupplierCategoryField({ initialValue = '', options }: { initialValue?: 
           placeholder="Enter a new category"
           autoFocus
           required
-          className="border-[#F5D62E] bg-[#FFFBE7]"
+          className="border-[#F58220] bg-[#FFFBE7]"
         />
       )}
       <p className="text-xs text-gray-500">Choose an existing category or add one that fits this supplier.</p>
@@ -139,7 +139,7 @@ export function Suppliers() {
       <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#303A43] px-4 py-3 shadow-sm">
         <div className="min-w-0">
           <h2 className="flex items-center text-xl font-extrabold tracking-tight text-white">
-            <span className="mr-2 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#F5D62E]">
+            <span className="mr-2 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#F58220]">
               <Truck className="h-4 w-4 text-[#303A43]" />
             </span>
             Suppliers
@@ -153,7 +153,7 @@ export function Suppliers() {
           if (!open) setEditingSupplier(null);
         }}>
           <DialogTrigger asChild>
-            <Button size="sm" className="h-10 shrink-0 rounded-xl bg-[#F5D62E] px-4 font-bold text-[#303A43] hover:bg-[#E9C900]">
+            <Button size="sm" className="h-10 shrink-0 rounded-xl bg-[#F58220] px-4 font-bold text-[#303A43] hover:bg-[#E9C900]">
               <Plus className="w-4 h-4 mr-1" />
               Add supplier
             </Button>
@@ -168,7 +168,7 @@ export function Suppliers() {
             <form key={editingSupplierData?.id || 'new-supplier'} onSubmit={handleAddSupplier} className="space-y-4">
               <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
                 <div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-gray-500">
-                  <FileText className="h-4 w-4 text-[#B58B00]" />
+                  <FileText className="h-4 w-4 text-[#F58220]" />
                   Supplier and contact information
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -189,9 +189,9 @@ export function Suppliers() {
                     <Label htmlFor="email">Supplier order email</Label>
                     <Input id="email" name="email" type="email" defaultValue={editingSupplierData?.email} placeholder="orders@supplier.com" />
                   </div>
-                  <div className="space-y-2 rounded-xl border border-[#F5D62E]/60 bg-[#FFFBE7] p-3 md:col-span-2">
+                  <div className="space-y-2 rounded-xl border border-[#F58220]/60 bg-[#FFFBE7] p-3 md:col-span-2">
                     <Label htmlFor="ccEmails" className="flex items-center gap-2 font-bold text-[#303A43]">
-                      <Mail className="h-4 w-4 text-[#B58B00]" />
+                      <Mail className="h-4 w-4 text-[#F58220]" />
                       CC team members on every order
                     </Label>
                     <Input id="ccEmails" name="ccEmails" defaultValue={editingSupplierData?.ccEmails?.join(', ')} placeholder="souschef@restaurant.ca, manager@restaurant.ca" className="bg-white" />
@@ -233,8 +233,8 @@ export function Suppliers() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 rounded-xl border border-[#F5D62E]/50 bg-[#FFFBE7] px-4 py-2.5 text-xs text-[#303A43] shadow-sm">
-        <Truck className="h-4 w-4 shrink-0 text-[#B58B00]" />
+      <div className="flex items-center gap-2 rounded-xl border border-[#F58220]/50 bg-[#FFFBE7] px-4 py-2.5 text-xs text-[#303A43] shadow-sm">
+        <Truck className="h-4 w-4 shrink-0 text-[#F58220]" />
         <span>Supplier contacts and ordering details. Select a supplier to view more.</span>
       </div>
 
@@ -256,19 +256,19 @@ export function Suppliers() {
             return (
               <Card
                 key={supplier.id}
-                className={`gap-0 overflow-hidden rounded-xl bg-white shadow-sm transition-colors ${isExpanded ? 'border-[#F5D62E]' : 'border-gray-200 hover:border-[#F5D62E]/70'}`}
+                className={`gap-0 overflow-hidden rounded-xl bg-white shadow-sm transition-colors ${isExpanded ? 'border-[#F58220]' : 'border-gray-200 hover:border-[#F58220]/70'}`}
               >
                 <div className="flex items-stretch">
                   <button
                     type="button"
                     aria-expanded={isExpanded}
                     aria-controls={`supplier-details-${supplier.id}`}
-                    className="min-w-0 flex-1 px-4 py-3 text-left transition-colors hover:bg-[#FFFBE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F5D62E]"
+                    className="min-w-0 flex-1 px-4 py-3 text-left transition-colors hover:bg-[#FFFBE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F58220]"
                     onClick={() => toggleSupplier(supplier.id)}
                   >
                     <div className="flex items-center gap-2.5">
                         {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 shrink-0 text-[#B58B00]" />
+                          <ChevronDown className="h-4 w-4 shrink-0 text-[#F58220]" />
                         ) : (
                           <ChevronRight className="h-4 w-4 shrink-0 text-gray-500" />
                         )}
@@ -307,7 +307,7 @@ export function Suppliers() {
                 </div>
 
                 {isExpanded && (
-                  <CardContent id={`supplier-details-${supplier.id}`} className="border-t border-[#F5D62E]/40 px-4 py-2.5">
+                  <CardContent id={`supplier-details-${supplier.id}`} className="border-t border-[#F58220]/40 px-4 py-2.5">
                     <div className="rounded-lg bg-gray-50 px-3 py-2.5">
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1.35fr_1.55fr_1fr_1fr_.75fr]">
                         <div className="min-w-0 text-[13px]">
@@ -352,7 +352,7 @@ export function Suppliers() {
                       {supplier.ccEmails && supplier.ccEmails.length > 0 && (
                         <div className="mt-2 grid min-w-0 grid-cols-[92px_minmax(0,1fr)] items-start gap-3 border-t border-gray-200 pt-2 text-[13px]">
                           <span className="flex items-center gap-1.5 font-semibold text-gray-500">
-                            <Mail className="h-3.5 w-3.5 shrink-0 text-[#B58B00]" />
+                            <Mail className="h-3.5 w-3.5 shrink-0 text-[#F58220]" />
                             CC
                           </span>
                           <span className="min-w-0 break-words text-gray-900">{supplier.ccEmails.join(', ')}</span>

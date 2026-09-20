@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254">
+ <defs><clipPath id="fruit"><circle cx="625" cy="707" r="385"/></clipPath><clipPath id="bars"><path d="M625 707L1000 332V1082Z M625 707L250 1082V707Z"/></clipPath></defs>
+ <path fill="#F58220" d="M645 267C651 109 761 48 922 55C918 180 852 250 739 279Z"/>
+ <path fill="#fff" d="M655 266Q720 180 830 127L677 266Z"/>
+ <circle cx="625" cy="707" r="464" fill="#F58220"/>
+ <g clip-path="url(#fruit)">
+  <g fill="#303A43" clip-path="url(#bars)">
+   <rect x="321" y="814" width="65" height="180" rx="10"/><rect x="410" y="769" width="63" height="225" rx="10"/><rect x="497" y="736" width="62" height="258" rx="10"/>
+   <rect x="697" y="677" width="60" height="320" rx="10"/><rect x="778" y="608" width="62" height="389" rx="10"/><rect x="860" y="534" width="66" height="463" rx="10"/>
+  </g>
+  <g fill="none" stroke="#303A43" stroke-width="20" stroke-linejoin="round">
+   <path d="M538 497L570 535V604L603 661 M718 480L682 517V600L650 651 M391 608L452 614L529 672L573 694 M596 765L565 834L555 870L523 904L520 933 M651 765L689 839V900L722 936"/>
+   <circle cx="516" cy="472" r="30"/><circle cx="743" cy="454" r="30"/><circle cx="363" cy="596" r="30"/><circle cx="508" cy="961" r="30"/><circle cx="742" cy="957" r="30"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-width="25" stroke-linecap="round">
+   <path d="M625 707V310 M625 707L905 427 M625 707H1022 M625 707L906 988 M625 707V1104 M625 707L344 988 M625 707H228 M625 707L344 426"/>
+  </g>
+ </g>
+ <circle cx="625" cy="707" r="385" fill="none" stroke="#fff" stroke-width="30"/>
+ <circle cx="625" cy="711" r="56" fill="#F58220" stroke="#fff" stroke-width="20"/>
+</svg>

@@ -252,7 +252,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
                 <Upload className="mr-2 h-4 w-4" /> Upload File
               </Button>
               {inventory.length === 0 && (
-                <p className="sm:col-span-2 text-sm text-amber-700">Add inventory items before scanning so every ingredient can be matched and costed.</p>
+                <p className="sm:col-span-2 text-sm text-[#F58220]">Add inventory items before scanning so every ingredient can be matched and costed.</p>
               )}
             </div>
           )}
@@ -304,10 +304,10 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
                 reset();
               }}
             >
-              <Card className={reviewIngredientCount === 0 ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}>
+              <Card className={reviewIngredientCount === 0 ? 'border-green-200 bg-green-50' : 'border-lime-200 bg-lime-50'}>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                   <div className="flex items-center gap-2">
-                    <Check className="h-5 w-5 text-green-700" />
+                    <Check className="h-5 w-5 text-[#F58220]" />
                     <div>
                       <p className="font-semibold">AI scan complete</p>
                       <p className="text-xs text-slate-600">{readyIngredientCount} cost-ready · {reviewIngredientCount} need review</p>
@@ -355,7 +355,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
                           </p>
                         </div>
                         <div className="shrink-0 text-right">
-                          <Badge className={cost === null ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}>
+                          <Badge className={cost === null ? 'bg-lime-100 text-[#F58220]' : 'bg-green-100 text-[#F58220]'}>
                             {cost === null ? 'Review' : `${Math.round(ingredient.matchConfidence * 100)}% match`}
                           </Badge>
                           <p className="mt-2 text-sm font-bold text-slate-950">{cost === null ? 'Not costed' : `$${cost.toFixed(2)}`}</p>
@@ -416,7 +416,7 @@ export function RecipeScan({ isOpen, inventory, onClose, onRecipeExtracted }: Re
               </div>
 
               {reviewIngredientCount > 0 && (
-                <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <p className="rounded-lg bg-lime-50 px-3 py-2 text-xs text-[#F58220]">
                   Items marked Review will not be silently costed. Continue to open the recipe editor and confirm their inventory item, quantity, or unit.
                 </p>
               )}

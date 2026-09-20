@@ -88,11 +88,11 @@ export function UsageVariance() {
         <label className="text-sm font-medium">Closing count<select className="mt-1 h-10 w-full rounded-lg border bg-white px-2" value={closingId} onChange={event => setClosingId(event.target.value)}><option value="">Choose a finalized count</option>{counts.map(count => <option key={count.id} value={count.id}>{count.countDate.slice(0, 10)} · {count.description}</option>)}</select></label>
       </div>
       <p className="text-sm text-slate-600">Uses finalized end-of-day counts. Activity after the opening date through the closing date is included. Actual = opening + received purchases − closing. Variance = actual − theoretical; positive means more was used than recipes predict.</p>
-      {counts.length < 2 && <p className="text-sm text-amber-800">Finalize at least two end-of-day inventory counts to compare usage.</p>}
+      {counts.length < 2 && <p className="text-sm text-[#F58220]">Finalize at least two end-of-day inventory counts to compare usage.</p>}
       {opening && closing && !valid && <p role="alert" className="text-sm text-red-700">The closing count must be on a later date than the opening count.</p>}
     </section>
     <>
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <div className="rounded-xl border border-lime-200 bg-lime-50 p-4 text-sm text-[#F58220]">
         <p className="font-semibold">Provisional comparison — check data completeness</p>
         <p className="mt-1">Purchases use received invoice/order dates and recorded stock quantities; invoice dates may differ from delivery dates. Sales summaries may omit menu items or days. Current recipe definitions and package conversions are used. Transfers and supplier returns are not reconciled here; recorded waste remains part of actual usage. Cost variance uses current unit costs, not historical accounting costs.</p>
         <p className="mt-1">{sales.length} POS daily records · {receivedInvoices.length} received invoices · {receivedOrders.length} additional received orders</p>
@@ -106,7 +106,7 @@ export function UsageVariance() {
               {title}<span aria-hidden="true">{sort?.column === column ? sort.descending ? '↓' : '↑' : '↕'}</span>
             </button>
           </th>)}</tr></thead>
-          <tbody>{rows.map(row => <tr key={row.item.id} className="border-t align-top"><th scope="row" className="min-w-48 p-3 font-medium">{row.item.name}<span className="block text-slate-500">{row.item.unit}</span>{row.issues.map(issue => <span key={issue} className="block text-xs font-normal text-amber-800">{issue}</span>)}</th>
+          <tbody>{rows.map(row => <tr key={row.item.id} className="border-t align-top"><th scope="row" className="min-w-48 p-3 font-medium">{row.item.name}<span className="block text-slate-500">{row.item.unit}</span>{row.issues.map(issue => <span key={issue} className="block text-xs font-normal text-[#F58220]">{issue}</span>)}</th>
             {[row.start, valid ? row.receipts : null, row.end, row.actual, row.theoretical, row.variance].map((value, index) => <td key={index} className="p-3">{quantity(value)}</td>)}
             <td className="p-3">{row.percent === null ? 'N/A' : `${quantity(row.percent)}%`}</td>
             <td className="p-3">{row.cost === null ? 'Unavailable' : money(row.cost)}</td>

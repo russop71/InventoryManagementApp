@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { ChevronLeft, ChevronDown, ChevronRight, TrendingDown, DollarSign, ShoppingBag, Filter, Calendar } from 'lucide-react';
 import { resolveCogsCategory } from '../utils/cogsCategoryMapping.js';
 
-const Y = '#F5D62E';
+const Y = '#F58220';
 const D = '#303A43';
 
 function fmt(n: number) {

@@ -36,7 +36,7 @@ function CategoryPicker({
   className?: string;
 }) {
   return (
-    <fieldset className={`rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-4 ${className}`}>
+    <fieldset className={`rounded-2xl border-2 border-[#F58220] bg-lime-50/60 p-4 ${className}`}>
       <legend className="px-2 text-sm font-black text-slate-900">Category <span className="text-red-600">*</span></legend>
       <p className="mb-3 text-xs leading-5 text-slate-600">{description}</p>
       <div className="flex flex-wrap gap-2" aria-label="Recipe categories">
@@ -48,7 +48,7 @@ function CategoryPicker({
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(option)}
-              className={`rounded-full border px-3 py-2 text-xs font-bold transition ${selected ? 'border-[#303A43] bg-[#303A43] text-white shadow-sm' : 'border-amber-300 bg-white text-slate-700 hover:border-[#303A43]'}`}
+              className={`rounded-full border px-3 py-2 text-xs font-bold transition ${selected ? 'border-[#303A43] bg-[#303A43] text-white shadow-sm' : 'border-[#F58220] bg-white text-slate-700 hover:border-[#303A43]'}`}
             >
               {option}
             </button>
@@ -62,7 +62,7 @@ function CategoryPicker({
         value={value}
         onChange={event => onChange(event.target.value)}
         placeholder="Type a category name"
-        className="mt-1 border-amber-300 bg-white"
+        className="mt-1 border-[#F58220] bg-white"
         required
       />
       {value && <p className="mt-2 text-xs font-semibold text-slate-700">Selected category: <span className="font-black">{value}</span></p>}
@@ -828,7 +828,7 @@ export function Recipes() {
 
         <TabsContent value="menuItems" className="space-y-4">
           {topSellerName && (
-            <Card className={topSellerMatch ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}>
+            <Card className={topSellerMatch ? 'border-lime-200 bg-lime-50' : 'border-slate-200 bg-slate-50'}>
               <CardContent>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -914,9 +914,9 @@ export function Recipes() {
                   const marginPercent = recipe.price > 0 ? (margin / recipe.price) * 100 : 0;
                   const isTopSellerMatch = recipe.menuItemName.trim().toLowerCase() === normalizedTopSellerName;
                   return (
-                    <div key={recipe.id} className={isTopSellerMatch ? 'bg-amber-50' : ''}>
+                    <div key={recipe.id} className={isTopSellerMatch ? 'bg-lime-50' : ''}>
                       <div className="p-4 md:hidden">
-                        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><button type="button" onClick={() => handleEditRecipe(recipe.id)} className="break-words text-left text-base font-black leading-snug text-slate-900">{recipe.menuItemName}</button><p className="mt-1 break-words text-xs text-slate-500">{recipe.category} · {recipe.ingredients.length} ingredients{recipe.externalId ? ` · POS ${recipe.externalId}` : ''}</p></div>{isTopSellerMatch && <Badge className="shrink-0 bg-amber-100 text-[10px] text-amber-800">Top Seller</Badge>}</div>
+                        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><button type="button" onClick={() => handleEditRecipe(recipe.id)} className="break-words text-left text-base font-black leading-snug text-slate-900">{recipe.menuItemName}</button><p className="mt-1 break-words text-xs text-slate-500">{recipe.category} · {recipe.ingredients.length} ingredients{recipe.externalId ? ` · POS ${recipe.externalId}` : ''}</p></div>{isTopSellerMatch && <Badge className="shrink-0 bg-lime-100 text-[10px] text-[#F58220]">Top Seller</Badge>}</div>
                         <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Food cost</p><p className="mt-1 font-black text-slate-900">${recipeCost.toFixed(2)}</p><p className="text-[10px] text-slate-500">{foodCostPercent.toFixed(0)}%</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Price</p><p className="mt-1 font-black text-slate-900">${recipe.price.toFixed(2)}</p></div><div className="rounded-xl bg-slate-50 p-2"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Margin</p><p className="mt-1 font-black" style={{ color: getMarginColor(marginPercent) }}>${margin.toFixed(2)}</p><p className="text-[10px]" style={{ color: getMarginColor(marginPercent) }}>{marginPercent.toFixed(0)}%</p></div></div>
                         <div className="mt-3 flex gap-2"><Button className="flex-1" size="sm" variant="outline" onClick={() => handleEditRecipe(recipe.id)}><Edit className="mr-1.5 h-4 w-4" />Edit</Button><Button aria-label={`Delete ${recipe.menuItemName}`} size="sm" variant="outline" onClick={() => setRecipePendingDelete({ id: recipe.id, name: recipe.menuItemName })}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
                       </div>
@@ -931,7 +931,7 @@ export function Recipes() {
                             {recipe.menuItemName}
                           </button>
                           {isTopSellerMatch && (
-                            <Badge className="bg-amber-100 text-amber-800 text-[10px]">Top Seller</Badge>
+                            <Badge className="bg-lime-100 text-[#F58220] text-[10px]">Top Seller</Badge>
                           )}
                         </div>
                         <p className="text-xs text-slate-500 mt-1 truncate">{recipe.ingredients.length} ingredients</p>
@@ -984,11 +984,11 @@ export function Recipes() {
               <CardContent>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-emerald-900">Recipes</p>
-                    <p className="text-xs text-emerald-700 mt-1">{preppedRecipes.length} recipes created</p>
+                    <p className="text-sm font-semibold text-[#F58220]">Recipes</p>
+                    <p className="text-xs text-[#F58220] mt-1">{preppedRecipes.length} recipes created</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-bold text-emerald-900">{preppedRecipes.length}</p>
+                    <p className="text-xl font-bold text-[#F58220]">{preppedRecipes.length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1123,7 +1123,7 @@ export function Recipes() {
                             <p className="truncate font-medium text-slate-900">{ingredient.quantity} {ingredient.unit} {ingredient.name}</p>
                             <p className="truncate text-xs text-slate-500">{item ? `Matched to ${item.name}` : 'No inventory match'}</p>
                           </div>
-                          <Badge className={isReady ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
+                          <Badge className={isReady ? 'bg-green-100 text-[#F58220]' : 'bg-lime-100 text-[#F58220]'}>
                             {isReady ? 'Cost-ready' : 'Review'}
                           </Badge>
                         </div>

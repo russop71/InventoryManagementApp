@@ -12,7 +12,7 @@ export function AuthLayout() {
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F5D62E]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F58220]"></div>
       </div>
     );
   }
@@ -35,7 +35,7 @@ export function AuthLayout() {
       return (
         <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC] p-6">
           <section className="w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/50">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800"><ShieldAlert className="h-7 w-7" /></span>
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-lime-100 text-[#F58220]"><ShieldAlert className="h-7 w-7" /></span>
             <h1 className="mt-5 text-2xl font-black text-[#303A43]">Company subscription inactive</h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">Your restaurant data remains protected. Ask your company owner to activate or update ZestIQ billing before continuing.</p>
           </section>

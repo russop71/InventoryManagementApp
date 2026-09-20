@@ -1,0 +1,114 @@
+/* A distinct editorial headline style for the private branding preview. */
+h1, h2, h3 {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+/* One typeface across the preview, including controls and numeric readouts. */
+body, button, input, select, textarea, .font-mono, .font-serif {
+  font-family: var(--font-sans);
+}
+
+/* Carry the headline lettering into navigation, calls to action and wordmark. */
+.grey-green-preview a,
+.grey-green-preview button,
+.grey-green-preview footer nav p,
+.zestiq-brand-word {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-weight: 400;
+}
+
+
+/* Light grey surfaces with the existing green accents, local homepage only. */
+.grey-green-preview [class~="bg-[#303A43]"] {
+  background-color: #F1EFEB;
+  color: #303A43;
+}
+.grey-green-preview [class~="text-white"] {
+  color: #303A43;
+}
+.grey-green-preview [class*="text-white/"] {
+  color: #62594F;
+}
+.grey-green-preview [class*="border-white/"] {
+  border-color: #D9CFC3;
+}
+.grey-green-preview [class*="bg-white/"] {
+  background-color: #FFFFFF;
+}
+
+/* Supporting copy must remain readable on the new light dashboard surfaces. */
+.zestiq-dashboard :is(.text-slate-300, .text-slate-400, .text-gray-300, .text-gray-400) {
+  color: #52605A;
+}
+
+/* Orange demo: light grey navigation and formerly charcoal panels. */
+.zestiq-app-shell :is(aside, section, div, button, a, span)[class~="bg-[#303A43]"] {
+  background-color: #E4E5E3;
+  color: #303A43;
+}
+/* Keep tiny menu strokes dark against their light header. */
+.zestiq-app-shell header span[class~="bg-[#303A43]"] { background-color: #303A43; }
+@scope (.zestiq-app-shell [class~="bg-[#303A43]"]) {
+  :is(.text-gray-300, .text-gray-400, .text-slate-300, .text-slate-400) { color: #52605A; }
+  [class~="text-white"] { color: #303A43; }
+  [class*="text-white/"] { color: #56605B; }
+  [class*="border-white/"] { border-color: #C5CCC7; }
+  [class*="bg-white/"] { background-color: #F4F4F2; }
+  [class~="bg-white/10"] { background-color: #F4F4F2; }
+  [class*="hover:text-white"]:hover { color: #202B25; }
+  [class*="hover:bg-white/"]:hover { background-color: #D5DAD6; }
+}
+
+.login-colour-preview [class~="text-white"] { color: #303A43; }
+.login-colour-preview [class*="text-white/"] { color: #62594F; }
+.login-colour-preview [class*="border-white/"] { border-color: #D9CFC3; }
+.login-colour-preview [class*="bg-white/"] { background-color: #FFFDFA; }
+
+/* Recolour the existing raster mark without replacing its artwork. */
+img[src*="zestiq-mark-exact"],
+img[src*="zestiq-icon"],
+img[src*="zestiq-touch-icon"] {
+  filter: hue-rotate(-25deg) saturate(1.2) brightness(1);
+}
+
+/* Use the same selective brand colour replacement for the citrus artwork. */
+.grey-green-preview img[src*="zestiq-mark-exact"],
+.grey-green-preview img[src*="zestiq-icon"],
+.grey-green-preview img[src*="zestiq-touch-icon"] {
+  filter: url(#product-brand-green);
+}
+
+/* Match the landing-page product walkthrough to the green preview theme.
+   Keep brightness unchanged so screenshot text and white surfaces stay clear. */
+img[src="/product-dashboard.png"],
+img[src="/product-inventory.png"],
+img[src="/product-ordering.png"] {
+  filter: url(#product-brand-green);
+}
+
+@theme {
+  --color-lime-50: #FFF8F0;
+  --color-lime-100: #FFF0DE;
+  --color-lime-200: #FFDCAD;
+  --color-lime-300: #F5B777;
+  --color-lime-400: #F58220;
+  --color-lime-500: #F58220;
+  --color-lime-600: #F58220;
+  --color-lime-700: #F58220;
+  --color-lime-800: #F58220;
+  --color-lime-900: #F58220;
+  --color-lime-950: #42240D;
+}
+
+.dark {
+  --primary: #F58220;
+  --primary-foreground: #42240D;
+  --ring: #F58220;
+}
+
+:root {
+  --chart-4: #F58220;
+  --chart-5: #F58220;
+}

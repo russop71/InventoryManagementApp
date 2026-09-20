@@ -136,7 +136,7 @@
 
 .zestiq-brand:hover .zestiq-brand-word,
 .zestiq-brand:focus-within .zestiq-brand-word {
-  text-shadow: 2px 2px 0 rgb(245 193 14 / 0.18);
+  text-shadow: 2px 2px 0 rgb(76 175 80 / 0.18);
 }
 
 @media (prefers-reduced-motion: reduce) {

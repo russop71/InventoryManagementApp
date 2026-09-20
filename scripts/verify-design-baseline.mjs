@@ -1,9 +1,14 @@
 import { access, readFile } from 'node:fs/promises';
 
 const requiredText = [
+  ['src/styles/theme.css', ['--primary: #F58220;', "'DM Serif Display'"]],
+  ['src/styles/index.css', ["./lime-preview.css"]],
+  ['src/app/components/ZestIQBrand.tsx', ['/zestiq-orange-vector.svg']],
+  ['src/app/pages/Orders.tsx', ["const Y = '#F58220'"]],
   ['src/app/pages/Landing.tsx', [
     'Forecast-to-order intelligence',
-    'AI-powered restaurant control',
+    'Know what it costs.',
+    'product-orange-dashboard.png',
     'Model the opportunity',
     'The working product',
     'One website. Two apps.',
@@ -32,6 +37,11 @@ const requiredText = [
 ];
 
 const failures = [];
+
+for (const file of ['src/styles/theme.css', 'src/app/components/Layout.tsx', 'src/app/pages/Orders.tsx']) {
+  const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+  if (/#(?:F5D62E|F5C10E)\b/i.test(source)) failures.push(`${file} restores obsolete yellow branding`);
+}
 
 for (const [file, markers] of requiredText) {
   let source = '';

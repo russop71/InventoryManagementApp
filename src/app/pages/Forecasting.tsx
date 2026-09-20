@@ -544,7 +544,7 @@ Restaurant Operations Team`;
                 <div className="flex items-center justify-between mb-2">
                   <Label>Ingredient Usage Predictions</Label>
                   {selectedItems.length > 0 && (
-                    <Badge className="bg-[#F5D62E] text-white">
+                    <Badge className="bg-[#F58220] text-white">
                       {selectedItems.length} items
                     </Badge>
                   )}
@@ -630,23 +630,23 @@ Restaurant Operations Team`;
       </div>
 
       {salesProjection.length > 0 && (
-        <Card className="overflow-hidden border-[#F5D62E]/40 bg-[#303A43] text-white">
+        <Card className="overflow-hidden border-[#F58220]/40 bg-[#303A43] text-white">
           <CardContent className="p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F5D62E]">Sales projection</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F58220]">Sales projection</p>
                 <h3 className="mt-1 text-2xl font-black">Plan the next seven days.</h3>
                 <p className="mt-1 text-sm text-white/60">Built from {salesData.length} days of POS sales, day-of-week patterns and recent trend.</p>
               </div>
               {isDemoAccount && (
-                <Button onClick={buildDemoForecast} className="bg-[#F5D62E] font-bold text-[#303A43] hover:bg-[#ffd34a]">
+                <Button onClick={buildDemoForecast} className="bg-[#F58220] font-bold text-[#303A43] hover:bg-[#F58220]">
                   <Sparkles className="mr-2 h-4 w-4" /> Build tomorrow's forecast
                 </Button>
               )}
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
               {salesProjection.map((day, index) => (
-                <div key={day.date} className={`rounded-xl p-3 ${index === 0 ? 'bg-[#F5D62E] text-[#303A43]' : 'bg-white/10'}`}>
+                <div key={day.date} className={`rounded-xl p-3 ${index === 0 ? 'bg-[#F58220] text-[#303A43]' : 'bg-white/10'}`}>
                   <p className="text-[11px] font-bold opacity-70">{day.label}</p>
                   <p className="mt-2 text-lg font-black">${day.revenue.toLocaleString('en-CA')}</p>
                   <p className="mt-1 text-[11px] font-medium opacity-70">{day.covers} covers</p>
@@ -848,7 +848,7 @@ Restaurant Operations Team`;
                     {email.items.map((item, idx) => (
                       <Badge 
                         key={idx} 
-                        className="bg-[#FEF9C3] text-[#1E3A5F] border border-[#F5D62E]/50 text-xs"
+                        className="bg-[#FEF9C3] text-[#1E3A5F] border border-[#F58220]/50 text-xs"
                       >
                         {item.name} ({item.quantity} {item.unit})
                       </Badge>

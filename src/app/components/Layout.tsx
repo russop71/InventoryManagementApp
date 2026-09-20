@@ -117,14 +117,14 @@ export function Layout() {
   }, [accountId, activeLocationId, location.pathname, user?.email]);
 
   return (
-    <div className="zestiq-app-shell min-h-screen overflow-x-clip bg-[#F7F3E8] pb-20 md:pb-0">
+    <div className="zestiq-app-shell min-h-screen overflow-x-clip bg-[#FAF6F1] pb-20 md:pb-0">
 
       {/* ── Desktop navigation ───────────────────────────── */}
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-[264px] flex-col overflow-y-auto bg-[#303A43] text-white shadow-2xl md:flex">
         <Link
           to="/app"
           aria-label="ZestIQ dashboard"
-          className="flex min-h-[88px] items-center border-b border-white/10 px-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F5D62E]"
+          className="flex min-h-[88px] items-center border-b border-white/10 px-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F58220]"
         >
           <ZestIQBrand
             markClassName="h-12 w-12 rounded-2xl"
@@ -135,8 +135,8 @@ export function Layout() {
         <div className="flex flex-1 flex-col px-4 py-5">
           <p className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[0.22em] text-white/40">Workspace</p>
           <nav className="space-y-1">
-            <Link to="/app" className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${location.pathname === '/app' || location.pathname === '/app/dashboard' ? 'bg-[#F5D62E] text-[#303A43] shadow-lg shadow-black/10' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}><LayoutDashboard className="h-[18px] w-[18px] shrink-0" /><span>Dashboard</span></Link>
-            {user?.platformAdmin && <Link to="/app/platform" className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${location.pathname === '/app/platform' ? 'bg-[#F5D62E] text-[#303A43] shadow-lg shadow-black/10' : 'border border-[#F5D62E]/30 bg-[#F5D62E]/10 text-[#F5D62E] hover:bg-[#F5D62E]/20'}`}><Building2 className="h-[18px] w-[18px] shrink-0" /><span>CEO Control Center</span></Link>}
+            <Link to="/app" className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${location.pathname === '/app' || location.pathname === '/app/dashboard' ? 'bg-[#F58220] text-[#303A43] shadow-lg shadow-black/10' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}><LayoutDashboard className="h-[18px] w-[18px] shrink-0" /><span>Dashboard</span></Link>
+            {user?.platformAdmin && <Link to="/app/platform" className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${location.pathname === '/app/platform' ? 'bg-[#F58220] text-[#303A43] shadow-lg shadow-black/10' : 'border border-[#F58220]/30 bg-[#F58220]/10 text-[#F58220] hover:bg-[#F58220]/20'}`}><Building2 className="h-[18px] w-[18px] shrink-0" /><span>CEO Control Center</span></Link>}
           </nav>
 
           {topMenuGroups.map(group => <div key={`desktop-group-${group.label}`} className="mt-5"><div className="mb-2 h-px bg-white/10" /><p className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[0.22em] text-white/40">{group.label}</p><nav className="space-y-1">{group.items.map(({ label, path, icon: Icon }) => {
@@ -145,7 +145,7 @@ export function Layout() {
                 <Link
                   key={`desktop-${path}`}
                   to={path}
-                  className={`flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${active ? 'bg-[#F5D62E] text-[#303A43]' : 'text-white/65 hover:bg-white/8 hover:text-white'}`}
+                  className={`flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${active ? 'bg-[#F58220] text-[#303A43]' : 'text-white/65 hover:bg-white/8 hover:text-white'}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span>{label}</span>
@@ -159,7 +159,7 @@ export function Layout() {
               onClick={() => navigate('/app/account')}
               className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left transition hover:bg-white/10"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F5D62E] text-sm font-black text-[#303A43]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F58220] text-sm font-black text-[#303A43]">
                 {(user?.name || 'Z').trim().charAt(0).toUpperCase()}
               </span>
               <span className="min-w-0 flex-1">
@@ -177,7 +177,7 @@ export function Layout() {
         <div className="flex min-w-0 flex-1 items-center gap-3 pr-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDD6C6] bg-white shadow-sm transition hover:border-[#F5D62E] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E]" aria-label="Menu">
+              <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDD6C6] bg-white shadow-sm transition hover:border-[#F58220] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F58220]" aria-label="Menu">
                 <span className="flex flex-col gap-[5px]">
                   <span className="block h-[2.5px] w-5 rounded-full bg-[#303A43]" />
                   <span className="block h-[2.5px] w-5 rounded-full bg-[#303A43]" />
@@ -188,7 +188,7 @@ export function Layout() {
             <DropdownMenuContent align="start" className="mt-1 w-56 rounded-2xl border-0 bg-white shadow-2xl">
               <div className="border-b border-gray-100 px-3 py-3"><p className="text-sm font-bold text-gray-900">{accountName || 'zestIQ Account'}</p><p className="mt-0.5 text-xs text-gray-400">{user?.name || 'Team Member'}</p></div>
               <div className="py-1">
-                {user?.platformAdmin && <DropdownMenuItem onClick={() => navigate('/app/platform')} className="mx-1 rounded-lg bg-[#FEF9C3]/60 font-semibold"><Building2 className="mr-2.5 h-4 w-4 text-[#A16207]" />CEO Control Center</DropdownMenuItem>}
+                {user?.platformAdmin && <DropdownMenuItem onClick={() => navigate('/app/platform')} className="mx-1 rounded-lg bg-[#FEF9C3]/60 font-semibold"><Building2 className="mr-2.5 h-4 w-4 text-[#F58220]" />CEO Control Center</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => navigate('/app/account')} className="mx-1 rounded-lg"><User className="mr-2.5 h-4 w-4 text-gray-400" />Account</DropdownMenuItem>
                 {user?.role === 'Owner' && <><DropdownMenuItem onClick={() => navigate('/app/users')} className="mx-1 rounded-lg"><Users className="mr-2.5 h-4 w-4 text-gray-400" />Users & Usage</DropdownMenuItem><DropdownMenuItem onClick={() => navigate('/app/payment-method')} className="mx-1 rounded-lg"><CreditCard className="mr-2.5 h-4 w-4 text-gray-400" />Subscription & Billing</DropdownMenuItem></>}
               </div>
@@ -216,7 +216,7 @@ export function Layout() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <select
-            className="h-10 w-36 min-w-0 rounded-xl border border-[#DDD6C6] bg-white px-3 text-sm font-semibold text-[#303A43] shadow-sm outline-none focus:border-[#F5D62E] focus:ring-2 focus:ring-[#F5D62E]/20 lg:w-48"
+            className="h-10 w-36 min-w-0 rounded-xl border border-[#DDD6C6] bg-white px-3 text-sm font-semibold text-[#303A43] shadow-sm outline-none focus:border-[#F58220] focus:ring-2 focus:ring-[#F58220]/20 lg:w-48"
             value={activeLocationId ?? ''}
             onChange={(event) => switchLocation(event.target.value)}
             aria-label="Active location"
@@ -225,11 +225,11 @@ export function Layout() {
           </select>
           <button
             onClick={() => navigate('/app/notifications')}
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDD6C6] bg-white text-[#303A43] shadow-sm transition hover:border-[#F5D62E]"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDD6C6] bg-white text-[#303A43] shadow-sm transition hover:border-[#F58220]"
             aria-label="Notifications"
           >
             <Bell className="h-[18px] w-[18px]" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-[#F5D62E]" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-[#F58220]" />
           </button>
         </div>
       </header>
@@ -261,7 +261,7 @@ export function Layout() {
               </div>
               <div className="py-1">
                 {user?.platformAdmin && (
-                  <DropdownMenuItem onClick={() => navigate('/app/platform')} className="rounded-lg mx-1 bg-[#FEF9C3]/60 font-semibold"><Building2 className="w-4 h-4 mr-2.5 text-[#A16207]" />CEO Control Center</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/app/platform')} className="rounded-lg mx-1 bg-[#FEF9C3]/60 font-semibold"><Building2 className="w-4 h-4 mr-2.5 text-[#F58220]" />CEO Control Center</DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => navigate('/app/account')}      className="rounded-lg mx-1"><User     className="w-4 h-4 mr-2.5 text-gray-400" />Account</DropdownMenuItem>
                 {user?.role === 'Owner' && (
@@ -301,7 +301,7 @@ export function Layout() {
           </DropdownMenu>
 
           {/* CENTER — ZestIQ logo + wordmark */}
-          <Link to="/app" aria-label="ZestIQ dashboard" className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5D62E]">
+          <Link to="/app" aria-label="ZestIQ dashboard" className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F58220]">
             <ZestIQBrand wordmarkClassName="text-[21px] text-[#303A43]" />
           </Link>
 
@@ -312,7 +312,7 @@ export function Layout() {
             aria-label="Notifications"
           >
             <Bell className="w-5 h-5" style={{ color: '#303A43' }} />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 border-2" style={{ borderColor: '#F5D62E' }} />
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 border-2" style={{ borderColor: '#F58220' }} />
           </button>
         </div>
 
@@ -407,8 +407,8 @@ export function Layout() {
                 to={path}
                 className={`relative flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition-all duration-150 ${active ? 'text-[#303A43]' : 'text-gray-400'}`}
               >
-                {active && <div className="absolute inset-0 rounded-xl" style={{ background: 'rgba(245,193,14,0.18)' }} />}
-                {active && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[3px] rounded-full" style={{ background: '#F5D62E' }} />}
+                {active && <div className="absolute inset-0 rounded-xl" style={{ background: 'rgba(255, 152, 31, 0.18)' }} />}
+                {active && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[3px] rounded-full" style={{ background: '#F58220' }} />}
                 <Icon className={`relative z-10 w-5 h-5 mb-0.5 ${active ? 'stroke-[2.5]' : ''}`} />
                 <span className={`relative z-10 text-[10px] leading-tight ${active ? 'font-bold' : 'font-medium'}`}>{label}</span>
               </Link>

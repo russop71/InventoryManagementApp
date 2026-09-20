@@ -52,7 +52,7 @@ import {
 } from '../utils/inventoryCountWorkflow.js';
 import { convertQuantity } from '../utils/unitConversion';
 
-const Y = '#F5D62E';
+const Y = '#F58220';
 const D = '#303A43';
 
 import { stockLevel, STOCK_LEVELS } from '../utils/stockLevels.js';
@@ -397,10 +397,10 @@ export function Inventory() {
             <button
               type="button"
               onClick={() => navigate(`/app/inventory/counts/${activeDraftCount.id}`)}
-              className="mt-3 flex w-full flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-left sm:flex-row sm:items-center sm:justify-between"
+              className="mt-3 flex w-full flex-col gap-2 rounded-2xl border border-lime-200 bg-lime-50 p-3 text-left sm:flex-row sm:items-center sm:justify-between"
             >
-              <div><p className="text-sm font-black text-amber-950">Inventory count in progress</p><p className="mt-1 text-xs text-amber-800">{activeDraftCount.description} · {summarizeInventoryCount(activeDraftCount).completedItems}/{summarizeInventoryCount(activeDraftCount).totalItems} items counted</p></div>
-              <span className="shrink-0 text-xs font-black text-amber-900 underline">Resume where you left off</span>
+              <div><p className="text-sm font-black text-[#F58220]">Inventory count in progress</p><p className="mt-1 text-xs text-[#F58220]">{activeDraftCount.description} · {summarizeInventoryCount(activeDraftCount).completedItems}/{summarizeInventoryCount(activeDraftCount).totalItems} items counted</p></div>
+              <span className="shrink-0 text-xs font-black text-[#F58220] underline">Resume where you left off</span>
             </button>
           )}
 
@@ -488,9 +488,9 @@ export function Inventory() {
                         setSelectedCountId(current => (current === row.id ? '' : row.id));
                       }
                     }}
-                    className={`grid w-full gap-2 px-3 py-3 text-left text-sm transition-colors sm:grid-cols-[0.9fr_1.4fr_0.8fr_0.8fr_auto] sm:items-center ${isActive ? 'bg-amber-50/70' : 'hover:bg-gray-50'}`}
+                    className={`grid w-full gap-2 px-3 py-3 text-left text-sm transition-colors sm:grid-cols-[0.9fr_1.4fr_0.8fr_0.8fr_auto] sm:items-center ${isActive ? 'bg-lime-50/70' : 'hover:bg-gray-50'}`}
                   >
-                    <div><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${finalized ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>{finalized ? <CheckCircle2 className="h-3 w-3" /> : <Clock3 className="h-3 w-3" />}{finalized ? 'Finalized' : 'Draft'}</span></div>
+                    <div><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${finalized ? 'bg-emerald-100 text-[#F58220]' : 'bg-lime-100 text-[#F58220]'}`}>{finalized ? <CheckCircle2 className="h-3 w-3" /> : <Clock3 className="h-3 w-3" />}{finalized ? 'Finalized' : 'Draft'}</span></div>
                     <div className="min-w-0"><p className="break-words font-black text-gray-900">{row.description}</p><p className="mt-1 text-xs text-gray-500">{row.countDate}{finalized && row.finalizedBy ? ` · ${row.finalizedBy}` : ''}</p></div>
                     <div className="sm:text-right"><p className="font-black text-gray-800">{rowSummary.completedItems}/{rowSummary.totalItems}</p><p className="text-[10px] text-gray-500">{rowSummary.progressPercent.toFixed(0)}% counted</p></div>
                     <div className="font-semibold text-gray-700 sm:text-right" style={{ fontFamily: 'var(--font-mono)' }}>{fmtVal(rowSummary.countedValue)}</div>
@@ -521,7 +521,7 @@ export function Inventory() {
                     <button key={item.itemId} type="button" onClick={() => navigate(`/app/inventory/${item.itemId}`)} className="w-full p-4 text-left">
                       <p className="break-words text-sm font-black leading-snug text-slate-900">{item.name}</p>
                       <p className="mt-1 break-words text-[11px] text-slate-500">{item.storageArea || 'Unassigned'} · {item.unit}</p>
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Expected</p><p className="mt-1 font-black">{item.hypothetical.toFixed(2)}</p></div><div><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Counted</p><p className="mt-1 font-black">{item.counted.toFixed(2)}</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Variance</p><p className={`mt-1 font-black ${dollarVariance < 0 ? 'text-rose-700' : dollarVariance > 0 ? 'text-emerald-700' : 'text-slate-600'}`}>{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} · {dollarVariance > 0 ? '+' : ''}{fmtVal(dollarVariance)}</p></div></div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Expected</p><p className="mt-1 font-black">{item.hypothetical.toFixed(2)}</p></div><div><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Counted</p><p className="mt-1 font-black">{item.counted.toFixed(2)}</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Variance</p><p className={`mt-1 font-black ${dollarVariance < 0 ? 'text-rose-700' : dollarVariance > 0 ? 'text-[#F58220]' : 'text-slate-600'}`}>{quantityVariance > 0 ? '+' : ''}{quantityVariance.toFixed(2)} · {dollarVariance > 0 ? '+' : ''}{fmtVal(dollarVariance)}</p></div></div>
                     </button>
                   );
                 })}
@@ -559,7 +559,7 @@ export function Inventory() {
                           <div className="text-right text-sm font-semibold text-gray-500">{Number(item.previousCounted ?? item.hypothetical).toFixed(2)}</div>
                           <div className="text-right text-sm font-semibold text-gray-500">{item.hypothetical.toFixed(2)}</div>
                           <div className="text-right text-sm font-semibold text-gray-900">{item.counted.toFixed(2)}</div>
-                          <div className={`text-right text-sm font-semibold ${variance < 0 ? 'text-rose-600' : variance === 0 ? 'text-gray-600' : 'text-emerald-600'}`}>
+                          <div className={`text-right text-sm font-semibold ${variance < 0 ? 'text-rose-600' : variance === 0 ? 'text-gray-600' : 'text-[#F58220]'}`}>
                             {variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)}
                           </div>
                           <div className="text-right text-sm font-semibold text-gray-700" style={{ fontFamily: 'var(--font-mono)' }}>{fmtVal(item.value)}</div>
@@ -593,7 +593,7 @@ export function Inventory() {
             onClick={() => setShowFilters(open => !open)}
             aria-expanded={showFilters}
             aria-controls="inventory-filters"
-            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-white transition ${showFilters || activeFilterCount > 0 ? 'border-[#F5D62E] ring-2 ring-[#F5D62E]/20' : 'border-gray-200 hover:border-gray-300'}`}
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-white transition ${showFilters || activeFilterCount > 0 ? 'border-[#F58220] ring-2 ring-[#F58220]/20' : 'border-gray-200 hover:border-gray-300'}`}
             aria-label="Filter inventory"
           >
             <Filter className="h-4 w-4 text-gray-600" />
@@ -623,19 +623,19 @@ export function Inventory() {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="text-xs font-bold text-gray-600">Category
-                <select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F5D62E]">
+                <select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F58220]">
                   <option value="all">All categories</option>
                   {filterOptions.categories.map(category => <option key={category} value={category}>{category}</option>)}
                 </select>
               </label>
               <label className="text-xs font-bold text-gray-600">Supplier
-                <select value={supplierFilter} onChange={event => setSupplierFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F5D62E]">
+                <select value={supplierFilter} onChange={event => setSupplierFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F58220]">
                   <option value="all">All suppliers</option>
                   {filterOptions.suppliers.map(supplier => <option key={supplier} value={supplier}>{supplier}</option>)}
                 </select>
               </label>
               <label className="text-xs font-bold text-gray-600">Storage area
-                <select value={storageAreaFilter} onChange={event => setStorageAreaFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F5D62E]">
+                <select value={storageAreaFilter} onChange={event => setStorageAreaFilter(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-[#303A43] outline-none focus:border-[#F58220]">
                   <option value="all">All storage areas</option>
                   {filterOptions.storageAreas.map(area => <option key={area} value={area}>{area}</option>)}
                 </select>
@@ -677,7 +677,7 @@ export function Inventory() {
           <label className="flex items-center gap-1 text-[11px] font-bold text-gray-500">
             <SlidersHorizontal className="h-3 w-3 shrink-0" />
             <span className="sr-only">Sort inventory</span>
-            <select aria-label="Sort inventory" value={sortBy} onChange={event => setSortBy(event.target.value as InventorySort)} className="max-w-[132px] cursor-pointer rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-amber-400">
+            <select aria-label="Sort inventory" value={sortBy} onChange={event => setSortBy(event.target.value as InventorySort)} className="max-w-[132px] cursor-pointer rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-[#F58220]">
               <option value="name-asc">Name: A–Z</option>
               <option value="name-desc">Name: Z–A</option>
               <option value="status">Low stock first</option>
@@ -693,18 +693,18 @@ export function Inventory() {
       </div>
 
       {selectedItemIds.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 border-b border-lime-100 bg-lime-50 px-4 py-3">
           <p className="mr-auto text-sm font-black text-slate-900">{selectedItemIds.length} selected</p>
           {selectedItemIds.length > 1 && (
             <>
               <label className="text-xs font-bold text-slate-600">Keep
-                <select value={mergeTargetId || selectedItemIds[0]} onChange={event => setMergeTargetId(event.target.value)} className="ml-2 rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-900">
+                <select value={mergeTargetId || selectedItemIds[0]} onChange={event => setMergeTargetId(event.target.value)} className="ml-2 rounded-lg border border-lime-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-900">
                   {selectedInventoryItems.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
             </>
           )}
-          <button type="button" onClick={requestMergeSelected} disabled={selectedItemIds.length < 2 || isMergingItems} title={selectedItemIds.length < 2 ? 'Select at least two items to merge' : 'Merge selected items'} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"><GitMerge className="h-3.5 w-3.5" />{isMergingItems ? 'Saving…' : 'Merge items'}</button>
+          <button type="button" onClick={requestMergeSelected} disabled={selectedItemIds.length < 2 || isMergingItems} title={selectedItemIds.length < 2 ? 'Select at least two items to merge' : 'Merge selected items'} className="inline-flex items-center gap-1.5 rounded-xl border border-[#F58220] bg-white px-3 py-2 text-xs font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"><GitMerge className="h-3.5 w-3.5" />{isMergingItems ? 'Saving…' : 'Merge items'}</button>
           <button type="button" onClick={() => setBulkActionPending('delete')} disabled={isDeletingItems} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white disabled:cursor-wait disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" />{isDeletingItems ? 'Saving…' : 'Delete selected'}</button>
           <button type="button" onClick={() => { setSelectedItemIds([]); setMergeTargetId(''); }} className="px-2 py-2 text-xs font-bold text-slate-600 underline">Clear</button>
         </div>
@@ -793,63 +793,63 @@ export function Inventory() {
           <form noValidate onSubmit={event => { event.preventDefault(); handleAddItem(); }} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold text-slate-700 sm:col-span-2">Item name<span aria-hidden="true"> *</span>
-                <input autoFocus aria-label="Item name" aria-required="true" value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Example: Fresh basil" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input autoFocus aria-label="Item name" aria-required="true" value={newItem.name} onChange={event => { setNewItem(prev => ({ ...prev, name: event.target.value })); setNewItemError(''); }} placeholder="Example: Fresh basil" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <InventoryOptionSelect label="Category" required value={newItem.category} options={[...categories.map(category => category.name), ...filterOptions.categories]} onChange={category => setNewItem(prev => ({ ...prev, category }))} />
               <InventoryOptionSelect label="Supplier" required value={newItem.supplier} options={[...suppliers.map(supplier => supplier.name), ...filterOptions.suppliers]} onChange={supplier => setNewItem(prev => ({ ...prev, supplier }))} />
               <label className="text-sm font-bold text-slate-700">SKU
-                <input value={newItem.sku} onChange={event => setNewItem(prev => ({ ...prev, sku: event.target.value }))} placeholder="Optional" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input value={newItem.sku} onChange={event => setNewItem(prev => ({ ...prev, sku: event.target.value }))} placeholder="Optional" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Vendor item code
-                <input value={newItem.vendorItemCode} onChange={event => setNewItem(prev => ({ ...prev, vendorItemCode: event.target.value }))} placeholder="Optional" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input value={newItem.vendorItemCode} onChange={event => setNewItem(prev => ({ ...prev, vendorItemCode: event.target.value }))} placeholder="Optional" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700 sm:col-span-2">Invoice aliases
-                <input value={newItem.invoiceAliases} onChange={event => setNewItem(prev => ({ ...prev, invoiceAliases: event.target.value }))} placeholder="Names this item may use on supplier invoices" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input value={newItem.invoiceAliases} onChange={event => setNewItem(prev => ({ ...prev, invoiceAliases: event.target.value }))} placeholder="Names this item may use on supplier invoices" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <InventoryOptionSelect label="Storage area" value={newItem.storageArea} options={storageAreas} onChange={storageArea => setNewItem(prev => ({ ...prev, storageArea }))} />
               <InventoryOptionSelect label="Unit" required value={newItem.unit} options={unitOptions} onChange={unit => setNewItem(prev => ({ ...prev, unit }))} />
               <label className="text-sm font-bold text-slate-700">On hand
-                <input type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" value={newItem.currentStock} onChange={event => setNewItem(prev => ({ ...prev, currentStock: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Par level
-                <input type="number" min="0" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" value={newItem.parLevel} onChange={event => setNewItem(prev => ({ ...prev, parLevel: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Unit cost
-                <input type="number" min="0" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} placeholder="0.00" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.unitCost} onChange={event => setNewItem(prev => ({ ...prev, unitCost: event.target.value }))} placeholder="0.00" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Tax rate (%)
-                <input type="number" min="0" step="0.01" value={newItem.taxRate} onChange={event => setNewItem(prev => ({ ...prev, taxRate: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.taxRate} onChange={event => setNewItem(prev => ({ ...prev, taxRate: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Reorder point
-                <input type="number" min="0" step="0.01" value={newItem.reorderPoint} onChange={event => setNewItem(prev => ({ ...prev, reorderPoint: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.reorderPoint} onChange={event => setNewItem(prev => ({ ...prev, reorderPoint: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Minimum order quantity
-                <input type="number" min="0" step="0.01" value={newItem.minimumOrderQty} onChange={event => setNewItem(prev => ({ ...prev, minimumOrderQty: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.minimumOrderQty} onChange={event => setNewItem(prev => ({ ...prev, minimumOrderQty: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Lead time (days)
-                <input type="number" min="0" step="1" value={newItem.leadTimeDays} onChange={event => setNewItem(prev => ({ ...prev, leadTimeDays: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="1" value={newItem.leadTimeDays} onChange={event => setNewItem(prev => ({ ...prev, leadTimeDays: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Target stock days
-                <input type="number" min="0" step="1" value={newItem.targetStockDays} onChange={event => setNewItem(prev => ({ ...prev, targetStockDays: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="1" value={newItem.targetStockDays} onChange={event => setNewItem(prev => ({ ...prev, targetStockDays: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Pack size
-                <input type="number" min="0" step="0.01" value={newItem.packSize} onChange={event => setNewItem(prev => ({ ...prev, packSize: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.packSize} onChange={event => setNewItem(prev => ({ ...prev, packSize: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <InventoryOptionSelect label="Pack unit" value={newItem.packUnit} options={unitOptions} onChange={packUnit => setNewItem(prev => ({ ...prev, packUnit }))} />
               <label className="text-sm font-bold text-slate-700">Units per pack
-                <input type="number" min="0" step="0.01" value={newItem.unitsPerPack} onChange={event => setNewItem(prev => ({ ...prev, unitsPerPack: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.unitsPerPack} onChange={event => setNewItem(prev => ({ ...prev, unitsPerPack: event.target.value }))} placeholder="1" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Yield (%)
-                <input type="number" min="0" step="0.01" value={newItem.yieldPercent} onChange={event => setNewItem(prev => ({ ...prev, yieldPercent: event.target.value }))} placeholder="100" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.yieldPercent} onChange={event => setNewItem(prev => ({ ...prev, yieldPercent: event.target.value }))} placeholder="100" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Waste (%)
-                <input type="number" min="0" step="0.01" value={newItem.wastePercent} onChange={event => setNewItem(prev => ({ ...prev, wastePercent: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="number" min="0" step="0.01" value={newItem.wastePercent} onChange={event => setNewItem(prev => ({ ...prev, wastePercent: event.target.value }))} placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700">Last counted
-                <input type="date" value={newItem.lastCountedAt} onChange={event => setNewItem(prev => ({ ...prev, lastCountedAt: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-amber-400" />
+                <input type="date" value={newItem.lastCountedAt} onChange={event => setNewItem(prev => ({ ...prev, lastCountedAt: event.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-base outline-none focus:border-[#F58220]" />
               </label>
               <label className="text-sm font-bold text-slate-700 sm:col-span-2">Notes
-                <textarea value={newItem.notes} onChange={event => setNewItem(prev => ({ ...prev, notes: event.target.value }))} placeholder="Storage, handling, or substitution notes" className="mt-1 min-h-24 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-amber-400" />
+                <textarea value={newItem.notes} onChange={event => setNewItem(prev => ({ ...prev, notes: event.target.value }))} placeholder="Storage, handling, or substitution notes" className="mt-1 min-h-24 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-[#F58220]" />
               </label>
             </div>
             {newItemError && <p role="alert" className="text-sm font-semibold text-red-700">{newItemError}</p>}

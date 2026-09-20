@@ -24,7 +24,7 @@ import { apiRequest } from '../utils/api';
 import { OrderBufferControl } from '../components/OrderBufferControl';
 import { sortRecordsNewestFirst } from '../utils/invoiceWorkflow.js';
 
-const Y = '#F5D62E';
+const Y = '#F58220';
 const D = '#303A43';
 
 type OrderStatus = 'pending' | 'ordered' | 'received' | 'cancelled';
@@ -600,8 +600,8 @@ export function Orders() {
     switch (priority) {
       case 'critical': return 'bg-red-500';
       case 'high': return 'bg-orange-500';
-      case 'medium': return 'bg-yellow-500';
-      default: return 'bg-green-500';
+      case 'medium': return 'bg-[#F58220]';
+      default: return 'bg-[#F58220]';
     }
   };
 
@@ -609,7 +609,7 @@ export function Orders() {
     switch (priority) {
       case 'critical': return 'bg-red-100 text-red-800 border-red-300';
       case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
-      default: return 'bg-green-100 text-green-800 border-green-300';
+      default: return 'bg-green-100 text-[#F58220] border-[#F58220]';
     }
   };
 
@@ -880,7 +880,7 @@ export function Orders() {
                           <p className="text-sm font-semibold text-gray-900">{suggestion.suggestedQuantity} {suggestion.unit}</p>
                           <p className="text-xs text-gray-500">${suggestion.totalCost.toFixed(2)}</p>
                           {suggestion.bufferPercent !== undefined && (
-                            <div className="mt-1 max-w-48 text-[10px] text-amber-700">
+                            <div className="mt-1 max-w-48 text-[10px] text-[#F58220]">
                               <p className="font-bold">{suggestion.bufferPercent}% buffer: +{Number((suggestion.bufferQuantity || 0).toFixed(3))} {suggestion.unit} before rounding</p>
                               {suggestion.bufferPercent > 0 && suggestion.suggestedQuantity === suggestion.baseSuggestedQuantity && (
                                 <p>Order quantity unchanged after rounding or minimum order.</p>
@@ -1095,7 +1095,7 @@ export function Orders() {
           <DialogHeader>
             <DialogTitle>Supplier email drafts ({draftEmails.length})</DialogTitle>
           </DialogHeader>
-          {user?.email?.trim().toLowerCase() === 'demo@zestiq.com' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Demo only — no emails will be sent. You can edit, copy, or download these drafts.</p>}
+          {user?.email?.trim().toLowerCase() === 'demo@zestiq.com' && <p className="rounded-lg bg-lime-50 p-3 text-sm text-[#F58220]">Demo only — no emails will be sent. You can edit, copy, or download these drafts.</p>}
           <div className="space-y-3">
             {draftEmails.length === 0 ? (
               <p className="text-sm text-gray-500">No supplier drafts available yet.</p>
@@ -1118,7 +1118,7 @@ export function Orders() {
                       size="sm"
                       disabled={isSent || isSending}
                       onClick={() => void openEmailClient(email)}
-                      className={isSent ? 'bg-green-700 text-white hover:bg-green-700' : ''}
+                      className={isSent ? 'bg-[#F58220] text-white hover:bg-[#F58220]' : ''}
                     >
                       {isSent
                         ? <><Check className="mr-1.5 h-3.5 w-3.5" /> Sent</>
@@ -1338,7 +1338,7 @@ export function Orders() {
                     </Button>
                   )}
                   {detailOrder.status === 'received' && (
-                    <div className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-green-700 font-bold text-sm bg-green-50">
+                    <div className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[#F58220] font-bold text-sm bg-green-50">
                       <CheckCircle2 className="w-4 h-4" /> Order Complete
                     </div>
                   )}

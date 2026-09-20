@@ -27,6 +27,6 @@ export function PrintCountSheet({ entries, areaOrder = [] }: { entries: Inventor
       <div className="flex gap-4"><button type="button" onClick={() => setSelected(areas)} className="underline">Select all</button><button type="button" onClick={() => setSelected([])} className="underline">Clear</button></div>
       <fieldset className="grid gap-3"><legend className="mb-2 font-semibold">Storage areas</legend>{areas.map(area => <label key={area} className="flex items-center gap-2"><input type="checkbox" checked={selected.includes(area)} onChange={e => setSelected(current => e.target.checked ? [...current, area] : current.filter(a => a !== area))} />{area} ({entries.filter(e => countArea(e) === area).length} items)</label>)}</fieldset>
       <p className="text-sm text-gray-600">Open the downloaded file in Excel to print it. After counting, use Start count or Resume count to enter quantities online.</p>
-      <button type="button" disabled={busy || !selected.some(a => areas.includes(a))} onClick={download} className="rounded-xl bg-[#F5D62E] px-4 py-3 font-bold disabled:opacity-50">{busy ? 'Preparing Excel file…' : 'Download Excel (.xlsx)'}</button>
+      <button type="button" disabled={busy || !selected.some(a => areas.includes(a))} onClick={download} className="rounded-xl bg-[#F58220] px-4 py-3 font-bold disabled:opacity-50">{busy ? 'Preparing Excel file…' : 'Download Excel (.xlsx)'}</button>
     </DialogContent></Dialog></>;
 }

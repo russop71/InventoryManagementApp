@@ -4,7 +4,7 @@ export function RouteError() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#F7F8FA] px-5 py-12 text-[#303A43]">
       <section className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-amber-100 text-amber-800">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-lime-100 text-[#F58220]">
           <AlertTriangle className="h-7 w-7" aria-hidden="true" />
         </div>
         <h1 className="mt-5 text-2xl font-black tracking-tight">We couldn’t open this page</h1>

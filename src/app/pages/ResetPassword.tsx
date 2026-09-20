@@ -55,10 +55,10 @@ export function ResetPassword() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F5D62E] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#F58220] p-4">
       <Card className="w-full max-w-md border-0 shadow-2xl">
         <CardHeader>
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#303A43] text-[#F5D62E]">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#303A43] text-[#F58220]">
             <KeyRound className="h-6 w-6" />
           </div>
           <CardTitle>Choose a new password</CardTitle>
@@ -97,7 +97,7 @@ export function ResetPassword() {
             </form>
           ) : (
             <div className="space-y-4">
-              <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="rounded-xl bg-lime-50 p-3 text-sm text-[#F58220]">
                 This link is missing or expired. Ask your company owner to send a new password-reset email.
               </p>
               <Button type="button" variant="outline" className="w-full" onClick={() => navigate('/login')}>

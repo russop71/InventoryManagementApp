@@ -18,7 +18,7 @@ export function Help() {
 
   const categories = [
     { name: 'Getting Started', icon: Lightbulb, color: 'bg-[#FEF9C3] text-[#303A43]', articles: 5, route: '/app/onboarding' },
-    { name: 'Inventory Management', icon: Book, color: 'bg-green-100 text-green-900', articles: 8, route: '/app/inventory' },
+    { name: 'Inventory Management', icon: Book, color: 'bg-green-100 text-[#F58220]', articles: 8, route: '/app/inventory' },
     { name: 'AI & Forecasting', icon: Zap, color: 'bg-purple-100 text-purple-900', articles: 6, route: '/app/forecasting' },
     { name: 'Integrations', icon: FileText, color: 'bg-orange-100 text-orange-900', articles: 4, route: '/app/integrations' }
   ];

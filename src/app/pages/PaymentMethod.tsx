@@ -77,7 +77,7 @@ function formatFrequency(frequency: BillingDetails['billingFrequency']) {
 }
 
 function statusClass(status: string) {
-  if (status === 'active') return 'bg-green-100 text-green-800';
+  if (status === 'active') return 'bg-green-100 text-[#F58220]';
   if (status === 'past_due' || status === 'unpaid') return 'bg-red-100 text-red-800';
   return 'bg-slate-100 text-slate-700';
 }
@@ -188,9 +188,9 @@ export function PaymentMethod() {
 
   if (!isOwner) {
     return (
-      <Card className="border-amber-200 bg-amber-50">
+      <Card className="border-lime-200 bg-lime-50">
         <CardContent className="py-8">
-          <LockKeyhole className="mb-3 h-8 w-8 text-amber-700" />
+          <LockKeyhole className="mb-3 h-8 w-8 text-[#F58220]" />
           <h2 className="text-xl font-bold text-slate-950">Company owner access required</h2>
           <p className="mt-2 text-sm text-slate-600">Only the company Owner can see subscriptions, payment history, payment methods, and renewal dates.</p>
         </CardContent>
@@ -219,17 +219,17 @@ export function PaymentMethod() {
       </div>
 
       {billing && !billing.configured && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="py-4 text-sm text-amber-900">
+        <Card className="border-lime-200 bg-lime-50">
+          <CardContent className="py-4 text-sm text-[#F58220]">
             Secure billing screens are ready, but Stripe keys and plan price IDs still need to be connected before customers can subscribe.
           </CardContent>
         </Card>
       )}
 
       {billing?.approvalStatus === 'pending_ceo_approval' && (
-        <Card className="border-[#F5D62E] bg-[#FFFCED]">
+        <Card className="border-[#F58220] bg-[#FFFCED]">
           <CardContent className="flex items-start gap-3 py-5">
-            <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#A16207]" />
+            <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#F58220]" />
             <div>
               <p className="font-bold text-[#303A43]">Payment received — final approval pending</p>
               <p className="mt-1 text-sm leading-6 text-slate-600">Your account and payment details are set. ZestIQ’s CEO can now review and approve the workspace. You can return here at any time to check its status.</p>
@@ -288,7 +288,7 @@ export function PaymentMethod() {
               <p className="font-semibold text-slate-950">Current commitment ends {formatDate(billing.commitmentEndsAt || null)}</p>
               {billing.status === 'trialing' && <p className="mt-1">Email hello@zestiq.ca before {billing.trialEndsAt ? new Date(billing.trialEndsAt).toLocaleString() : 'the trial expires'} to cancel without charge or a paid commitment.</p>}
               {billing.nonRenewalEffectiveAt
-                ? <p className="mt-1 text-amber-800">Non-renewal is scheduled. Service and monthly billing continue through {formatDate(billing.nonRenewalEffectiveAt)}.</p>
+                ? <p className="mt-1 text-[#F58220]">Non-renewal is scheduled. Service and monthly billing continue through {formatDate(billing.nonRenewalEffectiveAt)}.</p>
                 : <p className="mt-1">New subscriptions continue month-to-month after the paid year, with 30 days’ cancellation notice by email. You may give notice before the term ends; the paid commitment still applies. Any separate signed agreement governs your existing subscription.</p>}
             </div>
             {!billing.nonRenewalEffectiveAt && <Button asChild variant="outline"><a href="mailto:hello@zestiq.ca?subject=ZestIQ%20subscription%20cancellation">Email cancellation request</a></Button>}
@@ -304,10 +304,10 @@ export function PaymentMethod() {
           {PLANS.map(plan => {
             const current = billing?.plan === plan.id;
             return (
-              <div key={plan.id} className={`rounded-2xl border-2 p-4 ${current ? 'border-[#F5D62E] bg-[#FEFCE8]' : 'border-slate-200'}`}>
+              <div key={plan.id} className={`rounded-2xl border-2 p-4 ${current ? 'border-[#F58220] bg-[#FEFCE8]' : 'border-slate-200'}`}>
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-bold text-slate-950">{plan.name}</p>
-                  {current && <Badge className="bg-[#F5D62E] text-[#303A43]"><Check className="mr-1 h-3 w-3" />Current</Badge>}
+                  {current && <Badge className="bg-[#F58220] text-[#303A43]"><Check className="mr-1 h-3 w-3" />Current</Badge>}
                 </div>
                 <p className="mt-3 text-2xl font-extrabold text-slate-950">{plan.price}</p>
                 <p className="mt-1 text-sm text-slate-500">{plan.detail}</p>
@@ -325,7 +325,7 @@ export function PaymentMethod() {
                   />
                   <p className="mt-2 text-xs text-slate-500">The first location is CAD $249.99/month. Each additional location is CAD $199.99/month.</p>
                 </div>
-                <label className={`mt-3 flex items-start gap-3 rounded-xl border-2 p-4 transition-colors ${includeZestEmployee ? 'border-[#F5D62E] bg-[#FFFCED]' : 'border-slate-200 bg-white'} ${current ? 'cursor-default' : 'cursor-pointer'}`}>
+                <label className={`mt-3 flex items-start gap-3 rounded-xl border-2 p-4 transition-colors ${includeZestEmployee ? 'border-[#F58220] bg-[#FFFCED]' : 'border-slate-200 bg-white'} ${current ? 'cursor-default' : 'cursor-pointer'}`}>
                   <Checkbox
                     checked={includeZestEmployee}
                     onCheckedChange={checked => setZestEmployeeEnabled(checked === true)}
@@ -350,7 +350,7 @@ export function PaymentMethod() {
                     CAD ${monthlyTotal.toFixed(2)}/month + applicable tax
                   </p>
                 </div>
-                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
+                <div className="mt-4 rounded-xl border border-lime-200 bg-lime-50 p-3 text-sm text-slate-700">
                   <p className="font-bold text-slate-950">30-day free trial, then a 12-month paid commitment</p>
                   <p className="mt-1 leading-5">Provide payment details upfront. No subscription fee is charged during the trial. Email hello@zestiq.ca before the trial expires to cancel without charge or commitment.</p>
                   <p className="mt-2 leading-5">Otherwise, your first monthly payment plus applicable tax is charged when the trial ends, starting a separate full 12-month paid term. The trial does not count toward that year.</p>
@@ -369,9 +369,9 @@ export function PaymentMethod() {
                 >
                   {current ? 'Current subscription' : 'Start 30-day free trial'}
                 </Button>
-                {!billing?.configured && billing?.checkoutUnavailableReason && <p className="mt-2 text-sm text-amber-800">{billing.checkoutUnavailableReason}</p>}
+                {!billing?.configured && billing?.checkoutUnavailableReason && <p className="mt-2 text-sm text-[#F58220]">{billing.checkoutUnavailableReason}</p>}
                 {zestEmployeeEnabled && (!billing?.schedulingPriceConfigured || (locationCount > 1 && !billing?.additionalLocationSchedulingPriceConfigured)) && (
-                  <p className="mt-2 text-xs font-medium text-amber-700">Scheduling checkout will be available once its Stripe price{locationCount > 1 ? 's are' : ' is'} connected.</p>
+                  <p className="mt-2 text-xs font-medium text-[#F58220]">Scheduling checkout will be available once its Stripe price{locationCount > 1 ? 's are' : ' is'} connected.</p>
                 )}
               </div>
             );

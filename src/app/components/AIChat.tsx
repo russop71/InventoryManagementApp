@@ -132,14 +132,14 @@ export function AIChat() {
         className="fixed bottom-24 right-4 z-30 h-12 w-12 rounded-full bg-[#303A43] px-0 text-white shadow-lg hover:bg-[#1E293B] sm:h-14 sm:w-auto sm:px-5"
         aria-label="Open zestIQ AI assistant"
       >
-        <Sparkles className="h-5 w-5 text-[#F5D62E] sm:mr-2" /> <span className="hidden sm:inline">Ask zestIQ AI</span>
+        <Sparkles className="h-5 w-5 text-[#F58220] sm:mr-2" /> <span className="hidden sm:inline">Ask zestIQ AI</span>
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="flex h-[min(760px,88vh)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden p-0 sm:max-w-xl">
           <DialogHeader className="border-b border-slate-200 bg-[#303A43] px-5 py-4 text-left text-white">
             <DialogTitle className="flex items-center gap-2 text-white">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F5D62E] text-[#303A43]"><Bot className="h-5 w-5" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F58220] text-[#303A43]"><Bot className="h-5 w-5" /></span>
               zestIQ AI Assistant
             </DialogTitle>
             <DialogDescription className="text-white/60">
@@ -172,7 +172,7 @@ export function AIChat() {
                   key={prompt}
                   type="button"
                   onClick={() => void sendMessage(prompt)}
-                  className="shrink-0 rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:border-[#F5D62E] hover:bg-[#FEFCE8]"
+                  className="shrink-0 rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:border-[#F58220] hover:bg-[#FEFCE8]"
                 >
                   {prompt}
                 </button>
@@ -200,7 +200,7 @@ export function AIChat() {
                 rows={2}
                 maxLength={4000}
                 placeholder="Ask about forecasts, ingredient demand, order buffers, inventory or costs…"
-                className="min-h-12 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#F5D62E]"
+                className="min-h-12 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#F58220]"
               />
               <Button type="submit" size="icon" disabled={!input.trim() || isSending} className="h-12 w-12 shrink-0 bg-[#303A43] text-white hover:bg-[#1E293B]">
                 <Send className="h-4 w-4" />
