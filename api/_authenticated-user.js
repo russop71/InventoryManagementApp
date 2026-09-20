@@ -1,5 +1,4 @@
 import { hasProductAccess } from './_launch-controls.js';
-import { requireEnrolledMfa } from './_mfa-policy.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -33,7 +32,6 @@ export async function requireActiveUser(req) {
     },
   }));
   const response = await fetch(
-    // Enforce the same second-factor policy on standalone scanner/email APIs.
     `${SUPABASE_URL}/rest/v1/app_users?auth_user_id=eq.${encodeURIComponent(authUser.id)}&status=eq.Active&select=id,account_id,role`,
     {
       headers: {
@@ -43,7 +41,6 @@ export async function requireActiveUser(req) {
     },
   );
   const users = await readJson(response);
-  requireEnrolledMfa(authUser, token);
   if (!users?.[0]) throw Object.assign(new Error('This account access is inactive'), { status: 403 });
   const accountResponse = await fetch(`${SUPABASE_URL}/rest/v1/accounts?id=eq.${encodeURIComponent(users[0].account_id)}&select=*`, {
     headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` },

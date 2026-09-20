@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -334,11 +333,11 @@ export function Account() {
           <Button
             variant="outline"
             className="w-full justify-start"
-            asChild
+            disabled
+            aria-label="Two-factor authentication is not available yet"
           >
-            <Link to="/mfa">Two-step verification</Link>
+            Two-Factor Authentication — Not available yet
           </Button>
-          <p className="text-sm text-slate-600">Optional for owners and admins. Use an authenticator app to protect your sign-in. No SMS charges.</p>
         </CardContent>
       </Card>
 

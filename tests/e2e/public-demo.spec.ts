@@ -943,42 +943,6 @@ test('builds and saves a POS-informed supplier forecast', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Generate Order' })).toHaveCount(1);
 });
 
-test('optional authenticator setup is accessible and can be cancelled without enrollment', async ({ page }) => {
-  await freshDemoLogin(page);
-  await page.route('**/api/v1/auth/mfa/status', route => route.fulfill({ json: { required: false, verified: false, canEnroll: true, factors: [] } }));
-  await page.route('**/api/v1/auth/mfa/enroll', route => route.fulfill({ json: {
-    id: '10000000-0000-4000-8000-000000000001',
-    qrCode: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100"/></svg>'),
-    uri: 'otpauth://totp/Test?secret=TESTKEY', secret: 'TESTKEY',
-  } }));
-  await page.goto('/app/account');
-  await expect(page.getByText('Account administration is disabled in the public demo.')).toBeVisible();
-  // Exercise the private-account setup UI with mocked authorization, not a real factor.
-  await page.goto('/mfa');
-  await expect(page.getByText(/Setup is optional/)).toBeVisible();
-  await page.getByRole('button', { name: 'Set up authenticator app' }).click();
-  await expect(page.getByAltText('ZestIQ authenticator QR code')).toBeVisible();
-  await page.getByLabel('Six-digit code').fill('123456');
-  await expect(page.getByRole('button', { name: 'Enable two-step verification' })).toBeDisabled();
-  await page.getByRole('checkbox').check();
-  await expect(page.getByRole('button', { name: 'Enable two-step verification' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Back to Account Settings' }).click();
-  await expect(page).toHaveURL(/\/app\/account$/);
-});
-
-test('enabled authenticator requires a code and rejects failed verification', async ({ page }) => {
-  await freshDemoLogin(page);
-  await page.route('**/api/v1/auth/mfa/status', route => route.fulfill({ json: { required: true, verified: false, canEnroll: true, factors: [{ id: '10000000-0000-4000-8000-000000000001', type: 'totp', status: 'verified' }] } }));
-  await page.route('**/api/v1/auth/mfa/verify', route => route.fulfill({ status: 422, json: { error: 'Invalid authenticator code' } }));
-  await page.goto('/mfa');
-  await expect(page.getByRole('button', { name: 'Back to Account Settings' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Set up authenticator app' })).toHaveCount(0);
-  await page.getByLabel('Six-digit code').fill('123456');
-  await page.getByRole('button', { name: 'Verify and continue' }).click();
-  await expect(page.getByText('Invalid authenticator code')).toBeVisible();
-  await expect(page).toHaveURL(new RegExp('/mfa$'));
-});
-
 test('dashboard switches between range averages and total sales', async ({ page }) => {
   await freshDemoLogin(page);
   const mode = page.getByRole('group', { name: 'Sales summary mode', exact: true });
