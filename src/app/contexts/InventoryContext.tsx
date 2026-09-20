@@ -172,6 +172,7 @@ export interface DailyOrder {
 
 export interface InvoiceRecord {
   id: string;
+  createdAt?: string;
   date: string;
   invoiceNumber: string;
   supplier: string;
@@ -1183,6 +1184,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
     const newInvoice: InvoiceRecord = {
       id: `${recordId}-invoice`,
+      createdAt: new Date().toISOString(),
       date: orderInput.date,
       invoiceNumber: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
       supplier: orderInput.supplier || 'Supplier',
@@ -1280,6 +1282,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const newInvoice: InvoiceRecord = {
       ...invoiceInput,
       id: `${Date.now()}-invoice`,
+      createdAt: new Date().toISOString(),
       invoiceNumber: invoiceInput.invoiceNumber || `INV-${Math.floor(100000 + Math.random() * 900000)}`,
     };
 
@@ -1527,6 +1530,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const calculatedTotal = invoiceItems.reduce((sum, item) => sum + item.cost, 0);
     const newInvoice: InvoiceRecord = {
       id: `${Date.now()}-invoice-${Math.random().toString(36).slice(2, 9)}`,
+      createdAt: now,
       date: invoiceInput.date || now,
       invoiceNumber,
       supplier: supplierName,

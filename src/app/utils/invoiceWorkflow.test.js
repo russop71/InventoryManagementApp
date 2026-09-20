@@ -8,7 +8,23 @@ import {
   normalizeInventoryItemName,
   inventoryItemMatchesInvoiceName,
   resolveInvoiceInventoryItem,
+  sortInvoicesNewestFirst,
 } from './invoiceWorkflow.js';
+
+test('sorts invoices newest first with creation and legacy insertion tie breakers', () => {
+  const invoices = [
+    { id: 'older', date: '2026-08-31' },
+    { id: 'same-early', date: '2026-09-20', createdAt: '2026-09-20T10:00:00Z' },
+    { id: 'invalid', date: 'not-a-date' },
+    { id: 'same-late', date: '2026-09-20', createdAt: '2026-09-20T12:00:00Z' },
+    { id: 'legacy-first', date: '2026-09-19' },
+    { id: 'legacy-last', date: '2026-09-19' },
+  ];
+  assert.deepEqual(sortInvoicesNewestFirst(invoices).map(item => item.id),
+    ['same-late', 'same-early', 'legacy-last', 'legacy-first', 'older', 'invalid']);
+  assert.equal(invoices[0].id, 'older');
+  assert.deepEqual(sortInvoicesNewestFirst([]), []);
+});
 
 test('groups order suggestions by supplier and totals each supplier group', () => {
   const suggestions = [

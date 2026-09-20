@@ -8,7 +8,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { CalendarDays, FileText, DollarSign, Pencil, Trash2, Save, X, Plus, ScanLine, ChevronDown, Filter, Search, SlidersHorizontal } from 'lucide-react';
-import { calculateInvoiceTotal, filterInvoiceItems } from '../utils/invoiceWorkflow';
+import { calculateInvoiceTotal, filterInvoiceItems, sortInvoicesNewestFirst } from '../utils/invoiceWorkflow';
 import { toast } from 'sonner';
 
 function fmtDate(value: string) {
@@ -38,7 +38,7 @@ export function Invoices() {
   const [invoicePendingDeletion, setInvoicePendingDeletion] = useState<InvoiceRecord | null>(null);
 
   const sortedInvoices = useMemo(() => {
-    return [...invoices].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+    return sortInvoicesNewestFirst(invoices);
   }, [invoices]);
 
   useEffect(() => {

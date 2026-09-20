@@ -20,6 +20,19 @@ export function calculateInvoiceTotal(items) {
   return items.reduce((sum, item) => sum + Number(item.cost || 0), 0);
 }
 
+export function sortInvoicesNewestFirst(invoices) {
+  const timestamp = value => {
+    if (!value) return 0;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  return invoices.map((invoice, index) => ({ invoice, index }))
+    .sort((a, b) => timestamp(b.invoice.date) - timestamp(a.invoice.date)
+      || timestamp(b.invoice.createdAt) - timestamp(a.invoice.createdAt)
+      || b.index - a.index)
+    .map(entry => entry.invoice);
+}
+
 export function filterInvoiceItems(inventory, query) {
   const normalized = (query || '').trim().toLowerCase();
   if (!normalized) return inventory;
