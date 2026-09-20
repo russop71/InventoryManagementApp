@@ -7,7 +7,7 @@ import { apiRequest } from '../utils/api';
 import { ZestIQBrand } from '../components/ZestIQBrand';
 
 type MfaStatus = { required: boolean; verified: boolean; canEnroll: boolean; factors: Array<{ id: string; type: string; status: string }> };
-type Enrollment = { id: string; qrCode: string; uri: string };
+type Enrollment = { id: string; qrCode: string; uri: string; secret?: string };
 
 export function Mfa() {
   const { isAuthenticated, mfaRequired, completeMfa, refreshSession, logout } = useAuth();
@@ -18,6 +18,8 @@ export function Mfa() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [qrFailed, setQrFailed] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [recoveryAcknowledged, setRecoveryAcknowledged] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -40,7 +42,7 @@ export function Mfa() {
 
   if (isAuthenticated === null) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (status?.verified) return <Navigate to="/app" replace />;
+
 
   const startEnrollment = async () => {
     setBusy(true);
@@ -55,8 +57,10 @@ export function Mfa() {
   const copyManualSetupLink = async () => {
     if (!enrollment?.uri) return;
     try {
-      await navigator.clipboard.writeText(enrollment.uri);
-      toast.success('Setup link copied. Add it in your authenticator app manually.');
+      const secret = enrollment.secret || new URL(enrollment.uri).searchParams.get('secret');
+      if (!secret) throw new Error('Missing setup key');
+      await navigator.clipboard.writeText(secret);
+      toast.success('Setup key copied. Add a time-based account in your authenticator app. Keep this key private.');
     } catch {
       toast.error('Could not copy the setup link. Please try the QR code again.');
     }
@@ -64,13 +68,17 @@ export function Mfa() {
 
   const verify = async (event: FormEvent) => {
     event.preventDefault();
-    const factorId = enrollment?.id || status?.factors.find(factor => factor.type === 'totp')?.id;
+    const factorId = enrollment?.id || status?.factors.find(factor => factor.type === 'totp' && factor.status === 'verified')?.id;
     if (!factorId) return toast.error('Set up an authenticator app first');
     setBusy(true);
     try {
       await completeMfa(factorId, code);
-      toast.success('Two-step verification is active');
-      navigate('/app', { replace: true });
+      if (removing) {
+        await apiRequest('/api/v1/auth/mfa/remove', { method: 'POST', body: JSON.stringify({ factorId }) });
+        await refreshSession();
+      }
+      toast.success(removing ? 'Two-step verification turned off' : 'Two-step verification is active');
+      navigate('/app/account', { replace: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'That code did not work. Try the newest code.');
     } finally { setBusy(false); }
@@ -80,16 +88,16 @@ export function Mfa() {
     setBusy(true);
     try {
       await refreshSession();
-      toast.success('Two-step verification is temporarily skipped.');
-      navigate('/app', { replace: true });
+      
+      navigate('/app/account', { replace: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to skip two-step verification right now');
     } finally { setBusy(false); }
   };
 
-  const hasExistingFactor = Boolean(status?.factors.some(factor => factor.type === 'totp'));
+  const hasExistingFactor = Boolean(status?.factors.some(factor => factor.type === 'totp' && factor.status === 'verified'));
   const canSetUp = status?.canEnroll === true;
-  const setupOptional = !mfaRequired;
+  const setupOptional = !mfaRequired && !(status?.required && !status?.verified);
 
-  return <main className="grid min-h-screen place-items-center bg-[#F5D62E] p-5"><section className="w-full max-w-md rounded-[30px] bg-white p-7 shadow-2xl sm:p-9"><ZestIQBrand markClassName="h-12 w-12 rounded-xl" wordmarkClassName="text-2xl" /><div className="mt-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#303A43] text-[#F5D62E]"><ShieldCheck /></div><h1 className="mt-4 text-3xl font-black tracking-tight text-[#303A43]">Protect your account</h1><p className="mt-2 text-sm leading-6 text-slate-600">{setupOptional ? 'Set up two-step verification now to protect your ZestIQ access. It is optional during the current rollout.' : 'Two-step verification is required for this account.'}</p>{!status && !statusError ? <p className="mt-7 text-sm text-slate-500">Checking account security…</p> : statusError ? <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><p>We could not load two-step verification.</p><p className="mt-1 text-amber-800">You can safely continue for now while we restore the connection.</p></div> : !canSetUp ? <p className="mt-7 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Two-step verification can be set up by company owners, administrators, and ZestIQ platform administrators.</p> : !enrollment && !hasExistingFactor ? <button type="button" disabled={busy} onClick={startEnrollment} className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#303A43] font-black text-white disabled:opacity-50"><Smartphone className="h-4 w-4 text-[#F5D62E]" />Set up authenticator app</button> : <form onSubmit={verify} className="mt-7 space-y-4">{enrollment?.qrCode && <><p className="text-sm font-bold text-[#303A43]">Scan this QR code with Google Authenticator, Microsoft Authenticator, 1Password, or another authenticator app.</p><div className="flex justify-center rounded-2xl border border-slate-200 bg-white p-4">{qrFailed ? <div className="flex h-48 w-48 flex-col items-center justify-center text-center text-sm text-slate-600"><p>The QR image could not load.</p><button type="button" className="mt-3 rounded-lg border px-3 py-2 font-bold" onClick={() => void copyManualSetupLink()}>Copy manual setup link</button></div> : <img src={enrollment.qrCode} alt="ZestIQ authenticator QR code" onError={() => setQrFailed(true)} className="h-48 w-48" />}</div><button type="button" onClick={() => void copyManualSetupLink()} className="w-full text-sm font-bold text-slate-600 underline">Can’t scan? Copy a manual setup link</button></>} {hasExistingFactor && !enrollment && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">An authenticator is already enrolled. Enter its current code below.</p>}<label className="block text-sm font-black text-slate-700">Six-digit code<input autoFocus inputMode="numeric" maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 text-center text-xl font-black tracking-[.35em] outline-none focus:border-[#F5D62E]" /></label><button disabled={busy || code.length !== 6} className="h-12 w-full rounded-xl bg-[#303A43] font-black text-white disabled:opacity-50">Verify and continue</button></form>}{setupOptional && <button type="button" disabled={busy} onClick={skipForNow} className="mt-4 w-full text-sm font-black text-slate-600 underline disabled:opacity-50">Skip for now</button>}<button type="button" onClick={logout} className="mt-5 w-full text-sm font-bold text-slate-500 underline">Sign out</button></section></main>;
+  return <main className="grid min-h-screen place-items-center bg-[#F5D62E] p-5"><section className="w-full max-w-md rounded-[30px] bg-white p-7 shadow-2xl sm:p-9"><ZestIQBrand markClassName="h-12 w-12 rounded-xl" wordmarkClassName="text-2xl" /><div className="mt-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#303A43] text-[#F5D62E]"><ShieldCheck /></div><h1 className="mt-4 text-3xl font-black tracking-tight text-[#303A43]">Protect your account</h1><p className="mt-2 text-sm leading-6 text-slate-600">{setupOptional ? 'Set up two-step verification now to protect your ZestIQ access. Setup is optional. Once enabled, a code is required when signing in.' : 'Two-step verification is required for this account.'}</p>{!status && !statusError ? <p className="mt-7 text-sm text-slate-500">Checking account security…</p> : statusError ? <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><p>We could not load two-step verification.</p><p className="mt-1 text-amber-800">Please reload to retry. Your account protection has not been changed.</p></div>  : hasExistingFactor && status?.verified && !removing ? <div className="mt-7 space-y-3"><p>Authenticator enabled</p><button type="button" onClick={() => setRemoving(true)} className="w-full rounded-xl border p-3 font-bold">Turn off two-step verification</button></div> : !canSetUp && !hasExistingFactor ? <p className="mt-7 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Two-step verification can be set up by company owners, administrators, and ZestIQ platform administrators.</p> : !enrollment && !hasExistingFactor ? <button type="button" disabled={busy} onClick={startEnrollment} className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#303A43] font-black text-white disabled:opacity-50"><Smartphone className="h-4 w-4 text-[#F5D62E]" />Set up authenticator app</button> : <form onSubmit={verify} className="mt-7 space-y-4">{enrollment?.qrCode && <><p className="text-sm font-bold text-[#303A43]">Scan this QR code with Google Authenticator, Microsoft Authenticator, 1Password, or another authenticator app.</p><div className="flex justify-center rounded-2xl border border-slate-200 bg-white p-4">{qrFailed ? <div className="flex h-48 w-48 flex-col items-center justify-center text-center text-sm text-slate-600"><p>The QR image could not load.</p><button type="button" className="mt-3 rounded-lg border px-3 py-2 font-bold" onClick={() => void copyManualSetupLink()}>Copy setup key</button></div> : <img src={enrollment.qrCode} alt="ZestIQ authenticator QR code" onError={() => setQrFailed(true)} className="h-48 w-48" />}</div><button type="button" onClick={() => void copyManualSetupLink()} className="w-full text-sm font-bold text-slate-600 underline">Can’t scan? Copy setup key</button><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={recoveryAcknowledged} onChange={event => setRecoveryAcknowledged(event.target.checked)} />I have saved a secure backup in my authenticator app. Losing access may require identity-verified support recovery.</label></>} {hasExistingFactor && !enrollment && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Enter a current authenticator code. If turning protection off, this confirms your request.</p>}<label className="block text-sm font-black text-slate-700">Six-digit code<input autoFocus inputMode="numeric" maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 text-center text-xl font-black tracking-[.35em] outline-none focus:border-[#F5D62E]" /></label><button disabled={busy || code.length !== 6 || Boolean(enrollment && !recoveryAcknowledged)} className="h-12 w-full rounded-xl bg-[#303A43] font-black text-white disabled:opacity-50">{removing ? 'Confirm turn off' : enrollment ? 'Enable two-step verification' : 'Verify and continue'}</button></form>}{setupOptional && <button type="button" disabled={busy} onClick={skipForNow} className="mt-4 w-full text-sm font-black text-slate-600 underline disabled:opacity-50">Back to Account Settings</button>}<p className="mt-5 text-xs text-slate-500">Lost your authenticator? Contact support@zestiq.ca. Recovery requires identity verification; resetting your password does not turn off two-step verification.</p><button type="button" onClick={logout} className="mt-5 w-full text-sm font-bold text-slate-500 underline">Sign out</button></section></main>;
 }

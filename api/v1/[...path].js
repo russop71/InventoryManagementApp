@@ -6,6 +6,7 @@ import { canAdministerAccount, canManageOperations, hasProductAccess, hasSchedul
 import { enforceRateLimit } from '../_request-guard.js';
 import { launchReadiness } from '../_launch-readiness.js';
 import { reportServerError } from '../_observability.js';
+import { hasVerifiedAuthenticator } from '../_mfa-policy.js';
 import { addCheckoutLineItems, checkoutLineItems, SUBSCRIPTION_PRICES_CAD_CENTS } from '../_subscription-pricing.js';
 import { applyCheckoutPolicy, checkoutReady, COMMITMENT_TERMS, CHECKOUT_DISCLOSURE, SUBSCRIPTION_AGREEMENT_VERSION } from '../_subscription-policy.js';
 
@@ -907,11 +908,9 @@ function jwtAssuranceLevel(token = '') {
 }
 
 function mfaRequiredFor(appUser, authUser) {
-  // MFA can be enabled once the authenticator rollout is complete. Keep it opt-in during setup
-  // so an owner is never locked out by an unfinished enrollment flow.
-  if (String(process.env.MFA_ENFORCEMENT || '').trim().toLowerCase() !== 'required') return false;
-  if (String(authUser?.email || '').trim().toLowerCase() === 'demo@zestiq.com') return false;
-  return isPlatformAdminEmail(authUser?.email) || ['Owner', 'Admin'].includes(appUser?.role);
+  // Enrollment is optional. Once confirmed, the second factor cannot be skipped,
+  // including after a role change.
+  return hasVerifiedAuthenticator(authUser);
 }
 
 function canEnrollMfa(appUser, authUser) {
@@ -1169,14 +1168,11 @@ export default async function handler(req, res) {
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'status' && method === 'GET') {
       const auth = await getAuthContext(req);
       const required = mfaRequiredFor(auth.appUser, auth.authUser);
-      // During the optional rollout, avoid blocking the MFA screen on a factor
-      // lookup. Setup itself still performs the authoritative Supabase call.
-      const enrolled = required ? await supabaseAuth('factors', { accessToken: auth.token }) : null;
       return json(res, 200, {
         required,
         verified: jwtAssuranceLevel(auth.token) === 'aal2',
-        canEnroll: canEnrollMfa(auth.appUser, auth.authUser),
-        factors: Array.isArray(enrolled?.factors) ? enrolled.factors.map(factor => ({
+        canEnroll: canEnrollMfa(auth.appUser, auth.authUser) && String(auth.authUser.email).toLowerCase() !== 'demo@zestiq.com',
+        factors: Array.isArray(auth.authUser.factors) ? auth.authUser.factors.map(factor => ({
           id: factor.id,
           type: factor.factor_type,
           status: factor.status,
@@ -1186,8 +1182,16 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'enroll' && method === 'POST') {
       const auth = await getAuthContext(req);
+      ensureMfa(auth);
+      enforceRateLimit(req, res, 'mfa-enroll', { limit: 5, windowMs: 60 * 60 * 1000 });
       if (String(auth.authUser?.email || '').trim().toLowerCase() === 'demo@zestiq.com') return json(res, 403, { error: 'Two-step verification changes are disabled in the public demo' });
       if (!canEnrollMfa(auth.appUser, auth.authUser)) return json(res, 403, { error: 'Two-step verification is available to account owners and administrators' });
+      if (hasVerifiedAuthenticator(auth.authUser)) return json(res, 409, { error: 'An authenticator is already enabled. Manage it in account security.' });
+      for (const factor of auth.authUser.factors || []) {
+        if (factor.factor_type === 'totp' && factor.status === 'unverified') {
+          await supabaseAuth(`factors/${encodeURIComponent(factor.id)}`, { method: 'DELETE', accessToken: auth.token });
+        }
+      }
       const enrolled = await supabaseAuth('factors', {
         method: 'POST',
         accessToken: auth.token,
@@ -1196,17 +1200,28 @@ export default async function handler(req, res) {
       const uri = enrolled?.totp?.uri || '';
       const qrCode = String(enrolled?.totp?.qr_code || '').trim();
       if (!qrCode || !uri) return json(res, 502, { error: 'Authenticator setup did not return a QR code. Please try again.' });
-      return json(res, 200, { id: enrolled.id, qrCode: mfaQrImageSource(qrCode), uri });
+      return json(res, 200, { id: enrolled.id, qrCode: mfaQrImageSource(qrCode), uri, secret: enrolled.totp.secret });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'verify' && method === 'POST') {
       const auth = await getAuthContext(req);
+      enforceRateLimit(req, res, 'mfa-verify', { limit: 10, windowMs: 60 * 1000 });
       const factorId = String(req.body?.factorId || '').trim();
       const code = String(req.body?.code || '').replace(/\s/g, '');
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(factorId) || !/^\d{6}$/.test(code)) return json(res, 400, { error: 'Enter the six-digit code from your authenticator app' });
       const challenge = await supabaseAuth(`factors/${encodeURIComponent(factorId)}/challenge`, { method: 'POST', accessToken: auth.token });
       const verified = await supabaseAuth(`factors/${encodeURIComponent(factorId)}/verify`, { method: 'POST', accessToken: auth.token, body: { challenge_id: challenge.id, code } });
       return json(res, 200, await sessionPayload(verified));
+    }
+
+    if (segments[0] === 'auth' && segments[1] === 'mfa' && segments[2] === 'remove' && method === 'POST') {
+      const auth = await getAuthContext(req);
+      if (jwtAssuranceLevel(auth.token) !== 'aal2') return json(res, 403, { error: 'Verify your authenticator before disabling two-step verification' });
+      const factorId = String(req.body?.factorId || '');
+      const factor = (auth.authUser.factors || []).find(item => item.id === factorId && item.factor_type === 'totp' && item.status === 'verified');
+      if (!factor) return json(res, 404, { error: 'Authenticator not found' });
+      await supabaseAuth(`factors/${encodeURIComponent(factorId)}`, { method: 'DELETE', accessToken: auth.token });
+      return json(res, 200, { success: true });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'logout' && method === 'POST') {
@@ -1217,6 +1232,7 @@ export default async function handler(req, res) {
 
     if (segments[0] === 'auth' && segments[1] === 'password' && method === 'POST') {
       const auth = await getAuthContext(req);
+      ensureMfa(auth);
       if (String(auth.authUser?.email || '').trim().toLowerCase() === 'demo@zestiq.com') return json(res, 403, { error: 'Password changes are disabled in the public demo' });
       const password = String(req.body?.password || '');
       if (password.length < 10) return json(res, 400, { error: 'Use a password with at least 10 characters' });
