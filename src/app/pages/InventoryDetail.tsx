@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { stockBarColor, stockLevel, STOCK_LEVELS } from '../utils/stockLevels.js';
 import { useParams, useNavigate } from 'react-router';
 import { getInventoryStorageLocations, useInventory } from '../contexts/InventoryContext';
 import { useToast } from '../contexts/ToastContext';
@@ -614,8 +615,8 @@ export function InventoryDetail() {
           <div className="min-w-[180px] flex-1 px-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{item.name}</h1>
-              <Badge className={item.inactive ? 'bg-gray-200 text-gray-700' : isLowStock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
-                {item.inactive ? 'Inactive' : isLowStock ? 'Low stock' : 'In stock'}
+              <Badge className={item.inactive ? 'bg-gray-200 text-gray-700' : ''} style={item.inactive ? undefined : { background: STOCK_LEVELS[stockLevel(item.currentStock, item.parLevel)].bg, color: STOCK_LEVELS[stockLevel(item.currentStock, item.parLevel)].color }}>
+                {item.inactive ? 'Inactive' : STOCK_LEVELS[stockLevel(item.currentStock, item.parLevel)].label}
               </Badge>
             </div>
             <p className="mt-0.5 text-xs text-slate-500">{item.category} · {item.supplier}</p>
@@ -641,7 +642,7 @@ export function InventoryDetail() {
           <div className="mt-3 h-2 w-full rounded-full bg-slate-200">
             <div
               className={`h-2 rounded-full transition-all ${
-                isLowStock ? 'bg-yellow-500' : 'bg-green-500'
+                stockBarColor(item.currentStock, item.parLevel)
               }`}
               style={{ width: `${Math.min(stockPercentage, 100)}%` }}
             />

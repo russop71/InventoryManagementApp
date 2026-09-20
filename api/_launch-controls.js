@@ -21,7 +21,7 @@ export function isShowcaseAccount(account) {
 }
 
 export function hasSchedulingAccess(account) {
-  return isShowcaseAccount(account) || account?.onboarding_state?.clientProfile?.schedulingEnabled === true;
+  return isDemoAccount(account) || isShowcaseAccount(account) || account?.onboarding_state?.clientProfile?.schedulingEnabled === true;
 }
 
 export function isDemoAdministrativeMutation(account, segments = [], method = 'GET') {

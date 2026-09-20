@@ -1,4 +1,5 @@
 import { useInventory } from '../contexts/InventoryContext';
+import { stockBarColor } from '../utils/stockLevels.js';
 import { useToast } from '../contexts/ToastContext';
 import { useLabor } from '../contexts/LaborContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -1102,7 +1103,7 @@ export function Dashboard() {
                       <div className="mt-2">
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full ${stockPercentage < 20 ? 'bg-red-500' : 'bg-yellow-500'}`}
+                            className={`h-2 rounded-full ${stockBarColor(item.currentStock, item.parLevel)}`}
                             style={{ width: `${stockPercentage}%` }}
                           />
                         </div>
@@ -1503,7 +1504,7 @@ export function Dashboard() {
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full ${
-                            stockPercentage < 20 ? 'bg-red-500' : 'bg-yellow-500'
+                            stockBarColor(item.currentStock, item.parLevel)
                           }`}
                           style={{ width: `${stockPercentage}%` }}
                         />

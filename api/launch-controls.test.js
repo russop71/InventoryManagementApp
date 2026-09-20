@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+test('public demo includes scheduling without enabling unpurchased customer access', () => {
+  assert.equal(hasSchedulingAccess({ slug: 'demo-zestiq-com' }), true);
+  assert.equal(hasSchedulingAccess({ slug: 'customer', onboarding_state: { clientProfile: { schedulingEnabled: false } } }), false);
+});
 import { canAdministerAccount, canManageOperations, hasProductAccess, hasSchedulingAccess, isDemoAccount, isDemoAdministrativeMutation, isShowcaseAccount, validateFinalizedCounts } from './_launch-controls.js';
 
 test('new clients are gated until the CAD Premium subscription is active', () => {

@@ -55,20 +55,15 @@ import { convertQuantity } from '../utils/unitConversion';
 const Y = '#F5D62E';
 const D = '#303A43';
 
-type Status = 'in-stock' | 'low-stock' | 'out-of-stock';
+import { stockLevel, STOCK_LEVELS } from '../utils/stockLevels.js';
+type Status = 'in-stock' | 'low-stock' | 'out-of-stock' | 'medium' | 'medium-high';
 type InventorySort = 'name-asc' | 'name-desc' | 'stock-asc' | 'stock-desc' | 'status' | 'value-desc' | 'value-asc' | 'supplier' | 'updated';
 
 function getStatus(current: number, par: number): Status {
-  if (current <= 0) return 'out-of-stock';
-  if (current < par * 0.5) return 'low-stock';
-  return 'in-stock';
+  return stockLevel(current, par);
 }
 
-const STATUS: Record<Status, { label: string; bg: string; color: string }> = {
-  'in-stock': { label: 'In Stock', bg: '#DCFCE7', color: '#166534' },
-  'low-stock': { label: 'Low Stock', bg: '#FEF9C3', color: '#854D0E' },
-  'out-of-stock': { label: 'Out of Stock', bg: '#FEE2E2', color: '#991B1B' },
-};
+const STATUS = STOCK_LEVELS;
 
 export function Inventory() {
   const navigate = useNavigate();
@@ -208,7 +203,7 @@ export function Inventory() {
       const matchesStorageArea = storageAreaFilter === 'all' || (item.storageArea || 'Unassigned') === storageAreaFilter;
       return matchesQuery && matchesTab && matchesCategory && matchesSupplier && matchesStorageArea;
     });
-    const statusRank: Record<Status, number> = { 'out-of-stock': 0, 'low-stock': 1, 'in-stock': 2 };
+    const statusRank: Record<Status, number> = { 'out-of-stock': 0, 'low-stock': 1, medium: 2, 'medium-high': 3, 'in-stock': 4 };
     return [...matches].sort((left, right) => {
       let result = 0;
       if (sortBy === 'name-asc') result = left.name.localeCompare(right.name);
@@ -773,7 +768,7 @@ export function Inventory() {
                   </div>
                 </div>
                 <p className="hidden text-right text-[11px] text-gray-500 tabular-nums md:block">{item.parLevel} <span className="text-[10px] text-gray-400">{item.unit}</span></p>
-                <p className="hidden text-right text-[11px] font-bold tabular-nums md:block" style={{ color: status === 'out-of-stock' ? '#DC2626' : status === 'low-stock' ? '#92400E' : '#374151' }}>
+                <p className="hidden text-right text-[11px] font-bold tabular-nums md:block" style={{ color }}>
                   {item.currentStock} <span className="text-[10px] font-normal text-gray-400">{item.unit}</span>
                 </p>
                 <div className="hidden justify-end md:flex">
