@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createCloverHandler } from '../_clover.js';
 import { normalizePosImportPayload } from '../../server/pos-import.js';
 import { extractResponseText } from '../scan.js';
 import { enforceAiQuota, recordAiUsage } from '../_ai-quota.js';
@@ -1082,6 +1083,18 @@ export default async function handler(req, res) {
   try {
     const segments = parseSegments(req);
     const method = req.method || 'GET';
+
+    if (segments[0] === 'clover') {
+      return await createCloverHandler({
+        db: supabase,
+        authenticate: async request => {
+          const auth = await getAuthContext(request);
+          ensureMfa(auth);
+          return auth;
+        },
+        rateLimit: enforceRateLimit,
+      })(req, res, segments[1]);
+    }
 
     if (segments[0] === 'auth' && segments[1] === 'register' && method === 'POST') {
       enforceRateLimit(req, res, 'auth-register', { limit: 5, windowMs: 60 * 60 * 1000 });

@@ -50,6 +50,8 @@ export function Integrations() {
   const [setupMode, setSetupMode] = useState<'import' | 'direct'>('import');
   const [selectedProviderId, setSelectedProviderId] = useState(provider || 'generic');
   const [isConnecting, setIsConnecting] = useState(false);
+  const [cloverStatus, setCloverStatus] = useState<{ configured: boolean; environment: string; status: string; merchant_name?: string; last_sync?: string; last_error?: string } | null>(null);
+  const [cloverError, setCloverError] = useState('');
   const setupRef = useRef<HTMLDivElement>(null);
   const selected = getPosProvider(selectedProviderId);
   const currentProvider = getPosProvider(provider);
@@ -57,12 +59,22 @@ export function Integrations() {
   const isDemoAccount = user?.email?.trim().toLowerCase() === 'demo@zestiq.com';
 
   useEffect(() => {
+    let active = true;
+    setCloverStatus(null); setCloverError('');
+    if (selectedProviderId !== 'clover' || !activeLocationId || isDemoAccount) return;
+    apiRequest<NonNullable<typeof cloverStatus>>(`/api/v1/clover/status?locationId=${encodeURIComponent(activeLocationId)}`)
+      .then(value => { if (active) setCloverStatus(value); })
+      .catch(error => { if (active) setCloverError(error instanceof Error ? error.message : 'Unable to check Clover'); });
+    return () => { active = false; };
+  }, [selectedProviderId, activeLocationId, isDemoAccount]);
+
+  useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const cloverResult = query.get('clover');
     if (!cloverResult) return;
     setSelectedProviderId('clover');
     setSetupMode('direct');
-    if (cloverResult === 'connected') showToast.success('Clover is connected. Your sales and menu data are syncing.');
+    if (cloverResult === 'connected') showToast.success('Clover authorization saved. You can now test a data sync.');
     else showToast.error(query.get('detail') || 'Clover could not be connected.');
     window.history.replaceState({}, '', '/app/integrations');
   }, []);
@@ -119,13 +131,13 @@ export function Integrations() {
     if (!activeLocationId) { showToast.error('Choose a location first'); return; }
     setIsConnecting(true);
     try {
-      if (selectedIsConnected) {
-        await apiRequest('/api/clover/sync', { method: 'POST', body: JSON.stringify({ locationId: activeLocationId }) });
-        showToast.success('Clover data synced successfully');
+      if (cloverStatus?.status === 'connected') {
+        await apiRequest('/api/v1/clover/sync', { method: 'POST', body: JSON.stringify({ locationId: activeLocationId }) });
+        showToast.success('Clover test snapshot saved. Reporting data was not changed.');
         window.location.reload();
         return;
       }
-      const result = await apiRequest<{ authorizeUrl: string }>('/api/clover/start', { method: 'POST', body: JSON.stringify({ locationId: activeLocationId }) });
+      const result = await apiRequest<{ authorizeUrl: string }>('/api/v1/clover/start', { method: 'POST', body: JSON.stringify({ locationId: activeLocationId }) });
       window.location.assign(result.authorizeUrl);
     } catch (error) { showToast.error(error instanceof Error ? error.message : 'Clover connection failed'); }
     finally { setIsConnecting(false); }
@@ -184,14 +196,27 @@ export function Integrations() {
           </TabsContent>
           <TabsContent value="direct">
         <Card className="overflow-hidden">
-          <CardHeader className="border-b border-slate-100"><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-lg"><PlugZap className="h-5 w-5 text-[#B58B00]" />Direct sync</CardTitle><CardDescription className="mt-1">Automatic daily sales and menu updates.</CardDescription></div><Badge variant="outline">Activation required</Badge></div></CardHeader>
+          <CardHeader className="border-b border-slate-100"><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-lg"><PlugZap className="h-5 w-5 text-[#B58B00]" />Direct sync</CardTitle><CardDescription className="mt-1">{selected.id === 'clover' ? 'Secure connection and test snapshots. Reporting sync is in development.' : 'Automatic daily sales and menu updates require provider activation.'}</CardDescription></div><Badge variant="outline">{selected.id === 'clover' ? 'Testing only' : 'Activation required'}</Badge></div></CardHeader>
           <CardContent className="space-y-4 pt-5">
             <div className="rounded-2xl bg-[#FEFCE8] p-4"><p className="font-black text-slate-900">{selected.name}</p><p className="mt-2 text-xs leading-5 text-slate-600">Direct connections use provider-approved OAuth or server-held credentials. ZestIQ does not ask you to paste secret API keys into this screen.</p></div>
             <div className="space-y-3 text-sm"><Feature icon={ShieldCheck} text="Credentials remain server-side" /><Feature icon={Database} text="Sales stays separated by company and location" /><Feature icon={Wifi} text="Connection health and last sync are visible" /></div>
             {isDemoAccount
               ? <span className="flex h-10 w-full cursor-not-allowed items-center justify-center rounded-md bg-slate-200 px-4 text-sm font-black text-slate-500">Available in a private workspace</span>
               : selected.id === 'clover'
-                ? <Button type="button" onClick={handleCloverConnection} disabled={isConnecting} className="w-full bg-[#F5D62E] font-black text-[#303A43] hover:bg-[#E5B60D]">{isConnecting ? 'Connecting…' : selectedIsConnected ? 'Sync Clover now' : 'Connect Clover securely'}</Button>
+                ? <div className="space-y-3">
+                  <p className="text-sm" role="status">{cloverError || (!cloverStatus ? 'Checking Clover configuration…' : !cloverStatus.configured ? 'Clover is awaiting secure server configuration. File imports remain available.' : `${cloverStatus.environment === 'sandbox' ? 'Sandbox testing' : 'Production'} · ${cloverStatus.status.replaceAll('_', ' ')}${cloverStatus.merchant_name ? ` · ${cloverStatus.merchant_name}` : ''}`)}</p>
+                  <p className="text-xs text-slate-600">Test sync saves a private menu and order snapshot. Automatic sync and reporting are not enabled yet.</p>
+                  {cloverStatus?.last_sync && <p className="text-xs">Last snapshot: {formatDate(cloverStatus.last_sync)}</p>}
+                  {cloverStatus?.last_error && <p className="text-sm text-amber-800">{cloverStatus.last_error}</p>}
+                  <Button type="button" onClick={handleCloverConnection} disabled={isConnecting || !cloverStatus?.configured} className="w-full bg-[#F5D62E] font-black text-[#303A43] hover:bg-[#E5B60D]">{isConnecting ? 'Working…' : cloverStatus?.status === 'connected' ? 'Test Clover sync' : cloverStatus?.status === 'reconnect_required' ? 'Reconnect Clover' : 'Connect Clover securely'}</Button>
+                  {cloverStatus?.configured && ['connected', 'reconnect_required'].includes(cloverStatus.status) && <Button variant="outline" disabled={isConnecting} onClick={async () => {
+                    if (!confirm('Disconnect Clover for this location? This removes the stored connection and test snapshot, but does not uninstall the app in Clover.')) return;
+                    setIsConnecting(true);
+                    try { await apiRequest('/api/v1/clover/disconnect', { method: 'POST', body: JSON.stringify({ locationId: activeLocationId }) }); setCloverStatus({ ...cloverStatus, status: 'disconnected', last_sync: undefined, last_error: undefined }); showToast.success('Clover disconnected'); }
+                    catch (error) { showToast.error(error instanceof Error ? error.message : 'Unable to disconnect Clover'); }
+                    finally { setIsConnecting(false); }
+                  }}>Disconnect Clover</Button>}
+                </div>
                 : <a href={requestUrl} className="flex h-10 w-full items-center justify-center rounded-md bg-[#F5D62E] px-4 text-sm font-black text-[#303A43] hover:bg-[#E5B60D]">Request direct activation</a>}
             <a href={selected.website} target={selected.website.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="flex items-center justify-center gap-1 text-xs font-bold text-[#2563EB] hover:underline">View provider information<ExternalLink className="h-3.5 w-3.5" /></a>
           </CardContent>
