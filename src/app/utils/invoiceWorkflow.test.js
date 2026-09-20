@@ -7,6 +7,7 @@ import {
   hasDuplicateInvoiceNumber,
   normalizeInventoryItemName,
   inventoryItemMatchesInvoiceName,
+  resolveInvoiceInventoryItem,
 } from './invoiceWorkflow.js';
 
 test('groups order suggestions by supplier and totals each supplier group', () => {
@@ -22,6 +23,34 @@ test('groups order suggestions by supplier and totals each supplier group', () =
     { supplier: 'Sysco', items: [suggestions[0], suggestions[2]], totalCost: 70 },
     { supplier: 'US Foods', items: [suggestions[1]], totalCost: 20 },
   ]);
+});
+
+test('repeat invoices reuse existing stock identity despite supplier and formatting changes', () => {
+  const stock = [{ id: 'salmon', name: 'Atlantic Salmon', unit: 'lb', currentStock: 10, supplier: 'A' }];
+  const first = resolveInvoiceInventoryItem(stock, { name: ' ATLANTIC SALMON - CS ', quantity: 3 });
+  assert.equal(first.item.id, 'salmon');
+  const afterReceipt = [{ ...first.item, currentStock: first.item.currentStock + 3 }];
+  const second = resolveInvoiceInventoryItem(afterReceipt, { name: 'Atlantic Salmon', quantity: 5, supplier: 'B' });
+  assert.equal(second.item.id, 'salmon');
+  assert.equal(second.item.currentStock + 5, 18);
+  assert.equal(resolveInvoiceInventoryItem(stock, { name: 'Atlantic Salmon', inventoryItemId: 'new' }).item.id, 'salmon');
+});
+
+test('unrecognized descriptions require explicit creation or a confirmed existing item', () => {
+  const stock = [{ id: 'salmon', name: 'Atlantic Salmon' }];
+  assert.match(resolveInvoiceInventoryItem(stock, { name: 'Fresh ATL SALM' }).error, /Choose/);
+  assert.equal(resolveInvoiceInventoryItem(stock, { name: 'Fresh ATL SALM', inventoryItemId: 'salmon' }).item.id, 'salmon');
+  assert.equal(resolveInvoiceInventoryItem(stock, { name: 'Cheddar', inventoryItemId: 'new' }).createNew, true);
+  assert.ok(resolveInvoiceInventoryItem(stock, { name: 'Cheddar', inventoryItemId: 'deleted' }).error);
+  const remembered = [{ ...stock[0], invoiceAliases: ['Fresh ATL SALM'] }];
+  assert.equal(resolveInvoiceInventoryItem(remembered, { name: 'Fresh ATL SALM' }).item.id, 'salmon');
+});
+
+test('ambiguous names require selection, including when new was requested', () => {
+  const stock = [{ id: 'a', name: 'Salmon' }, { id: 'b', name: 'Salmon' }];
+  assert.ok(resolveInvoiceInventoryItem(stock, { name: 'Salmon' }).error);
+  assert.ok(resolveInvoiceInventoryItem(stock, { name: 'Salmon', inventoryItemId: 'new' }).error);
+  assert.equal(resolveInvoiceInventoryItem(stock, { name: 'Salmon', inventoryItemId: 'b' }).item.id, 'b');
 });
 
 test('matches supplier invoice descriptions through hidden inventory aliases', () => {

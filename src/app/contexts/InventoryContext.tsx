@@ -7,7 +7,7 @@ import { calculateForecastOrderQuantity } from '../utils/forecastOrderUtils';
 import { buildDemoLocationData, DEMO_DATA_VERSION } from '../utils/demoData';
 import { markDemoSessionReset, shouldResetDemoSession } from '../utils/demoSession.js';
 import { mergeLocationData } from '../utils/locationDataMerge.js';
-import { hasDuplicateInvoiceNumber, inventoryItemMatchesInvoiceName, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
+import { hasDuplicateInvoiceNumber, resolveInvoiceInventoryItem, normalizeInventoryItemName } from '../utils/invoiceWorkflow.js';
 import { findBestSupplierMatch, mergeDuplicateSuppliers, normalizeSupplierName } from '../utils/supplierMatching.js';
 import { convertIngredientQuantity, convertQuantity, normalizeUnit } from '../utils/unitConversion';
 import type { InventoryCount } from '../utils/inventoryCounts';
@@ -234,6 +234,7 @@ export interface PreppedRecipe {
 }
 
 export interface ScannedInvoiceItem {
+  inventoryItemId?: string;
   name: string;
   quantity: number;
   unit: string;
@@ -1362,11 +1363,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const invoiceItems: OrderItem[] = [];
 
     for (const [index, scannedItem] of invoiceInput.items.entries()) {
-      const normalizedName = normalizeInventoryItemName(scannedItem.name);
-      const matchingIndexes = nextInventory.map((item, itemIndex) => ({ item, itemIndex })).filter(({ item }) => (
-        normalizedName.length > 0 && inventoryItemMatchesInvoiceName(item, scannedItem.name)
-      ));
-      const itemIndex = matchingIndexes.find(({ item }) => normalizeSupplierName(item.supplier) === normalizedSupplier || item.purchaseOptions?.some(option => normalizeSupplierName(option.supplier) === normalizedSupplier))?.itemIndex ?? matchingIndexes[0]?.itemIndex ?? -1;
+      const match = resolveInvoiceInventoryItem(nextInventory, scannedItem);
+      if (match.error) return { success: false, error: match.error };
+      const itemIndex = match.item ? nextInventory.findIndex(item => item.id === match.item.id) : -1;
       const scannedUnit = normalizeUnit(scannedItem.unit.trim() || 'ea');
       const rawQuantity = Math.max(0, Number(scannedItem.quantity) || 0);
       const packSize = Math.max(0, Number(scannedItem.packSize) || rawQuantity || 1);

@@ -10,9 +10,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Trash2, ChevronDown } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { findBestSupplierMatch } from '../utils/supplierMatching.js';
-import { inventoryItemMatchesInvoiceName } from '../utils/invoiceWorkflow.js';
+import { resolveInvoiceInventoryItem } from '../utils/invoiceWorkflow.js';
 
 interface InvoiceItem {
+  inventoryItemId?: string;
   name: string;
   quantity: number;
   unit: string;
@@ -217,6 +218,8 @@ export function InvoiceScanner() {
   const handleItemEdit = (index: number, field: keyof InvoiceItem, value: string | number) => {
     const updated = [...editedItems];
     updated[index] = { ...updated[index], [field]: value };
+    if (field === 'name') updated[index].inventoryItemId = undefined;
+    setReviewAcknowledged(false);
 
     if (field === 'packSize' || field === 'packCount' || field === 'unitsPerPack') {
       updated[index].quantity = Number(updated[index].packSize || 0)
@@ -292,7 +295,7 @@ export function InvoiceScanner() {
     (extractedData?.confidence ?? 0) < 0.75 || editedItems.some(item => (item.confidence ?? 0) < 0.75)
   );
   const hasUnknownSupplier = Boolean(extractedData) && !findBestSupplierMatch(extractedData?.vendor || '', suppliers);
-  const hasNewInventoryItems = editedItems.some(item => !inventory.some(existing => inventoryItemMatchesInvoiceName(existing, item.name)));
+  const hasNewInventoryItems = editedItems.some(item => !resolveInvoiceInventoryItem(inventory, item).item);
   const requiresExplicitReview = hasLowConfidence || hasUnknownSupplier || hasNewInventoryItems;
 
   return (
@@ -464,7 +467,7 @@ export function InvoiceScanner() {
                 <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
                   {hasLowConfidence && <p>Some text was unclear. Compare every highlighted value with the original invoice.</p>}
                   {hasUnknownSupplier && <p>This supplier is not in ZestIQ yet and will be created when you approve the invoice.</p>}
-                  {hasNewInventoryItems && <p>One or more unmatched lines will create new inventory items. Edit their names and units first if needed.</p>}
+                  {hasNewInventoryItems && <p>Match each unmatched line to existing inventory, or explicitly choose Create new item. Check quantities and units before saving.</p>}
                 </div>
               )}
             </CardContent>
@@ -489,10 +492,18 @@ export function InvoiceScanner() {
                         onChange={(e) => handleItemEdit(index, 'name', e.target.value)}
                         className="mt-1"
                       />
-                      <p className={`mt-1 text-[11px] ${inventory.some(existing => inventoryItemMatchesInvoiceName(existing, item.name)) ? 'text-green-700' : 'text-amber-700'}`}>
-                        {inventory.some(existing => inventoryItemMatchesInvoiceName(existing, item.name))
-                          ? `Matches inventory: ${inventory.find(existing => inventoryItemMatchesInvoiceName(existing, item.name))?.name}`
-                          : 'New inventory item will be created after approval.'}
+                      <Label htmlFor={`invoice-item-match-${index}`} className="mt-2 block text-xs">Update inventory item</Label>
+                      <select id={`invoice-item-match-${index}`} className="mt-1 w-full min-w-0 rounded border p-2 text-sm"
+                        value={resolveInvoiceInventoryItem(inventory, item).item?.id || item.inventoryItemId || ''}
+                        onChange={event => handleItemEdit(index, 'inventoryItemId', event.target.value)}>
+                        <option value="">Choose existing item or create new…</option>
+                        <option value="new">Create new item (only if not already stocked)</option>
+                        {inventory.map(existing => <option key={existing.id} value={existing.id}>{existing.name} — {existing.unit} · {existing.supplier}</option>)}
+                      </select>
+                      <p className="mt-1 text-[11px] text-gray-600">
+                        {resolveInvoiceInventoryItem(inventory, item).item
+                          ? `Adds this delivery to ${resolveInvoiceInventoryItem(inventory, item).item.name}; keeps existing stock and remembers this invoice name.`
+                          : resolveInvoiceInventoryItem(inventory, item).error || 'A new inventory item will be created after approval.'}
                       </p>
                     </div>
                     <Button

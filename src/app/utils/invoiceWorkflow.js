@@ -61,3 +61,17 @@ export function inventoryItemMatchesInvoiceName(item, invoiceName) {
   ];
   return recognizedNames.some(name => normalizeInventoryItemName(name) === normalizedInvoiceName);
 }
+
+// Use the same decision for the review screen and import. Never silently choose
+// among duplicate records, or create stock because OCR changed a description.
+export function resolveInvoiceInventoryItem(inventory, line) {
+  const matches = inventory.filter(item => inventoryItemMatchesInvoiceName(item, line.name));
+  if (line.inventoryItemId && line.inventoryItemId !== 'new') {
+    const item = inventory.find(item => item.id === line.inventoryItemId);
+    return item ? { item } : { error: 'The selected inventory item is no longer available. Select it again.' };
+  }
+  if (matches.length === 1) return { item: matches[0] };
+  if (matches.length > 1) return { error: `Multiple inventory items match ${line.name}. Choose the correct item.` };
+  if (line.inventoryItemId === 'new') return { createNew: true };
+  return { error: `Choose an existing inventory item for ${line.name}, or explicitly select Create new item.` };
+}
