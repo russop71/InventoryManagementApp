@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/verify-design-baseline.mjs && vite build && node scripts/generate-static-routes.mjs",
-    "build:ios": "VITE_API_URL=https://zestiq.ca npm run build && npx cap sync ios",
+    "build:ios": "VITE_API_URL=https://zestiq.ca VITE_APP_VARIANT=manager npm run build && npx cap sync ios",
     "ios:open": "npx cap open ios",
     "build:employee": "VITE_API_URL=https://zestiq.ca VITE_APP_VARIANT=employee vite build --outDir dist-employee",
     "employee:sync": "npm run build:employee && cd native/zestemployee && ../../node_modules/.bin/cap sync ios && ../../node_modules/.bin/cap sync android",

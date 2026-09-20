@@ -64,7 +64,8 @@ const Users = lazy(() => import("./pages/Users").then(module => ({ default: modu
 const Waste = lazy(() => import("./pages/Waste").then(module => ({ default: module.Waste })));
 
 const isEmployeeNativeBuild = import.meta.env.VITE_APP_VARIANT === 'employee';
-function NativeEntry() { return <Navigate to="/employee" replace />; }
+const isManagerNativeBuild = import.meta.env.VITE_APP_VARIANT === 'manager';
+function NativeEntry() { return <Navigate to={isEmployeeNativeBuild ? "/employee" : "/app"} replace />; }
 function PublicTermsRedirect() { return <Navigate to="/terms" replace />; }
 function PublicPrivacyRedirect() { return <Navigate to="/privacy" replace />; }
 function LegacyAIOrdersRedirect() { return <Navigate to="/app/orders" replace />; }
@@ -78,7 +79,7 @@ function LegacyCogsRedirect() {
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: isEmployeeNativeBuild ? NativeEntry : Landing,
+    Component: isEmployeeNativeBuild || isManagerNativeBuild ? NativeEntry : Landing,
   },
   {
     path: "/login",

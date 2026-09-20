@@ -7,6 +7,8 @@
   "background_color": "#FBFAF6",
   "theme_color": "#F5C10E",
   "icons": [
+    { "src": "/zestiq-tab-icon-v2.png", "sizes": "64x64", "type": "image/png", "purpose": "any" },
+    { "src": "/zestiq-apple-touch-v2.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
     { "src": "/zestiq-mark-exact.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any maskable" }
   ]
 }
