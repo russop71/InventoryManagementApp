@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Enforce orange brand policy
+        run: node --test scripts/brand-policy.test.mjs && node scripts/verify-design-baseline.mjs
+
       - name: Run unit tests
         run: npm test
 

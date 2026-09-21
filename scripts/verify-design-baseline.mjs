@@ -1,4 +1,5 @@
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
+import { brandViolations } from './brand-policy.mjs';
 
 const requiredText = [
   ['src/styles/theme.css', ['--primary: #F58220;', "'DM Serif Display'"]],
@@ -38,10 +39,16 @@ const requiredText = [
 
 const failures = [];
 
-for (const file of ['src/styles/theme.css', 'src/app/components/Layout.tsx', 'src/app/pages/Orders.tsx']) {
-  const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
-  if (/#(?:F5D62E|F5C10E)\b/i.test(source)) failures.push(`${file} restores obsolete yellow branding`);
+async function verifyBrandDirectory(directory) {
+  for (const entry of await readdir(new URL(`../${directory}`, import.meta.url), { withFileTypes: true })) {
+    const file = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) await verifyBrandDirectory(file);
+    else if (/\.(tsx?|jsx?|css|svg)$/.test(file) && !/\.test\./.test(file)) {
+      failures.push(...brandViolations(file, await readFile(new URL(`../${file}`, import.meta.url), 'utf8')));
+    }
+  }
 }
+await verifyBrandDirectory('src');
 
 for (const [file, markers] of requiredText) {
   let source = '';
@@ -60,9 +67,9 @@ for (const [file, markers] of requiredText) {
 }
 
 try {
-  await access(new URL('../public/zestiq-mark-exact.png', import.meta.url));
+  await access(new URL('../public/zestiq-orange-vector.svg', import.meta.url));
 } catch {
-  failures.push('public/zestiq-mark-exact.png is missing');
+  failures.push('public/zestiq-orange-vector.svg is missing');
 }
 
 if (failures.length) {
