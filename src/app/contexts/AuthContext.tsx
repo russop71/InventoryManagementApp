@@ -52,6 +52,7 @@ interface AuthContextType {
   switchLocation: (locationId: string) => void;
   addLocation: (locationName: string) => Promise<void>;
   updateLocation: (locationId: string, locationName: string) => Promise<void>;
+  setLocationArchived: (locationId: string, archived: boolean) => Promise<void>;
   updateAccountProfile: (accountName: string) => Promise<void>;
   updateOnboarding: (updates: Partial<OnboardingProgress>) => Promise<OnboardingProgress>;
   refreshSession: () => Promise<void>;
@@ -315,6 +316,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthState(current => ({ ...current, locations: payload.locations }));
   };
 
+  const setLocationArchived = async (locationId: string, archived: boolean) => {
+    const accountId = authState.accountId;
+    if (!accountId) throw new Error('No account is selected');
+    const payload = await apiRequest<{ locations: AccountLocation[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(locationId)}/${archived ? 'archive' : 'restore'}`, { method: 'POST' });
+    setAuthState(current => {
+      const nextActive = payload.locations.some(location => location.id === current.activeLocationId)
+        ? current.activeLocationId : payload.locations[0]?.id || null;
+      const stored = readStoredSession();
+      if (stored) writeStoredSession({ ...stored, activeLocationId: nextActive || undefined });
+      return { ...current, locations: payload.locations, activeLocationId: nextActive };
+    });
+  };
+
   const updateAccountProfile = async (accountName: string) => {
     const normalizedName = accountName.trim();
     const accountId = authState.accountId;
@@ -363,6 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       switchLocation,
       addLocation,
       updateLocation,
+      setLocationArchived,
       updateAccountProfile,
       updateOnboarding,
       refreshSession,

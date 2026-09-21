@@ -3,6 +3,7 @@ import { normalizePosImportPayload } from '../../server/pos-import.js';
 import { extractResponseText } from '../scan.js';
 import { enforceAiQuota, recordAiUsage } from '../_ai-quota.js';
 import { canAdministerAccount, canManageOperations, hasProductAccess, hasSchedulingAccess, isDemoAccount, isDemoAdministrativeMutation, isPlatformAdminEmail, validateFinalizedCounts } from '../_launch-controls.js';
+import { paidAdditionalLocations } from '../_location-policy.js';
 import { enforceRateLimit } from '../_request-guard.js';
 import { launchReadiness } from '../_launch-readiness.js';
 import { reportServerError } from '../_observability.js';
@@ -754,7 +755,14 @@ async function getAccount(accountIdentifier) {
 }
 
 async function listLocations(accountId) {
-  return supabase(`locations?account_id=eq.${encodeURIComponent(accountId)}&select=*&order=created_at.asc`);
+  return supabase(`locations?account_id=eq.${encodeURIComponent(accountId)}&archived_at=is.null&select=*&order=created_at.asc`);
+}
+
+async function paidLocationAllowance(account) {
+  if (!account.stripe_subscription_id || !STRIPE_SECRET_KEY) return 0;
+  const subscription = await stripeGet(`subscriptions/${encodeURIComponent(account.stripe_subscription_id)}`, { 'expand[]': 'latest_invoice' });
+  if (subscription.customer !== account.stripe_customer_id) throw Object.assign(new Error('Unable to verify location billing'), { status: 409 });
+  return paidAdditionalLocations(subscription, STRIPE_PRICE_ADDITIONAL_LOCATION);
 }
 
 function hasAllLocationAccess(appUser, authUser) {
@@ -850,7 +858,7 @@ async function ensureLocationBelongsToAccount(accountId, locationIdentifier) {
 
 async function ensureLocationAccess(accountId, locationIdentifier, appUser, authUser) {
   const location = await ensureLocationBelongsToAccount(accountId, locationIdentifier);
-  if (!location) return null;
+  if (!location || location.archived_at) return null;
   if (hasAllLocationAccess(appUser, authUser)) return location;
   const allowedIds = await listUserLocationIds(appUser);
   if (!allowedIds.includes(location.id)) {
@@ -1262,7 +1270,7 @@ export default async function handler(req, res) {
         const [accounts, users, locations, events] = await Promise.all([
           supabase('accounts?select=*&order=created_at.desc'),
           supabase('app_users?select=id,account_id,name,email,role,status,last_login,created_at&order=created_at.asc'),
-          supabase('locations?select=id,account_id'),
+          supabase('locations?archived_at=is.null&select=id,account_id'),
           supabase(`app_usage_events?created_at=gte.${encodeURIComponent(since)}&select=account_id,created_at&order=created_at.desc&limit=10000`),
         ]);
         const clients = accounts.map(account => {
@@ -1894,6 +1902,20 @@ export default async function handler(req, res) {
     }
 
     if (segments[2] === 'locations') {
+      if (segments.length === 4 && segments[3] === 'archived' && method === 'GET') {
+        if (!canAdministerAccount(access.appUser.role)) return json(res, 403, { error: 'Owner or admin access is required' });
+        const rows = await supabase(`locations?account_id=eq.${accountId}&archived_at=not.is.null&select=*&order=archived_at.desc`);
+        return json(res, 200, { locations: rows.map(mapLocation) });
+      }
+      if (segments.length === 5 && ['archive', 'restore'].includes(segments[4]) && method === 'POST') {
+        if (!canAdministerAccount(access.appUser.role)) return json(res, 403, { error: 'Owner or admin access is required to manage locations' });
+        await supabase('rpc/manage_account_location', { method: 'POST', body: {
+          p_account_id: accountId, p_action: segments[4], p_location_id: segments[3],
+          p_paid_additional: segments[4] === 'restore' ? await paidLocationAllowance(account) : 0,
+        } });
+        const all = await listLocations(accountId);
+        return json(res, 200, { locations: all.map(mapLocation) });
+      }
       if (segments.length === 3 && method === 'GET') {
         const rows = await listAccessibleLocations(accountId, access.appUser, access.authUser);
         return json(res, 200, { locations: rows.map(mapLocation) });
@@ -1901,20 +1923,12 @@ export default async function handler(req, res) {
       if (segments.length === 3 && method === 'POST') {
         if (!canAdministerAccount(access.appUser.role)) return json(res, 403, { error: 'Owner or admin access is required to add locations' });
         const name = String(req.body?.name || '').trim();
-        if (!name) return json(res, 400, { error: 'location name is required' });
+        if (name.length < 2 || name.length > 120) return json(res, 400, { error: 'Location name must be between 2 and 120 characters' });
         const slug = normalizeSlug(name);
-        let rows = await supabase(`locations?account_id=eq.${accountId}&slug=eq.${encodeURIComponent(slug)}&select=*`);
-        if (!rows.length) {
-          const existingLocations = await listLocations(accountId);
-          const allowedLocationCount = 1 + Number(account.additional_location_quantity || 0);
-          if (existingLocations.length >= allowedLocationCount) {
-            return json(res, 402, {
-              error: `Your subscription includes ${allowedLocationCount} location${allowedLocationCount === 1 ? '' : 's'}. Add billing for another location before creating it.`,
-            });
-          }
-          rows = await supabase('locations?select=*', { method: 'POST', prefer: 'return=representation', body: { account_id: accountId, slug, name, timezone: 'America/Toronto' } });
-          await supabase('location_data', { method: 'POST', prefer: 'return=minimal', body: { location_id: rows[0].id } });
-        }
+        await supabase('rpc/manage_account_location', { method: 'POST', body: {
+          p_account_id: accountId, p_action: 'create', p_name: name, p_slug: slug,
+          p_paid_additional: await paidLocationAllowance(account),
+        } });
         const all = await listLocations(accountId);
         return json(res, 201, { locations: all.map(mapLocation) });
       }
