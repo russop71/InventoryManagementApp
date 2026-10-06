@@ -29,6 +29,9 @@ const PublicContactPage = lazy(() => import("./pages/PublicMarketingPages").then
 const RestaurantFoodCostCalculator = lazy(() => import("./pages/RestaurantSeoGuides").then(module => ({ default: module.RestaurantFoodCostCalculator })));
 const RestaurantInventoryBuyerGuide = lazy(() => import("./pages/RestaurantSeoGuides").then(module => ({ default: module.RestaurantInventoryBuyerGuide })));
 const RestaurantInventoryManagementGuide = lazy(() => import("./pages/RestaurantSeoGuides").then(module => ({ default: module.RestaurantInventoryManagementGuide })));
+const WeeklyRestaurantInventoryChecklist = lazy(() => import("./pages/RestaurantSeoGuides").then(module => ({ default: module.WeeklyRestaurantInventoryChecklist })));
+const RestaurantInvoicePriceChangeGuide = lazy(() => import("./pages/RestaurantSeoGuides").then(module => ({ default: module.RestaurantInvoicePriceChangeGuide })));
+const BurlingtonRestaurantInventoryPage = lazy(() => import("./pages/RestaurantSeoGuides").then(module => ({ default: module.BurlingtonRestaurantInventoryPage })));
 
 const Account = lazy(() => import("./pages/Account").then(module => ({ default: module.Account })));
 const AuthLayout = lazy(() => import("./components/AuthLayout").then(module => ({ default: module.AuthLayout })));
@@ -124,6 +127,18 @@ export const router = createBrowserRouter([
   {
     path: "/restaurant-food-cost-calculator",
     Component: RestaurantFoodCostCalculator,
+  },
+  {
+    path: "/weekly-restaurant-inventory-checklist",
+    Component: WeeklyRestaurantInventoryChecklist,
+  },
+  {
+    path: "/restaurant-invoice-price-change-tracking",
+    Component: RestaurantInvoicePriceChangeGuide,
+  },
+  {
+    path: "/restaurant-inventory-software-burlington",
+    Component: BurlingtonRestaurantInventoryPage,
   },
   {
     path: "/privacy",

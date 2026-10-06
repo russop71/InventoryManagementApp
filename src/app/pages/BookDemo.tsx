@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowLeft, ArrowRight, BarChart3, CalendarCheck, Check, CheckCircle2, FileScan, Loader2, Mail, ShieldCheck, Sparkles } from 'lucide-react';
+import { track } from '@vercel/analytics';
 import { POS_PROVIDERS } from '../data/posProviders';
 import { usePageSeo } from '../utils/seo';
 import { ZestIQBrand } from '../components/ZestIQBrand';
@@ -11,6 +12,7 @@ export function BookDemo() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [hasTrackedStart, setHasTrackedStart] = useState(false);
   usePageSeo({ title: 'Book a ZestIQ Restaurant Software Demo', description: 'Book a tailored ZestIQ demo for restaurant inventory, food cost, invoice scanning, purchasing, beverage and labour workflows.', path: '/book-demo' });
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -27,11 +29,18 @@ export function BookDemo() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result?.error || 'We could not send your request. Please try again.');
+      track('DemoRequestSubmitted', { venues: String(payload.venues || 'Not provided') });
       navigate('/book-demo/thank-you', { replace: true });
     } catch (error) {
+      track('DemoRequestFailed');
       setSubmitError(error instanceof Error ? error.message : 'We could not send your request. Please try again.');
       setIsSubmitting(false);
     }
+  };
+  const handleFormFocus = () => {
+    if (hasTrackedStart) return;
+    setHasTrackedStart(true);
+    track('DemoRequestStarted');
   };
 
   return (
@@ -43,16 +52,16 @@ export function BookDemo() {
           <h1 className="mt-7 text-4xl font-black leading-[0.98] tracking-[-0.04em] sm:text-5xl">See ZestIQ in action.</h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-slate-500">Tell us a little about your operation. We’ll tailor the conversation around the workflows and margin opportunities that matter to you.</p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          <form onSubmit={handleSubmit} onFocusCapture={handleFormFocus} className="mt-8 space-y-4">
             <label className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off" /></label>
-            <div className="grid gap-4 sm:grid-cols-2"><Field label="First name" name="firstName" autoComplete="given-name" /><Field label="Last name" name="lastName" autoComplete="family-name" /></div>
+            <div className="grid gap-4 sm:grid-cols-2"><Field label="First name" name="firstName" autoComplete="given-name" /><Field label="Last name" name="lastName" autoComplete="family-name" required={false} /></div>
             <Field label="Work email" name="email" type="email" autoComplete="email" />
-            <Field label="Phone number" name="phone" type="tel" autoComplete="tel" />
+            <Field label="Phone number" name="phone" type="tel" autoComplete="tel" required={false} />
             <Field label="Restaurant or company" name="restaurant" autoComplete="organization" />
-            <SelectField label="Role" name="role" options={['Owner / CEO', 'Operations', 'Finance', 'Chef / Culinary', 'General manager', 'Other']} />
-            <SelectField label="Current POS system" name="pos" options={POS_PROVIDERS.filter(item => item.id !== 'generic').map(item => item.name).concat('Other / Not listed', 'No POS yet')} />
-            <SelectField label="Number of venues" name="venues" options={['1 venue', '2–5 venues', '6–15 venues', '16–50 venues', '51+ venues']} />
-            <label className="block"><span className="text-xs font-black text-slate-700">What is your main goal? <span className="text-red-500">*</span></span><textarea required name="goal" rows={4} placeholder="Reduce food cost, speed up counts, control labour, improve ordering…" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#F58220] focus:ring-4 focus:ring-[#F58220]/15" /></label>
+            <SelectField label="Role" name="role" options={['Owner / CEO', 'Operations', 'Finance', 'Chef / Culinary', 'General manager', 'Other']} required={false} />
+            <SelectField label="Current POS system" name="pos" options={POS_PROVIDERS.filter(item => item.id !== 'generic').map(item => item.name).concat('Other / Not listed', 'No POS yet')} required={false} />
+            <SelectField label="Number of venues" name="venues" options={['1 venue', '2–5 venues', '6–15 venues', '16–50 venues', '51+ venues']} required={false} />
+            <label className="block"><span className="text-xs font-black text-slate-700">What is your main goal? <span className="font-semibold text-slate-400">Optional</span></span><textarea name="goal" rows={3} placeholder="Reduce food cost, speed up counts, improve ordering…" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#F58220] focus:ring-4 focus:ring-[#F58220]/15" /></label>
             {submitError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{submitError}</div>}
             <button type="submit" disabled={isSubmitting} className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#303A43] px-6 font-black text-white transition hover:bg-[#172238] disabled:cursor-wait disabled:opacity-70">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}{isSubmitting ? 'Sending request…' : 'Request my demo'}{!isSubmitting && <ArrowRight className="h-4 w-4" />}</button>
             <p className="text-center text-[11px] leading-5 text-slate-400">Your inquiry will be sent securely to demo@zestiq.ca. By continuing, you acknowledge our <Link to="/privacy" className="font-bold text-slate-600 underline underline-offset-2">Privacy Policy</Link> and <Link to="/terms" className="font-bold text-slate-600 underline underline-offset-2">Terms of Service</Link>.</p>
@@ -106,6 +115,6 @@ export function BookDemoThankYou() {
   );
 }
 
-function Field({ label, name, type = 'text', autoComplete }: { label: string; name: string; type?: string; autoComplete: string }) { return <label className="block"><span className="text-xs font-black text-slate-700">{label} <span className="text-red-500">*</span></span><input required className={fieldClass} name={name} type={type} autoComplete={autoComplete} /></label>; }
-function SelectField({ label, name, options }: { label: string; name: string; options: string[] }) { return <label className="block"><span className="text-xs font-black text-slate-700">{label} <span className="text-red-500">*</span></span><select required className={fieldClass} name={name} defaultValue=""><option value="" disabled>Please select</option>{options.map(option => <option value={option} key={option}>{option}</option>)}</select></label>; }
+function Field({ label, name, type = 'text', autoComplete, required = true }: { label: string; name: string; type?: string; autoComplete: string; required?: boolean }) { return <label className="block"><span className="text-xs font-black text-slate-700">{label} {required ? <span className="text-red-500">*</span> : <span className="font-semibold text-slate-400">Optional</span>}</span><input required={required} className={fieldClass} name={name} type={type} autoComplete={autoComplete} /></label>; }
+function SelectField({ label, name, options, required = true }: { label: string; name: string; options: string[]; required?: boolean }) { return <label className="block"><span className="text-xs font-black text-slate-700">{label} {required ? <span className="text-red-500">*</span> : <span className="font-semibold text-slate-400">Optional</span>}</span><select required={required} className={fieldClass} name={name} defaultValue=""><option value="">{required ? 'Please select' : 'Not provided'}</option>{options.map(option => <option value={option} key={option}>{option}</option>)}</select></label>; }
 function DemoBenefit({ icon: Icon, title, text }: { icon: typeof Check; title: string; text: string }) { return <div className="rounded-[22px] bg-white p-5 shadow-sm"><Icon className="h-5 w-5 text-[#F58220]" /><p className="mt-3 font-black">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></div>; }

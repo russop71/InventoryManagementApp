@@ -48,6 +48,24 @@ test('sends a valid demo request to the configured inbox', async () => {
   }
 });
 
+test('accepts a lower-friction request with only the essential contact fields', async () => {
+  resetRateLimitsForTests();
+  const originalFetch = global.fetch;
+  const originalKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = 'test-key';
+  global.fetch = async () => ({ ok: true, json: async () => ({ id: 'email-optional-fields' }) });
+  try {
+    const res = responseMock();
+    await handler({ method: 'POST', body: { firstName: 'Pat', email: 'pat@example.com', restaurant: 'Example Restaurant' }, headers: {}, socket: { remoteAddress: 'optional-ip' } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.payload, { sent: true });
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = originalKey;
+  }
+});
+
 test('accepts the honeypot silently without sending email', async () => {
   resetRateLimitsForTests();
   const originalFetch = global.fetch;

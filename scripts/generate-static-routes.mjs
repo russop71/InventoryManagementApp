@@ -10,6 +10,9 @@ const pages = [
   ['/canadian-owned', 'Canadian-Owned Restaurant Software | ZestIQ', 'ZestIQ is a Canadian-owned restaurant operations software company building inventory, cost, labour and AI tools.'],
   ['/best-restaurant-inventory-management-software-canada', 'Best Restaurant Inventory Management Software Canada | 2026 Guide', 'A practical 2026 guide to choosing restaurant inventory management software in Canada. Compare counting, food cost, invoices, ordering, POS, labour and multi-location requirements.'],
   ['/restaurant-inventory-management-guide', 'Restaurant Inventory Management Guide: Counts, Food Cost & Ordering', 'A practical restaurant inventory management guide covering count sheets, units, recipe costing, invoice prices, waste, variance, pars and ordering.'],
+  ['/weekly-restaurant-inventory-checklist', 'Weekly Restaurant Inventory Checklist | Free Count Routine', 'Use this weekly restaurant inventory checklist to prepare counts, verify deliveries, investigate variance, update food cost and approve supplier orders.'],
+  ['/restaurant-invoice-price-change-tracking', 'Restaurant Supplier Price Change Tracking | Invoice Cost Alerts', 'Learn how to track restaurant supplier price changes from invoices, update recipe cost, protect menu margin and give managers a focused weekly review.'],
+  ['/restaurant-inventory-software-burlington', 'Restaurant Inventory Software Burlington, Ontario | ZestIQ', 'Burlington-based restaurant inventory and food-cost software for independent restaurants and multi-location operators across Ontario and Canada.'],
   ['/restaurant-food-cost-calculator', 'Free Restaurant Food Cost Calculator | Food Cost Percentage', 'Calculate restaurant food cost percentage, gross profit and target menu price. Includes the formula and practical guidance for recipe and menu costing.'],
   ['/restaurant-inventory-management-software', 'Restaurant Inventory Management Software Canada | ZestIQ', 'Restaurant inventory management software for Canadian operators. Connect mobile counts, invoices, live food cost, waste, pars, purchasing and multi-location insights.'],
   ['/restaurant-food-cost-software', 'Restaurant Food Cost & Recipe Costing Software | ZestIQ', 'Restaurant food cost software linking recipes to current ingredient prices, menu margins, beverages and supplier changes.'],
@@ -80,6 +83,55 @@ const resourceContent = {
       ['How often should a restaurant count inventory?', 'Many restaurants complete a full count weekly and daily spot counts for expensive, fast-moving or high-variance products.'],
       ['What is restaurant inventory variance?', 'It is the difference between expected usage or stock and the actual count, expressed in units or dollars.'],
       ['How do pars improve restaurant ordering?', 'Comparing target stock with current stock, incoming orders and expected demand creates a more defensible order quantity.'],
+    ],
+  },
+  '/weekly-restaurant-inventory-checklist': {
+    label: 'Weekly restaurant inventory checklist',
+    heading: 'A weekly restaurant inventory checklist your team can actually finish.',
+    intro: 'Prepare, count, review and act on restaurant inventory with a consistent weekly routine built around storage areas, count units, variance, food cost and ordering.',
+    modified: '2026-10-06',
+    sections: [
+      ['Before the restaurant inventory count', 'Choose a consistent cut-off time, finish receiving, arrange items in physical walking order, verify units and assign each storage area.'],
+      ['During the count', 'Count every line, preserve the correct units, flag damaged stock, avoid product movement and recount surprising high-value quantities.'],
+      ['The next morning', 'Review actual and theoretical usage, investigate the largest dollar variances, check supplier price changes, adjust pars and approve supplier orders.'],
+    ],
+    faqs: [
+      ['What day should a restaurant count inventory?', 'Choose a consistent low-activity cut-off that aligns with your reporting week. Consistency matters more than the specific weekday.'],
+      ['Who should count restaurant inventory?', 'Assign trained employees to defined storage areas and have a manager review unusual or high-value quantities before finalizing.'],
+      ['What should happen after a weekly inventory count?', 'Review value, usage variance, waste, supplier price changes and replenishment needs while the count is current.'],
+    ],
+  },
+  '/restaurant-invoice-price-change-tracking': {
+    label: 'Restaurant supplier price-change tracking',
+    heading: 'Catch restaurant supplier price changes before they erase menu margin.',
+    intro: 'Connect approved invoice prices with ingredient cost, inventory value, affected recipes and a focused manager review.',
+    modified: '2026-10-06',
+    sections: [
+      ['Capture comparable supplier cost', 'Record supplier, date, product, pack size, quantity, unit price and comparable base-unit cost, then review scanned values before posting.'],
+      ['Show managers what needs attention', 'Explain the old cost, new cost, percentage change, dollar impact and affected recipes. Prioritize changes using purchase volume, menu sales and margin.'],
+      ['Turn the alert into a decision', 'Verify the invoice, compare approved suppliers, review yield and portion size, measure recipe margin and document the action taken.'],
+    ],
+    faqs: [
+      ['How often should restaurants review supplier price changes?', 'Review material changes when invoices are approved and provide managers with a weekly summary of all changes and their operational impact.'],
+      ['Should an invoice automatically update recipe cost?', 'The extracted invoice and supplier-item match should be reviewed first. Approved prices can then flow into affected recipes and menu margins.'],
+      ['What is the best way to compare supplier prices?', 'Normalize products to a comparable usable unit and account for pack size, yield, quality, delivery terms and credits.'],
+    ],
+  },
+  '/restaurant-inventory-software-burlington': {
+    label: 'Restaurant inventory software from Burlington, Ontario',
+    heading: 'Restaurant inventory software for Burlington operators—and Canadian teams beyond Halton.',
+    intro: 'ZestIQ is a Burlington-based Canadian restaurant software company connecting inventory, invoices, food and beverage cost, purchasing, labour and multi-location oversight.',
+    modified: '2026-10-06',
+    schemaType: 'SoftwareApplication',
+    sections: [
+      ['Local conversations and Canadian operating context', 'Restaurant operators in Burlington, Oakville, Hamilton, Milton and the Greater Toronto Area can book a focused walkthrough using Canadian-dollar pricing and Canadian product documentation.'],
+      ['Use ZestIQ across Canada', 'ZestIQ is delivered online so independent and multi-location restaurant teams across Canada can use the platform without installing restaurant hardware.'],
+      ['Evaluate a complete workflow', 'Test mobile counts, invoice review, live recipe cost, waste and variance, supplier ordering and protected multi-location oversight.'],
+    ],
+    faqs: [
+      ['Is ZestIQ based in Burlington?', 'Yes. ZestIQ is a Canadian restaurant software company based in Burlington, Ontario.'],
+      ['Can restaurants outside Burlington use ZestIQ?', 'Yes. ZestIQ is a web-based platform designed for Canadian restaurant operators.'],
+      ['Can I use my own restaurant data during a demo?', 'Bring a representative invoice, inventory workflow or food-cost question and ZestIQ can tailor the conversation around your operation.'],
     ],
   },
   '/restaurant-food-cost-calculator': {
@@ -170,7 +222,7 @@ for (const [path, title, description] of pages) {
     graph.push({ '@type': 'FAQPage', mainEntity: content.faqs.map(([question, answer]) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) });
   }
   const schema = { '@context': 'https://schema.org', '@graph': graph };
-  const crawlableContent = content ? `<main id="zestiq-crawlable-content"><article><p>${escapeHtml(content.label)}</p><h1>${escapeHtml(content.heading)}</h1><p>${escapeHtml(content.intro)}</p>${content.sections.map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(body)}</p></section>`).join('')}<section><h2>Frequently asked questions</h2>${content.faqs.map(([question, answer]) => `<h3>${escapeHtml(question)}</h3><p>${escapeHtml(answer)}</p>`).join('')}</section><nav aria-label="Related restaurant resources"><a href="/restaurant-inventory-management-software">Restaurant inventory software</a> · <a href="/restaurant-inventory-management-guide">Inventory guide</a> · <a href="/restaurant-food-cost-calculator">Food-cost calculator</a> · <a href="/book-demo">Book a ZestIQ demo</a></nav></article></main>` : '';
+  const crawlableContent = content ? `<main id="zestiq-crawlable-content"><article><p>${escapeHtml(content.label)}</p><h1>${escapeHtml(content.heading)}</h1><p>${escapeHtml(content.intro)}</p>${content.sections.map(([heading, body]) => `<section><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(body)}</p></section>`).join('')}<section><h2>Frequently asked questions</h2>${content.faqs.map(([question, answer]) => `<h3>${escapeHtml(question)}</h3><p>${escapeHtml(answer)}</p>`).join('')}</section><nav aria-label="Related restaurant resources"><a href="/restaurant-inventory-management-software">Restaurant inventory software</a> · <a href="/restaurant-inventory-management-guide">Inventory guide</a> · <a href="/weekly-restaurant-inventory-checklist">Weekly inventory checklist</a> · <a href="/restaurant-invoice-price-change-tracking">Supplier price-change tracking</a> · <a href="/restaurant-food-cost-calculator">Food-cost calculator</a> · <a href="/restaurant-inventory-software-burlington">Burlington restaurant software</a> · <a href="/book-demo">Book a ZestIQ demo</a></nav></article></main>` : '';
   let html = template
     .replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(title)}</title>`)
     .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/s, `<meta name="description" content="${escapeHtml(description)}" />`)

@@ -1,7 +1,7 @@
 import { enforceRateLimit } from './_request-guard.js';
 import { reportServerError } from './_observability.js';
 
-const REQUIRED_FIELDS = ['firstName', 'lastName', 'email', 'phone', 'restaurant', 'role', 'pos', 'venues', 'goal'];
+const REQUIRED_FIELDS = ['firstName', 'email', 'restaurant'];
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function clean(value, maxLength = 500) {
@@ -33,37 +33,39 @@ export function normalizeDemoRequest(body = {}) {
 }
 
 function requestText(request) {
+  const provided = value => value || 'Not provided';
   return [
     'New ZestIQ demo request',
     '',
-    `Name: ${request.firstName} ${request.lastName}`,
+    `Name: ${request.firstName}${request.lastName ? ` ${request.lastName}` : ''}`,
     `Work email: ${request.email}`,
-    `Phone: ${request.phone}`,
+    `Phone: ${provided(request.phone)}`,
     `Restaurant/company: ${request.restaurant}`,
-    `Role: ${request.role}`,
-    `POS: ${request.pos}`,
-    `Number of venues: ${request.venues}`,
+    `Role: ${provided(request.role)}`,
+    `POS: ${provided(request.pos)}`,
+    `Number of venues: ${provided(request.venues)}`,
     '',
     'Main goal:',
-    request.goal,
+    provided(request.goal),
   ].join('\n');
 }
 
 function requestHtml(request) {
+  const provided = value => value || 'Not provided';
   const rows = [
-    ['Name', `${request.firstName} ${request.lastName}`],
+    ['Name', `${request.firstName}${request.lastName ? ` ${request.lastName}` : ''}`],
     ['Work email', request.email],
-    ['Phone', request.phone],
+    ['Phone', provided(request.phone)],
     ['Restaurant/company', request.restaurant],
-    ['Role', request.role],
-    ['POS', request.pos],
-    ['Number of venues', request.venues],
+    ['Role', provided(request.role)],
+    ['POS', provided(request.pos)],
+    ['Number of venues', provided(request.venues)],
   ];
   return `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#172238;max-width:680px;margin:0 auto">
     <h1 style="font-size:24px;margin:0 0 18px">New ZestIQ demo request</h1>
     <table role="presentation" style="border-collapse:collapse;width:100%">${rows.map(([label, value]) => `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;width:190px">${escapeHtml(label)}</td><td style="padding:8px 12px;border:1px solid #e2e8f0">${escapeHtml(value)}</td></tr>`).join('')}</table>
     <h2 style="font-size:16px;margin:20px 0 6px">Main goal</h2>
-    <p style="white-space:pre-wrap;margin:0">${escapeHtml(request.goal)}</p>
+    <p style="white-space:pre-wrap;margin:0">${escapeHtml(provided(request.goal))}</p>
   </div>`;
 }
 

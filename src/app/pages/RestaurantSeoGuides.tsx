@@ -7,6 +7,8 @@ import { usePageSeo } from '../utils/seo';
 const guideLinks = [
   ['Canadian buyer’s guide', '/best-restaurant-inventory-management-software-canada'],
   ['Inventory management guide', '/restaurant-inventory-management-guide'],
+  ['Weekly inventory checklist', '/weekly-restaurant-inventory-checklist'],
+  ['Track supplier price changes', '/restaurant-invoice-price-change-tracking'],
   ['Food-cost calculator', '/restaurant-food-cost-calculator'],
 ] as const;
 
@@ -51,6 +53,37 @@ export function RestaurantInventoryBuyerGuide() {
       </div>
       <p>A perfect score is not required. The scorecard makes trade-offs visible and gives operators a repeatable way to compare products against the work their restaurant performs every week.</p>
     </GuideSection>
+    <GuideSection title="ZestIQ, MarketMan, MarginEdge and Restaurant365 at a glance">
+      <p>This is a practical starting point based on each vendor’s public product information as of October 2026—not a substitute for a live demo or written proposal. Product packaging, integrations and pricing can change, so ask every vendor to demonstrate the exact workflow your restaurant needs.</p>
+      <div className="overflow-x-auto rounded-2xl border border-black/10">
+        <table className="min-w-[900px] w-full border-collapse text-left text-sm">
+          <thead className="bg-[#303A43] text-white"><tr><th className="p-4 font-black">Platform</th><th className="p-4 font-black">Vendor-stated focus</th><th className="p-4 font-black">Useful fit to evaluate</th><th className="p-4 font-black">Confirm during the demo</th></tr></thead>
+          <tbody className="divide-y divide-black/10 bg-[#FBFAF6]">
+            {[
+              ['ZestIQ', 'Canadian restaurant inventory, invoice review, current food and beverage cost, ordering, labour and multi-location control.', 'Independent Canadian restaurants and growing groups that want one connected operating workflow with public CAD pricing.', 'Current POS availability, onboarding plan and which recommendations require manager approval.'],
+              ['MarketMan', 'Inventory, recipe costing, purchasing, invoice and expense workflows, AI-assisted ordering, POS/accounting integrations and multi-unit tools.', 'Operators comparing a mature back-of-house inventory and purchasing platform with broad integration coverage.', 'Exact package, implementation requirements, integration scope and total Canadian cost.'],
+              ['MarginEdge', 'Invoice processing, inventory, ordering, food-cost reporting, theoretical usage, accounting/POS connections, transfers and bar inventory.', 'Restaurants prioritizing invoice-to-accounting workflows, daily cost visibility and established integrations.', 'Availability in your market, implementation process, included modules and location-level pricing.'],
+              ['Restaurant365', 'Inventory, purchasing, recipe costing, accounting, workforce management, payroll and multi-location financial reporting.', 'Restaurant groups evaluating a broad enterprise back-office and financial operations platform.', 'Required modules, implementation effort, accounting migration and total cost by location.'],
+            ].map(([vendor, focus, fit, confirm]) => <tr key={vendor}><th scope="row" className="p-4 align-top text-base font-black text-[#303A43]">{vendor}</th><td className="p-4 align-top leading-6 text-black/60">{focus}</td><td className="p-4 align-top leading-6 text-black/60">{fit}</td><td className="p-4 align-top leading-6 text-black/60">{confirm}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-5 flex flex-wrap gap-4 text-sm font-black">
+        <a href="https://www.marketman.com/platform" target="_blank" rel="noreferrer" className="underline decoration-black/20 underline-offset-4">MarketMan product information</a>
+        <a href="https://www.marginedge.com/lp/restaurant-inventory-management" target="_blank" rel="noreferrer" className="underline decoration-black/20 underline-offset-4">MarginEdge product information</a>
+        <a href="https://www.restaurant365.com/inventory" target="_blank" rel="noreferrer" className="underline decoration-black/20 underline-offset-4">Restaurant365 product information</a>
+      </div>
+    </GuideSection>
+    <GuideSection title="See the real ZestIQ workflow before you decide">
+      <p>These are current product screens, not conceptual mockups. During a demo, ask to move from an inventory count to a price change and then to a reviewable supplier order so you can judge the full workflow.</p>
+      <div className="grid gap-4 md:grid-cols-3">
+        {[
+          ['/product-orange-dashboard.png', 'Operations dashboard', 'Restaurant dashboard bringing inventory, cost and attention items together.'],
+          ['/product-orange-inventory.png', 'Inventory control', 'Restaurant inventory items, count status, units and current stock information.'],
+          ['/product-orange-ordering.png', 'Reviewable ordering', 'Supplier ordering workflow with quantities reviewed before an order is sent.'],
+        ].map(([src, title, caption]) => <figure key={src} className="overflow-hidden rounded-2xl border border-black/10 bg-white"><img src={src} alt={`ZestIQ ${title.toLowerCase()} product screen`} width="1200" height="800" loading="lazy" className="aspect-[4/3] w-full object-cover object-top" /><figcaption className="p-4"><strong className="block text-[#303A43]">{title}</strong><span className="mt-1 block text-sm leading-6 text-black/55">{caption}</span></figcaption></figure>)}
+      </div>
+    </GuideSection>
     <GuideSection title="Questions to ask during every restaurant inventory demo">
       <p>Ask the vendor to perform a real workflow: count one ingredient in two units, receive a changed supplier price, show the affected recipe margin and build a suggested order. Request a clear explanation of what happens when a scan is uncertain, a POS item does not match a recipe or the internet connection is interrupted.</p>
       <p>Also ask what is included in the advertised price. Onboarding, additional locations, invoice volume, POS connections, scheduling and support may be separate charges. A transparent total cost is more useful than a low starting price that excludes the workflows your restaurant needs.</p>
@@ -63,6 +96,84 @@ export function RestaurantInventoryBuyerGuide() {
       ['What is restaurant inventory management software?', 'It is software that helps restaurants count ingredients and beverages, value on-hand stock, organize suppliers and purchasing, calculate recipe cost, monitor waste and make replenishment decisions.'],
       ['How much does restaurant inventory software cost in Canada?', 'Pricing varies by location count, feature set, invoice volume and integrations. Compare the total monthly cost in Canadian dollars, including onboarding and required add-ons.'],
       ['Can one system manage food, beverage and labour?', 'Some platforms focus only on stock. Broader restaurant operations systems can connect kitchen and bar inventory with food cost, purchasing, waste, sales and labour.'],
+    ]} />
+  </GuideLayout>;
+}
+
+export function WeeklyRestaurantInventoryChecklist() {
+  usePageSeo({
+    title: 'Weekly Restaurant Inventory Checklist | Free Count Routine',
+    description: 'Use this weekly restaurant inventory checklist to prepare counts, verify deliveries, investigate variance, update food cost and approve supplier orders.',
+    path: '/weekly-restaurant-inventory-checklist',
+  });
+
+  return <GuideLayout eyebrow="Restaurant inventory checklist" title="A weekly restaurant inventory checklist your team can actually finish." intro="A repeatable weekly routine is more valuable than a complicated process that changes every count. Use this checklist to prepare, count, review and act on restaurant inventory consistently.">
+    <GuideSection title="Before the count">
+      <Checklist items={['Choose the same operational cut-off time each week.', 'Finish receiving and record transfers before counting.', 'Arrange items in the physical walking order of each storage area.', 'Confirm purchase units, count units and case conversions.', 'Assign each walk-in, freezer, dry-storage and bar section to one person.', 'Print or load a backup count sheet in case connectivity is interrupted.']} />
+    </GuideSection>
+    <GuideSection title="During the count">
+      <Checklist items={['Count every line, including zero quantities.', 'Keep cases, partial cases, kilograms, bottles and portions in their correct units.', 'Flag damaged, expired or questionable stock instead of silently adjusting it.', 'Avoid receiving or moving product until the count is complete.', 'Recount high-value items and surprising quantities before finalizing.']} />
+    </GuideSection>
+    <GuideSection title="The next morning">
+      <Checklist items={['Review beginning inventory, purchases and ending inventory.', 'Compare actual usage with recipe-linked theoretical usage.', 'Investigate the largest dollar variances first.', 'Review supplier price changes and affected recipe margins.', 'Adjust pars using demand, lead time and upcoming events.', 'Approve supplier-specific orders only after quantities and pack sizes are reviewed.']} />
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Link to="/restaurant-inventory-management-software" className="guide-primary">See the inventory workflow<ArrowRight className="h-4 w-4" /></Link><Link to="/restaurant-inventory-management-guide" className="guide-secondary">Read the complete guide</Link></div>
+    </GuideSection>
+    <Faq items={[
+      ['What day should a restaurant count inventory?', 'Choose a consistent low-activity cut-off that aligns with your reporting week. Consistency matters more than the specific weekday.'],
+      ['Who should count restaurant inventory?', 'Assign trained employees to defined storage areas and have a manager review unusual or high-value quantities before finalizing.'],
+      ['What should happen after a weekly inventory count?', 'Review value, actual usage, theoretical usage, waste, supplier price changes and replenishment needs while the count is still current.'],
+    ]} />
+  </GuideLayout>;
+}
+
+export function RestaurantInvoicePriceChangeGuide() {
+  usePageSeo({
+    title: 'Restaurant Supplier Price Change Tracking | Invoice Cost Alerts',
+    description: 'Learn how to track restaurant supplier price changes from invoices, update recipe cost, protect menu margin and give managers a focused weekly review.',
+    path: '/restaurant-invoice-price-change-tracking',
+  });
+
+  return <GuideLayout eyebrow="Restaurant supplier cost control" title="Catch restaurant supplier price changes before they erase menu margin." intro="A supplier increase matters most when it changes a high-volume recipe, a low-margin menu item or the value of stock already on hand. Build a review process that connects every approved invoice price with the decisions it affects.">
+    <GuideSection title="Capture the price and its context">
+      <p>Record the supplier, invoice date, product, pack size, quantity, unit price and comparable base-unit cost. A case price cannot be compared safely until pack sizes and yields are normalized. Review scanned values before posting them to inventory or recipes.</p>
+      <Checklist items={['Compare base-unit cost rather than only case price.', 'Flag pack-size changes separately from true price increases.', 'Keep the prior approved price and effective date.', 'Require review when supplier-item matching is uncertain.', 'Prevent duplicate invoices from changing stock or cost twice.']} />
+    </GuideSection>
+    <GuideSection title="Show managers what needs attention">
+      <p>A useful alert explains the old cost, new cost, percentage change, dollar impact and affected recipes. Group low-impact changes into a weekly manager digest and surface material changes immediately so the team is not overwhelmed by noise.</p>
+      <p>Prioritize changes using purchase volume, menu sales and current contribution margin. A 4% increase on a core protein can matter more than a 20% increase on a garnish used twice a week.</p>
+    </GuideSection>
+    <GuideSection title="Turn a price alert into a decision">
+      <Checklist items={['Verify the invoice and supplier agreement.', 'Check whether another approved supplier offers a comparable pack.', 'Review portion size and preparation yield.', 'Measure the effect on recipe cost and contribution margin.', 'Adjust menu price only after considering demand and competitive position.', 'Document the decision so the next manager understands what changed.']} />
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Link to="/restaurant-invoice-scanner" className="guide-primary">Explore invoice scanning<ArrowRight className="h-4 w-4" /></Link><Link to="/restaurant-food-cost-software" className="guide-secondary">See live food-cost software</Link></div>
+    </GuideSection>
+    <Faq items={[
+      ['How often should restaurants review supplier price changes?', 'Review material changes when invoices are approved and provide managers with a weekly summary of all changes and their operational impact.'],
+      ['Should an invoice automatically update recipe cost?', 'The extracted invoice and supplier-item match should be reviewed first. Once approved, the current ingredient cost can flow into affected recipes and menu margins.'],
+      ['What is the best way to compare supplier prices?', 'Normalize products to a comparable usable unit and account for pack size, yield, quality, delivery terms and credits—not only the invoice total.'],
+    ]} />
+  </GuideLayout>;
+}
+
+export function BurlingtonRestaurantInventoryPage() {
+  usePageSeo({
+    title: 'Restaurant Inventory Software Burlington, Ontario | ZestIQ',
+    description: 'Burlington-based restaurant inventory and food-cost software for independent restaurants and multi-location operators across Ontario and Canada.',
+    path: '/restaurant-inventory-software-burlington',
+  });
+
+  return <GuideLayout eyebrow="Built in Burlington, Ontario" title="Restaurant inventory software for Burlington operators—and Canadian teams beyond Halton." intro="ZestIQ is a Burlington-based Canadian restaurant software company connecting inventory counts, supplier invoices, food and beverage cost, purchasing, labour and multi-location oversight.">
+    <GuideSection title="Local conversations, Canadian operating context">
+      <p>Restaurant operators in Burlington, Oakville, Hamilton, Milton and the Greater Toronto Area can book a focused product walkthrough built around their own count, invoice and purchasing workflow. ZestIQ uses Canadian-dollar pricing and documentation designed for Canadian operators.</p>
+      <p>ZestIQ is delivered online, so restaurant teams across Canada can use the same platform without installing restaurant hardware. Product availability, integrations and onboarding scope are confirmed during the demo.</p>
+    </GuideSection>
+    <GuideSection title="What Burlington restaurant teams can evaluate">
+      <Checklist items={['Mobile inventory counts organized by storage area.', 'Invoice scanning with human review and supplier-item matching.', 'Current food and beverage recipe cost.', 'Waste, actual-versus-theoretical usage and variance review.', 'Reviewable supplier orders and demand signals.', 'Separate location records with protected owner oversight.']} />
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Link to="/book-demo" className="guide-primary">Book a Burlington-area demo<ArrowRight className="h-4 w-4" /></Link><Link to="/product-tour" className="guide-secondary">Tour the product</Link></div>
+    </GuideSection>
+    <Faq items={[
+      ['Is ZestIQ based in Burlington?', 'Yes. ZestIQ is a Canadian restaurant software company based in Burlington, Ontario.'],
+      ['Can restaurants outside Burlington use ZestIQ?', 'Yes. ZestIQ is a web-based platform designed for Canadian restaurant operators, including independent and multi-location teams.'],
+      ['Can I use my own restaurant data during a demo?', 'Bring a representative invoice, inventory workflow or food-cost question and ZestIQ can tailor the conversation around your operation.'],
     ]} />
   </GuideLayout>;
 }
