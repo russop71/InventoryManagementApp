@@ -11,8 +11,12 @@ import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Trash2, Chevro
 import { apiRequest } from '../utils/api';
 import { findBestSupplierMatch } from '../utils/supplierMatching.js';
 import { resolveInvoiceInventoryItem } from '../utils/invoiceWorkflow.js';
+import { applyInvoiceAiMatch, invoiceMatchingCatalog } from '../utils/invoiceAiMatching.js';
 
 interface InvoiceItem {
+  suggestedInventoryItemId?: string;
+  matchConfidence?: number;
+  aiMatchApplied?: boolean;
   inventoryItemId?: string;
   name: string;
   quantity: number;
@@ -146,11 +150,13 @@ export function InvoiceScanner() {
         try {
           const json = await apiRequest<ExtractedInvoice>('/api/scan-invoice', {
             method: 'POST',
-            body: JSON.stringify({ imageData: dataUrl })
+            body: JSON.stringify({ imageData: dataUrl, inventoryCatalog: invoiceMatchingCatalog(inventory) })
           });
           // Normalize response
           const normalizedItems = (json.items || []).map((it: any) => ({
             name: it.name || it.item || '',
+            suggestedInventoryItemId: it.suggestedInventoryItemId,
+            matchConfidence: it.matchConfidence,
             quantity: Number(it.quantity) || 0,
             unit: it.unit || 'ea',
             packSize: Number(it.packSize) || Number(it.quantity) || 1,
@@ -196,7 +202,7 @@ export function InvoiceScanner() {
             setSupplierMatchMessage('No existing supplier matched. Review the supplier name before saving.');
           }
           setExtractedData(parsed);
-          setEditedItems(parsed.items);
+          setEditedItems(parsed.items.map(item => applyInvoiceAiMatch(item, inventory)));
           setReviewAcknowledged(false);
           if (!parsed.invoiceNumber || !parsed.date) {
             setErrorMessage('The invoice number or date could not be read. Enter the missing information before saving.');
@@ -218,6 +224,8 @@ export function InvoiceScanner() {
   const handleItemEdit = (index: number, field: keyof InvoiceItem, value: string | number) => {
     const updated = [...editedItems];
     updated[index] = { ...updated[index], [field]: value };
+    if (field === 'name' || field === 'inventoryItemId' || field === 'unit') updated[index].aiMatchApplied = false;
+    if (field === 'unit' && editedItems[index].aiMatchApplied) updated[index].inventoryItemId = undefined;
     if (field === 'name') updated[index].inventoryItemId = undefined;
     setReviewAcknowledged(false);
 
@@ -296,7 +304,8 @@ export function InvoiceScanner() {
   );
   const hasUnknownSupplier = Boolean(extractedData) && !findBestSupplierMatch(extractedData?.vendor || '', suppliers);
   const hasNewInventoryItems = editedItems.some(item => !resolveInvoiceInventoryItem(inventory, item).item);
-  const requiresExplicitReview = hasLowConfidence || hasUnknownSupplier || hasNewInventoryItems;
+  const hasAiMatches = editedItems.some(item => item.aiMatchApplied);
+  const requiresExplicitReview = hasLowConfidence || hasUnknownSupplier || hasNewInventoryItems || hasAiMatches;
 
   return (
     <div className="space-y-4 pb-20">
@@ -421,7 +430,7 @@ export function InvoiceScanner() {
       {/* Extracted Data */}
       {extractedData && (
         <>
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <Card className="invoice-review-readable bg-gradient-to-br from-green-50 to-green-100 border-green-200">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center">
@@ -468,12 +477,13 @@ export function InvoiceScanner() {
                   {hasLowConfidence && <p>Some text was unclear. Compare every highlighted value with the original invoice.</p>}
                   {hasUnknownSupplier && <p>This supplier is not in ZestIQ yet and will be created when you approve the invoice.</p>}
                   {hasNewInventoryItems && <p>Match each unmatched line to existing inventory, or explicitly choose Create new item. Check quantities and units before saving.</p>}
+                  {hasAiMatches && <p>AI selected likely inventory matches. Verify the selected products, quantities and units before approving.</p>}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="invoice-review-readable">
             <CardHeader>
               <CardTitle className="text-base">Review & Edit Items</CardTitle>
               <p className="text-xs text-gray-500 mt-1">
@@ -501,6 +511,7 @@ export function InvoiceScanner() {
                         {inventory.map(existing => <option key={existing.id} value={existing.id}>{existing.name} — {existing.unit} · {existing.supplier}</option>)}
                       </select>
                       <p className="mt-1 text-[11px] text-gray-600">
+                        {item.aiMatchApplied && 'AI-selected match — please verify. '}
                         {resolveInvoiceInventoryItem(inventory, item).item
                           ? `Adds this delivery to ${resolveInvoiceInventoryItem(inventory, item).item.name}; keeps existing stock and remembers this invoice name.`
                           : resolveInvoiceInventoryItem(inventory, item).error || 'A new inventory item will be created after approval.'}

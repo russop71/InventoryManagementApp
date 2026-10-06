@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { useInventory } from '../contexts/InventoryContext';
+import { PrintOrderGuide } from '../components/PrintOrderGuide';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
@@ -696,12 +697,13 @@ export function Orders() {
 
       {/* Header */}
       <div className="px-4 pt-2 pb-5">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-[26px] font-extrabold tracking-tight" style={{ color: D }}>Orders</h1>
             <p className="text-sm text-gray-400 mt-0.5">Manage purchase orders and track deliveries.</p>
           </div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <PrintOrderGuide inventory={inventory} />
             <button
               onClick={() => navigate('/app/forecasting')}
               className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold shrink-0 border border-gray-200 bg-white text-gray-700"

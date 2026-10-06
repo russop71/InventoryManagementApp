@@ -222,6 +222,12 @@ body,
   overflow-x: hidden;
 }
 
+/* Invoice review uses black text on its light surfaces; icons retain status colours. */
+.zestiq-app-shell .invoice-review-readable,
+.zestiq-app-shell .invoice-review-readable :is(label, input, select, option, p, span, h2, h3, [data-slot="card-title"], [data-slot="badge"]) {
+  color: #000 !important;
+}
+
 @media screen and (max-width: 639px) {
   .landing-compact-word {
     display: none;
