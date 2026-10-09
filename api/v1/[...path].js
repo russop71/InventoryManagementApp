@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { sendRegistrationEmails } from '../_customer-emails.js';
 import { normalizePosImportPayload } from '../../server/pos-import.js';
 import { extractResponseText } from '../scan.js';
 import { enforceAiQuota, recordAiUsage } from '../_ai-quota.js';
@@ -1117,9 +1118,11 @@ export default async function handler(req, res) {
       if (existing.length) return json(res, 409, { error: 'An account with this email already exists' });
 
       let authUser;
+      let registeredAccount;
       try {
         authUser = await createAuthUser({ email, password, name });
         const { account } = await ensureAccountForEmail(email, companyName || undefined);
+        registeredAccount = account;
         await supabase('app_users', {
           method: 'POST',
           prefer: 'return=minimal',
@@ -1131,8 +1134,9 @@ export default async function handler(req, res) {
         }
         throw error;
       }
+      const emailDelivery = await sendRegistrationEmails({ userId: authUser.id, name, email, account: registeredAccount });
       const tokenPayload = await signInWithPassword(email, password);
-      return json(res, 201, await sessionPayload(tokenPayload));
+      return json(res, 201, { ...await sessionPayload(tokenPayload), ...emailDelivery });
     }
 
     if (segments[0] === 'auth' && segments[1] === 'login' && method === 'POST') {

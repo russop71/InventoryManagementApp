@@ -54,14 +54,6 @@ export function Login() {
           return;
         }
         await register(name, companyName, email, password, { privacyAccepted, termsAccepted });
-        try {
-          await apiRequest<{ sent: boolean }>('/api/send-welcome-email', {
-            method: 'POST',
-            body: JSON.stringify({ name, email }),
-          });
-        } catch (emailError) {
-          console.error('Failed to send welcome email', emailError);
-        }
         toast.success('Account created. Next, add your secure payment details.');
         navigate('/app/payment-method');
       } else {

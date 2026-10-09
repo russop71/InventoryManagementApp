@@ -5,14 +5,19 @@ import { createHmac } from 'node:crypto';
 
 test('verified checkout and invoice events use current Stripe subscription state', async t => {
   const original = { ...process.env };
-  Object.assign(process.env, { SUPABASE_SECRET_KEY: 'test_db', STRIPE_SECRET_KEY: 'test_key', STRIPE_WEBHOOK_SECRET: 'test_webhook' });
+  Object.assign(process.env, { SUPABASE_SECRET_KEY: 'test_db', STRIPE_SECRET_KEY: 'test_key', STRIPE_WEBHOOK_SECRET: 'test_webhook', RESEND_API_KEY: 'test_email' });
   const { default: handler } = await import(`./stripe-webhook.js?lifecycle=${Date.now()}`);
   const previousFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = previousFetch; process.env = original; });
   const patches = [];
   const audits = [];
+  const emails = [];
   let state = 'trialing';
   globalThis.fetch = async (url, options = {}) => {
+    if (String(url) === 'https://api.resend.com/emails') {
+      emails.push({ body: JSON.parse(options.body), key: options.headers['Idempotency-Key'] });
+      return Response.json({ id: 'email_checkout' });
+    }
     if (String(url).startsWith('https://api.stripe.com/v1/subscriptions/')) {
       return Response.json({ id: 'sub_test', customer: 'cus_test', status: state,
         trial_end: 1792411200, start_date: 1789819200,
@@ -40,6 +45,8 @@ test('verified checkout and invoice events use current Stripe subscription state
   const checkout = { id: 'cs_test', created: 1789819200, customer: 'cus_test', subscription: 'sub_test', client_reference_id: 'account_test', payment_status: 'no_payment_required', metadata: { plan: 'monthly', agreement_version: '2026-09-19' }, consent: { terms_of_service: 'accepted' } };
   assert.equal((await send('checkout.session.completed', checkout)).billing_status, 'trialing');
   assert.equal(audits[0].customer_accepted, true);
+  assert.deepEqual(emails[0].body.to, ['pat@zestiq.ca']);
+  assert.equal(emails[0].key, 'checkout-alert/cs_test');
   assert.equal(patches[0].commitment_started_at, new Date(1792411200 * 1000).toISOString());
   const invoice = { amount_paid: 0, parent: { subscription_details: { subscription: 'sub_test' } } };
   assert.equal((await send('invoice.payment_succeeded', invoice)).billing_status, 'trialing');
@@ -49,4 +56,5 @@ test('verified checkout and invoice events use current Stripe subscription state
   assert.equal((await send('customer.subscription.deleted', { id: 'sub_test' })).billing_status, 'canceled');
   assert.equal((await send('invoice.payment_succeeded', invoice)).billing_status, 'canceled');
   assert.equal((await send('checkout.session.completed', checkout)).billing_status, 'canceled');
+  assert.equal(emails.length, 1, 'invoice, subscription and canceled checkout events do not send signup alerts');
 });
