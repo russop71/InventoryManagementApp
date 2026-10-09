@@ -343,6 +343,7 @@ async function parseResponse(response) {
   if (!response.ok) {
     const error = new Error(payload?.msg || payload?.error_description || payload?.message || payload?.hint || `Request failed (${response.status})`);
     error.status = response.status;
+    error.code = payload?.error_code || payload?.code;
     throw error;
   }
   return payload;
@@ -374,7 +375,20 @@ async function supabaseAuth(path, { method = 'GET', body, accessToken } = {}) {
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  return parseResponse(response);
+  try {
+    return await parseResponse(response);
+  } catch (error) {
+    // Supabase can report invalid user JWTs as 403. The client renews
+    // sessions on 401; keep genuine permission failures as 403.
+    if (accessToken && path === 'user' && method === 'GET' &&
+        [401, 403].includes(error.status) &&
+        (error.code === 'bad_jwt' || /^invalid JWT\b/i.test(error.message))) {
+      error.status = 401;
+      error.code = 'SESSION_EXPIRED';
+      error.message = 'Your session has expired. Please sign in again if automatic renewal fails.';
+    }
+    throw error;
+  }
 }
 
 function mfaQrImageSource(qrCode) {
