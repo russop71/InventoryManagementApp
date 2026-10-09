@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { subscriptionBillingPatch } from './_subscription-policy.js';
+import { sendCheckoutAlert } from './_customer-emails.js';
 
 export const config = {
   api: {
@@ -174,6 +175,8 @@ export default async function handler(req, res) {
         await activateAccountFromCheckout(accountId, object, subscription);
         if (event.type !== 'checkout.session.async_payment_failed') {
           await recordSubscriptionAgreement(accountId, object, acceptedAt);
+          // Await delivery so Stripe retries the webhook if the email provider fails.
+          await sendCheckoutAlert(object, subscription);
         }
       }
     }
