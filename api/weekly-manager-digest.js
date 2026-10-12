@@ -26,9 +26,9 @@ export default async function handler(req, res) {
     since.setUTCDate(since.getUTCDate() - 7);
     const digestKey = weekKey(now);
     const [accounts, locations, locationRows, users, locationAssignments] = await Promise.all([
-      database('accounts?select=id,name'),
+      database('accounts?select=id,name,onboarding_state'),
       database('locations?select=id,account_id,name'),
-      database('location_data?select=location_id,inventory,invoices,orders'),
+      database('location_data?select=location_id,inventory,invoices,orders,recipes'),
       database('app_users?status=eq.Active&select=id,account_id,name,email,role,status'),
       database('app_user_locations?select=user_id,location_id,account_id'),
     ]);
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       if (!recipients.length) continue;
       const summaries = locations
         .filter(location => location.account_id === account.id)
-        .map(location => ({ id: location.id, ...summarizeLocationAttention({ ...dataByLocation.get(location.id), name: location.name }, since) }))
+        .map(location => ({ id: location.id, ...summarizeLocationAttention({ ...dataByLocation.get(location.id), name: location.name }, since, { until: now, foodCostTarget: account.onboarding_state?.clientProfile?.foodCostTarget }) }))
         .filter(hasAttention);
       if (!summaries.length) continue;
       const existing = await database(`app_usage_events?account_id=eq.${encodeURIComponent(account.id)}&event_name=eq.weekly_manager_digest_sent&metadata-%3E%3Eweek_key=eq.${encodeURIComponent(digestKey)}&select=id&limit=1`);
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       for (const manager of managers) {
         const managerLocations = ['Owner', 'Admin'].includes(manager.role)
           ? summaries
-          : summaries.filter(location => locationAssignments.some(assignment => assignment.user_id === manager.id && assignment.location_id === location.id));
+          : summaries.filter(location => locationAssignments.some(assignment => assignment.account_id === account.id && assignment.user_id === manager.id && assignment.location_id === location.id));
         if (!managerLocations.length) continue;
         results.push(await sendWeeklyManagerDigest({ recipients: [manager.email], recipientName: manager.name, accountName: account.name, locations: managerLocations, periodStart: since, periodEnd: now }));
       }
