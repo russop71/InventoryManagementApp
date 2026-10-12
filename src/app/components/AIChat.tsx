@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { Bot, Loader2, Send, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
+import { assistantScopeKey, assistantTextParts } from '../utils/assistantChat.js';
 
 interface ChatMessage {
   id: string;
@@ -12,10 +14,10 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
+  'Help me get started with ZestIQ.',
+  'How do I scan and check an invoice?',
   'What needs my attention today?',
-  'How will forecasted sales become my next order?',
-  'Which inventory items are below par?',
-  'Which ingredients could run short?',
+  'How do I fix a recipe food cost that looks wrong?',
 ];
 
 const weatherDescription = (code: number) => {
@@ -75,18 +77,67 @@ async function getLiveContext(locationName?: string) {
 }
 
 export function AIChat() {
-  const { accountId, accountName, activeLocationId, locations } = useAuth();
+  const { accountId, user, activeLocationId } = useAuth();
+  if (!accountId || !user) return null;
+  return <ScopedAIChat key={assistantScopeKey(accountId, `${user.id || user.email}:${user.role}`, activeLocationId)} />;
+}
+
+function ScopedAIChat() {
+  const { accountId, accountName, activeLocationId, locations, user } = useAuth();
+  const activeLocation = locations.find(location => location.id === activeLocationId);
+  const welcome: ChatMessage = { id: 'welcome', role: 'assistant', content: `Hi ${user?.name?.split(' ')[0] || 'there'}! I can help you use ZestIQ, troubleshoot problems and understand your authorized account data. Tell me what you’re trying to do, or share how you prefer to work.` };
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Hi! I’m your zestIQ AI assistant. I can help with this app and explain how your authorized sales, menu items, recipes, inventory, suppliers and forecasts turn into reviewable order recommendations.',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([welcome]);
+  const [notes, setNotes] = useState<string[]>([]);
+  const [showMemory, setShowMemory] = useState(false);
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [isLoadingMemory, setIsLoadingMemory] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [memoryStatus, setMemoryStatus] = useState('');
+  const requestRef = useRef<AbortController | null>(null);
+  const mutationRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const memoryUrl = `/api/v1/accounts/${encodeURIComponent(accountId || '')}/assistant?locationId=${encodeURIComponent(activeLocationId || '')}`;
+  const busy = isSending || isLoadingMemory || isClearing;
+
+  useEffect(() => () => requestRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (!isOpen || !accountId || !activeLocationId || isSending || isClearing) return;
+    const controller = new AbortController();
+    setIsLoadingMemory(true);
+    void apiRequest<{ history: Array<{ role: 'user' | 'assistant'; content: string }>; notes: string[]; memoryEnabled?: boolean }>(memoryUrl, { signal: controller.signal })
+      .then(result => {
+        if (controller.signal.aborted) return;
+        setMemoryEnabled(result.memoryEnabled !== false);
+        if (result.memoryEnabled !== false) setMessages([welcome, ...result.history.map((entry, index) => ({ ...entry, id: `saved-${index}` }))]);
+        setNotes(result.notes);
+        setMemoryStatus('');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setMemoryStatus('Saved conversations are unavailable right now. You can still ask for help.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsLoadingMemory(false); });
+    return () => controller.abort();
+  }, [isOpen, accountId, activeLocationId]);
+
+  const clearMemory = async () => {
+    if (busy || mutationRef.current) return;
+    mutationRef.current = true;
+    setIsClearing(true);
+    const controller = new AbortController();
+    requestRef.current = controller;
+    try {
+      await apiRequest(memoryUrl, { method: 'DELETE', signal: controller.signal });
+      if (controller.signal.aborted) return;
+      setMessages([welcome]); setNotes([]); setInput('');
+      setMemoryStatus('Your chat and saved preferences for this location have been cleared.');
+    } catch {
+      if (!controller.signal.aborted) setMemoryStatus('Could not clear memory. Please try again.');
+    } finally { mutationRef.current = false; if (!controller.signal.aborted) setIsClearing(false); }
+  };
 
   useEffect(() => {
     if (isOpen) endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -94,33 +145,42 @@ export function AIChat() {
 
   const sendMessage = async (messageText: string) => {
     const message = messageText.trim();
-    if (!message || !accountId || isSending) return;
+    if (!message || !accountId || busy || mutationRef.current) return;
+    mutationRef.current = true;
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message };
-    const history = messages.filter(entry => entry.id !== 'welcome').map(entry => ({ role: entry.role, content: entry.content }));
     setMessages(current => [...current, userMessage]);
     setInput('');
     setIsSending(true);
+    const controller = new AbortController();
+    requestRef.current = controller;
     try {
-      const activeLocation = locations.find(location => location.id === activeLocationId);
       const liveContext = await getLiveContext(activeLocation?.name);
-      const result = await apiRequest<{ answer: string }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/assistant`, {
+      if (controller.signal.aborted) return;
+      const result = await apiRequest<{ answer: string; memorySaved: boolean; memoryEnabled?: boolean; notes: string[] }>(`/api/v1/accounts/${encodeURIComponent(accountId)}/assistant`, {
         method: 'POST',
+        signal: controller.signal,
         body: JSON.stringify({
           message,
           locationId: activeLocationId,
-          history,
+          ...(!memoryEnabled ? { history: messages.filter(entry => entry.id !== 'welcome').map(entry => ({ role: entry.role, content: entry.content })) } : {}),
           liveContext,
         }),
       });
+      if (controller.signal.aborted) return;
       setMessages(current => [...current, { id: crypto.randomUUID(), role: 'assistant', content: result.answer }]);
+      setNotes(result.notes || []);
+      setMemoryEnabled(result.memoryEnabled !== false);
+      setMemoryStatus(result.memorySaved || result.memoryEnabled === false ? '' : 'This answer is available, but the conversation could not be saved.');
     } catch (error) {
+      if (controller.signal.aborted) return;
       setMessages(current => [...current, {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: error instanceof Error ? error.message : 'I’m temporarily unavailable. Please try again.',
       }]);
     } finally {
-      setIsSending(false);
+      mutationRef.current = false;
+      if (!controller.signal.aborted) setIsSending(false);
     }
   };
 
@@ -142,23 +202,32 @@ export function AIChat() {
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F58220] text-[#303A43]"><Bot className="h-5 w-5" /></span>
               zestIQ AI Assistant
             </DialogTitle>
-            <DialogDescription className="text-white/60">
-              Company-aware help for {accountName}. Other businesses’ information is never included.
+            <DialogDescription className="break-words text-white/60">
+              Help for {accountName} · {activeLocation?.name}. {memoryEnabled ? 'Your chats and preferences are remembered here.' : 'Shared demo chat stays temporary.'}
             </DialogDescription>
           </DialogHeader>
+
+          <div className="border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-600">
+            {memoryEnabled ? <div className="flex items-center justify-between gap-2">
+              <button type="button" className="min-h-9 font-semibold text-[#303A43] underline" onClick={() => setShowMemory(current => !current)}>Saved preferences ({notes.length})</button>
+              <button type="button" disabled={busy} onClick={() => void clearMemory()} className="min-h-9 rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-50">{isClearing ? 'Clearing…' : 'Clear memory'}</button>
+            </div> : <p>Shared demo chats stay in this browser tab and are not saved.</p>}
+            {memoryEnabled && showMemory && <div className="mt-2 max-h-28 overflow-y-auto break-words rounded-lg bg-slate-50 p-2"><p className="mb-1">Your memory is separate for each user, company and location. Tell me “I prefer…” or “Remember…” to share a preference.</p>{notes.length ? <ul className="list-disc space-y-1 pl-4">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul> : <p>No saved preferences yet.</p>}</div>}
+            {memoryStatus && <p role="status" className="mt-1 leading-5">{memoryStatus}</p>}
+          </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4">
             {messages.map(message => (
               <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === 'user' ? 'bg-[#303A43] text-white' : 'border border-slate-200 bg-white text-slate-800 shadow-sm'}`}>
-                  {message.content}
+                <div className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === 'user' ? 'bg-[#303A43] text-white' : 'border border-slate-200 bg-white text-slate-800 shadow-sm'}`}>
+                  {assistantTextParts(message.content).map((part, index) => part.route ? <Link key={index} to={part.route} onClick={() => setIsOpen(false)} className="font-semibold underline">{part.text}</Link> : <span key={index}>{part.text}</span>)}
                 </div>
               </div>
             ))}
-            {isSending && (
+            {(isSending || isLoadingMemory) && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Reviewing your company data…
+                  <Loader2 className="h-4 w-4 animate-spin" /> {isLoadingMemory ? 'Loading your conversation…' : 'Finding the next step…'}
                 </div>
               </div>
             )}
@@ -171,6 +240,7 @@ export function AIChat() {
                 <button
                   key={prompt}
                   type="button"
+                  disabled={busy}
                   onClick={() => void sendMessage(prompt)}
                   className="shrink-0 rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:border-[#F58220] hover:bg-[#FEFCE8]"
                 >
@@ -199,10 +269,11 @@ export function AIChat() {
                 }}
                 rows={2}
                 maxLength={4000}
-                placeholder="Ask about forecasts, ingredient demand, order buffers, inventory or costs…"
+                disabled={busy}
+                placeholder="Ask me anything about ZestIQ…"
                 className="min-h-12 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#F58220]"
               />
-              <Button type="submit" size="icon" disabled={!input.trim() || isSending} className="h-12 w-12 shrink-0 bg-[#303A43] text-white hover:bg-[#1E293B]">
+              <Button type="submit" size="icon" disabled={!input.trim() || busy} className="h-12 w-12 shrink-0 bg-[#303A43] text-white hover:bg-[#1E293B]">
                 <Send className="h-4 w-4" />
               </Button>
             </div>
