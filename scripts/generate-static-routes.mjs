@@ -211,14 +211,16 @@ for (const [path, title, description] of pages) {
   const url = `https://zestiq.ca${path}`;
   const content = resourceContent[path];
   const graph = [
-    { '@type': 'WebPage', '@id': `${url}#webpage`, name: title, description, url, inLanguage: 'en-CA', isPartOf: { '@type': 'WebSite', name: 'ZestIQ', url: 'https://zestiq.ca/' } },
+    { '@type': 'Organization', '@id': 'https://zestiq.ca/#organization', name: 'ZestIQ', legalName: 'Zest IQ Inc.', url: 'https://zestiq.ca/', logo: 'https://zestiq.ca/zestiq-mark-exact.png', email: 'Pat@zestiq.ca', telephone: '+1-416-455-7401', sameAs: ['https://www.linkedin.com/company/143964247/'], address: { '@type': 'PostalAddress', streetAddress: '5137 Oakley Drive', addressLocality: 'Burlington', addressRegion: 'ON', postalCode: 'L7L 6P1', addressCountry: 'CA' } },
+    { '@type': 'WebSite', '@id': 'https://zestiq.ca/#website', name: 'ZestIQ', url: 'https://zestiq.ca/', inLanguage: 'en-CA', publisher: { '@id': 'https://zestiq.ca/#organization' } },
+    { '@type': 'WebPage', '@id': `${url}#webpage`, name: title, description, url, inLanguage: 'en-CA', isPartOf: { '@id': 'https://zestiq.ca/#website' }, publisher: { '@id': 'https://zestiq.ca/#organization' } },
     { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'ZestIQ', item: 'https://zestiq.ca/' }, { '@type': 'ListItem', position: 2, name: title, item: url }] },
   ];
   if (content) {
     const contentType = content.schemaType || (path.endsWith('calculator') ? 'WebApplication' : 'Article');
     graph.push(contentType === 'SoftwareApplication'
-      ? { '@type': contentType, name: 'ZestIQ', headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', applicationCategory: 'BusinessApplication', operatingSystem: 'Web', offers: { '@type': 'Offer', price: '249.99', priceCurrency: 'CAD', url: 'https://zestiq.ca/pricing' }, mainEntityOfPage: { '@id': `${url}#webpage` } }
-      : { '@type': contentType, headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', mainEntityOfPage: { '@id': `${url}#webpage` } });
+      ? { '@type': contentType, name: 'ZestIQ', headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', applicationCategory: 'BusinessApplication', operatingSystem: 'Web', offers: { '@type': 'Offer', price: '249.99', priceCurrency: 'CAD', url: 'https://zestiq.ca/pricing' }, publisher: { '@id': 'https://zestiq.ca/#organization' }, mainEntityOfPage: { '@id': `${url}#webpage` } }
+      : { '@type': contentType, headline: content.heading, description, url, dateModified: content.modified, inLanguage: 'en-CA', author: { '@id': 'https://zestiq.ca/#organization' }, publisher: { '@id': 'https://zestiq.ca/#organization' }, mainEntityOfPage: { '@id': `${url}#webpage` } });
     graph.push({ '@type': 'FAQPage', mainEntity: content.faqs.map(([question, answer]) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) });
   }
   const schema = { '@context': 'https://schema.org', '@graph': graph };
@@ -232,6 +234,8 @@ for (const [path, title, description] of pages) {
     .replace(/<meta name="twitter:title" content="[^"]*"\s*\/>/s, `<meta name="twitter:title" content="${escapeHtml(title)}" />`)
     .replace(/<meta name="twitter:description" content="[^"]*"\s*\/>/s, `<meta name="twitter:description" content="${escapeHtml(description)}" />`)
     .replace(/<link rel="canonical" href="[^"]*"\s*\/>/s, `<link rel="canonical" href="${url}" />`)
+    .replace(/<link rel="alternate" hreflang="en-CA" href="[^"]*"\s*\/>/s, `<link rel="alternate" hreflang="en-CA" href="${url}" />`)
+    .replace(/<link rel="alternate" hreflang="x-default" href="[^"]*"\s*\/>/s, `<link rel="alternate" hreflang="x-default" href="${url}" />`)
     .replace(/\s*<script id="zestiq-home-schema" type="application\/ld\+json">.*?<\/script>/s, '')
     .replace('</head>', `    <script type="application/ld+json">${JSON.stringify(schema)}</script>\n  </head>`)
     .replace(/<div id="root">.*?<\/div>/s, `<div id="root">${crawlableContent}</div>`);
