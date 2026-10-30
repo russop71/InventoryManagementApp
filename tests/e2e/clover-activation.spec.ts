@@ -1,6 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test('imported Clover data does not offer an unavailable direct sync', async ({ page }) => {
+async function setup(page: Page, cloverStatus: Record<string, unknown>) {
+  const actions: { path: string; body: unknown }[] = [];
   const accountId = 'b74c80db-0c0b-4fc0-8a89-b5d2cbd808f5';
   const locationId = 'd74c80db-0c0b-4fc0-8a89-b5d2cbd808f5';
   const errors: string[] = [];
@@ -17,24 +18,57 @@ test('imported Clover data does not offer an unavailable direct sync', async ({ 
     const request = route.request(), path = new URL(request.url()).pathname;
     let body: unknown = data;
     if (path.includes('/auth/session/')) body = session;
- else if (path.endsWith('/locations')) body = { locations: session.locations };
+    else if (path.endsWith('/locations')) body = { locations: session.locations };
+    else if (path === '/api/clover/status') { if (request.method() === 'DELETE') { actions.push({ path, body: request.postDataJSON() }); body = { disconnected: true }; } else body = cloverStatus; }
+    else if (path === '/api/clover/start') { actions.push({ path, body: request.postDataJSON() }); body = { authorizeUrl: 'https://www.clover.com/oauth/v2/authorize?client_id=test' }; }
+    else if (path === '/api/clover/sync') { actions.push({ path, body: request.postDataJSON() }); body = { synced: true }; }
     else if (path.includes('/integrations/toast')) body = { toast: data.integrations.toast };
     else if (path.includes('/labor')) body = { labor: data.integrations.labor };
     else if (path.endsWith('/waste')) body = { entries: [] };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
-  const cloverRequests: string[] = [];
-  page.on('request', request => { if (request.url().includes('/api/clover/')) cloverRequests.push(request.url()); });
   await page.goto('/app/integrations');
   await page.getByRole('button', { name: 'Open Clover Dining integration settings', exact: true }).click();
   await expect(page.getByText('Imported data available', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Direct connection' }).click();
-  await expect(page.getByText('Clover automatic sync is not activated. Import sales now or request activation.', { exact: true })).toBeVisible();
+  return { actions, errors, locationId };
+}
+
+test('unconfigured Clover keeps imports available without offering an unavailable sync', async ({ page }) => {
+  const { actions, errors } = await setup(page, { available: false, connected: false });
+  await expect(page.getByText(/Clover automatic sync is not activated yet/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sync Clover now' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Connect Clover securely' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Request direct activation' })).toHaveAttribute('href', /^mailto:/);
   await page.getByRole('button', { name: 'Import Clover sales instead' }).click();
   await expect(page.getByRole('button', { name: 'Import Clover Dining sales', exact: true })).toBeVisible();
-  expect(cloverRequests).toEqual([]);
+  expect(actions).toEqual([]); expect(errors).toEqual([]);
+});
+
+test('restaurant can start provider authorization for the selected location', async ({ page }) => {
+  const { actions, errors, locationId } = await setup(page, { available: true, connected: false });
+  await page.route('https://www.clover.com/**', route => route.fulfill({ contentType: 'text/html', body: 'Clover authorization test page' }));
+  await page.getByRole('button', { name: 'Connect Clover securely' }).click();
+  await expect(page).toHaveURL('https://www.clover.com/oauth/v2/authorize?client_id=test');
+  expect(actions).toEqual([{ path: '/api/clover/start', body: { locationId } }]);
+  expect(errors).toEqual([]);
+});
+
+test('authorized restaurant sees merchant and confirms the first sync', async ({ page }) => {
+  const { actions, errors, locationId } = await setup(page, { available: true, connected: true, merchantName: 'Test Clover Kitchen' });
+  await expect(page.getByText('Authorized: Test Clover Kitchen')).toBeVisible();
+  await page.getByRole('button', { name: 'Sync Clover now', exact: true }).click();
+  expect(actions).toEqual([]);
+  await page.getByRole('button', { name: 'Confirm and sync Clover', exact: true }).click();
+  await expect.poll(() => actions.length).toBe(1);
+  expect(actions[0]).toEqual({ path: '/api/clover/sync', body: { locationId } });
+  expect(errors).toEqual([]);
+});
+
+test('restaurant can stop automatic updates without erasing saved sales', async ({ page }) => {
+  const { actions, errors, locationId } = await setup(page, { available: true, connected: true, merchantName: 'Test Clover Kitchen' });
+  await page.getByRole('button', { name: 'Stop automatic Clover sync', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm stop sync', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Connect Clover securely', exact: true })).toBeVisible();
+  expect(actions).toEqual([{ path: '/api/clover/status', body: { locationId } }]);
   expect(errors).toEqual([]);
 });

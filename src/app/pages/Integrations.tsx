@@ -1,3 +1,5 @@
+import { apiRequest } from '../utils/api';
+import { CloverConnection } from '../components/CloverConnection';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useToast, type PosImportPayload } from '../contexts/ToastContext';
@@ -60,7 +62,7 @@ export function Integrations() {
     if (!cloverResult) return;
     setSelectedProviderId('clover');
     setSetupMode('direct');
-    showToast.error('Clover automatic sync is not activated. You can import a sales export while activation is arranged.');
+    if (cloverResult !== 'authorized' && cloverResult !== 'connected') showToast.error(cloverResult === 'expired' ? 'Clover authorization expired. Start the connection again.' : cloverResult === 'cancelled' ? 'Clover authorization was cancelled. Your sales data was not changed.' : 'Clover could not be connected. Check the app setup and try again.');
     window.history.replaceState({}, '', '/app/integrations');
   }, []);
 
@@ -106,9 +108,14 @@ export function Integrations() {
     } finally { setIsImporting(false); }
   };
 
-  const handleDisconnect = () => {
-    disconnectToast();
-    showToast.success('POS sales data disconnected from this location');
+  const handleDisconnect = async () => {
+    try {
+      if (provider === 'clover' && connectionMode === 'direct') {
+        await apiRequest('/api/clover/status', { method: 'DELETE', body: JSON.stringify({ locationId: activeLocationId }) });
+      }
+      disconnectToast();
+      showToast.success('POS sales data disconnected from this location');
+    } catch (error) { showToast.error(error instanceof Error ? error.message : 'Sales could not be disconnected.'); }
   };
 
   const handleLogout = () => {
@@ -164,14 +171,13 @@ export function Integrations() {
           </TabsContent>
           <TabsContent value="direct">
         <Card className="overflow-hidden">
-          <CardHeader className="border-b border-slate-100"><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-lg"><PlugZap className="h-5 w-5 text-[#F58220]" />Direct sync</CardTitle><CardDescription className="mt-1">{selected.id === 'clover' ? 'Clover automatic sync is not activated. Import sales now or request activation.' : 'Automatic daily sales and menu updates after activation.'}</CardDescription></div><Badge variant="outline">Activation required</Badge></div></CardHeader>
+          <CardHeader className="border-b border-slate-100"><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-lg"><PlugZap className="h-5 w-5 text-[#F58220]" />Direct sync</CardTitle><CardDescription className="mt-1">{selected.id === 'clover' ? 'Authorize your Clover restaurant and sync sales for this location.' : 'Automatic daily sales and menu updates after activation.'}</CardDescription></div><Badge variant="outline">{selected.id === 'clover' ? 'Clover authorization' : 'Activation required'}</Badge></div></CardHeader>
           <CardContent className="space-y-4 pt-5">
             <div className="rounded-2xl bg-[#FEFCE8] p-4"><p className="font-black text-slate-900">{selected.name}</p><p className="mt-2 text-xs leading-5 text-slate-600">Direct connections use provider-approved OAuth or server-held credentials. ZestIQ does not ask you to paste secret API keys into this screen.</p></div>
-            {selected.id === 'clover' ? <p className="text-sm text-slate-600">{selectedIsConnected && connectionMode === 'import' ? 'Your imported Clover sales are available. Importing a file does not enable automatic sync. ' : ''}Use a CSV or JSON sales export until direct sync is available.</p> : <div className="space-y-3 text-sm"><Feature icon={ShieldCheck} text="Credentials remain server-side" /><Feature icon={Database} text="Sales stays separated by company and location" /><Feature icon={Wifi} text="Connection health and last sync are visible" /></div>}
+            {selected.id === 'clover' ? <p className="text-sm text-slate-600">{selectedIsConnected && connectionMode === 'import' ? 'Your imported Clover sales are available. Importing a file does not enable automatic sync.' : 'Each Clover authorization is linked to one company and restaurant location.'}</p> : <div className="space-y-3 text-sm"><Feature icon={ShieldCheck} text="Credentials remain server-side" /><Feature icon={Database} text="Sales stays separated by company and location" /><Feature icon={Wifi} text="Connection health and last sync are visible" /></div>}
             {isDemoAccount
               ? <span className="flex h-10 w-full cursor-not-allowed items-center justify-center rounded-md bg-slate-200 px-4 text-sm font-black text-slate-500">Available in a private workspace</span>
-              : <a href={requestUrl} className="flex h-10 w-full items-center justify-center rounded-md bg-[#F58220] px-4 text-sm font-black text-[#303A43] hover:bg-[#E5B60D]">Request direct activation</a>}
-            {selected.id === 'clover' && <Button type="button" variant="outline" className="w-full" onClick={() => setSetupMode('import')}>Import Clover sales instead</Button>}
+              : selected.id === 'clover' && activeLocationId ? <CloverConnection key={activeLocationId} locationId={activeLocationId} onImport={() => setSetupMode('import')} /> : <a href={requestUrl} className="flex h-10 w-full items-center justify-center rounded-md bg-[#F58220] px-4 text-sm font-black text-[#303A43] hover:bg-[#E5B60D]">Request direct activation</a>}
             <a href={selected.website} target={selected.website.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="flex items-center justify-center gap-1 text-xs font-bold text-[#2563EB] hover:underline">View provider information<ExternalLink className="h-3.5 w-3.5" /></a>
           </CardContent>
         </Card>
