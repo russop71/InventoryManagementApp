@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { CheckCircle, ChevronDown, ChevronRight, Database, ExternalLink, FileSpreadsheet, LogOut, Mail, MapPin, Phone, PlugZap, ShieldCheck, Upload, Wifi, XCircle } from 'lucide-react';
 import { toast as showToast } from 'sonner';
-import { apiRequest } from '../utils/api';
 
 function parseCsv(text: string) {
   const rows: string[][] = [];
@@ -49,7 +48,6 @@ export function Integrations() {
   const [isImporting, setIsImporting] = useState(false);
   const [setupMode, setSetupMode] = useState<'import' | 'direct'>('import');
   const [selectedProviderId, setSelectedProviderId] = useState(provider || 'generic');
-  const [isConnecting, setIsConnecting] = useState(false);
   const setupRef = useRef<HTMLDivElement>(null);
   const selected = getPosProvider(selectedProviderId);
   const currentProvider = getPosProvider(provider);
@@ -62,8 +60,7 @@ export function Integrations() {
     if (!cloverResult) return;
     setSelectedProviderId('clover');
     setSetupMode('direct');
-    if (cloverResult === 'connected') showToast.success('Clover is connected. Your sales and menu data are syncing.');
-    else showToast.error(query.get('detail') || 'Clover could not be connected.');
+    showToast.error('Clover automatic sync is not activated. You can import a sales export while activation is arranged.');
     window.history.replaceState({}, '', '/app/integrations');
   }, []);
 
@@ -114,23 +111,6 @@ export function Integrations() {
     showToast.success('POS sales data disconnected from this location');
   };
 
-  const handleCloverConnection = async () => {
-    if (isDemoAccount) return;
-    if (!activeLocationId) { showToast.error('Choose a location first'); return; }
-    setIsConnecting(true);
-    try {
-      if (selectedIsConnected) {
-        await apiRequest('/api/clover/sync', { method: 'POST', body: JSON.stringify({ locationId: activeLocationId }) });
-        showToast.success('Clover data synced successfully');
-        window.location.reload();
-        return;
-      }
-      const result = await apiRequest<{ authorizeUrl: string }>('/api/clover/start', { method: 'POST', body: JSON.stringify({ locationId: activeLocationId }) });
-      window.location.assign(result.authorizeUrl);
-    } catch (error) { showToast.error(error instanceof Error ? error.message : 'Clover connection failed'); }
-    finally { setIsConnecting(false); }
-  };
-
   const handleLogout = () => {
     logout(); showToast.success('Logged out successfully'); navigate('/login');
   };
@@ -165,7 +145,7 @@ export function Integrations() {
       {isDemoAccount && <Card className="border-lime-200 bg-lime-50"><CardContent className="py-4"><p className="font-semibold text-[#F58220]">Integration setup is read-only in the public demo.</p><p className="mt-1 text-sm text-[#F58220]">The Toast connection and sample sales remain available to explore. Connectors, imports and disconnection are enabled in a private workspace.</p></CardContent></Card>}
 
       <div ref={setupRef} id="integration-settings" className="scroll-mt-5 rounded-[28px] border border-[#F58220]/60 bg-[#FFFDF1] p-3 shadow-sm sm:p-5">
-        <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><span className="flex h-11 min-w-11 items-center justify-center rounded-xl px-2 text-xs font-black text-white" style={{ backgroundColor: selected.colour }}>{selected.mark}</span><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#F58220]">Integration settings</p><h2 className="text-xl font-black text-slate-950">Set up {selected.name}</h2></div></div><Badge className={selectedIsConnected ? 'bg-emerald-100 text-[#F58220]' : 'bg-white text-slate-700'}>{selectedIsConnected ? 'Data active' : 'Not connected'}</Badge></div>
+        <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><span className="flex h-11 min-w-11 items-center justify-center rounded-xl px-2 text-xs font-black text-white" style={{ backgroundColor: selected.colour }}>{selected.mark}</span><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#F58220]">Integration settings</p><h2 className="text-xl font-black text-slate-950">Set up {selected.name}</h2></div></div><Badge className={selectedIsConnected ? 'bg-emerald-100 text-[#F58220]' : 'bg-white text-slate-700'}>{selectedIsConnected ? connectionMode === 'import' ? 'Imported data available' : 'Data active' : 'Not connected'}</Badge></div>
         <Tabs value={setupMode} onValueChange={value => setSetupMode(value as 'import' | 'direct')} className="gap-4">
           <TabsList className="h-11 w-full bg-[#303A43] p-1 text-white sm:w-auto"><TabsTrigger value="import" className="px-5 text-white data-[state=active]:bg-[#F58220] data-[state=active]:font-black data-[state=active]:text-[#303A43]"><FileSpreadsheet className="h-4 w-4" />Import a file</TabsTrigger><TabsTrigger value="direct" className="px-5 text-white data-[state=active]:bg-[#F58220] data-[state=active]:font-black data-[state=active]:text-[#303A43]"><PlugZap className="h-4 w-4" />Direct connection</TabsTrigger></TabsList>
           <TabsContent value="import">
@@ -184,15 +164,14 @@ export function Integrations() {
           </TabsContent>
           <TabsContent value="direct">
         <Card className="overflow-hidden">
-          <CardHeader className="border-b border-slate-100"><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-lg"><PlugZap className="h-5 w-5 text-[#F58220]" />Direct sync</CardTitle><CardDescription className="mt-1">Automatic daily sales and menu updates.</CardDescription></div><Badge variant="outline">Activation required</Badge></div></CardHeader>
+          <CardHeader className="border-b border-slate-100"><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-lg"><PlugZap className="h-5 w-5 text-[#F58220]" />Direct sync</CardTitle><CardDescription className="mt-1">{selected.id === 'clover' ? 'Clover automatic sync is not activated. Import sales now or request activation.' : 'Automatic daily sales and menu updates after activation.'}</CardDescription></div><Badge variant="outline">Activation required</Badge></div></CardHeader>
           <CardContent className="space-y-4 pt-5">
             <div className="rounded-2xl bg-[#FEFCE8] p-4"><p className="font-black text-slate-900">{selected.name}</p><p className="mt-2 text-xs leading-5 text-slate-600">Direct connections use provider-approved OAuth or server-held credentials. ZestIQ does not ask you to paste secret API keys into this screen.</p></div>
-            <div className="space-y-3 text-sm"><Feature icon={ShieldCheck} text="Credentials remain server-side" /><Feature icon={Database} text="Sales stays separated by company and location" /><Feature icon={Wifi} text="Connection health and last sync are visible" /></div>
+            {selected.id === 'clover' ? <p className="text-sm text-slate-600">{selectedIsConnected && connectionMode === 'import' ? 'Your imported Clover sales are available. Importing a file does not enable automatic sync. ' : ''}Use a CSV or JSON sales export until direct sync is available.</p> : <div className="space-y-3 text-sm"><Feature icon={ShieldCheck} text="Credentials remain server-side" /><Feature icon={Database} text="Sales stays separated by company and location" /><Feature icon={Wifi} text="Connection health and last sync are visible" /></div>}
             {isDemoAccount
               ? <span className="flex h-10 w-full cursor-not-allowed items-center justify-center rounded-md bg-slate-200 px-4 text-sm font-black text-slate-500">Available in a private workspace</span>
-              : selected.id === 'clover'
-                ? <Button type="button" onClick={handleCloverConnection} disabled={isConnecting} className="w-full bg-[#F58220] font-black text-[#303A43] hover:bg-[#E5B60D]">{isConnecting ? 'Connecting…' : selectedIsConnected ? 'Sync Clover now' : 'Connect Clover securely'}</Button>
-                : <a href={requestUrl} className="flex h-10 w-full items-center justify-center rounded-md bg-[#F58220] px-4 text-sm font-black text-[#303A43] hover:bg-[#E5B60D]">Request direct activation</a>}
+              : <a href={requestUrl} className="flex h-10 w-full items-center justify-center rounded-md bg-[#F58220] px-4 text-sm font-black text-[#303A43] hover:bg-[#E5B60D]">Request direct activation</a>}
+            {selected.id === 'clover' && <Button type="button" variant="outline" className="w-full" onClick={() => setSetupMode('import')}>Import Clover sales instead</Button>}
             <a href={selected.website} target={selected.website.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="flex items-center justify-center gap-1 text-xs font-bold text-[#2563EB] hover:underline">View provider information<ExternalLink className="h-3.5 w-3.5" /></a>
           </CardContent>
         </Card>
