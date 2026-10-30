@@ -915,6 +915,32 @@ async function requireAccountAccess(req, accountIdentifier, { ownerOnly = false 
   return { ...auth, account };
 }
 
+// Reuse account, MFA, subscription and location policies for the server-only POS connector.
+export { supabase as cloverDatabase };
+
+export async function requireCloverAccess(req, locationId) {
+  const auth = await getAuthContext(req);
+  ensureMfa(auth);
+  return validateCloverActor(auth.appUser, locationId, auth.authUser);
+}
+
+async function validateCloverActor(appUser, locationId, authUser) {
+  if (!appUser || appUser.status !== 'Active' || !canManageOperations(appUser.role)) {
+    throw Object.assign(new Error('Owner, admin or manager access is required to connect Clover'), { status: 403 });
+  }
+  const account = await getAccount(appUser.account_id);
+  if (!account || isDemoAccount(account)) throw Object.assign(new Error('Connect Clover from a private company workspace'), { status: 403 });
+  if (!hasProductAccess({ account, authUser })) throw Object.assign(new Error('An active company subscription is required'), { status: 402 });
+  const location = await ensureLocationAccess(account.id, locationId, appUser, authUser);
+  if (!location) throw Object.assign(new Error('Restaurant location not found'), { status: 404 });
+  return { appUser, account, location };
+}
+
+export async function revalidateCloverAccess(userId, accountId, locationId) {
+  const users = await supabase(`app_users?id=eq.${encodeURIComponent(userId)}&account_id=eq.${encodeURIComponent(accountId)}&select=*`);
+  return validateCloverActor(users?.[0], locationId);
+}
+
 async function signInWithPassword(email, password) {
   return supabaseAuth('token?grant_type=password', {
     method: 'POST',
@@ -2232,6 +2258,10 @@ export default async function handler(req, res) {
           return json(res, 200, { toast: toastData });
         }
         if (segments[6] === 'import' && method === 'POST') {
+          if (process.env.CLOVER_PRODUCTION_ENABLED === 'true') {
+            const clover = await supabase(`clover_connections?location_id=eq.${locationId}&status=neq.disconnected&select=location_id&limit=1`);
+            if (clover.length) return json(res, 409, { error: 'Stop automatic Clover sync before replacing this location’s POS feed with an import.', code: 'CLOVER_DISCONNECT_REQUIRED' });
+          }
           if (!canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to import POS data' });
           const normalized = normalizePosImportPayload(req.body || {});
           if (!normalized.salesData.length) return json(res, 400, { error: 'No valid sales rows were found in that export' });
