@@ -21,6 +21,7 @@ export function CloverConnection({ locationId, onImport }: { locationId: string;
   const [confirmSync, setConfirmSync] = useState(false);
   const active = useRef(true);
   const locked = useRef(false);
+  const installKey = `zestiq:clover-install:${locationId}`;
   useEffect(() => {
     active.current = true;
     const controller = new AbortController();
@@ -30,15 +31,25 @@ export function CloverConnection({ locationId, onImport }: { locationId: string;
     return () => { active.current = false; controller.abort(); };
   }, [locationId]);
 
-  async function act(action: 'connect' | 'sync' | 'disconnect') {
+  useEffect(() => {
+    if (!status?.available || status.connected || status.reconnectRequired || sessionStorage.getItem(installKey) !== 'authorize') return;
+    // Clover has returned from the private-app install step. Clear the marker
+    // first so a cancelled/failed authorization cannot create a redirect loop.
+    sessionStorage.removeItem(installKey);
+    void act('connect', true);
+  }, [installKey, status?.available, status?.connected, status?.reconnectRequired]);
+
+  async function act(action: 'connect' | 'sync' | 'disconnect', installed = false) {
     if (locked.current || !locationId) return;
     locked.current = true; setBusy(true); setError('');
     try {
       if (action === 'connect') {
-        const result = await apiRequest<{ authorizeUrl: string }>('/api/clover/start', { method: 'POST', body: JSON.stringify({ locationId }) });
+        const result = await apiRequest<{ installUrl: string; authorizeUrl: string }>('/api/clover/start', { method: 'POST', body: JSON.stringify({ locationId }) });
         if (!active.current) return;
-        const target = new URL(result.authorizeUrl);
-        if (target.origin !== 'https://www.clover.com' || target.pathname !== '/oauth/v2/authorize') throw new Error('Clover authorization could not be started.');
+        const target = new URL(installed ? result.authorizeUrl : result.installUrl);
+        const expectedPath = installed ? '/oauth/v2/authorize' : '/oauth/authorize';
+        if (target.origin !== 'https://www.clover.com' || target.pathname !== expectedPath) throw new Error('Clover authorization could not be started.');
+        if (!installed) sessionStorage.setItem(installKey, 'authorize');
         window.location.assign(target.toString());
       } else if (action === 'disconnect') {
         await apiRequest('/api/clover/status', { method: 'DELETE', body: JSON.stringify({ locationId }) });

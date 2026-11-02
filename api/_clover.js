@@ -85,9 +85,15 @@ export async function cloverStart(req, res) {
   await database(`clover_production_oauth_states?location_id=eq.${id(location.id)}`, { method: 'DELETE', prefer: 'return=minimal' });
   await database('clover_production_oauth_states', { method: 'POST', prefer: 'return=minimal', body: { state_hash: hash(state), browser_hash: hash(browser), user_id: appUser.id, account_id: account.id, location_id: location.id, expires_at: new Date(Date.now() + 600_000).toISOString() } });
   res.setHeader('Set-Cookie', cookie(browser));
+  // Private Clover apps must be installed for the merchant before v2 OAuth can
+  // complete. The distribution URL installs (or reopens) the app and returns
+  // the merchant to ZestIQ's configured launch path, where the browser can
+  // continue with the state-bound v2 authorization request.
+  const installUrl = new URL('https://www.clover.com/oauth/authorize');
+  installUrl.search = new URLSearchParams({ client_id: cloverCredentials().clientId }).toString();
   const url = new URL('https://www.clover.com/oauth/v2/authorize');
   url.search = new URLSearchParams({ client_id: cloverCredentials().clientId, response_type: 'code', redirect_uri: cloverCallbackUrl(), state }).toString();
-  return res.status(200).json({ authorizeUrl: url.toString() });
+  return res.status(200).json({ installUrl: installUrl.toString(), authorizeUrl: url.toString() });
 }
 
 export async function cloverCallback(req, res) {

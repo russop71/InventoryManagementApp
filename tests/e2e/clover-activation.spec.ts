@@ -20,7 +20,7 @@ async function setup(page: Page, cloverStatus: Record<string, unknown>) {
     if (path.includes('/auth/session/')) body = session;
     else if (path.endsWith('/locations')) body = { locations: session.locations };
     else if (path === '/api/clover/status') { if (request.method() === 'DELETE') { actions.push({ path, body: request.postDataJSON() }); body = { disconnected: true }; } else body = cloverStatus; }
-    else if (path === '/api/clover/start') { actions.push({ path, body: request.postDataJSON() }); body = { authorizeUrl: 'https://www.clover.com/oauth/v2/authorize?client_id=test' }; }
+    else if (path === '/api/clover/start') { actions.push({ path, body: request.postDataJSON() }); body = { installUrl: 'https://www.clover.com/oauth/authorize?client_id=test', authorizeUrl: 'https://www.clover.com/oauth/v2/authorize?client_id=test' }; }
     else if (path === '/api/clover/sync') { actions.push({ path, body: request.postDataJSON() }); body = { synced: true }; }
     else if (path.includes('/integrations/toast')) body = { toast: data.integrations.toast };
     else if (path.includes('/labor')) body = { labor: data.integrations.labor };
@@ -44,12 +44,23 @@ test('unconfigured Clover keeps imports available without offering an unavailabl
   expect(actions).toEqual([]); expect(errors).toEqual([]);
 });
 
-test('restaurant can start provider authorization for the selected location', async ({ page }) => {
+test('restaurant installs the private app before provider authorization', async ({ page }) => {
   const { actions, errors, locationId } = await setup(page, { available: true, connected: false });
   await page.route('https://www.clover.com/**', route => route.fulfill({ contentType: 'text/html', body: 'Clover authorization test page' }));
   await page.getByRole('button', { name: 'Connect Clover securely' }).click();
-  await expect(page).toHaveURL('https://www.clover.com/oauth/v2/authorize?client_id=test');
+  await expect(page).toHaveURL('https://www.clover.com/oauth/authorize?client_id=test');
   expect(actions).toEqual([{ path: '/api/clover/start', body: { locationId } }]);
+
+  // The private-app install returns to ZestIQ. The saved browser marker should
+  // immediately continue the state-bound v2 OAuth step without another click.
+  await page.goto('/app/integrations');
+  await page.getByRole('button', { name: 'Open Clover Dining integration settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Direct connection' }).click();
+  await expect(page).toHaveURL('https://www.clover.com/oauth/v2/authorize?client_id=test');
+  expect(actions).toEqual([
+    { path: '/api/clover/start', body: { locationId } },
+    { path: '/api/clover/start', body: { locationId } },
+  ]);
   expect(errors).toEqual([]);
 });
 

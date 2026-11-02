@@ -51,6 +51,9 @@ test('authorization URL uses production v2 OAuth, random state and an HttpOnly b
   authFixture(t, { extra(url, init, body) { if (url.pathname.endsWith('/clover_production_oauth_states') && init.method === 'POST') { stateRow = body; return Response.json(null); } } });
   const res = response(); await start(req('POST', { locationId: L }), res);
   assert.equal(res.statusCode, 200);
+  const install = new URL(res.body.installUrl);
+  assert.equal(install.origin, 'https://www.clover.com'); assert.equal(install.pathname, '/oauth/authorize');
+  assert.equal(install.searchParams.get('client_id'), 'test-client');
   const target = new URL(res.body.authorizeUrl);
   assert.equal(target.origin, 'https://www.clover.com'); assert.equal(target.pathname, '/oauth/v2/authorize');
   assert.equal(target.searchParams.get('redirect_uri'), 'https://zestiq.ca/api/clover/callback');
