@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   if (!cloverConfiguration().available) return res.status(200).json({ skipped: 'not_configured' });
   try {
     // Oldest-first processing avoids starving a connection after a busy scheduled run.
-    const connections = await database('clover_connections?status=eq.connected&select=*&order=last_sync_at.asc.nullsfirst&limit=1001');
+    const connections = await database('clover_production_connections?status=eq.connected&select=*&order=last_sync_at.asc.nullsfirst&limit=1001');
     const deadline = Date.now() + 250_000;
     let synced = 0, failed = 0, processed = 0;
     for (const row of connections.slice(0, 1000)) {

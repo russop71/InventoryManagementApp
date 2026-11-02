@@ -21,8 +21,7 @@ Each Clover merchant can be connected to only one ZestIQ location at a time. Own
 
 | Variable | Value |
 | --- | --- |
-| `CLOVER_CLIENT_ID` | Approved production Clover app ID |
-| `CLOVER_CLIENT_SECRET` | Production app secret |
+| `CLOVER_CLIENT_ID` / `CLOVER_CLIENT_SECRET` | Production app ID/secret pair; existing `CLOVER_PRIVATE_APP_ID` / `CLOVER_PRIVATE_APP_SECRET` are also supported as a matched pair |
 | `CLOVER_ENCRYPTION_KEY` | New 32-byte key encoded as 64 hexadecimal characters; generate locally with `openssl rand -hex 32` |
 | `CLOVER_PRODUCTION_ENABLED` | `true`, after the migration and Clover approval are complete |
 | `APP_URL` | `https://zestiq.ca` |
@@ -30,10 +29,10 @@ Each Clover merchant can be connected to only one ZestIQ location at a time. Own
 | `SUPABASE_URL` | Existing project URL |
 | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Existing server-only service role credential |
 
-6. Redeploy the current main commit. Confirm `GET /api/clover/status` returns `{"available":true}`. This validates local configuration/table availability, **not** Clover approval or actual merchant authorization.
+6. Redeploy the current main commit. Confirm `GET /api/clover/status` returns `{"available":true}`. The response also includes boolean configuration/schema checks, without secret values. This validates local configuration/table availability, **not** Clover approval or actual merchant authorization.
 7. Connect an authorized test restaurant through the real UI, verify the displayed merchant, run a sync, compare sales/menu values with Clover, then verify the next scheduled run. Review Vercel cron logs; a 503 indicates a failed/incomplete batch. Do not call the cron against all live customers merely to test configuration.
 
-The current environment has no connected Vercel or Supabase administrator tooling, so applying the production SQL and setting secrets requires the operator's dashboard access. Never paste secrets into a GitHub issue or chat. Keep a secure backup of the encryption key; changing it without re-encrypting existing credentials requires restaurants to reconnect.
+Supabase and Vercel are connected for production administration. The new connector uses separate `clover_production_connections` and `clover_production_oauth_states` tables; existing legacy Clover rows and sandbox configuration are preserved. Existing legacy authorizations are not automatically decrypted or converted; authorize the restaurant again through the new flow. Never paste secrets into a GitHub issue or chat. Keep a secure backup of the encryption key; changing it without re-encrypting existing credentials requires restaurants to reconnect.
 
 ## Reporting scope and operational limits
 

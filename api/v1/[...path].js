@@ -2259,7 +2259,7 @@ export default async function handler(req, res) {
         }
         if (segments[6] === 'import' && method === 'POST') {
           if (process.env.CLOVER_PRODUCTION_ENABLED === 'true') {
-            const clover = await supabase(`clover_connections?location_id=eq.${locationId}&status=neq.disconnected&select=location_id&limit=1`);
+            const clover = await supabase(`clover_production_connections?location_id=eq.${locationId}&status=neq.disconnected&select=location_id&limit=1`);
             if (clover.length) return json(res, 409, { error: 'Stop automatic Clover sync before replacing this location’s POS feed with an import.', code: 'CLOVER_DISCONNECT_REQUIRED' });
           }
           if (!canManageOperations(access.appUser.role)) return json(res, 403, { error: 'Owner, admin or manager access is required to import POS data' });
