@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cloverConfiguration, sealTokens, openTokens } from '../../api/_clover-config.js';
+import { cloverConfiguration, cloverCredentials, sealTokens, openTokens } from '../../api/_clover-config.js';
 import { calendarDay, cloverList, summarizeCloverOrders, zonedMidnight } from '../../api/_clover-client.js';
 
 Object.assign(process.env, { SUPABASE_SECRET_KEY: 'test-db-key', APP_URL: 'https://zestiq.ca', CLOVER_PRODUCTION_ENABLED: 'true', CLOVER_CLIENT_ID: 'test-client', CLOVER_CLIENT_SECRET: 'test-secret', CLOVER_ENCRYPTION_KEY: 'ab'.repeat(32), CRON_SECRET: 'test-cron' });
@@ -25,8 +25,8 @@ function authFixture(t, { role = 'Owner', account = A, locationAccount = A, assi
     if (url.pathname.endsWith('/accounts')) return Response.json([{ id: account, slug: 'private-kitchen', billing_status: 'active' }]);
     if (url.pathname.endsWith('/locations')) return Response.json(locationAccount === account ? [{ id: L, account_id: account, timezone: 'America/Toronto' }] : []);
     if (url.pathname.endsWith('/app_user_locations')) return Response.json(assignments.map(location_id => ({ location_id })));
-    if (url.pathname.endsWith('/clover_connections')) return Response.json([]);
-    if (url.pathname.endsWith('/clover_oauth_states')) return Response.json([]);
+    if (url.pathname.endsWith('/clover_production_connections')) return Response.json([]);
+    if (url.pathname.endsWith('/clover_production_oauth_states')) return Response.json([]);
     if (url.pathname.endsWith('/rpc/disconnect_clover')) return Response.json(true);
     throw new Error(`Unexpected request ${url.pathname}`);
   });
@@ -48,7 +48,7 @@ test('tokens are encrypted and cannot be moved to another location', () => {
 });
 test('authorization URL uses production v2 OAuth, random state and an HttpOnly browser cookie', async t => {
   let stateRow;
-  authFixture(t, { extra(url, init, body) { if (url.pathname.endsWith('/clover_oauth_states') && init.method === 'POST') { stateRow = body; return Response.json(null); } } });
+  authFixture(t, { extra(url, init, body) { if (url.pathname.endsWith('/clover_production_oauth_states') && init.method === 'POST') { stateRow = body; return Response.json(null); } } });
   const res = response(); await start(req('POST', { locationId: L }), res);
   assert.equal(res.statusCode, 200);
   const target = new URL(res.body.authorizeUrl);
@@ -61,7 +61,7 @@ test('authorization URL uses production v2 OAuth, random state and an HttpOnly b
 });
 test('staff cannot connect Clover', async t => {
   const calls = authFixture(t, { role: 'Staff' }); const res = response(); await start(req('POST', { locationId: L }), res);
-  assert.equal(res.statusCode, 403); assert.ok(!calls.some(call => call.url.pathname.endsWith('/clover_oauth_states')));
+  assert.equal(res.statusCode, 403); assert.ok(!calls.some(call => call.url.pathname.endsWith('/clover_production_oauth_states')));
 });
 test('manager cannot connect an unassigned location', async t => {
   authFixture(t, { role: 'Manager' }); const res = response(); await start(req('POST', { locationId: L }), res); assert.equal(res.statusCode, 403);
@@ -71,7 +71,7 @@ test('cross-company location is rejected before any Clover call', async t => {
   assert.equal(res.statusCode, 404); assert.ok(calls.every(call => call.url.hostname !== 'api.clover.com'));
 });
 test('status exposes merchant and sync health without credentials', async t => {
-  authFixture(t, { extra(url) { if (url.pathname.endsWith('/clover_connections')) return Response.json([{ status: 'connected', merchant_name: 'Test Kitchen', last_sync_at: '2026-10-30', encrypted_tokens: 'must-not-leak' }]); } });
+  authFixture(t, { extra(url) { if (url.pathname.endsWith('/clover_production_connections')) return Response.json([{ status: 'connected', merchant_name: 'Test Kitchen', last_sync_at: '2026-10-30', encrypted_tokens: 'must-not-leak' }]); } });
   const res = response(); await status(req('GET', {}, `/api/clover/status?locationId=${L}`), res);
   assert.equal(res.body.connected, true); assert.equal(res.body.merchantName, 'Test Kitchen'); assert.ok(!JSON.stringify(res.body).includes('must-not-leak'));
 });
@@ -82,7 +82,7 @@ test('callback without browser cookie never exchanges a code or saves a connecti
 test('callback consumes a browser-bound state and stores only encrypted credentials', async t => {
   let connected;
   const calls = authFixture(t, { extra(url, init, body) {
-    if (url.pathname.endsWith('/clover_oauth_states') && init.method === 'PATCH') {
+    if (url.pathname.endsWith('/clover_production_oauth_states') && init.method === 'PATCH') {
       assert.equal(url.searchParams.get('browser_hash'), `eq.${hashed('browser')}`);
       assert.equal(url.searchParams.get('consumed_at'), 'is.null');
       return Response.json([{ user_id: U, account_id: A, location_id: L }]);
@@ -145,7 +145,7 @@ test('sync renews a token once, persists it before API reads, then atomically pu
   const steps = [];
   let leaseId;
   authFixture(t, { extra(url, init, body) {
-    if (url.pathname.endsWith('/clover_connections')) {
+    if (url.pathname.endsWith('/clover_production_connections')) {
       if (init.method === 'PATCH' && body.lease_id) { leaseId = body.lease_id; return Response.json([{ ...row, lease_id: leaseId }]); }
       if (init.method === 'PATCH' && body.encrypted_tokens) { steps.push('persist-token'); assert.equal(openTokens(body.encrypted_tokens, `${A}:${L}:MERCHANT123`).access_token, 'renewed'); return Response.json([row]); }
       return Response.json([row]);
@@ -173,7 +173,7 @@ test('provider failure does not publish partial data and releases the lease', as
   const row = { location_id: L, account_id: A, connected_by: U, merchant_id: 'MERCHANT123', status: 'connected', encrypted_tokens: sealTokens(tokens, `${A}:${L}:MERCHANT123`) };
   let published = false, released = false;
   authFixture(t, { extra(url, init, body) {
-    if (url.pathname.endsWith('/clover_connections')) {
+    if (url.pathname.endsWith('/clover_production_connections')) {
       if (init.method === 'PATCH' && body.lease_id) return Response.json([row]);
       if (init.method === 'PATCH' && body.lease_id === null) { released = true; return Response.json(null); }
       return Response.json([row]);
@@ -184,4 +184,11 @@ test('provider failure does not publish partial data and releases the lease', as
   const res = response(); await sync(req('POST', { locationId: L }, '/api/clover/sync'), res);
   assert.equal(res.statusCode, 502); assert.equal(published, false); assert.equal(released, true);
   assert.ok(!JSON.stringify(res.body).includes('do-not-expose'));
+});
+
+test('existing production private-app credentials work without mixing credential pairs', () => {
+  const env = { ...process.env, CLOVER_CLIENT_ID: '', CLOVER_CLIENT_SECRET: '', CLOVER_PRIVATE_APP_ID: 'private-id', CLOVER_PRIVATE_APP_SECRET: 'private-secret' };
+  assert.deepEqual(cloverCredentials(env), { clientId: 'private-id', clientSecret: 'private-secret' });
+  assert.equal(cloverConfiguration(env).available, true);
+  assert.equal(cloverConfiguration({ ...env, CLOVER_CLIENT_ID: 'incomplete-pair' }).available, false);
 });

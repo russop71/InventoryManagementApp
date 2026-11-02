@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { cloverDatabase as database, requireCloverAccess, revalidateCloverAccess } from './v1/[...path].js';
-import { cloverCallbackUrl, cloverConfiguration, requireCloverConfiguration, sealTokens, openTokens } from './_clover-config.js';
+import { cloverCallbackUrl, cloverConfiguration, cloverCredentials, requireCloverConfiguration, sealTokens, openTokens } from './_clover-config.js';
 import { calendarDay, zonedMidnight, cloverList, cloverRequest, summarizeCloverOrders, validatedTokenPair } from './_clover-client.js';
 import { enforceRateLimit } from './_request-guard.js';
 
@@ -9,7 +9,7 @@ const hash = value => createHash('sha256').update(String(value)).digest('hex');
 const cookieName = '__Host-zestiq-clover';
 const cookie = (value, age = 600) => `${cookieName}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${age}`;
 export const tokenContext = row => `${row.account_id}:${row.location_id}:${row.merchant_id}`;
-const connectionPath = locationId => `clover_connections?location_id=eq.${id(locationId)}`;
+const connectionPath = locationId => `clover_production_connections?location_id=eq.${id(locationId)}`;
 const safeFailure = error => error?.code?.startsWith('CLOVER_') ? error.message : 'Clover could not complete the operation. Please try again or contact ZestIQ support.';
 
 async function withLease(row, work) {
@@ -41,7 +41,7 @@ export async function syncClover(row, { deadline = Date.now() + 180_000 } = {}) 
     let tokens = openTokens(connection.encrypted_tokens, tokenContext(connection));
     if (tokens.access_token_expiration * 1000 < Date.now() + 60_000) {
       if (tokens.refresh_token_expiration * 1000 <= Date.now()) throw Object.assign(new Error('Reconnect Clover to renew access.'), { status: 409, code: 'CLOVER_RECONNECT_REQUIRED' });
-      tokens = validatedTokenPair(await cloverRequest('/oauth/v2/refresh', { body: { client_id: process.env.CLOVER_CLIENT_ID, refresh_token: tokens.refresh_token } }));
+      tokens = validatedTokenPair(await cloverRequest('/oauth/v2/refresh', { body: { client_id: cloverCredentials().clientId, refresh_token: tokens.refresh_token } }));
       // Refresh tokens rotate once. Persist the new pair before any sales request.
       const saved = await database(`${connectionPath(connection.location_id)}&lease_id=eq.${leaseId}`, { method: 'PATCH', prefer: 'return=representation', body: { encrypted_tokens: sealTokens(tokens, tokenContext(connection)) } });
       if (!saved?.length) throw Object.assign(new Error('Clover connection changed. Please retry.'), { status: 409, code: 'CLOVER_CONNECTION_CHANGED' });
@@ -81,12 +81,12 @@ export async function cloverStart(req, res) {
   const existing = await database(`${connectionPath(location.id)}&select=status,lease_until`);
   if (existing?.[0]?.lease_until && Date.parse(existing[0].lease_until) > Date.now()) throw Object.assign(new Error('Wait for the current sync to finish before reconnecting.'), { status: 409 });
   const state = randomBytes(32).toString('base64url'), browser = randomBytes(32).toString('base64url');
-  await database(`clover_oauth_states?expires_at=lt.${id(new Date().toISOString())}`, { method: 'DELETE', prefer: 'return=minimal' });
-  await database(`clover_oauth_states?location_id=eq.${id(location.id)}`, { method: 'DELETE', prefer: 'return=minimal' });
-  await database('clover_oauth_states', { method: 'POST', prefer: 'return=minimal', body: { state_hash: hash(state), browser_hash: hash(browser), user_id: appUser.id, account_id: account.id, location_id: location.id, expires_at: new Date(Date.now() + 600_000).toISOString() } });
+  await database(`clover_production_oauth_states?expires_at=lt.${id(new Date().toISOString())}`, { method: 'DELETE', prefer: 'return=minimal' });
+  await database(`clover_production_oauth_states?location_id=eq.${id(location.id)}`, { method: 'DELETE', prefer: 'return=minimal' });
+  await database('clover_production_oauth_states', { method: 'POST', prefer: 'return=minimal', body: { state_hash: hash(state), browser_hash: hash(browser), user_id: appUser.id, account_id: account.id, location_id: location.id, expires_at: new Date(Date.now() + 600_000).toISOString() } });
   res.setHeader('Set-Cookie', cookie(browser));
   const url = new URL('https://www.clover.com/oauth/v2/authorize');
-  url.search = new URLSearchParams({ client_id: process.env.CLOVER_CLIENT_ID, response_type: 'code', redirect_uri: cloverCallbackUrl(), state }).toString();
+  url.search = new URLSearchParams({ client_id: cloverCredentials().clientId, response_type: 'code', redirect_uri: cloverCallbackUrl(), state }).toString();
   return res.status(200).json({ authorizeUrl: url.toString() });
 }
 
@@ -100,13 +100,13 @@ export async function cloverCallback(req, res) {
     const state = query.get('state'), code = query.get('code'), merchantId = query.get('merchant_id');
     const browser = String(req.headers?.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1);
     if (!state || !browser) return redirect('expired');
-    const states = await database(`clover_oauth_states?state_hash=eq.${hash(state)}&browser_hash=eq.${hash(browser)}&expires_at=gt.${id(new Date().toISOString())}&consumed_at=is.null`, { method: 'PATCH', prefer: 'return=representation', body: { consumed_at: new Date().toISOString() } });
+    const states = await database(`clover_production_oauth_states?state_hash=eq.${hash(state)}&browser_hash=eq.${hash(browser)}&expires_at=gt.${id(new Date().toISOString())}&consumed_at=is.null`, { method: 'PATCH', prefer: 'return=representation', body: { consumed_at: new Date().toISOString() } });
     const saved = states?.[0];
     if (!saved) return redirect('expired');
     if (query.get('error') || !code || !merchantId || !/^[A-Z0-9]{8,32}$/i.test(merchantId)) return redirect('cancelled');
-    if (query.get('client_id') && query.get('client_id') !== process.env.CLOVER_CLIENT_ID) return redirect('failed');
+    if (query.get('client_id') && query.get('client_id') !== cloverCredentials().clientId) return redirect('failed');
     await revalidateCloverAccess(saved.user_id, saved.account_id, saved.location_id);
-    const tokens = validatedTokenPair(await cloverRequest('/oauth/v2/token', { body: { client_id: process.env.CLOVER_CLIENT_ID, client_secret: process.env.CLOVER_CLIENT_SECRET, code } }));
+    const tokens = validatedTokenPair(await cloverRequest('/oauth/v2/token', { body: { client_id: cloverCredentials().clientId, client_secret: cloverCredentials().clientSecret, code } }));
     const merchant = await cloverRequest(`/v3/merchants/${id(merchantId)}`, { token: tokens.access_token });
     if (merchant.id !== merchantId) return redirect('failed');
     await revalidateCloverAccess(saved.user_id, saved.account_id, saved.location_id);
@@ -122,10 +122,12 @@ export async function cloverStatus(req, res) {
   const config = cloverConfiguration();
   const locationId = req.query?.locationId || new URL(req.url, 'https://zestiq.ca').searchParams.get('locationId');
   if (!locationId) {
-    if (!config.available) return res.status(200).json({ available: false });
-    try { await database('clover_connections?select=location_id&limit=0'); }
-    catch { return res.status(200).json({ available: false }); }
-    return res.status(200).json({ available: true });
+    if (!config.available) return res.status(200).json({ available: false, checks: config.checks });
+    try {
+      await database('clover_production_connections?select=location_id,connected_by,encrypted_tokens,last_sync_at,lease_until&limit=0');
+      await database('clover_production_oauth_states?select=browser_hash,consumed_at&limit=0');
+    } catch { return res.status(200).json({ available: false, checks: { ...config.checks, databaseSchema: false } }); }
+    return res.status(200).json({ available: true, checks: { ...config.checks, databaseSchema: true } });
   }
   const { location } = await requireCloverAccess(req, locationId);
   if (!config.available) return res.status(200).json({ available: false, connected: false });

@@ -1,10 +1,20 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
+// Keep credential pairs together. Production already uses a private Canada app.
+// Never copy sandbox Preview credentials or combine keys from different apps.
+export function cloverCredentials(env = process.env) {
+  for (const [idKey, secretKey] of [['CLOVER_CLIENT_ID', 'CLOVER_CLIENT_SECRET'], ['CLOVER_PRIVATE_APP_ID', 'CLOVER_PRIVATE_APP_SECRET'], ['CLOVER_APP_ID', 'CLOVER_APP_SECRET']]) {
+    if (env[idKey] || env[secretKey]) return { clientId: env[idKey], clientSecret: env[secretKey] };
+  }
+  return {};
+}
+
 export function cloverConfiguration(env = process.env) {
+  const credentials = cloverCredentials(env);
   const checks = {
     productionEnabled: env.CLOVER_PRODUCTION_ENABLED === 'true',
-    clientId: Boolean(env.CLOVER_CLIENT_ID),
-    clientSecret: Boolean(env.CLOVER_CLIENT_SECRET),
+    clientId: Boolean(credentials.clientId),
+    clientSecret: Boolean(credentials.clientSecret),
     encryptionKey: /^[0-9a-f]{64}$/i.test(env.CLOVER_ENCRYPTION_KEY || ''),
     database: Boolean(env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY),
     scheduler: Boolean(env.CRON_SECRET),
