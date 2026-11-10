@@ -938,7 +938,17 @@ async function validateCloverActor(appUser, locationId, authUser) {
 
 export async function revalidateCloverAccess(userId, accountId, locationId) {
   const users = await supabase(`app_users?id=eq.${encodeURIComponent(userId)}&account_id=eq.${encodeURIComponent(accountId)}&select=*`);
-  return validateCloverActor(users?.[0], locationId);
+  const appUser = users?.[0];
+  // OAuth callbacks and scheduled syncs have no browser session. Reload the
+  // trusted Auth identity so the same administrator policy applies as at start.
+  let authUser;
+  if (appUser?.auth_user_id) {
+    authUser = await supabaseAuth(`admin/users/${encodeURIComponent(appUser.auth_user_id)}`);
+    if (authUser?.id !== appUser.auth_user_id || Date.parse(authUser.banned_until) > Date.now()) {
+      throw Object.assign(new Error('Clover account access is no longer available'), { status: 403 });
+    }
+  }
+  return validateCloverActor(appUser, locationId, authUser);
 }
 
 async function signInWithPassword(email, password) {

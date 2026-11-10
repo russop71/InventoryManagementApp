@@ -9,6 +9,7 @@ const { default: start } = await import('../../api/clover/start.js');
 const { default: status } = await import('../../api/clover/status.js');
 const { default: callback } = await import('../../api/clover/callback.js');
 const { default: sync } = await import('../../api/clover/sync.js');
+const { revalidateCloverAccess } = await import('../../api/v1/[...path].js');
 const A = '11111111-1111-4111-8111-111111111111', L = '44444444-4444-4444-8444-444444444444', U = '33333333-3333-4333-8333-333333333333';
 const tokens = { access_token: 'private-access', refresh_token: 'private-refresh', access_token_expiration: Math.floor(Date.now() / 1000) + 1000, refresh_token_expiration: Math.floor(Date.now() / 1000) + 9000 };
 const hashed = value => createHash('sha256').update(value).digest('hex');
@@ -33,6 +34,21 @@ function authFixture(t, { role = 'Owner', account = A, locationAccount = A, assi
   return calls;
 }
 const req = (method, body = {}, url = '/api/clover/start') => ({ method, body, url, headers: { authorization: 'Bearer test-token', 'x-forwarded-for': '127.0.0.1' } });
+
+for (const scenario of ['administrator', 'ordinary owner', 'inactive administrator', 'mismatched identity', 'banned administrator']) {
+  test(`Clover background access revalidates ${scenario} against trusted Auth`, async t => {
+    const previous = process.env.ZESTIQ_PLATFORM_ADMIN_EMAILS;
+    process.env.ZESTIQ_PLATFORM_ADMIN_EMAILS = 'admin@example.com';
+    t.after(() => { if (previous === undefined) delete process.env.ZESTIQ_PLATFORM_ADMIN_EMAILS; else process.env.ZESTIQ_PLATFORM_ADMIN_EMAILS = previous; });
+    authFixture(t, { extra(url) {
+      if (url.pathname.endsWith('/app_users')) return Response.json([{ id: U, account_id: A, auth_user_id: 'auth-admin', email: 'admin@example.com', role: 'Owner', status: scenario === 'inactive administrator' ? 'Inactive' : 'Active' }]);
+      if (url.pathname.endsWith('/auth/v1/admin/users/auth-admin')) return Response.json({ id: scenario === 'mismatched identity' ? 'another-user' : 'auth-admin', email: scenario === 'ordinary owner' ? 'owner@example.com' : 'admin@example.com', ...(scenario === 'banned administrator' ? { banned_until: new Date(Date.now() + 60000).toISOString() } : {}) });
+      if (url.pathname.endsWith('/accounts')) return Response.json([{ id: A, slug: 'private-test', billing_status: 'not_configured' }]);
+    } });
+    if (scenario === 'administrator') assert.equal((await revalidateCloverAccess(U, A, L)).location.id, L);
+    else await assert.rejects(revalidateCloverAccess(U, A, L), error => [402, 403].includes(error.status));
+  });
+}
 
 test('production config rejects sandbox URLs, missing secrets and invalid encryption keys', () => {
   assert.equal(cloverConfiguration().available, true);
