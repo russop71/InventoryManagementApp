@@ -211,3 +211,40 @@ test('existing production private-app credentials work without mixing credential
   assert.equal(cloverConfiguration(env).available, true);
   assert.equal(cloverConfiguration({ ...env, CLOVER_CLIENT_ID: 'incomplete-pair' }).available, false);
 });
+
+for (const day of ['2026-03-08', '2026-11-01']) {
+  test(`live sync imports today's paid sales across DST on ${day}`, async t => {
+    t.mock.method(Date, 'now', () => Date.parse(`${day}T18:00:00Z`));
+    const { default: live } = await import('../../api/clover/live-sync.js');
+    const row = { location_id: L, account_id: A, connected_by: U, merchant_id: 'MERCHANT123', status: 'connected', encrypted_tokens: sealTokens({ ...tokens, access_token: `live-${day}`, access_token_expiration: Date.now() / 1000 + 900 }, `${A}:${L}:MERCHANT123`) };
+    let published;
+    authFixture(t, { extra(url, init, body) {
+      if (url.pathname.endsWith('/clover_production_connections')) return Response.json([row]);
+      if (url.pathname.endsWith('/items')) return Response.json({ elements: [] });
+      if (url.pathname.endsWith('/orders')) {
+        const until = day === '2026-03-08' ? '2026-03-09' : '2026-11-02';
+        assert.ok(url.searchParams.getAll('filter').includes(`createdTime<${zonedMidnight(until, 'America/Toronto')}`));
+        return Response.json({ elements: [{ id: 'today', state: 'locked', paymentState: 'PAID', createdTime: Date.now() - 1000 }, { id: 'unpaid', state: 'open', paymentState: 'OPEN', createdTime: Date.now() - 1000 }] });
+      }
+      if (url.pathname.endsWith('/orders/today/line_items')) return Response.json({ elements: [{ id: 'l1', name: 'Test pasta', priceWithModifiersAndItemAndOrderDiscounts: 1234 }] });
+      if (url.pathname.endsWith('/rpc/publish_clover_sync')) { published = body; return Response.json(true); }
+    } });
+    const request = { method: 'GET', headers: { authorization: 'Bearer test-cron' } };
+    const res = response(); await live(request, res);
+    assert.equal(res.statusCode, 200); assert.equal(res.body.synced, 1);
+    assert.equal(published.p_sales.length, 2);
+    assert.equal(published.p_sales.find(value => value.date === day).revenue, 12.34);
+    assert.equal(published.p_sales.reduce((sum, value) => sum + value.revenue, 0), 12.34);
+    // Repeated runs replace the same bounded day window, never append transactions.
+    const second = response(); await live(request, second);
+    assert.equal(second.body.synced, 1);
+    assert.equal(published.p_sales.find(value => value.date === day).revenue, 12.34);
+  });
+}
+
+test('live schedule rejects unauthenticated requests without accessing merchant data', async t => {
+  const { default: live } = await import('../../api/clover/live-sync.js');
+  const calls = authFixture(t); const res = response();
+  await live({ method: 'GET', headers: {} }, res);
+  assert.equal(res.statusCode, 401); assert.equal(calls.length, 0);
+});

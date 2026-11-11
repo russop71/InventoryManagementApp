@@ -8,6 +8,10 @@
       "schedule": "0 13 * * 1"
     },
     {
+      "path": "/api/clover/live-sync",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/clover/daily-sync",
       "schedule": "0 10 * * *"
     }

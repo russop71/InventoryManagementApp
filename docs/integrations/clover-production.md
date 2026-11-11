@@ -7,7 +7,7 @@ The production connector uses North American Clover OAuth v2. Sandbox credential
 1. Select a ZestIQ restaurant location, open Integrations → Clover Dining → Direct connection.
 2. Click **Connect Clover securely**, sign in on Clover, select the matching restaurant and approve access.
 3. Return to ZestIQ. Check the authorized merchant name and click **Sync Clover now**. Confirm the restaurant before replacing the current POS feed.
-4. Daily updates run at 10:00 UTC. The page shows the last successful sync and provider errors. **Stop automatic Clover sync** removes stored credentials and pending authorizations. Existing sales remain until separately disconnected/replaced.
+4. Near-live updates run every minute through `/api/clover/live-sync`, refreshing today and yesterday. Nightly reconciliation runs at 10:00 UTC through `/api/clover/daily-sync`. Timing is best-effort; busy connections and provider outages retry on the next scheduled run. The page shows the last successful sync and provider errors. **Stop automatic Clover sync** removes stored credentials and pending authorizations. Existing sales remain until separately disconnected/replaced.
 
 Each Clover merchant can be connected to only one ZestIQ location at a time. Owner/admin users can manage their account's locations; managers must have location access. Ordering and staff users cannot manage Clover. Demo accounts cannot connect real merchants.
 
@@ -36,7 +36,7 @@ Supabase and Vercel are connected for production administration. The new connect
 
 ## Reporting scope and operational limits
 
-- Sync refreshes the last **seven complete calendar days**, grouped by each ZestIQ location's configured timezone, including daylight saving changes. Today is excluded. Existing historical Clover days from the **same merchant** outside that window remain unchanged.
+- Manual and nightly sync refresh **today plus the previous seven calendar days**, grouped by each ZestIQ location's configured timezone, including daylight saving changes. Today is provisional. The minute job refreshes today and yesterday to limit API traffic and catch midnight-spanning payments. Existing historical Clover days from the **same merchant** outside that window remain unchanged.
 - Revenue is item sales after item/order discounts and modifiers, **before refunds**, excluding tax and tips. It is not bank settlement or a refund-adjusted accounting report. Only locked, paid/refunded orders are included; open/deleted/test orders and deleted/non-revenue lines are omitted. Clover does not supply covers here, so counts are left at zero and described as unavailable.
 - Line item reporting prices must be present. Missing pricing, an incomplete page, a provider failure or an exceeded batch/time limit fails without publishing partial sales. Weighted items use Clover's thousandths scaling.
 - Inventory/catalog items become POS menu items; recipe ingredient and cost-category mappings are retained by ID. This connector does not create inventory ingredients or mutate Clover orders, menus or stock.

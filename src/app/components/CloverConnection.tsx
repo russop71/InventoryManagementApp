@@ -25,10 +25,18 @@ export function CloverConnection({ locationId, onImport }: { locationId: string;
   useEffect(() => {
     active.current = true;
     const controller = new AbortController();
-    apiRequest<CloverStatus>(`/api/clover/status?locationId=${encodeURIComponent(locationId)}`, { signal: controller.signal })
+    let checking = false;
+    const checkStatus = () => {
+      if (checking || controller.signal.aborted) return;
+      checking = true;
+      void apiRequest<CloverStatus>(`/api/clover/status?locationId=${encodeURIComponent(locationId)}`, { signal: controller.signal })
       .then(value => { if (!controller.signal.aborted) setStatus(value); })
-      .catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Could not check Clover status.'); });
-    return () => { active.current = false; controller.abort(); };
+      .catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Could not check Clover status.'); })
+      .finally(() => { checking = false; });
+    };
+    checkStatus();
+    const timer = window.setInterval(checkStatus, 15_000);
+    return () => { active.current = false; controller.abort(); window.clearInterval(timer); };
   }, [locationId]);
 
   useEffect(() => {
@@ -84,18 +92,18 @@ export function CloverConnection({ locationId, onImport }: { locationId: string;
     {status && !status.available && <p className="text-sm text-slate-600">Clover automatic sync is not activated yet. ZestIQ must complete production setup before restaurants can authorize access. You can import a sales export now.</p>}
     {status?.available && <>
       <p role="status" className="text-sm font-semibold text-slate-800">{status.reconnectRequired ? 'Clover needs to be reconnected.' : status.connected ? `Authorized: ${status.merchantName || 'Clover restaurant'}` : 'Connect the Clover restaurant that belongs to this ZestIQ location.'}</p>
-      <p className="text-xs leading-5 text-slate-600">Sign in to Clover, choose your restaurant and approve read access. Your Clover password stays with Clover. Connecting enables daily sync; your first sync replaces this location’s current POS feed.</p>
+      <p className="text-xs leading-5 text-slate-600">Sign in to Clover, choose your restaurant and approve read access. Your Clover password stays with Clover. Connecting enables automatic sync about every minute; your first sync replaces this location’s current POS feed.</p>
       {status.lastSync && <p className="text-xs text-slate-600">Last successful sync: {new Date(status.lastSync).toLocaleString('en-CA')}</p>}
       {status.lastError && <p className="text-sm text-amber-800">Last sync: {status.lastError}</p>}
       {status.connected ? <>
         <Button className="w-full bg-[#F58220] text-[#303A43] hover:bg-[#db711b]" disabled={busy || status.syncing} onClick={() => setConfirmSync(true)}>{busy ? 'Syncing…' : status.syncing ? 'Sync in progress…' : 'Sync Clover now'}</Button>
-        {confirmSync && <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm"><p>This updates this location’s POS feed using the last seven complete calendar days from {status.merchantName || 'Clover'}. Confirm this is the correct restaurant.</p><Button className="mt-2" disabled={busy} onClick={() => void act('sync')}>Confirm and sync Clover</Button><Button variant="ghost" disabled={busy} onClick={() => setConfirmSync(false)}>Cancel</Button></div>}
+        {confirmSync && <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm"><p>This updates this location’s POS feed using today and the previous seven calendar days from {status.merchantName || 'Clover'}. Confirm this is the correct restaurant.</p><Button className="mt-2" disabled={busy} onClick={() => void act('sync')}>Confirm and sync Clover</Button><Button variant="ghost" disabled={busy} onClick={() => setConfirmSync(false)}>Cancel</Button></div>}
       </> : <Button className="w-full bg-[#F58220] text-[#303A43] hover:bg-[#db711b]" disabled={busy} onClick={() => void act('connect')}>{busy ? 'Opening Clover…' : status.reconnectRequired ? 'Reconnect Clover securely' : 'Connect Clover securely'}</Button>}
       {(status.connected || status.reconnectRequired) && <>
         <Button className="w-full" variant="outline" disabled={busy} onClick={() => setConfirmDisconnect(true)}>Stop automatic Clover sync</Button>
         {confirmDisconnect && <div className="rounded-xl border border-slate-200 p-3 text-sm"><p>Stop automatic updates? Previously synced sales will stay available.</p><Button className="mt-2" disabled={busy} onClick={() => void act('disconnect')}>Confirm stop sync</Button><Button variant="ghost" disabled={busy} onClick={() => setConfirmDisconnect(false)}>Cancel</Button></div>}
       </>}
-      <p className="text-xs leading-5 text-slate-500">Sales are item sales after discounts, before refunds; tax and tips are excluded. Guest counts are not provided by this connection. The last seven complete calendar days are refreshed each sync.</p>
+      <p className="text-xs leading-5 text-slate-500">Sales are item sales after discounts, before refunds; tax and tips are excluded. Guest counts are not provided by this connection. Today’s paid sales refresh about every minute. Today’s total is provisional; the previous seven days are reconciled overnight.</p>
     </>}
     <Button type="button" variant="outline" className="w-full" onClick={onImport}>Import Clover sales instead</Button>
   </div>;

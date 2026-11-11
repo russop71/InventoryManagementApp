@@ -28,7 +28,7 @@ async function withLease(row, work) {
   }
 }
 
-export async function syncClover(row, { deadline = Date.now() + 180_000 } = {}) {
+export async function syncClover(row, { deadline = Date.now() + 180_000, lookbackDays = 7 } = {}) {
   try { await revalidateCloverAccess(row.connected_by, row.account_id, row.location_id); }
   catch (error) {
     if ([402, 403, 404].includes(error.status)) {
@@ -49,15 +49,17 @@ export async function syncClover(row, { deadline = Date.now() + 180_000 } = {}) 
     const signal = AbortSignal.timeout(Math.max(1, Math.min(180_000, deadline - Date.now())));
     const prefix = `/v3/merchants/${id(connection.merchant_id)}`;
     const today = calendarDay(Date.now(), location.timezone || 'America/Toronto');
-    const since = new Date(`${today}T12:00:00Z`); since.setUTCDate(since.getUTCDate() - 7);
+    const since = new Date(`${today}T12:00:00Z`); since.setUTCDate(since.getUTCDate() - lookbackDays);
     const fromDay = calendarDay(since, 'UTC');
+    const tomorrow = new Date(`${today}T12:00:00Z`); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const untilDay = calendarDay(tomorrow, 'UTC');
     // Calendar-day boundaries are resolved in the restaurant timezone, including DST.
     const query = new URLSearchParams();
     query.append('filter', `createdTime>=${zonedMidnight(fromDay, location.timezone || 'America/Toronto')}`);
-    query.append('filter', `createdTime<${zonedMidnight(today, location.timezone || 'America/Toronto')}`);
+    query.append('filter', `createdTime<${zonedMidnight(untilDay, location.timezone || 'America/Toronto')}`);
     const items = await cloverList(`${prefix}/items?expand=categories`, tokens.access_token, { signal });
     const orders = await cloverList(`${prefix}/orders?${query}`, tokens.access_token, { signal });
-    const validOrders = orders.filter(order => !order.deletedTime && !order.testMode && order.state === 'locked' && ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'CREDITED'].includes(String(order.paymentState || '').toUpperCase()) && calendarDay(order.createdTime, location.timezone || 'America/Toronto') >= fromDay && calendarDay(order.createdTime, location.timezone || 'America/Toronto') < today);
+    const validOrders = orders.filter(order => !order.deletedTime && !order.testMode && order.state === 'locked' && ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'CREDITED'].includes(String(order.paymentState || '').toUpperCase()) && calendarDay(order.createdTime, location.timezone || 'America/Toronto') >= fromDay && calendarDay(order.createdTime, location.timezone || 'America/Toronto') < untilDay);
     // Three concurrent requests respect merchant rate limits and avoid incomplete expansions.
     let cursor = 0;
     await Promise.all(Array.from({ length: 3 }, async () => {
@@ -66,11 +68,11 @@ export async function syncClover(row, { deadline = Date.now() + 180_000 } = {}) 
         order.lines = await cloverList(`${prefix}/orders/${id(order.id)}/line_items`, tokens.access_token, { maxPages: 31, signal });
       }
     }));
-    const sales = summarizeCloverOrders(validOrders, items, location.timezone || 'America/Toronto', fromDay, today);
+    const sales = summarizeCloverOrders(validOrders, items, location.timezone || 'America/Toronto', fromDay, untilDay);
     const menu = items.filter(item => !item.deleted && item.isRevenue !== false).map(item => ({ id: item.id, name: String(item.name || 'Unnamed item'), category: item.categories?.elements?.[0]?.name || 'Uncategorized', price: Number(item.price || 0) / 100, ingredients: [] }));
-    const published = await database('rpc/publish_clover_sync', { method: 'POST', body: { p_location_id: connection.location_id, p_lease_id: leaseId, p_sales: sales, p_menu: menu, p_from_day: fromDay, p_until_day: today } });
+    const published = await database('rpc/publish_clover_sync', { method: 'POST', body: { p_location_id: connection.location_id, p_lease_id: leaseId, p_sales: sales, p_menu: menu, p_from_day: fromDay, p_until_day: untilDay } });
     if (published !== true) throw Object.assign(new Error('Clover connection changed before the sync finished. Please retry.'), { status: 409, code: 'CLOVER_CONNECTION_CHANGED' });
-    return { synced: true, fromDay, untilDay: today, days: sales.length, menuItems: menu.length };
+    return { synced: true, fromDay, untilDay, days: sales.length, menuItems: menu.length };
   });
 }
 
