@@ -204,6 +204,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [accountId, activeLocationId, token, isDemoAccount]);
 
   useEffect(() => {
+    if (!accountId || !activeLocationId || !token || isDemoAccount || !isHydrated || provider !== 'clover' || connectionMode !== 'direct') return;
+    const controller = new AbortController();
+    let checking = false;
+    const refreshSales = async () => {
+      if (checking || document.visibilityState === 'hidden') return;
+      checking = true;
+      try {
+        const payload = await apiRequest<ToastIntegrationPayload>(`/api/v1/accounts/${encodeURIComponent(accountId)}/locations/${encodeURIComponent(activeLocationId)}/integrations/toast`, { signal: controller.signal });
+        const state = payload.toast;
+        if (controller.signal.aborted || state?.provider !== 'clover' || !state.lastSync || state.lastSync === lastSync) return;
+        setSalesData(state.salesData || []);
+        setLastSync(state.lastSync);
+        // Keep restaurant recipe mappings while refreshing Clover names/prices.
+        setMenuItems(previous => (state.menuItems || []).map(item => {
+          const mapped = previous.find(existing => existing.id === item.id);
+          return mapped ? { ...item, ingredients: mapped.ingredients, cogsCategoryId: mapped.cogsCategoryId } : item;
+        }));
+      } catch { /* Retain the last successful sales snapshot during outages. */ }
+      finally { checking = false; }
+    };
+    const timer = window.setInterval(() => { void refreshSales(); }, 15_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [accountId, activeLocationId, token, isDemoAccount, isHydrated, provider, connectionMode, lastSync]);
+
+  useEffect(() => {
     if (!isDemoAccount || !isHydrated || recipes.length === 0) return;
     const demo = demoState();
     setProvider('toast'); setConnectionMode('direct'); setRestaurantId('zestaurant');
