@@ -64,7 +64,7 @@ export function BookDemo() {
             <label className="block"><span className="text-xs font-black text-slate-700">What is your main goal? <span className="font-semibold text-slate-400">Optional</span></span><textarea name="goal" rows={3} placeholder="Reduce food cost, speed up counts, improve ordering…" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#F58220] focus:ring-4 focus:ring-[#F58220]/15" /></label>
             {submitError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{submitError}</div>}
             <button type="submit" disabled={isSubmitting} className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#303A43] px-6 font-black text-white transition hover:bg-[#172238] disabled:cursor-wait disabled:opacity-70">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}{isSubmitting ? 'Sending request…' : 'Request my demo'}{!isSubmitting && <ArrowRight className="h-4 w-4" />}</button>
-            <p className="text-center text-[11px] leading-5 text-slate-400">Your inquiry will be sent securely to demo@zestiq.ca. By continuing, you acknowledge our <Link to="/privacy" className="font-bold text-slate-600 underline underline-offset-2">Privacy Policy</Link> and <Link to="/terms" className="font-bold text-slate-600 underline underline-offset-2">Terms of Service</Link>.</p>
+            <p className="text-center text-[11px] leading-5 text-slate-400">Your inquiry will be saved securely for our team to follow up. By continuing, you acknowledge our <Link to="/privacy" className="font-bold text-slate-600 underline underline-offset-2">Privacy Policy</Link> and <Link to="/terms" className="font-bold text-slate-600 underline underline-offset-2">Terms of Service</Link>.</p>
           </form>
         </section>
 
@@ -108,7 +108,7 @@ export function BookDemoThankYou() {
         <p className="mt-7 text-xs font-black uppercase tracking-[0.2em] text-[#F58220]">Inquiry received</p>
         <h1 className="mt-3 text-4xl font-black leading-tight tracking-[-0.04em] sm:text-5xl">Thank you for your inquiry.</h1>
         <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-slate-500">Our team will reach out for more information shortly. We’ll use those details to tailor your ZestIQ demo.</p>
-        <div className="mt-8 rounded-2xl bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-600">A confirmation is not required—your request has already been sent to our team.</div>
+        <div className="mt-8 rounded-2xl bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-600">Your request has been saved. Our team will contact you using the details you provided.</div>
         <Link to="/" className="mt-8 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#303A43] px-6 font-black text-white transition hover:bg-[#172238]"><ArrowLeft className="h-4 w-4" />Back to the website</Link>
       </section>
     </main>

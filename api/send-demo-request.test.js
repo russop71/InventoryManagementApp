@@ -23,47 +23,100 @@ test('normalizes and bounds public demo-request input', () => {
   assert.equal(request.restaurant.length, 180);
 });
 
-test('sends a valid demo request to the configured inbox', async () => {
+async function withBackend(run, { storageFails = false, emailFails = false, missingEmailKey = false, patchFails = false } = {}) {
   resetRateLimitsForTests();
   const originalFetch = global.fetch;
-  const originalKey = process.env.RESEND_API_KEY;
-  process.env.RESEND_API_KEY = 'test-key';
-  let sentPayload;
-  global.fetch = async (_url, options) => {
-    sentPayload = JSON.parse(options.body);
-    return { ok: true, json: async () => ({ id: 'email-1' }) };
-  };
-  try {
-    const res = responseMock();
-    await handler({ method: 'POST', body: validBody, headers: {}, socket: { remoteAddress: 'test-ip' } }, res);
-    assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.payload, { sent: true });
-    assert.deepEqual(sentPayload.to, ['demo@zestiq.ca']);
-    assert.equal(sentPayload.reply_to, 'pat@example.com');
-    assert.match(sentPayload.subject, /Example Restaurant/);
-  } finally {
-    global.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.RESEND_API_KEY;
-    else process.env.RESEND_API_KEY = originalKey;
+  const originalEnv = { ...process.env };
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-database-key';
+  delete process.env.SUPABASE_SECRET_KEY;
+  process.env.RESEND_API_KEY = 'test-email-key';
+  delete process.env.DEMO_REQUEST_TO;
+  if (missingEmailKey) {
+    delete process.env.RESEND_API_KEY;
+    delete process.env.RESEND_API_TOKEN;
+    delete process.env.RESEND_KEY;
   }
+  const calls = [];
+  global.fetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push({ url, method: options.method, body });
+    if (url.includes('/rest/v1/demo_requests')) {
+      return { ok: options.method === 'POST' ? !storageFails : !patchFails, status: 503 };
+    }
+    if (url === 'https://api.resend.com/emails') {
+      return { ok: !emailFails, status: emailFails ? 503 : 200, json: async () => ({ id: 'email-1' }) };
+    }
+    return { ok: true, json: async () => ({}) };
+  };
+  try { await run(calls); }
+  finally { global.fetch = originalFetch; process.env = originalEnv; }
+}
+
+function submit(body = validBody) {
+  const res = responseMock();
+  return handler({ method: 'POST', body, headers: {}, socket: { remoteAddress: 'test-ip' } }, res).then(() => res);
+}
+
+test('saves the lead before notifying Pat and records provider acceptance', async () => {
+  await withBackend(async calls => {
+    const res = await submit();
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.payload, { received: true, sent: true });
+    assert.equal(calls[0].method, 'POST');
+    assert.match(calls[0].url, /rest\/v1\/demo_requests$/);
+    assert.equal(calls[0].body.first_name, 'Pat');
+    assert.equal(calls[0].body.email, validBody.email);
+    assert.equal(calls[0].body.website, undefined);
+    assert.deepEqual(calls[1].body.to, ['Pat@zestiq.ca']);
+    assert.equal(calls[1].body.reply_to, validBody.email);
+    assert.equal(calls[2].method, 'PATCH');
+    assert.match(calls[2].url, new RegExp(calls[0].body.id));
+    assert.equal(calls[2].body.notification_status, 'accepted');
+    assert.equal(calls[2].body.notification_provider_id, 'email-1');
+  });
 });
 
-test('accepts a lower-friction request with only the essential contact fields', async () => {
-  resetRateLimitsForTests();
-  const originalFetch = global.fetch;
-  const originalKey = process.env.RESEND_API_KEY;
-  process.env.RESEND_API_KEY = 'test-key';
-  global.fetch = async () => ({ ok: true, json: async () => ({ id: 'email-optional-fields' }) });
-  try {
-    const res = responseMock();
-    await handler({ method: 'POST', body: { firstName: 'Pat', email: 'pat@example.com', restaurant: 'Example Restaurant' }, headers: {}, socket: { remoteAddress: 'optional-ip' } }, res);
+test('keeps the inquiry and records failure when the email provider fails', async () => {
+  await withBackend(async calls => {
+    const res = await submit();
+    assert.deepEqual(res.payload, { received: true, sent: false });
+    assert.equal(calls[2].body.notification_status, 'failed');
+    assert.match(calls[2].body.notification_error, /503/);
+  }, { emailFails: true });
+});
+
+test('saves inquiries even when no email key is configured', async () => {
+  await withBackend(async calls => {
+    const res = await submit();
+    assert.deepEqual(res.payload, { received: true, sent: false });
+    assert.equal(calls[1].body.notification_status, 'failed');
+    assert.equal(calls.some(call => call.url === 'https://api.resend.com/emails'), false);
+  }, { missingEmailKey: true });
+});
+
+test('does not send email or claim receipt if storage fails', async () => {
+  await withBackend(async calls => {
+    const res = await submit();
+    assert.equal(res.statusCode, 503);
+    assert.match(res.payload.error, /could not save/);
+    assert.equal(calls.some(call => call.url === 'https://api.resend.com/emails'), false);
+  }, { storageFails: true });
+});
+
+test('a notification-status write failure does not lose a saved inquiry', async () => {
+  await withBackend(async () => {
+    const res = await submit();
+    assert.deepEqual(res.payload, { received: true, sent: true });
+  }, { patchFails: true });
+});
+
+test('accepts essential contact fields and honours a configured notification inbox', async () => {
+  await withBackend(async calls => {
+    process.env.DEMO_REQUEST_TO = 'owner@example.com';
+    const res = await submit({ firstName: 'Pat', email: 'pat@example.com', restaurant: 'Example Restaurant' });
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.payload, { sent: true });
-  } finally {
-    global.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.RESEND_API_KEY;
-    else process.env.RESEND_API_KEY = originalKey;
-  }
+    assert.deepEqual(calls[1].body.to, ['owner@example.com']);
+  });
 });
 
 test('accepts the honeypot silently without sending email', async () => {

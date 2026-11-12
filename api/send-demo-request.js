@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { enforceRateLimit } from './_request-guard.js';
 import { reportServerError } from './_observability.js';
 
@@ -91,10 +92,47 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.RESEND_API_KEY || process.env.RESEND_API_TOKEN || process.env.RESEND_KEY || '';
   const from = process.env.DEMO_FROM_EMAIL || process.env.WELCOME_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'ZestIQ <hello@zestiq.ca>';
-  const to = process.env.DEMO_REQUEST_TO || 'demo@zestiq.ca';
-  if (!apiKey) return res.status(503).json({ error: 'Demo requests are temporarily unavailable. Please email demo@zestiq.ca.' });
+  const to = process.env.DEMO_REQUEST_TO || 'Pat@zestiq.ca';
+  const databaseUrl = process.env.SUPABASE_URL || 'https://dpicnqksnvasquxkfxqs.supabase.co';
+  const databaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const id = randomUUID();
+  const databaseHeaders = {
+    apikey: databaseKey, Authorization: `Bearer ${databaseKey}`, 'Content-Type': 'application/json',
+  };
+  const databaseEndpoint = `${databaseUrl}/rest/v1/demo_requests`;
+  const context = { route: '/api/send-demo-request', method: 'POST', requestId: id };
+  // Persist first: an email outage must never discard a prospective customer's inquiry.
+  try {
+    if (!databaseKey) throw new Error('Demo request storage is not configured');
+    const { website, firstName, lastName, ...contact } = request;
+    const saved = await fetch(databaseEndpoint, {
+      method: 'POST', headers: { ...databaseHeaders, Prefer: 'return=minimal' },
+      body: JSON.stringify({ id, first_name: firstName, last_name: lastName, ...contact, notification_to: to }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!saved.ok) throw new Error(`Demo request storage failed (${saved.status})`);
+  } catch (error) {
+    console.error('demo_request_storage_failed', { requestId: id });
+    await reportServerError(error, context);
+    return res.status(503).json({ error: 'We could not save your request. Please try again or email Pat@zestiq.ca.' });
+  }
+
+  async function recordNotification(update) {
+    try {
+      const updated = await fetch(`${databaseEndpoint}?id=eq.${id}`, {
+        method: 'PATCH', headers: databaseHeaders,
+        body: JSON.stringify({ ...update, notification_attempted_at: new Date().toISOString() }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!updated.ok) throw new Error(`Notification status storage failed (${updated.status})`);
+    } catch (error) {
+      console.error('demo_request_notification_status_failed', { requestId: id });
+      await reportServerError(error, context);
+    }
+  }
 
   try {
+    if (!apiKey) throw new Error('Demo notification email is not configured');
     const providerResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -106,16 +144,19 @@ export default async function handler(req, res) {
         text: requestText(request),
         html: requestHtml(request),
       }),
+      signal: AbortSignal.timeout(10000),
     });
     const providerPayload = await providerResponse.json().catch(() => ({}));
     if (!providerResponse.ok) {
-      const error = new Error(providerPayload?.message || providerPayload?.error || 'Email provider request failed');
-      await reportServerError(error, { route: '/api/send-demo-request', method: 'POST' });
-      return res.status(502).json({ error: 'We could not send your request. Please email demo@zestiq.ca.' });
+      throw new Error(`Email provider request failed (${providerResponse.status})`);
     }
-    return res.status(200).json({ sent: true });
+    if (!providerPayload.id) throw new Error('Email provider did not return a message ID');
+    await recordNotification({ notification_status: 'accepted', notification_provider_id: providerPayload.id, notification_error: null });
+    return res.status(200).json({ received: true, sent: true });
   } catch (error) {
-    await reportServerError(error, { route: '/api/send-demo-request', method: 'POST' });
-    return res.status(500).json({ error: 'We could not send your request. Please email demo@zestiq.ca.' });
+    await recordNotification({ notification_status: 'failed', notification_error: String(error.message || 'Notification failed').slice(0, 500) });
+    console.error('demo_request_notification_failed', { requestId: id });
+    await reportServerError(error, context);
+    return res.status(200).json({ received: true, sent: false });
   }
 }
